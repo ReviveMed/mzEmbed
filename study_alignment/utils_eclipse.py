@@ -10,7 +10,8 @@ import json
 import numpy as np
 
 from bmxp.eclipse import MSAligner
-from mspeaks import MSPeaks
+from .mspeaks import MSPeaks
+# from mspeaks import MSPeaks
 
 # %%
 

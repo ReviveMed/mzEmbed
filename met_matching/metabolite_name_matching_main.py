@@ -4,47 +4,62 @@ import numpy as np
 from ast import literal_eval
 import re
 from fuzzywuzzy import fuzz
-from requests import get
+from requests import get as requests_get
 import os
-from google.cloud import storage
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-if (not os.path.exists(dir_path+"/MCP_Metabolites")) or (not os.path.exists(dir_path+"/adduct.txt")):
-    client = storage.Client()
+local_adduct_path = dir_path+"/adduct.txt"
+local_MCP_path = dir_path+"/MCP_Metabolites"
+local_met_db_processed_path = dir_path+"/MCP_Metabolites_processed"
 
-    MCP_path = "MCP_Adducts_RT/MCP_Metabolites"
-    adduct_path = "MCP_Adducts_RT/adducts_current.txt"
-    bucket = client.get_bucket('mzlearn-webapp.appspot.com')
 
-    if not os.path.exists(dir_path+"/MCP_Metabolites"):
-        # download to local
-        blob = bucket.blob(MCP_path)
-        # download MCP_path to local
-        print("downloading MCP_path to local")
-        blob.download_to_filename(dir_path+"/MCP_Metabolites")
+if not os.path.exists(local_met_db_processed_path):
 
-    if not os.path.exists(dir_path+"/adduct.txt"):
-        # download to local
-        blob = bucket.blob(adduct_path)
-        # download MCP_path to local
-        print("downloading adduct to local")
-        blob.download_to_filename(dir_path+"/adduct.txt")
 
-met_db = pd.read_csv(dir_path+"/MCP_Metabolites", sep="\t")  # hardcoded internal MCP met DB
-refmet_db = pd.read_csv(dir_path+"/refmet.csv")  # hardcoded refmet db of standardized names with PubChem and InChI keys
+    if (not os.path.exists(dir_path+"/MCP_Metabolites")) or (not os.path.exists(dir_path+"/adduct.txt")):
 
-# preprocess met_db
-met_db_processed = met_db.fillna("").copy()
-met_db_processed.metabolite__monisotopic_molecular_weight = [np.nan if i=="" else i for i in met_db_processed.metabolite__monisotopic_molecular_weight]
-syn_parsed = []
-for syns, met_name in np.array(met_db_processed[["synonyms__synonym", "metabolite__name"]]):
-    syn_list = literal_eval(syns.lower())
-    if met_name != "":
-        syn_list += [met_name]
-    syn_parsed += [[re.sub(" ", "", j) for j in syn_list]]
-met_db_processed["parsed_synonyms"] = syn_parsed
-met_db_processed.reset_index(inplace=True)
+        from google.cloud import storage
+        client = storage.Client()
+
+        MCP_path = "MCP_Adducts_RT/MCP_Metabolites"
+        adduct_path = "MCP_Adducts_RT/adducts_current.txt"
+        bucket = client.get_bucket('mzlearn-webapp.appspot.com')
+
+        if not os.path.exists(dir_path+"/MCP_Metabolites"):
+            # download to local
+            blob = bucket.blob(MCP_path)
+            # download MCP_path to local
+            print("downloading MCP_path to local")
+            blob.download_to_filename(dir_path+"/MCP_Metabolites")
+
+        if not os.path.exists(dir_path+"/adduct.txt"):
+            # download to local
+            blob = bucket.blob(adduct_path)
+            # download MCP_path to local
+            print("downloading adduct to local")
+            blob.download_to_filename(dir_path+"/adduct.txt")
+
+
+    met_db = pd.read_csv(dir_path+"/MCP_Metabolites", sep="\t")  # hardcoded internal MCP met DB
+    refmet_db = pd.read_csv(dir_path+"/refmet.csv")  # hardcoded refmet db of standardized names with PubChem and InChI keys
+
+    # preprocess met_db
+    met_db_processed = met_db.fillna("").copy()
+    met_db_processed.metabolite__monisotopic_molecular_weight = [np.nan if i=="" else i for i in met_db_processed.metabolite__monisotopic_molecular_weight]
+    syn_parsed = []
+    for syns, met_name in np.array(met_db_processed[["synonyms__synonym", "metabolite__name"]]):
+        syn_list = literal_eval(syns.lower())
+        if met_name != "":
+            syn_list += [met_name]
+        syn_parsed += [[re.sub(" ", "", j) for j in syn_list]]
+    met_db_processed["parsed_synonyms"] = syn_parsed
+    met_db_processed.reset_index(inplace=True)
+    # save the processed met_db
+    met_db_processed.to_csv(dir_path+"/MCP_Metabolites_processed", sep="\t", index=False)
+else:
+    met_db_processed = pd.read_csv(dir_path+"/MCP_Metabolites_processed", sep="\t")
+
 
 def refmet_query(name):
     """
@@ -56,7 +71,7 @@ def refmet_query(name):
     """
 
     query_url = f'https://www.metabolomicsworkbench.org/rest/refmet/match/{name}/name'
-    query_return = get(query_url).text
+    query_return = requests_get(query_url).text
     refmet_out = {"name": "", "pubchem_cid": "", "inchi_key": "", "exactmass": "", "formula": "", "super_class": "", "main_class": "", "sub_class": ""}
     if query_return != "[]":
         refmet_out = eval(query_return)

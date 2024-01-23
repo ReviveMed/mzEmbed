@@ -13,6 +13,17 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import pickle
+import json
+import feather
+
+import umap
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import KFold
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.impute import KNNImputer
 
 DEFAULT_VERBOSE = True
 
@@ -32,10 +43,81 @@ class MSPeaks:
         self.peak_freq_th = 0
         self.sample_freq_th = 0
         self.study_id = None
+        self.overall_RT_min = np.nan
+        self.overall_RT_max = np.nan
+        self.overall_MZ_min = np.nan
+        self.overall_MZ_max = np.nan
 
     def _update_basic_info(self):
         self.num_peaks = len(self.peak_info.index)
         self.num_samples = len(self.sample_info.index)
+
+      
+    def to_dict(self):  
+        return {
+                'num_peaks':self.num_peaks,
+                'num_samples':self.num_samples,
+                'peak_freq_th':self.peak_freq_th,
+                'sample_freq_th':self.sample_freq_th,
+                'study_id':self.study_id,
+                'overall_RT_min':self.overall_RT_min,
+                'overall_RT_max':self.overall_RT_max,
+                'overall_MZ_min':self.overall_MZ_min,
+                'overall_MZ_max':self.overall_MZ_max,
+                # 'peak_info':self.peak_info.to_dict(),
+                # 'peak_intensity':self.peak_intensity.to_dict(),
+                # 'missing_val_mask':self.missing_val_mask.to_dict(),
+                # 'targets_info':self.targets_info.to_dict(),
+                # 'sample_info':self.sample_info.to_dict()
+                'peak_info': self.peak_info,
+                'peak_intensity': self.peak_intensity,
+                'missing_val_mask': self.missing_val_mask,
+                'targets_info': self.targets_info,
+                'sample_info': self.sample_info
+        }
+
+
+
+    def from_dict(self,dict_obj):
+        # self.peak_info = pd.DataFrame.from_dict(dict_obj['peak_info'])
+        # self.peak_intensity = pd.DataFrame.from_dict(dict_obj['peak_intensity'])
+        # self.missing_val_mask = pd.DataFrame.from_dict(dict_obj['missing_val_mask'])
+        # self.targets_info = pd.DataFrame.from_dict(dict_obj['targets_info'])
+        # self.sample_info = pd.DataFrame.from_dict(dict_obj['sample_info'])
+        self.peak_info =dict_obj['peak_info']
+        self.peak_intensity = dict_obj['peak_intensity']
+        self.missing_val_mask = dict_obj['missing_val_mask']
+        self.targets_info = dict_obj['targets_info']
+        self.sample_info = dict_obj['sample_info']
+        self.num_peaks = dict_obj['num_peaks']
+        self.num_samples = dict_obj['num_samples']
+        self.peak_freq_th = dict_obj['peak_freq_th']
+        self.sample_freq_th = dict_obj['sample_freq_th']
+        self.study_id = dict_obj['study_id']
+        self.overall_RT_min = dict_obj['overall_RT_min']
+        self.overall_RT_max = dict_obj['overall_RT_max']
+        self.overall_MZ_min = dict_obj['overall_MZ_min']
+        self.overall_MZ_max = dict_obj['overall_MZ_max']
+
+    # def save_to_json(self, file_path):
+    #     with open(file_path, 'w') as file:
+    #         json.dump(self.to_dict(), file)
+
+    # def load_from_json(self, file_path):
+    #     with open(file_path, 'r') as file:
+    #         self.from_dict(json.load(file))
+
+    def save_to_pickle(self, file_path):
+        # save_dict = self.to_dict()
+        with open(file_path, 'wb') as file:
+            # pickle.dump(self.to_dict(), file)
+            pickle.dump(self.to_dict(), file,pickle.HIGHEST_PROTOCOL)
+
+    def load_from_pickle(self, file_path):
+        with open(file_path, 'rb') as file:
+            self.from_dict(pickle.load(file))
+
+
 
     def add_peak_info(self, info):
         self.peak_info = _data_importer(info)
@@ -64,10 +146,10 @@ class MSPeaks:
             self.check_samples()
 
     def add_params_overall(self, params):
-        self.overall_RT_min = params.loc['overall_rt_min']
-        self.overall_RT_max = params.loc['overall_rt_max']
-        self.overall_MZ_min = params.loc['overall_mz_min']
-        self.overall_MZ_max = params.loc['overall_mz_max']
+        self.overall_RT_min = params.loc['overall_rt_min'].iloc[0]
+        self.overall_RT_max = params.loc['overall_rt_max'].iloc[0]
+        self.overall_MZ_min = params.loc['overall_mz_min'].iloc[0]
+        self.overall_MZ_max = params.loc['overall_mz_max'].iloc[0]
 
     def add_targets_info(self, info):
         self.targets_info = _data_importer(info)
@@ -282,11 +364,6 @@ class MSPeaks:
 
     def umap_plot_peaks(self):
         raise NotImplementedError
-
-
-    def save_to_pickle(self, filename):
-        with open(filename, 'wb') as f:
-            pickle.dump(self, f,pickle.HIGHEST_PROTOCOL)
     
     def get_target_matches(self):
         raise NotImplementedError
@@ -296,34 +373,35 @@ class MSPeaks:
     
     def remove_outlier_peaks(self):
         raise NotImplementedError
+    
 
 #######################################################
 ######### Creation Functions #########
 #######################################################
 
-def load_mspeaks_from_pickle(filename):
-    with open(filename, 'rb') as f:
-        return pickle.load(f)
+# def load_mspeaks_from_pickle(filename):
+#     with open(filename, 'rb') as f:
+#         return pickle.load(f)
 
 
 def create_mspeaks(peak_info=None, sample_info=None, peak_intensity=None, targets_info=None, params_overall=None):
 
     # create an empty MSPeaks object
-    mspeaks = MSPeaks()
+    mspeaks_obj = MSPeaks()
 
     # add the peak_info, sample_info, peak_intensity, and targets_info
     if peak_info is not None:
-        mspeaks.add_peak_info(peak_info)
+        mspeaks_obj.add_peak_info(peak_info)
     if sample_info is not None:
-        mspeaks.add_sample_info(sample_info)
+        mspeaks_obj.add_sample_info(sample_info)
     if peak_intensity is not None:
-        mspeaks.add_peak_intensity(peak_intensity)
+        mspeaks_obj.add_peak_intensity(peak_intensity)
     if targets_info is not None:
-        mspeaks.add_targets_info(targets_info)
+        mspeaks_obj.add_targets_info(targets_info)
     if params_overall is not None:
-        mspeaks.add_params_overall(params_overall)
+        mspeaks_obj.add_params_overall(params_overall)
 
-    return mspeaks
+    return mspeaks_obj
 
 
 def create_mspeaks_from_mzlearn_result(result_dir,peak_subdir='final_peaks'):
@@ -421,7 +499,6 @@ def _data_importer(data):
     else:
         return data
 
-from sklearn.impute import KNNImputer
 
 def _impute_peaks_missing_val(peaks_df,fill_na_method='knn',**kwargs):
     backup_fillval = peaks_df.median(axis=0).median()
@@ -474,13 +551,7 @@ def _impute_peaks_missing_val(peaks_df,fill_na_method='knn',**kwargs):
 ########### Helper functions for plotting ###########
 #######################################################
 # %%
-import umap
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.model_selection import KFold
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
+
 
 def prep_for_reduc_dim(peaks_df):
     data = np.log2(peaks_df.T)
@@ -617,21 +688,21 @@ def plot_reduc_dim(plot_title,reduc_dim_df,dim_name=None,
         plt.close()
     return
 
-# %%
-if __name__ == "__main__":
+# # %%
+# if __name__ == "__main__":
 
-    # %%
-    result_dir = '/Users/jonaheaton/Desktop/Data-engine/ST001428/result_hilic_pos_2023-09-28-01-29-57-'
-    st001428 = create_mspeaks_from_mzlearn_result(result_dir)
-    # %%
+#     # %%
+#     result_dir = '/Users/jonaheaton/Desktop/Data-engine/ST001428/result_hilic_pos_2023-09-28-01-29-57-'
+#     st001428 = create_mspeaks_from_mzlearn_result(result_dir)
+#     # %%
 
 
-    st001428.get_samples(0.1)
-    # %%
+#     st001428.get_samples(0.1)
+#     # %%
 
-    st001428.plot_peak_freq()
-    # %%
-    st001428.get_peaks(0.4)
-    # %%
-    st001428.plot_sample_freq()
-    # %%
+#     st001428.plot_peak_freq()
+#     # %%
+#     st001428.get_peaks(0.4)
+#     # %%
+#     st001428.plot_sample_freq()
+#     # %%
