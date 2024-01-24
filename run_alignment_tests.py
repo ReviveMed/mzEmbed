@@ -1,4 +1,4 @@
-
+# %%
 ###################
 ## Preamble
 ###################
@@ -31,6 +31,7 @@ from met_matching.metabolite_name_matching_main import refmet_query
 # import local modules help
 # https://fortierq.github.io/python-import/
 
+# %%
 ###################
 ## Helper Functions
 ###################
@@ -79,7 +80,7 @@ def peaks_to_targets_wrapper(peak_info,targets_df,rt_tol,mz_tol=0.005):
         mz_tol=mz_tol)
     return matches_1
 
-
+# %%
 ###################
 ### Cleaning up the targeted data
 ###################
@@ -133,7 +134,7 @@ def clean_targeted_data(target_data_path):
     
     return targets
 
-
+# %%
 ###################
 ### Initialize the Study comparison
 ###################
@@ -408,11 +409,21 @@ def initialize_study_comparison(targets_path0, targets_path1, peaks_obj_path0, p
         plt.savefig(os.path.join(save_dir, f'{name0}_{name1}_peaks_targets.png'))
         plt.close()
 
+    if ('_pos' in name0):
+        polarity = 'pos'
+    elif '_neg' in name0:
+        polarity = 'neg'
+    if ('hilic_' in name0):
+        ms_type = 'hilic'
+    elif ('rp_' in name0):
+        ms_type = 'rp'
 
     input_info = {
         'comparison_id': f'{name0}_vs_{name1}',
         'name0': name0,
         'name1': name1,
+        'polarity': polarity,
+        'ms_type': ms_type,
         'num_files0': num_files_0,
         'num_files1': num_files_1,
         'num_targets0': num_targets0,
@@ -443,6 +454,7 @@ def initialize_study_comparison(targets_path0, targets_path1, peaks_obj_path0, p
 
     return input_info
 
+# %%
 ###################
 ### Wrapper for Study Alignment
 ###################
@@ -503,8 +515,12 @@ def align_study_comparison(input_info,run_params,yes_plot=True,n_neighbors=20,al
     output_params['study_id'] = name0 + '_' + name1
     output_params['comparison_id'] = name0 + '_vs_' + name1
     output_params['num common targets'] = targets_common.shape[0]
+    
+
     output_params['alignment_method'] = alignment_method
     output_params['KNN_neighbors'] = n_neighbors
+    if 'mode' in input_info:
+        output_params['mode'] = input_info['mode']
 
 
     # load the peaks object
@@ -525,6 +541,12 @@ def align_study_comparison(input_info,run_params,yes_plot=True,n_neighbors=20,al
     output_params['num_peaks_1'] = peaks1.peak_info.shape[0]
     num_peaks =  min(peaks0.peak_info.shape[0], peaks1.peak_info.shape[0])
     output_params['num_peaks'] = num_peaks
+
+
+    #### these are the numbers we care about
+    output_params['NUM TARGETS'] = targets_common.shape[0]
+    output_params['NUM POTENTIAL PEAKS'] = num_peaks
+    #### #### ####
 
     # run the MS alignment
     try:
@@ -567,6 +589,9 @@ def align_study_comparison(input_info,run_params,yes_plot=True,n_neighbors=20,al
     output_params['num common peaks'] = len(aligned_fts_tuples)
     output_params['num common peaks perct'] = len(aligned_fts_tuples)/num_peaks
 
+    ##### these are the numbers we care about
+    output_params['PERCENTAGE PEAKS ALIGNED'] = len(aligned_fts_tuples)/num_peaks
+    #### #### ####
 
     targets_common.replace('NA', np.nan, inplace=True)
     targets_common_peak_matched = targets_common.copy()
@@ -586,6 +611,10 @@ def align_study_comparison(input_info,run_params,yes_plot=True,n_neighbors=20,al
     else:
         num_target_fts_tuples = 0
         num_target_fts_tuples_aligned = 0
+
+    ##### these are the numbers we care about
+    output_params['NUM TARGETS IDENTIFIED IN BOTH STUDIES'] = num_target_fts_tuples
+    #### #### ####
 
     output_params['num targets captured by pre-alignment-peaks both-studies'] = num_target_fts_tuples
     output_params['num targets captured by pre-alignment-peaks correctly-aligned'] = num_target_fts_tuples_aligned
@@ -649,6 +678,14 @@ def align_study_comparison(input_info,run_params,yes_plot=True,n_neighbors=20,al
         output_params['percentage targets captured by post-alignment-peaks correctly-aligned'] = (
             num_target_post_align_ft_tuples_aligned/num_target_post_align_targets_both)
         
+        ##### these are the numbers we care about
+        output_params['PERCENTAGE IDENTIFIED TARGETS CAPTURED'] = (
+            num_target_post_align_targets_both/num_target_fts_tuples)
+
+        output_params['PERCENTAGE IDENTIFIED TARGETS ALIGNED'] = (
+            num_target_post_align_ft_tuples_aligned/num_target_fts_tuples)
+        ##### ##### #####
+        
         output_params['targets captured by post-alignment-peaks both-studies'] = target_post_align_targets_both
         output_params['targets captured by post-alignment-peaks correctly-aligned'] = target_of_target_post_align_ft_tuples_aligned
     else:
@@ -661,6 +698,8 @@ def align_study_comparison(input_info,run_params,yes_plot=True,n_neighbors=20,al
 
         output_params['targets captured by post-alignment-peaks both-studies'] = []
         output_params['targets captured by post-alignment-peaks correctly-aligned'] = []
+        output_params['PERCENTAGE IDENTIFIED TARGETS ALIGNED'] = 0
+        output_params['PERCENTAGE IDENTIFIED TARGETS ALIGNED'] = 0
 
     # The are the numbers we care about
     # 'num targets captured by post-alignment-peaks both-studies'
@@ -736,7 +775,9 @@ def align_study_comparison(input_info,run_params,yes_plot=True,n_neighbors=20,al
 
     output_params['rt abs error'] = rt_abs_error
     output_params['mz abs error'] = mz_abs_error
-
+    ##### these are the numbers we care about
+    output_params['ALIGNMENT RT REL ERROR'] = rt_abs_error/np.mean(np.abs(targets_rt_diff))
+    ##### ##### #####
 
     #####################
     # Save and plot the results
@@ -816,6 +857,7 @@ def align_study_comparison(input_info,run_params,yes_plot=True,n_neighbors=20,al
 
     return
 
+# %%
 ###################
 ### Pathing Functions
 ###################
@@ -871,6 +913,7 @@ def load_result_id(result_id, data_dir):
 
     return peaks_path, target_path, result_id
 
+# %%
 ##################
 ### Gather results
 ##################
@@ -892,7 +935,11 @@ def get_run_param_file_list(param_save_dir,subset_file=None):
     return run_param_files
 
 
-def gather_results(comparison_id_list,output_dir,run_param_files=None):
+def gather_results(comparison_id_list,output_dir,run_param_files=None,n_neighbors=None,ret_output_files=False):
+
+    ret_output_files_list = []
+    if n_neighbors is not None:
+        print(f'filtering outputs for n_neighbors={n_neighbors}')
 
     for comparison_id in comparison_id_list:
         output_study_dir = os.path.join(output_dir, comparison_id)
@@ -916,6 +963,12 @@ def gather_results(comparison_id_list,output_dir,run_param_files=None):
         output_files = [os.path.join(output_study_dir, x) for x in output_files]
         # redundant check
         # output_files = [x for x in output_files if os.path.exists(x)]
+        if n_neighbors is not None:
+            output_files = [x for x in output_files if f'knn{n_neighbors}_' in x]
+
+        if ret_output_files:
+            ret_output_files_list.extend(output_files)
+            continue
 
         output_results = []
         for output_file in output_files:
@@ -953,6 +1006,8 @@ def gather_results(comparison_id_list,output_dir,run_param_files=None):
 
         output_results_df.to_csv(os.path.join(output_study_dir, f'{comparison_id}_output_results.csv'))
 
+    if ret_output_files:
+        return ret_output_files_list
 
     all_output_results = []
     for comparison_id in comparison_id_list:
@@ -965,10 +1020,10 @@ def gather_results(comparison_id_list,output_dir,run_param_files=None):
     all_output_results_df = pd.concat(all_output_results)
     all_output_results_df.to_csv(os.path.join(output_dir, f'all_output_results.csv'))
 
-    return
+    return None
 
 
-
+# %%
 ###################
 ### Main
 ###################
@@ -976,7 +1031,7 @@ data_dir = '/Users/jonaheaton/Desktop/alignment_analysis/Input_Data'
 output_dir = '/Users/jonaheaton/Desktop/alignment_analysis/Output_Data'
 master_comparison_id_list = []
 
-def main(mode='hilic_pos',comparison_id_list=None,run_param_files=None):
+def main(mode='hilic_pos',comparison_id_list=None,run_param_files=None,comparison_id_subset=None,n_neighbors=8):
 
     if comparison_id_list is None:
         comparison_id_list = []
@@ -1008,13 +1063,17 @@ def main(mode='hilic_pos',comparison_id_list=None,run_param_files=None):
             print('')
 
             comparison_id = f'{result_id0}_vs_{result_id1}'
+            
+            if comparison_id_subset is not None:
+                if comparison_id not in comparison_id_subset:
+                    continue
             comparison_id_list.append(comparison_id)
 
             input_info = initialize_study_comparison(target_path0, target_path1, peaks_path0, peaks_path1, 
                                                      result_id0, result_id1, output_dir,yes_plot=False)
-
+            input_info['mode'] = mode
             yes_plot = False
-            n_neighbors = 7
+            # n_neighbors = 8
 
             # run_params = {
             # 'freq_th0': 0.5,
@@ -1055,39 +1114,110 @@ def main(mode='hilic_pos',comparison_id_list=None,run_param_files=None):
 
     return comparison_id_list
 
+# %%
+###################
+## Parameter Cleaing Functions
+
+def change_param_freq_threshold(param_file_path,freq_th0,freq_th1):
+    param_file_dir = os.path.dirname(param_file_path)
+    run_params = load_json(param_file_path)
+    run_params['freq_th0'] = freq_th0
+    run_params['freq_th1'] = freq_th1
+    freq_th0_perc = int(100*freq_th0)
+    freq_th1_perc = int(100*freq_th1)
+    if 'method_param_name' not in run_params:
+        run_params['method_param_name'] =  get_method_param_name(run_params['param_name'])
+    run_params['param_name'] = run_params['alignment_method'] + f'_{freq_th0_perc}_{freq_th1_perc}' + '_' + run_params['method_param_name']
+    save_path = os.path.join(param_file_dir, run_params['param_name'] + '.json')
+    save_json(run_params, save_path)
+    return save_path
+
+def get_method_param_name(param_name):
+    # count the number of underscores
+    num_underscores = param_name.count('_')
+    if num_underscores == 2:
+        method_param_name = 'default'
+    else:
+        method_param_name = param_name.split('_')[-1]
+    return method_param_name
+
+# %%
+########################
 
 if __name__ == '__main__':
+
+    explore_freq_threshold= True
+    method_metabC_grid_search = False
+    method_Eclipse_grid_search = False
+    skip_alignment = False
+    n_neighbors = 5
 
     comparison_id_list = []
     alignment_param_path = '/Users/jonaheaton/Desktop/alignment_analysis/Alignment_Params'
     
+    if method_metabC_grid_search:
+        # Run a grid search for exploration
+        run_param_file_names = create_metaCombiner_grid_search(save_dir=alignment_param_path,
+                                    freq_th0 = [0.25,0.5],
+                                    freq_th1 = [0.25,0.5],
+                                    tolmz = [0.003,0.005],
+                                    windx = [0.01],
+                                    windy = [0.01,0.03])
+    elif method_Eclipse_grid_search:
+        raise NotImplementedError('Eclipse grid search not implemented')
+    else:
+        # Comparison to the original alignment parameters
+        # run_param_file_names = ['Eclipse_50_50.json','metabCombiner_50_50.json','metabCombiner_50_50_Jan23.json']
+        # run_param_file_names = ['metaCombiner_50_50']
+        run_param_file_names = ['Eclipse_50_50.json','metabCombiner_50_50_Jan23.json']
 
-    run_param_file_names = create_metaCombiner_grid_search(save_dir=alignment_param_path,
-                                freq_th0 = [0.25,0.5],
-                                freq_th1 = [0.25,0.5],
-                                tolmz = [0.003,0.005],
-                                windx = [0.01],
-                                windy = [0.01])
-    
-    
-    # run_param_file_names = ['metaCombiner_50_50_a']
+    # get the file paths to the run param files
     run_param_files = [os.path.join(alignment_param_path, x) for x in run_param_file_names]
 
-    # comparison_id_list = main('hilic_neg',comparison_id_list=comparison_id_list,run_param_files=run_param_files)
-    
-    # comparison_id_list = main('rp_pos',comparison_id_list=comparison_id_list,run_param_files=run_param_files)
-    # comparison_id_list = main('rp_neg',comparison_id_list=comparison_id_list)
-    comparison_id_list = main('hilic_pos',comparison_id_list=comparison_id_list,run_param_files=run_param_files)
+    # explore the frequency threshold parameter
+    if explore_freq_threshold:
+        new_run_param_files = []
+        for param_file in run_param_files:
+            freq_th_list = [0.25,0.5,0.75]
+            for freq_th0 in freq_th_list:
+                for freq_th1 in freq_th_list:
+                    new_run_param_files.append(change_param_freq_threshold(param_file, freq_th0, freq_th1))
 
-    # # save the comparison id list
-    # with open(os.path.join(output_dir, 'comparison_id_list.txt'), 'w') as f:
-    #     for comparison_id in comparison_id_list:
-    #         f.write(comparison_id + '\n')
 
-    # # open the comparison id list
-    # with open(os.path.join(output_dir, 'comparison_id_list.txt'), 'r') as f:
-    #     comparison_id_list = f.read().splitlines()
+    # Run the alignment tests over all the modes
+    if skip_alignment:
+        mode_list = []
+    else:
+        mode_list = ['hilic_pos','hilic_neg','rp_pos','rp_neg']
+        for mode in mode_list:
+            comparison_id_list = main(mode,
+                                    comparison_id_list=comparison_id_list,
+                                    run_param_files=run_param_files,
+                                    n_neighbors=n_neighbors)
 
-    # gather the results
-    gather_results(comparison_id_list,output_dir)
 
+        # save the comparison id list
+        # with open(os.path.join(output_dir, 'comparison_id_list.txt'), 'w') as f:
+        #     for comparison_id in comparison_id_list:
+        #         f.write(comparison_id + '\n')
+
+
+    # open the comparison id list
+    with open(os.path.join(output_dir, 'comparison_id_list.txt'), 'r') as f:
+        comparison_id_list = f.read().splitlines()
+
+    # gather the results for the params of interest
+    output_files = gather_results(comparison_id_list,output_dir,
+                                  run_param_files=run_param_files,
+                                  n_neighbors=n_neighbors,
+                                ret_output_files=False)
+
+
+
+
+
+# %%
+# delete all of the output files
+# for output_file in output_files:
+#     os.remove(output_file)
+# %%

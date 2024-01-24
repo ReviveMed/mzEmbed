@@ -8,6 +8,7 @@ import os
 import pandas as pd
 import json
 import numpy as np
+import shutil
 
 from bmxp.eclipse import MSAligner
 from .mspeaks import MSPeaks
@@ -35,7 +36,7 @@ def get_eclipse_format(study_peaks,study_name,log_intensity=False):
 
 
 
-def align_ms_studies(origin_study,input_study,origin_name='origin',input_name='input',
+def align_ms_studies_with_Eclipse(origin_study,input_study,origin_name='origin',input_name='input',
                      alignment_params=None,save_dir=None,log_intensity=False, clean_output=False):
     #align the input study to the origin study
     # origin_study: MSPeaks object
@@ -76,10 +77,13 @@ def align_ms_studies(origin_study,input_study,origin_name='origin',input_name='i
     if save_dir is not None:
         a.to_csv(filepath=os.path.join(save_dir,f'{input_name}_aligned_to_{origin_name}.csv'))
 
+
+
     # remove the temp files
-    os.remove('tmp/origin.csv')
-    os.remove('tmp/input.csv')
-    os.rmdir('tmp')
+    # os.remove('tmp/origin.csv')
+    # os.remove('tmp/input.csv')
+    # os.rmdir('tmp')
+    shutil.rmtree('tmp')
 
     if clean_output:
         alignment_result = a.results()
@@ -90,7 +94,6 @@ def align_ms_studies(origin_study,input_study,origin_name='origin',input_name='i
         return a
 
 
-align_ms_studies_with_Eclipse = align_ms_studies
 
 def combine_two_alignment_results(existing_align_df,align_df=None):
     if align_df is None:

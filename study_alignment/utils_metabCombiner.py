@@ -12,7 +12,7 @@ import itertools
 dir_path = os.path.dirname(os.path.realpath(__file__))
 path_to_r_script = dir_path + "/metabCombiner_wrapper.R"
 
-def get_metabCombiner_format(study_peaks,save_dir=None,study_name='study'):
+def get_metabCombiner_format(study_peaks,save_dir=None,study_name='study',max_num_samples=1000):
     assert isinstance(study_peaks,MSPeaks)
     # peaks_df = pd.DataFrame()
     # peaks_df['feats'] =  study_peaks.peak_info.index
@@ -21,8 +21,10 @@ def get_metabCombiner_format(study_peaks,save_dir=None,study_name='study'):
     peaks_df = study_peaks.peak_info[['rtmed','mzmed']].copy()
     peaks_df['rtmed'] = peaks_df['rtmed']/60 # convert to minutes
     peak_intensity = study_peaks.peak_intensity
-    # peak_intensity.columns = ['sample_'+str(i) for i in range(peak_intensity.shape[1])]
+    peak_intensity.columns = [f'{study_name}_sample_'+str(i) for i in range(peak_intensity.shape[1])]
     peak_intensity.fillna(0,inplace=True)
+    if peak_intensity.shape[1] > max_num_samples:
+        peak_intensity = peak_intensity.iloc[:,:max_num_samples]
     peaks_df = pd.concat([peaks_df,peak_intensity],axis=1)
     if save_dir is not None:
         peaks_df.to_csv(os.path.join(save_dir,f'{study_name}_peak_df.txt'),sep='\t',index=True)
@@ -66,10 +68,10 @@ def align_ms_studies_with_metabCombiner(origin_study,input_study,
         with open(os.path.join(save_dir,f'{input_name}_aligned_to_{origin_name}_metabCombine_params.json'), 'w') as fp:
             json.dump(alignment_params, fp)
 
-    origin_df = get_metabCombiner_format(origin_study)
+    origin_df = get_metabCombiner_format(origin_study,study_name='s0')
     origin_df.to_csv(tmp_data1_path,sep='\t',index=True)
 
-    input_df = get_metabCombiner_format(input_study)
+    input_df = get_metabCombiner_format(input_study,study_name='s1')
     input_df.to_csv(tmp_data2_path,sep='\t',index=True)
 
     # I still need to change the overall RT min and max

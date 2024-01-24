@@ -7,7 +7,14 @@ from fuzzywuzzy import fuzz
 from requests import get as requests_get
 import os
 
-dir_path = os.path.dirname(os.path.realpath(__file__))
+
+
+dir_path = '/Users/jonaheaton/local_met_db'
+if dir_path is None:
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+elif not os.path.isdir(dir_path):
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+
 
 local_adduct_path = dir_path+"/adduct.txt"
 local_MCP_path = dir_path+"/MCP_Metabolites"

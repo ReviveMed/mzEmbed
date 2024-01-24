@@ -70,13 +70,13 @@ main <- function(dataset1_path, dataset2_path, output_path, params_json_path) {
   print(paste("tolQ:", tolQ))
 
   data1 <- metabData(dataset1, mz = "mzmed", rt = "rtmed", 
-                    id = "feats", adduct = NULL, 
+                    id = "feats", adduct = NULL, samples='s0_sample',
                     extra = NULL, rtmin = rtmin1, rtmax = rtmax1, 
                     misspc = misspc1, measure = "median",
                     zero = TRUE, duplicate = opts.duplicate())
 
   data2 <- metabData(dataset2, mz = "mzmed", rt = "rtmed", 
-                    id = "feats",  adduct = NULL,
+                    id = "feats",  adduct = NULL, samples='s1_sample',
                     extra = NULL, rtmin = rtmin2, rtmax = rtmax2,
                     misspc = misspc2, measure = "median", zero = TRUE,
                     duplicate = opts.duplicate())    

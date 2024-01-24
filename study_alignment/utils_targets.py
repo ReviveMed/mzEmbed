@@ -1,10 +1,27 @@
 import os
 import pandas as pd
-import sys
-import json
 import numpy as np
-# import matplotlib.pyplot as plt
 import trackpy as tp
+
+
+
+######### Main Wrapper Function #########
+def peaks_to_targets_wrapper(peak_info,targets_df,rt_tol,mz_tol=0.005):
+    matches_1, true_pos_perct = get_potential_target_matches(targets_df,
+                    peak_info=peak_info,
+                    rt_tol=rt_tol,
+                    result_path=None,
+                    mz_tol=mz_tol)
+
+
+    matches_1,true_pos_perct, _ = link_targets_to_peaks(
+        peaks_df = matches_1, 
+        targets_df=targets_df, 
+        rt_tol=rt_tol, 
+        mz_tol=mz_tol)
+    
+    return matches_1
+
 
 
 ######### New and Improved linking between targets and features #########
@@ -103,6 +120,8 @@ def link_targets_to_peaks(peaks_df,targets_df,rt_tol=20,mz_tol=0.005,\
     return matches,true_pos_perct, missing_targets
 
 match_targets_to_peaks = link_targets_to_peaks
+
+
 
 #################
 ## One to many linking, where one target can be linked to multiple peaks
@@ -283,9 +302,9 @@ def process_targeted_data(targeted_data_path):
     return targets_df
 
 
-########### 
+########### ########### 
 ## Helpers
-###########
+########### ########### 
 
 def load_params_from_file(csv_path,verbose=True):
     loaded_params = pd.read_csv(csv_path)
