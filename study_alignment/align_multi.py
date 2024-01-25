@@ -243,10 +243,10 @@ def combine_alignments_in_dir(save_dir,origin_name='origin',input_name_list=None
 
     existing_align_df = None
     if alignment_method is None:
-        # file_format = f'INPUT_aligned_to_{origin_name}.csv'
+        file_format = f'INPUT_aligned_to_{origin_name}.csv'
         file_format_check = f'_aligned_to_{origin_name}.csv'
     else:
-        # file_format = f'INPUT_aligned_to_{origin_name}_with_{alignment_method}.csv'
+        file_format = f'INPUT_aligned_to_{origin_name}_with_{alignment_method}.csv'
         file_format_check = f'_aligned_to_{origin_name}_with_{alignment_method}.csv'
 
     count_multi_alignments = 0

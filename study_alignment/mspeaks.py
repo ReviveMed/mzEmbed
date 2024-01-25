@@ -117,6 +117,17 @@ class MSPeaks:
         with open(file_path, 'rb') as file:
             self.from_dict(pickle.load(file))
 
+    def save(self,file_path):
+        if '.pkl' in file_path:
+            self.save_to_pickle(file_path)
+        else:
+            raise NotImplementedError
+        
+    def load(self,file_path):
+        if '.pkl' in file_path:
+            self.load_from_pickle(file_path)
+        else:
+            raise NotImplementedError
 
 
     def add_peak_info(self, info):
