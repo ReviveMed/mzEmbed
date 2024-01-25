@@ -95,33 +95,6 @@ def align_ms_studies_with_Eclipse(origin_study,input_study,origin_name='origin',
 
 
 
-def combine_two_alignment_results(existing_align_df,align_df=None):
-    if align_df is None:
-        return existing_align_df
-    kept_cols = [x for x in align_df.columns if 'Compound_ID' in x]
-    align_df = align_df[kept_cols]
-    align_df.set_index('Compound_ID',inplace=True)
-    if existing_align_df is None:
-        return align_df
-    align_df = align_df.merge(existing_align_df,
-                              left_index=True,
-                              right_index=True,
-                              how='outer')
-    return align_df
-
-
-
-def combine_alignments_in_dir(save_dir,origin_name='origin'):
-    existing_align_df = None
-
-    for file in os.listdir(save_dir):
-        if f'aligned_to_{origin_name}.csv' in file:
-            new_align_df = pd.read_csv(os.path.join(save_dir,file))
-            existing_align_df = combine_two_alignment_results(existing_align_df,new_align_df)
-    
-    existing_align_df.to_csv(os.path.join(save_dir,f'combined_{origin_name}_alignments.csv'))
-    return existing_align_df
-
 # %%
 
 if __name__ == "__main__":

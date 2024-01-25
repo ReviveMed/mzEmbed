@@ -25,6 +25,7 @@ from study_alignment.utils_eclipse import align_ms_studies_with_Eclipse
 from study_alignment.utils_metabCombiner import align_ms_studies_with_metabCombiner, create_metaCombiner_grid_search
 from study_alignment.mspeaks import create_mspeaks_from_mzlearn_result, MSPeaks
 
+from study_alignment.align_pair import align_ms_studies
 # from study_alignment import mspeaks as myms
 from met_matching.metabolite_name_matching_main import refmet_query
 
