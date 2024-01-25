@@ -1127,7 +1127,7 @@ def change_param_freq_threshold(param_file_path,freq_th0,freq_th1):
     freq_th0_perc = int(100*freq_th0)
     freq_th1_perc = int(100*freq_th1)
     if 'method_param_name' not in run_params:
-        run_params['method_param_name'] =  get_method_param_name(run_params['param_name'])
+        run_params['alignment_name'] =  get_method_param_name(run_params['param_name'])
     run_params['param_name'] = run_params['alignment_method'] + f'_{freq_th0_perc}_{freq_th1_perc}' + '_' + run_params['method_param_name']
     save_path = os.path.join(param_file_dir, run_params['param_name'] + '.json')
     save_json(run_params, save_path)

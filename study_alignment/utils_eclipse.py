@@ -37,7 +37,8 @@ def get_eclipse_format(study_peaks,study_name,log_intensity=False):
 
 
 def align_ms_studies_with_Eclipse(origin_study,input_study,origin_name='origin',input_name='input',
-                     alignment_params=None,save_dir=None,log_intensity=False, clean_output=False):
+                     alignment_params=None,save_dir=None,log_intensity=False, clean_output=True,
+                     alignment_savename='Eclipse'):
     #align the input study to the origin study
     # origin_study: MSPeaks object
     # input_study: MSPeaks object
@@ -55,7 +56,9 @@ def align_ms_studies_with_Eclipse(origin_study,input_study,origin_name='origin',
 
     # a.set_defaults( {'weights':
         # {"RT": 1, "Intensity": 1, "MZ": 5}})
-    if alignment_params is None:
+    # check if alignment_params is empty dictionary
+
+    if (alignment_params is None) or (not alignment_params):
         alignment_params = {
             # 'scalers': 
             'cutoffs': {"RT": 6, "Intensity": 6, "MZ": 6},
@@ -76,6 +79,8 @@ def align_ms_studies_with_Eclipse(origin_study,input_study,origin_name='origin',
     # a.report() # Generate a report
     if save_dir is not None:
         a.to_csv(filepath=os.path.join(save_dir,f'{input_name}_aligned_to_{origin_name}.csv'))
+        # a.to_csv(filepath=os.path.join(save_dir,f'{input_name}_aligned_to_{origin_name}_match_ids.csv'))
+        # a.to_csv(filepath=os.path.join(save_dir,f'{input_name}_aligned_to_{origin_name}_with_{alignment_savename}.csv'))
 
 
 

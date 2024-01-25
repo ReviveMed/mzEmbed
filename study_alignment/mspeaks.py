@@ -25,7 +25,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.impute import KNNImputer
 
-DEFAULT_VERBOSE = True
+DEFAULT_VERBOSE = False
 
 #######################################################
 # create a  class called MSPeaks
@@ -250,7 +250,12 @@ class MSPeaks:
             return self.peak_intensity[self.get_samples(freq_th)]
 
 
-    def rename_selected_peaks(self,current_ids,new_ids,verbose=DEFAULT_VERBOSE):
+    def rename_selected_peaks(self,current_ids,new_ids=None,verbose=DEFAULT_VERBOSE):
+        if new_ids is None:
+            assert isinstance(current_ids, dict), "Error: if new_ids is None, current_ids must be a dict."
+            new_ids = current_ids.values()
+            current_ids = current_ids.keys()
+
         # useful when we want to rename peaks to match a standard, such as when doing study-alignment
         if 'original_id' not in self.peak_info.columns:
             self.peak_info['original_id'] = self.peak_info.index
@@ -268,7 +273,11 @@ class MSPeaks:
         self._update_basic_info()
         return
 
-    def rename_selected_samples(self,current_ids,new_ids,verbose=DEFAULT_VERBOSE):
+    def rename_selected_samples(self,current_ids,new_ids=None,verbose=DEFAULT_VERBOSE):
+        if new_ids is None:
+            assert isinstance(current_ids, dict), "Error: if new_ids is None, current_ids must be a dict."
+            new_ids = current_ids.values()
+            current_ids = current_ids.keys()
         # useful when we want to rename samples to match a standard, such as when doing study-alignment
         removed_ids  = set(self.sample_info.index) - set(current_ids)
         if verbose: print(f"while renaming samples, Removed {len(removed_ids)} samples:\n{removed_ids}")
@@ -424,7 +433,7 @@ def create_mspeaks(peak_info=None, sample_info=None, peak_intensity=None, target
     return mspeaks_obj
 
 
-def create_mspeaks_from_mzlearn_result(result_dir,peak_subdir='final_peaks'):
+def create_mspeaks_from_mzlearn_result(result_dir,peak_subdir='final_peaks',peak_intensity='intensity_max'):
     # read in the peak_info
     peak_info_path = os.path.join(result_dir,peak_subdir,'peak_info.csv')
     if not os.path.exists(peak_info_path):
@@ -442,7 +451,7 @@ def create_mspeaks_from_mzlearn_result(result_dir,peak_subdir='final_peaks'):
 
     # read in the peak_intensity
     try:
-        peak_intensity = pd.read_csv(os.path.join(result_dir,peak_subdir,'intensity_max.csv'), index_col=0)
+        peak_intensity = pd.read_csv(os.path.join(result_dir,peak_subdir,f'{peak_intensity}.csv'), index_col=0)
     except FileNotFoundError:
         peak_intensity = None
 

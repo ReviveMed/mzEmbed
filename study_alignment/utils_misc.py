@@ -4,6 +4,7 @@
 
 import json
 import os
+import numpy as np
 
 ###################
 ## Basic File I/O Functions
@@ -24,6 +25,8 @@ def save_json(data, file_path):
 
 def unravel_dict(d, prefix='a'):
     unravel = {}
+    if isinstance(d, list):
+        d = {str(i): v for i, v in enumerate(d)}
     for k, v in d.items():
         unravel[prefix + '_' + k] = v
     for k, v in list(unravel.items()):  # Create a copy of the items
