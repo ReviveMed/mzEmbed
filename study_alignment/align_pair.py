@@ -9,7 +9,8 @@ from .utils_misc import load_json, save_json
 
 # %% align_ms_studies
 def align_ms_studies(origin_study, input_study, origin_name='origin', input_name='input',
-                     alignment_method='metabcombiner', alignment_params=None, save_dir=None):
+                     alignment_method='metabcombiner', alignment_params=None, save_dir=None,
+                     verbose=False):
     '''
     Aligns two mass spectrometry studies using the specified alignment method.
 
@@ -37,16 +38,17 @@ def align_ms_studies(origin_study, input_study, origin_name='origin', input_name
             json.dump(alignment_params, fp)
 
     try:
-        if alignment_method.lower() == 'eclipse':
-            print('running Eclipse alignment')
+        if 'eclipse' in alignment_method.lower():
+            if verbose: print('running Eclipse alignment')
             alignment_result_df = align_ms_studies_with_Eclipse(origin_study=origin_study, 
                                                                 input_study=input_study,
                                                                 origin_name=origin_name,
                                                                 input_name=input_name,
                                                                 alignment_params=alignment_params,
                                                                 clean_output=True)
-        elif (alignment_method.lower() == 'metabcombiner') or (alignment_method.lower() == 'metacombiner'):
-            print('running metabCombiner alignment')
+        elif ('metabcombiner' in alignment_method.lower()):
+        # elif (alignment_method.lower() == 'metabcombiner') or (alignment_method.lower() == 'metacombiner'):
+            if verbose: print('running metabCombiner alignment')
             alignment_result_df = align_ms_studies_with_metabCombiner(origin_study=origin_study, 
                                                                       input_study=input_study,
                                                                       origin_name=origin_name,

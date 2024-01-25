@@ -368,8 +368,17 @@ class MSPeaks:
     def get_target_matches(self):
         raise NotImplementedError
     
-    def remove_outlier_samples(self):
-        raise NotImplementedError
+    def remove_outlier_samples(self,method=None):
+        if method is None:
+            method = 'low_frequency'
+        
+        if method == 'low_frequency':
+            # remove super low frequency peaks
+            self.apply_freq_th_on_peaks(freq_th=0.1,inplace=True)
+            # remove samples with too few peaks
+            self.apply_freq_th_on_samples(freq_th=0.1,inplace=True)
+        else:
+            raise NotImplementedError
     
     def remove_outlier_peaks(self):
         raise NotImplementedError
