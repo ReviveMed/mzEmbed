@@ -5,6 +5,7 @@ import pandas as pd
 import json
 import numpy as np
 import shutil
+import re
 
 from .align_pair import align_ms_studies
 from .mspeaks import MSPeaks, create_mspeaks_from_mzlearn_result
@@ -242,16 +243,28 @@ def combine_alignments_in_dir(save_dir,origin_name='origin',input_name_list=None
 
     existing_align_df = None
     if alignment_method is None:
-        file_format = f'INPUT_aligned_to_{origin_name}.csv'
+        # file_format = f'INPUT_aligned_to_{origin_name}.csv'
         file_format_check = f'_aligned_to_{origin_name}.csv'
     else:
-        file_format = f'INPUT_aligned_to_{origin_name}_with_{alignment_method}.csv'
+        # file_format = f'INPUT_aligned_to_{origin_name}_with_{alignment_method}.csv'
         file_format_check = f'_aligned_to_{origin_name}_with_{alignment_method}.csv'
 
     count_multi_alignments = 0
     for file in os.listdir(save_dir):
         if file_format_check in file:
-            input_name = file.split('_')[0]
+            # the easy but breakable way to find the input name
+            # will break if a '_' is in the input name
+            # input_name = file.split('_')[0]
+            
+            # find input_name using regex
+            # input_name = re.findall(r'(.*)_aligned_to',file)[0]
+
+            # find input name using regeg search
+            match = re.search(r'(.*)_aligned_to',file)
+            if match:
+                input_name = match.group(1)
+            else:
+                raise ValueError(f'could not find input name in {file}')
             
             if input_name_list is not None:
                 if input_name not in input_name_list:
