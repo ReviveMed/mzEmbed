@@ -56,16 +56,25 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
     fill_na_strategy = kwargs.get('fill_na_strategy', None)
     outlier_samples_removal_strategy = kwargs.get('outlier_samples_removal_strategy', None)
     verbose = kwargs.get('verbose', True)
-    save_cleaned_peak_obj = kwargs.get('save_cleaned_peak_obj', False)
+    cleaned_peaks_obj_dir = kwargs.get('save_cleaned_peak_obj', None)
 
     # if norm_func is not None:
     #     peak_intensity_name = 'intensity_max_synthetic_norm'
     # else:
     peak_intensity_name = 'intensity_max'
     skip_norm= False
-        
-    clean_peaks0_path = os.path.join(save_dir,f'{origin_name}_cleaned.pkl')
-    if os.path.exists(clean_peaks0_path):
+    save_cleaned_peak_obj = False
+
+    if (cleaned_peaks_obj_dir is not None):
+        save_cleaned_peak_obj = True
+        if (cleaned_peaks_obj_dir == '') or (cleaned_peaks_obj_dir == True):
+            cleaned_peaks_obj_dir = save_dir
+        os.makedirs(cleaned_peaks_obj_dir,exist_ok=True)
+
+    if save_cleaned_peak_obj:
+        clean_peaks0_path = os.path.join(cleaned_peaks_obj_dir,f'{origin_name}_cleaned.pkl')
+
+    if save_cleaned_peak_obj and os.path.exists(clean_peaks0_path):
         origin_study = MSPeaks()
         origin_study.load(clean_peaks0_path)
 
@@ -74,14 +83,7 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
         ## Origin study Preparation
         if 'pkl' not in origin_peak_obj_path:
             # assume that this is a mzlearn result directory instead
-            origin_study = create_mspeaks_from_mzlearn_result(origin_peak_obj_path,peak_intensity=peak_intensity_name)
-            # if origin_study.peak_intensity is None:
-            #     print('did not find the normalized peak intensity')
-            #     origin_study.add_peak_intensity(peak_intensity_name)
-            #     skip_norm = False
-            # else:
-            #     skip_norm = True
-                
+            origin_study = create_mspeaks_from_mzlearn_result(origin_peak_obj_path,peak_intensity=peak_intensity_name)                
             origin_study.add_study_id(origin_name,rename_samples=False)
         else:
             origin_study = MSPeaks()
@@ -102,6 +104,7 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
                                             sample_subset=origin_select_files)
             
         if (norm_func is not None) and (not skip_norm):
+            origin_study.apply_freq_th_on_peaks(freq_th=0.1)
             origin_study.normalize_intensity(norm_func=norm_func)
 
         if fill_na_strategy is not None:
@@ -110,7 +113,7 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
             if verbose: print('WARNING: no fill_na_strategy provided, missing values will not be filled')
 
         if save_cleaned_peak_obj:
-            origin_study.save(os.path.join(save_dir,f'{origin_name}_cleaned.pkl'))
+            origin_study.save(os.path.join(cleaned_peaks_obj_dir,f'{origin_name}_cleaned.pkl'))
 
 
     ## Input study Preparation
@@ -125,13 +128,6 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
                 # assume that this is a mzlearn result directory instead
                 input_study = create_mspeaks_from_mzlearn_result(input_peak_obj_path,peak_intensity=peak_intensity_name)
                 input_study.add_study_id(input_name,rename_samples=False)
-                # if input_study.peak_intensity is None:
-                #     print('did not find the normalized peak intensity')
-                #     input_study.add_peak_intensity(peak_intensity_name)
-                #     skip_norm = False
-                # else:
-                #     skip_norm = True
-
             else:
                 input_study = MSPeaks()
                 input_study.load(input_peak_obj_path)
@@ -145,13 +141,14 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
                 input_study.apply_freq_th_on_peaks(freq_th=input_freq_th,
                                                 inplace=True)
             if (norm_func is not None) and (not skip_norm):
+                input_study.apply_freq_th_on_peaks(freq_th=0.1)
                 input_study.normalize_intensity(norm_func=norm_func)
             
             if fill_na_strategy is not None:
                 input_study.fill_missing_values(method=fill_na_strategy)
 
             if save_cleaned_peak_obj:
-                input_study.save(os.path.join(save_dir,f'{input_name}_cleaned.pkl'))
+                input_study.save(os.path.join(cleaned_peaks_obj_dir,f'{input_name}_cleaned.pkl'))
             else:
                 clean_path = None
 
@@ -207,20 +204,36 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
 ######################
 # %% Rename the peaks in each study to correspond to the origin, removing peaks that don't align
 
-def rename_inputs_to_origin(input_peak_obj_path_list, 
-                            save_dir, multi_alignment_df=None):
+def rename_inputs_to_origin(save_dir, multi_alignment_df=None,
+                            input_name_list=None,load_dir=None):
     
     paths_to_renamed_studies = []
     if multi_alignment_df is None:
         multi_alignment_df = pd.read_csv(os.path.join(save_dir,'alignment_df.csv'),index_col=0)
 
+    if load_dir is None:
+        load_dir = save_dir
+
     origin_name = multi_alignment_df.index.name
     
-    # if input_name_list is None:
-    #     input_name_list = multi_alignment_df.columns.tolist()
+    if input_name_list is None:
+        input_name_list = multi_alignment_df.columns.tolist()
         # input_name_list.remove(origin_name)
 
-    for input_study_path in input_peak_obj_path_list:
+    for input_name in input_name_list:
+
+        renamed_input_study_path = os.path.join(save_dir,f'{input_name}_renamed.pkl')
+        if os.path.exists(renamed_input_study_path):
+            print(f'{renamed_input_study_path} already exists')
+            paths_to_renamed_studies.append(renamed_input_study_path)
+            continue
+
+        input_study_path = os.path.join(load_dir,f'{input_name}_cleaned.pkl')
+        if not os.path.exists(input_study_path):
+            print(f'WARNING: could not find {input_study_path}')
+
+
+
         input_study = MSPeaks()
         input_study.load(input_study_path)
         assert input_study.study_id is not None, 'input study does not have a study_id'
@@ -239,8 +252,8 @@ def rename_inputs_to_origin(input_peak_obj_path_list,
         input_alignment.dropna(inplace=True)
         # input_study.rename_peaks(multi_alignment_df[input_name].dropna().to_dict())
         input_study.rename_selected_peaks(input_alignment.to_dict())
-        input_study.save(os.path.join(save_dir,f'{input_name}_renamed.pkl'))
-        paths_to_renamed_studies.append(os.path.join(save_dir,f'{input_name}_renamed.pkl'))
+        input_study.save(renamed_input_study_path)
+        paths_to_renamed_studies.append(renamed_input_study_path)
 
     return paths_to_renamed_studies
 

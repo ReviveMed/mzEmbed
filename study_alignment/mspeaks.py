@@ -24,7 +24,7 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.impute import KNNImputer
-
+import matplotlib.colors as mcolors
 DEFAULT_VERBOSE = False
 
 #######################################################
@@ -389,6 +389,42 @@ class MSPeaks:
     def umap_plot_peaks(self):
         raise NotImplementedError
     
+
+    def heirarchical_clustering_plot(self,save_path=None,plot_name=None,freq_cutoff=0.2,show_na='zero',):
+        vals = self.peak_intensity
+        vals = np.log2(vals+1)
+        nan_locs = self.missing_val_mask
+        if show_na=='zero':
+            vals[nan_locs] = 0
+            
+        peak_subset = self.get_peaks(freq_th=freq_cutoff)
+        vals = vals.loc[peak_subset]
+
+        # Create a continuous color map from values
+        row_col_values = self.sample_info['run_order']
+        norm = mcolors.Normalize(vmin=row_col_values.min(), vmax=row_col_values.max(), clip=True)
+        mapper = plt.cm.ScalarMappable(norm=norm, cmap=plt.get_cmap('turbo'))
+
+        # Convert values to colors
+        # row_colors = pd.Series(mapper.to_rgba(row_col_values))
+        row_colors = pd.Series([tuple(color) for color in mapper.to_rgba(row_col_values)])
+        row_colors.name = 'run_order'
+
+
+        sns.clustermap(vals.T, cmap='viridis', figsize=(10,10), cbar_kws={'label': 'log2(intensity)'},
+                       row_colors=row_colors)
+        if plot_name is None:
+            num_samples = len(self.sample_info.index)
+            num_feats = len(self.peak_info.index)
+            plot_name = f'{self.study_id} UMAP of Samples ({num_samples}, {num_feats} feats)'
+        
+        plt.title(plot_name)
+        plt.tight_layout()
+        if save_path is not None:
+            plt.savefig(save_path,dpi=300,bbox_inches='tight')
+            plt.close()
+
+
     def get_target_matches(self):
         raise NotImplementedError
     
