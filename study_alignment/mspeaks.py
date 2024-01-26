@@ -250,11 +250,15 @@ class MSPeaks:
             return self.peak_intensity[self.get_samples(freq_th)]
 
 
-    def rename_selected_peaks(self,current_ids,new_ids=None,verbose=DEFAULT_VERBOSE):
+    def rename_selected_peaks(self,current_ids_or_dict,new_ids=None,verbose=DEFAULT_VERBOSE):
         if new_ids is None:
-            assert isinstance(current_ids, dict), "Error: if new_ids is None, current_ids must be a dict."
-            new_ids = current_ids.values()
-            current_ids = current_ids.keys()
+            assert isinstance(current_ids_or_dict, dict), "Error: if new_ids is None, current_ids must be a dict."
+            rename_dict = current_ids_or_dict
+            new_ids = rename_dict.keys()
+            current_ids = rename_dict.values()
+        else:
+            current_ids = current_ids_or_dict
+            # rename_dict = dict(zip(current_ids,new_ids))
 
         # useful when we want to rename peaks to match a standard, such as when doing study-alignment
         if 'original_id' not in self.peak_info.columns:

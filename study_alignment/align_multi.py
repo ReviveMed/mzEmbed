@@ -58,10 +58,11 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
     verbose = kwargs.get('verbose', True)
     save_cleaned_peak_obj = kwargs.get('save_cleaned_peak_obj', False)
 
-    if norm_func is not None:
-        peak_intensity_name = 'intensity_max_synthetic_norm'
-    else:
-        peak_intensity_name = 'intensity_max'
+    # if norm_func is not None:
+    #     peak_intensity_name = 'intensity_max_synthetic_norm'
+    # else:
+    peak_intensity_name = 'intensity_max'
+    skip_norm= False
         
     clean_peaks0_path = os.path.join(save_dir,f'{origin_name}_cleaned.pkl')
     if os.path.exists(clean_peaks0_path):
@@ -74,12 +75,12 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
         if 'pkl' not in origin_peak_obj_path:
             # assume that this is a mzlearn result directory instead
             origin_study = create_mspeaks_from_mzlearn_result(origin_peak_obj_path,peak_intensity=peak_intensity_name)
-            if origin_study.peak_intensity is None:
-                print('did not find the normalized peak intensity')
-                origin_study.add_peak_intensity(peak_intensity_name)
-                skip_norm = False
-            else:
-                skip_norm = True
+            # if origin_study.peak_intensity is None:
+            #     print('did not find the normalized peak intensity')
+            #     origin_study.add_peak_intensity(peak_intensity_name)
+            #     skip_norm = False
+            # else:
+            #     skip_norm = True
                 
             origin_study.add_study_id(origin_name,rename_samples=False)
         else:
@@ -122,14 +123,14 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
         else:
             if 'pkl' not in input_peak_obj_path:
                 # assume that this is a mzlearn result directory instead
-                input_study = create_mspeaks_from_mzlearn_result(input_peak_obj_path)
+                input_study = create_mspeaks_from_mzlearn_result(input_peak_obj_path,peak_intensity=peak_intensity_name)
                 input_study.add_study_id(input_name,rename_samples=False)
-                if input_study.peak_intensity is None:
-                    print('did not find the normalized peak intensity')
-                    input_study.add_peak_intensity(peak_intensity_name)
-                    skip_norm = False
-                else:
-                    skip_norm = True
+                # if input_study.peak_intensity is None:
+                #     print('did not find the normalized peak intensity')
+                #     input_study.add_peak_intensity(peak_intensity_name)
+                #     skip_norm = False
+                # else:
+                #     skip_norm = True
 
             else:
                 input_study = MSPeaks()
@@ -207,7 +208,7 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
 # %% Rename the peaks in each study to correspond to the origin, removing peaks that don't align
 
 def rename_inputs_to_origin(input_peak_obj_path_list, 
-                            save_dir, input_name_list=None, multi_alignment_df=None):
+                            save_dir, multi_alignment_df=None):
     
     paths_to_renamed_studies = []
     if multi_alignment_df is None:
@@ -215,16 +216,17 @@ def rename_inputs_to_origin(input_peak_obj_path_list,
 
     origin_name = multi_alignment_df.index.name
     
-    if input_name_list is None:
-        input_name_list = multi_alignment_df.columns.tolist()
+    # if input_name_list is None:
+    #     input_name_list = multi_alignment_df.columns.tolist()
         # input_name_list.remove(origin_name)
 
-    for input_study_path,input_name in zip(input_peak_obj_path_list,input_name_list):
+    for input_study_path in input_peak_obj_path_list:
         input_study = MSPeaks()
         input_study.load(input_study_path)
         assert input_study.study_id is not None, 'input study does not have a study_id'
-        if input_study.study_id != input_name:
-                raise ValueError(f'input study_id "{input_study.study_id}" does not match input_name "{input_name}"')
+        input_name = input_study.study_id
+        # if input_study.study_id != input_name:
+        #         raise ValueError(f'input study_id "{input_study.study_id}" does not match input_name "{input_name}"')
                 # print(f'WARNING: input study_id "{input_study.study_id}" does not match input_name "{input_name}"')
         
         if input_name not in multi_alignment_df.columns:
@@ -233,7 +235,8 @@ def rename_inputs_to_origin(input_peak_obj_path_list,
         if input_name == origin_name:
             continue
 
-        input_alignment = multi_alignment_df[input_name].dropna()
+        input_alignment = multi_alignment_df[input_name]
+        input_alignment.dropna(inplace=True)
         # input_study.rename_peaks(multi_alignment_df[input_name].dropna().to_dict())
         input_study.rename_selected_peaks(input_alignment.to_dict())
         input_study.save(os.path.join(save_dir,f'{input_name}_renamed.pkl'))

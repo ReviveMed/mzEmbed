@@ -636,7 +636,8 @@ if not os.path.exists(base_dir):
 # input_dir = f'{base_dir}/data_2023_october/selected_studiesX 13/combat_mskcc_binary_task'
 # input_dir = f'{base_dir}/data_2023_october/selected_studiesX 13/combat_survival_class_task'
 # input_dir = f'{base_dir}/hilic_pos_2023_nov_21/subset all_studies/num_cohorts_thresh_0.5/combat_Sex'
-input_dir = f'{base_dir}/hilic_pos_2023_nov_21/subset all_studies/num_cohorts_thresh_0.5/combat_survival class'
+# input_dir = f'{base_dir}/hilic_pos_2023_nov_21/subset all_studies/num_cohorts_thresh_0.5/combat_survival class'
+input_dir = f'{base_dir}/hilic_pos_2024_jan_25/subset all_studies from Jan25_alignments/num_cohorts_thresh_0.5/combat_Benefit'
 # input_dir = f'{base_dir}/data_2023_october/selected_studiesX 13/combat_mskcc_binary_task'
 # data_engine_path = '/Users/jonaheaton/Desktop/Data-engine'
 

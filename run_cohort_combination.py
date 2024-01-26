@@ -46,7 +46,7 @@ origin_result_path = os.path.join(data_path,origin_name,'rcc1_rcc3_output_v1_202
 
 cohort_combine_dir = os.path.join(dropbox_dir,'development_CohortCombination')
 norm_setting_dir = os.path.join(cohort_combine_dir,'norm_settings')
-output_dir = f'{cohort_combine_dir}/hilic_pos_2024_jan_25'
+output_dir = f'{cohort_combine_dir}/hilic_pos_2024_jan_26'
 origin_metadata_file = f'{output_dir}/rcc_sample_info3.csv'
 os.makedirs(output_dir,exist_ok=True)
 plots_dir = os.path.join(output_dir,'plots')
@@ -55,7 +55,7 @@ os.makedirs(norm_setting_dir,exist_ok=True)
 
 
 fill_na_strat = 'min'
-origin_freq_th = 0.8
+origin_freq_th = 0.2
 norm_name = 'synthetic v1'
 
 # assert os.path.exists(os.path.join(output_dir,'norm_settings',f'{norm_name}.json')), f'Norm function {norm_name} not found'
@@ -64,32 +64,36 @@ norm_name = 'synthetic v1'
 study_id_list = ['ST001200','ST001422','ST001428','ST001519','ST001849','ST001931',\
                 'ST001932','ST002112','ST002238','ST002331','ST002711']
 
-other_study_freq_th = 0.4
+other_study_freq_th = 0.2
 
 alignment_param_path = '/Users/jonaheaton/Desktop/alignment_analysis/Alignment_Params/Merge_50_50_Jan25.json'
 alignment_params = load_json(alignment_param_path)
 # alignment_params = params['alignment_params']
 
-
-align_save_dir = os.path.join(output_dir,'Jan25_alignments')
+alignment_dir_name = 'Jan25_alignments'
+align_save_dir = os.path.join(output_dir,alignment_dir_name)
 os.makedirs(align_save_dir,exist_ok=True)
 
 
 # %% Choose the files used to apply the frequency threshold on the origin study
 
-metadata = pd.read_csv(origin_metadata_file,index_col=0)
-select_files = metadata[metadata['study_week'] =='baseline'].index.tolist()
-train_select_files = metadata[(metadata['study_week'] =='baseline') &
-                             (metadata['phase']==3) &
-                             (metadata['Benefit'].isin([0,1]))
+origin_metadata = pd.read_csv(origin_metadata_file,index_col=0)
+# rename the index of metadata to include the study name
+origin_metadata.index = [f'{origin_name}_{y}' for y in origin_metadata.index]
+
+
+select_files = origin_metadata[origin_metadata['study_week'] =='baseline'].index.tolist()
+train_select_files = origin_metadata[(origin_metadata['study_week'] =='baseline') &
+                             (origin_metadata['phase']==3) &
+                             (origin_metadata['Benefit'].isin(['CB','NCB']))
                              ].index.tolist()
 
-test_select_files = metadata[(metadata['study_week'] =='baseline') &
-                             (metadata['phase']==1) &
-                             (metadata['Benefit'].isin([0,1]))
+test_select_files = origin_metadata[(origin_metadata['study_week'] =='baseline') &
+                             (origin_metadata['phase']==1) &
+                             (origin_metadata['Benefit'].isin(['CB','NCB']))
                              ].index.tolist()
 
-
+select_files = train_select_files+test_select_files
 
 # %% Choose the subset of studies used for analysis
 origin_studies = ['ST001236','ST001237']
@@ -98,6 +102,9 @@ selected_studies_subset = ['ST001236','ST001237','ST001932','ST001519','ST002112
                         'ST002711','ST002331','ST001849','ST001931']
 
 selected_subset_name = 'all_studies'
+
+
+selected_subset_name = selected_subset_name + ' from ' + alignment_dir_name
 
 
 
@@ -127,7 +134,8 @@ cohort_correction_method = 'combat'
 
 
 # %% What is the fine-tuning task?
-finetune_label_col = 'survival class'
+# finetune_label_col = 'survival class'
+finetune_label_col = 'Benefit'
 task_name = f'{cohort_correction_method}_{finetune_label_col}'
 
 training_files  = train_select_files
@@ -284,78 +292,91 @@ def standardize_across_cohorts(combined_intensity,cohort_labels,method):
 ################################################################
 ################################################################
 
+
 origin_study_pkl_file = os.path.join(output_dir,f'{origin_name}.pkl')
-if os.path.exists(origin_study_pkl_file):
-    # print('OOPs')
-    origin_peak_obj_path = origin_result_path
-else:
-    # origin_peak_obj_path = origin_study_pkl_file
-    origin_study = create_mspeaks_from_mzlearn_result(origin_result_path,peak_intensity='intensity_max_synthetic_norm')
-    origin_study.add_study_id(origin_name)
-    origin_study.save(origin_study_pkl_file)
-    origin_peak_obj_path = origin_study_pkl_file
+clean_origin_study_pkl_file = os.path.join(align_save_dir,f'{origin_name}_cleaned.pkl')
+alignment_df_path = os.path.join(align_save_dir,'alignment_df.csv')
 
-input_peak_obj_path_list = []
-input_name_list = []
+norm_func = get_norm_func(norm_name,output_dir)
+# if select_files[0] not in 
+# select_files = [f'{origin_name}_{x}' for x in select_files]
+if not os.path.exists(alignment_df_path):
 
-for study_id in study_id_list:
-    for result_id in os.listdir(os.path.join(data_path,study_id)):
-        if '.' in result_id:
-            continue
-        if 'SKIP' in result_id:
-            continue
-        if 'meta' in result_id:
-            continue
-        if 'target' in result_id:
-            continue
-        
-        result_path = os.path.join(data_path,study_id,result_id)
-        result_name = study_id#+'_'+result_id
-        if result_name == origin_name:
-            continue
+    if os.path.exists(origin_study_pkl_file):
+        origin_peak_obj_path = origin_study_pkl_file
+    else:
+        # origin_peak_obj_path = origin_study_pkl_file
+        # origin_study = create_mspeaks_from_mzlearn_result(origin_result_path,peak_intensity='intensity_max_synthetic_norm')
+        origin_study = create_mspeaks_from_mzlearn_result(origin_result_path)
+        origin_study.add_study_id(origin_name)
+        origin_study.normalize_intensity(norm_func)
+        origin_study.save(origin_study_pkl_file)
+        origin_peak_obj_path = origin_study_pkl_file
 
-        print(result_name)
-        if os.path.exists(os.path.join(other_data_path,study_id,'final_peaks','intensity_max_synthetic_norm.csv')):
-            # copy the file over
-            new_path = os.path.join(data_path,study_id,result_id,'final_peaks','intensity_max_synthetic_norm.csv')
-            os.makedirs(os.path.dirname(new_path),exist_ok=True)
-            shutil.copy(os.path.join(other_data_path,study_id,'final_peaks','intensity_max_synthetic_norm.csv'),new_path)
+    input_peak_obj_path_list = []
+    input_name_list = []
 
+    for study_id in study_id_list:
+        for result_id in os.listdir(os.path.join(data_path,study_id)):
+            if '.' in result_id:
+                continue
+            if 'SKIP' in result_id:
+                continue
+            if 'meta' in result_id:
+                continue
+            if 'target' in result_id:
+                continue
             
-        input_study_pkl_file = os.path.join(output_dir,f'{result_name}.pkl')
-        if not os.path.exists(input_study_pkl_file):
-            # input_study_pkl_file = result_path
-            # print('OOPs')
-            new_study = create_mspeaks_from_mzlearn_result(result_path)
-            new_study.add_study_id(study_id)
-            new_study.save(input_study_pkl_file)
+            result_path = os.path.join(data_path,study_id,result_id)
+            result_name = study_id#+'_'+result_id
+            if result_name == origin_name:
+                continue
 
-        input_peak_obj_path_list.append(input_study_pkl_file)
-        input_name_list.append(study_id)
+            print(result_name)
+            if os.path.exists(os.path.join(other_data_path,study_id,'final_peaks','intensity_max_synthetic_norm.csv')):
+                # copy the file over
+                new_path = os.path.join(data_path,study_id,result_id,'final_peaks','intensity_max_synthetic_norm.csv')
+                os.makedirs(os.path.dirname(new_path),exist_ok=True)
+                shutil.copy(os.path.join(other_data_path,study_id,'final_peaks','intensity_max_synthetic_norm.csv'),new_path)
+
+                
+            input_study_pkl_file = os.path.join(output_dir,f'{result_name}.pkl')
+            if not os.path.exists(input_study_pkl_file):
+                # input_study_pkl_file = result_path
+                # print('OOPs')
+                # new_study = create_mspeaks_from_mzlearn_result(result_path,peak_intensity='intensity_max_synthetic_norm')
+                new_study = create_mspeaks_from_mzlearn_result(result_path)
+                new_study.add_study_id(study_id)
+                new_study.normalize_intensity(norm_func)
+                new_study.save(input_study_pkl_file)
+
+            input_peak_obj_path_list.append(input_study_pkl_file)
+            input_name_list.append(study_id)
 
 
 
-# norm_func = get_norm_func(norm_name,output_dir)
+    # norm_func = get_norm_func(norm_name,output_dir)
 
-align_multiple_ms_studies(origin_peak_obj_path= origin_peak_obj_path,
-                          input_peak_obj_path_list=input_peak_obj_path_list,
-                          save_dir=align_save_dir,
-                            origin_name=origin_name,
-                            input_name_list=input_name_list,
-                            alignment_method = 'Merge',
-                            alignment_params = alignment_params['alignment_params'],
-                            origin_freq_th = origin_freq_th,
-                            input_freq_th = other_study_freq_th,
-                            origin_select_files = select_files,
-                            fill_na_strategy = fill_na_strat,
-                            outlier_samples_removal_strategy = 'low_frequency',
-                            norm_func = None,
-                            save_cleaned_peak_obj=True)
+    align_multiple_ms_studies(origin_peak_obj_path= origin_peak_obj_path,
+                            input_peak_obj_path_list=input_peak_obj_path_list,
+                            save_dir=align_save_dir,
+                                origin_name=origin_name,
+                                input_name_list=input_name_list,
+                                alignment_method = 'Merge',
+                                alignment_params = alignment_params['alignment_params'],
+                                origin_freq_th = origin_freq_th,
+                                input_freq_th = other_study_freq_th,
+                                origin_select_files = select_files,
+                                fill_na_strategy = fill_na_strat,
+                                outlier_samples_removal_strategy = 'low_frequency',
+                                norm_func = None,
+                                save_cleaned_peak_obj=True)
 
 
 # %%
-alignment_df = pd.read_csv(os.path.join(align_save_dir,'alignment_df.csv'),index_col=0)
-
+alignment_df = pd.read_csv(alignment_df_path,index_col=0)
+alignment_scores = pd.read_csv(os.path.join(align_save_dir,'alignment_scores.csv'),index_col=0)
+input_name_list = alignment_df.columns.tolist()
 clean_input_path_list_txt_file = os.path.join(align_save_dir,'clean_input_path_list.txt')
 # read the paths from the file
 with open(clean_input_path_list_txt_file) as f:
@@ -363,7 +384,6 @@ with open(clean_input_path_list_txt_file) as f:
 
 paths_to_renamed_studies = rename_inputs_to_origin(clean_input_peak_obj_path_list,
                         align_save_dir,
-                        input_name_list=input_name_list,
                         multi_alignment_df=alignment_df)
 
 
@@ -386,6 +406,9 @@ with open(os.path.join(selected_studies_dir,'selected_studies.txt'),'w') as f:
 
 # %% Load the combined metadata 
 metadata_df = pd.read_csv(new_metadata_file,index_col=0)
+
+# rename the index of metadata to include the study name
+metadata_df.index = [f'{x}_{y}' for x,y in zip(metadata_df['Study'],metadata_df.index)]
 
 metadata_df = metadata_df.loc[metadata_df['Study'].isin(selected_studies),:].copy()
 select_num = metadata_df['Study'].nunique()
@@ -413,7 +436,9 @@ print('number of nulls:', metadata_df[pretrain_label_col].isnull().sum())
 # %% Select the studies that are not the origin studies, then plot the overlap with the origin study 
 other_selected_studies = [x for x in selected_studies if x not in origin_studies]
 
-alignment_cols = [f'Compound_ID_{study_id}' for study_id in other_selected_studies]
+# alignment_cols = [f'Compound_ID_{study_id}' for study_id in other_selected_studies]
+alignment_cols = [f'{study_id}' for study_id in other_selected_studies]
+
 align_df = alignment_df[alignment_cols].copy()
 
 
@@ -439,8 +464,7 @@ print(f'Number of features detected in at least {num_cohorts_thresh*100}% of the
 
 # check if origin_study is already loaded
 if 'origin_study' not in locals():
-    origin_study_pkl_file = os.path.join(output_dir,f'{origin_name}.pkl')
-    if os.path.exists(origin_study_pkl_file):
+    if os.path.exists(clean_origin_study_pkl_file):
         origin_study = MSPeaks()
         origin_study.load(origin_study_pkl_file)
 
@@ -541,10 +565,27 @@ task_dir = os.path.join(select_feats_dir,task_name)
 os.makedirs(task_dir,exist_ok=True)
 
 input_data = data_corrected.T
+if finetune_label_col not in metadata_df.columns:
+    print(f'warning: {finetune_label_col} not in metadata_df.columns')
+    if finetune_label_col in origin_metadata.columns:
+        common_index = list(set(metadata_df.index).intersection(set(origin_metadata.index)))
+        metadata_df[finetune_label_col] = pd.null
+        metadata_df.loc[common_index,finetune_label_col] = origin_metadata.loc[common_index,finetune_label_col]
+    else:
+        print(f'warning: {finetune_label_col} also not in origin_metadata.columns')
+        raise ValueError(f'finetune_label_col {finetune_label_col} not in metadata_df.columns')
+
+if training_files[0] not in metadata_df.index:
+    print('warning: training_files[0] not in metadata_df.index')
+    training_files = [f'{origin_name}_{x}' for x in training_files]
+    test_files = [f'{origin_name}_{x}' for x in test_files]
+    # validation_files = [f'{origin_name}_{x}' for x in validation_files]
+
 input_pretrain_labels = metadata_df[pretrain_label_col].copy()
 input_finetune_labels = metadata_df[finetune_label_col].copy()
 
 pretrain_files = [x for x in input_data.index if x not in training_files+test_files]
+
 
 y_pretrain = input_pretrain_labels.loc[pretrain_files].copy()
 y_finetune = input_finetune_labels.loc[training_files].copy()
