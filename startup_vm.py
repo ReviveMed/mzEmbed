@@ -12,147 +12,23 @@ from mysql.connector.constants import ClientFlag
 from google.cloud import storage
 import gcsfs
 
-
 from sklearn.neighbors import KNeighborsRegressor
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
 script_path = os.path.dirname(os.path.abspath(__file__))
-# dir_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(script_path, '..'))
 
 from study_alignment.utils_targets import peaks_to_targets_wrapper, process_targeted_data
 from study_alignment.utils_eclipse import align_ms_studies_with_Eclipse
 from study_alignment.utils_metabCombiner import align_ms_studies_with_metabCombiner, create_metaCombiner_grid_search
-from study_alignment.mspeaks import (create_mspeaks_from_mzlearn_result, MSPeaks, create_mspeaks_from_mzlearn_result,
-                                     load_mspeaks_from_pickle)
-
+from study_alignment.mspeaks import create_mspeaks_from_mzlearn_result, MSPeaks
+from study_alignment.align_multi import *
 from study_alignment.align_pair import align_ms_studies
 from met_matching.metabolite_name_matching_main import refmet_query
 
 from study_alignment.utils_misc import change_param_freq_threshold, get_method_param_name
 from study_alignment.utils_misc import load_json, save_json, unravel_dict
-
-########################################################################################################################
-# Helper Functions
-########################################################################################################################
-def get_synthetic_norm_func(norm_func_vals, base_func=synthetic_normalization_Nov2023_wrapper_repeat):
-    other_kwargs = {}
-    for key, val in norm_func_vals.items():
-        if key == 'norm_method_name':
-            continue
-        other_kwargs[key] = val
-
-    def my_cycle_synthetic_norm(peak_intensity, peak_info, sample_info):
-        norm_df, _ = base_func(peak_intensity, sample_info, peak_info, **other_kwargs)
-        return norm_df
-
-    return my_cycle_synthetic_norm
-
-
-def get_synthetic_norm_func_from_json(json_file):
-    with open(json_file) as f:
-        data = json.load(f)
-    return get_synthetic_norm_func(data)
-
-
-def save_records_to_json(save_path, record_dct, scores_dict=None):
-    # save the results to json
-    if scores_dict is not None:
-        for key in scores_dict.keys():
-            record_dct[key] = scores_dict[key]
-
-    # assume record_dct is your dictionary
-    record_dct_converted = {}
-    for key, value in record_dct.items():
-        if isinstance(value, np.float32):
-            record_dct_converted[key] = float(value)
-        elif isinstance(value, np.int64):
-            record_dct_converted[key] = int(value)
-        else:
-            record_dct_converted[key] = value
-
-    with open(save_path, 'w') as fp:
-        json.dump(record_dct_converted, fp)
-
-    return
-
-
-def get_norm_func(norm_name, data_dir):
-    os.makedirs(os.path.join(data_dir, 'norm_settings'), exist_ok=True)
-    norm_func_json_file = os.path.join(data_dir, 'norm_settings', f'{norm_name}.json')
-
-    if 'pool' in norm_name:
-        # save_records_to_json(norm_func_json_file,{'norm_method_name':'Map Pool'})
-        return orig_pool_map_norm
-    elif 'raw' in norm_name:
-        # save_records_to_json(norm_func_json_file,{'norm_method_name':'Raw'})
-        return None
-    elif 'TIC' in norm_name:
-        # save_records_to_json(norm_func_json_file,{'norm_method_name':'TIC'})
-        return compute_TIC_norm
-
-    if os.path.exists(norm_func_json_file):
-        norm_func = get_synthetic_norm_func_from_json(norm_func_json_file)
-        return norm_func
-    else:
-        raise ValueError(f'Norm function {norm_name} not found')
-
-
-def get_list_available_study_ids(data_path):
-    study_id_list = []
-    for study_id in os.listdir(data_path):
-        if '.' in study_id:
-            continue
-        if 'SKIP' in study_id:
-            continue
-        if ('ST' in study_id) or ('MTBL' in study_id):
-            study_id_list.append(study_id)
-    return study_id_list
-
-
-def min_max_scale(df):
-    overall_min = df.min().min()
-    overall_max = df.max().max()
-    df = (df - overall_min) / (overall_max - overall_min)
-    return df
-
-
-def standardize_across_cohorts(combined_intensity, cohort_labels, method):
-    assert len(combined_intensity.columns) == len(cohort_labels)
-
-    if method == 'combat':
-        data_corrected = pycombat_norm(combined_intensity, cohort_labels)
-    elif method == 'raw':
-        data_corrected = combined_intensity.copy()
-    elif method == 'min_max':
-        data_corrected = combined_intensity.copy()
-        for cohort in set(cohort_labels):
-            cohort_idx = np.where(cohort_labels == cohort)[0]
-            cohort_data = data_corrected.iloc[:, cohort_idx].copy()
-            cohort_data = min_max_scale(cohort_data)
-            data_corrected.iloc[:, cohort_idx] = cohort_data
-
-    elif method == 'zscore_0':
-        data_corrected = combined_intensity.copy()
-        for cohort in set(cohort_labels):
-            cohort_idx = np.where(cohort_labels == cohort)[0]
-            cohort_data = data_corrected.iloc[:, cohort_idx].copy()
-            cohort_data = (cohort_data - cohort_data.mean(axis=0)) / cohort_data.std(axis=0)
-            cohort_data.fillna(0, inplace=True)
-            data_corrected.iloc[:, cohort_idx] = cohort_data
-    elif method == 'zscore_1':
-        data_corrected = combined_intensity.copy()
-        for cohort in set(cohort_labels):
-            cohort_idx = np.where(cohort_labels == cohort)[0]
-            cohort_data = data_corrected.iloc[:, cohort_idx].copy()
-            cohort_data = (cohort_data - cohort_data.mean(axis=1)) / cohort_data.std(axis=1)
-            cohort_data.fillna(0, inplace=True)
-            data_corrected.iloc[:, cohort_idx] = cohort_data
-    else:
-        raise ValueError(f'Invalid method: {method}')
-
-    return data_corrected
 
 
 ########################################################################################################################
@@ -304,8 +180,8 @@ if len(records) > 0:
     other_job_ids = other_job_ids.split(',')
     reference_job_freq_th = reference_job_freq_th.split(',')
     other_job_freq_th = other_job_freq_th.split(',')
-    other_job_freq_th = [float(i)/100 for i in other_job_freq_th]
-    reference_job_freq_th = [float(i)/100for i in reference_job_freq_th]
+    other_job_freq_th = [float(i) / 100 for i in other_job_freq_th]
+    reference_job_freq_th = [float(i) / 100 for i in reference_job_freq_th]
 
     # change the job status to 2 meaning running
     job_status = 2
@@ -353,51 +229,67 @@ if len(records) > 0:
             for freq_th in other_study_freq_th:
 
                 # frequency sub dir
-                freq_grid_search_dir_name = f'reference_freq_th_{reference_freq_th}_freq_th_{freq_th}'
+                freq_grid_search_dir_name = f'{alignment_method}_reference_freq_th_{reference_freq_th}_freq_th_{freq_th}'
 
                 # get mspeak object for the reference study
-                reference_job_id = str(reference_job_id)
-                origin_study = get_mspeak_from_job_id(script_path, reference_job_id, reference_freq_th)
+                origin_study = get_mspeak_from_job_id(script_path, str(reference_job_id), reference_freq_th)
 
                 # fill missing values
                 origin_study.fill_missing_values(method=fill_na_strat)
                 origin_study.add_study_id(reference_job_id, rename_samples=False)
                 if not os.path.exists(f"{script_path}/{reference_job_id}/{freq_grid_search_dir_name}"):
                     os.makedirs(f"{script_path}/{reference_job_id}/{freq_grid_search_dir_name}")
-                origin_study.save_to_pickle(os.path.join(f"{script_path}/{reference_job_id}/{freq_grid_search_dir_name}", f"{reference_job_id}.pkl"))
+                origin_study.save_to_pickle(
+                    os.path.join(f"{script_path}/{reference_job_id}/{freq_grid_search_dir_name}",
+                                 f"{reference_job_id}.pkl"))
+                origin_peak_obj_path = os.path.join(f"{script_path}/{reference_job_id}/{freq_grid_search_dir_name}",
+                                                    f"{reference_job_id}.pkl")
 
                 # save the alignment results different folder depends on the frequency threshold
                 align_save_dir_freq_th = os.path.join(align_save_dir, f'{freq_grid_search_dir_name}')
                 # if no alignment folder exists, create one
                 if not os.path.exists(align_save_dir_freq_th):
                     os.makedirs(align_save_dir_freq_th)
+                # save other studies to folder
+                input_peak_obj_path_list = []
+                other_job_ids = []
                 for study_id in other_job_ids:
                     # process rest of the jobs and aligin to origin_study
                     # other_study_freq_th = 0.2
-                    study_id = str(study_id)
+                    other_job_ids.append(study_id)
                     # get mspeak object for the study_id study
-                    new_study = get_mspeak_from_job_id(script_path, study_id, freq_th)
+                    new_study = get_mspeak_from_job_id(script_path, str(study_id), freq_th)
                     # fill missing values
                     new_study.fill_missing_values(method=fill_na_strat)
                     new_study.add_study_id(study_id, rename_samples=False)
                     if not os.path.exists(f"{script_path}/{study_id}/{freq_grid_search_dir_name}"):
                         os.makedirs(f"{script_path}/{study_id}/{freq_grid_search_dir_name}")
-                    new_study.save_to_pickle(os.path.join(f"{script_path}/{study_id}/{freq_grid_search_dir_name}", f"{study_id}.pkl"))
+                    new_study.save_to_pickle(
+                        os.path.join(f"{script_path}/{study_id}/{freq_grid_search_dir_name}", f"{study_id}.pkl"))
+                    input_peak_obj_path_list.append(
+                        os.path.join(f"{script_path}/{study_id}/{freq_grid_search_dir_name}", f"{study_id}.pkl"))
 
-                    ############################################################################################################
-                    # alignment happens here
-                    ############################################################################################################
-                    try:
-                        align_ms_studies(origin_study,
-                                         new_study,
-                                         origin_name=reference_job_id,
-                                         input_name=study_id,
-                                         save_dir=align_save_dir_freq_th)
-                    except Exception as e:
-                        print(f'Alignment failed for {study_id} with error {e}')
+                ########################################################################################################
+                # alignment happens here using
+                ########################################################################################################
+                alignment_df = align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list,
+                                                         align_save_dir_freq_th,
+                                                         origin_name=reference_job_id,
+                                                         input_name=other_job_ids,
+                                                         alignment_method=alignment_method)
+                alignment_df.to_csv(os.path.join(align_save_dir_freq_th, 'alignment_df.csv'), index=True)\
 
-                alignment_df = combine_alignments_in_dir(align_save_dir_freq_th, origin_name=reference_job_id)
-                alignment_df.to_csv(os.path.join(align_save_dir_freq_th, 'alignment_df.csv'), index=True)
+                # try:
+                #     align_ms_studies(origin_study,
+                #                      new_study,
+                #                      origin_name=reference_job_id,
+                #                      input_name=study_id,
+                #                      save_dir=align_save_dir_freq_th)
+                # except Exception as e:
+                #     print(f'Alignment failed for {study_id} with error {e}')
+
+                # alignment_df = combine_alignments_in_dir(align_save_dir_freq_th, origin_name=reference_job_id)
+                # alignment_df.to_csv(os.path.join(align_save_dir_freq_th, 'alignment_df.csv'), index=True)
 
                 # based on alignment_df build the grid_search_summary_df
                 # this summary df has the following columns:
@@ -407,33 +299,45 @@ if len(records) > 0:
                 # 4. common peaks found in all studies
                 print(alignment_df.columns)
                 dummy_row = {'method': alignment_method,
-                             'reference_cohort_freq_threshold': f"{int(reference_freq_th*100)}%",
-                             'remaining_cohorts_freq_threshold': f"{int(freq_th*100)}%",
-                             'common_peaks': (~alignment_df.isna()).all(axis=1).sum(), # common peaks is the count of rows from alignment_df that has no nan
+                             'reference_cohort_freq_threshold': f"{int(reference_freq_th * 100)}%",
+                             'remaining_cohorts_freq_threshold': f"{int(freq_th * 100)}%",
+                             'common_peaks': (~alignment_df.isna()).all(axis=1).sum(),
+                             # common peaks is the count of rows from alignment_df that has no nan
                              'reference_cohort_peaks': alignment_df.shape[0]}
                 for study_id in other_job_ids:
                     study_id = str(study_id)
-                    dummy_row[f"remaining_cohort_{study_id}_peaks"] = alignment_df['Compound_ID_' + str(study_id)].count()
+                    dummy_row[f"remaining_cohort_{study_id}_peaks"] = alignment_df[
+                        'Compound_ID_' + str(study_id)].count()
 
                 dummy_row['common_peaks'] = (~alignment_df.isna()).all(axis=1).sum()
                 grid_search_summary_df = grid_search_summary_df.append(dummy_row, ignore_index=True)
 
-                ################################################################################################################
-                # rename the features in each study to correspond to the origin, remove the features that do not align to origin
-                ################################################################################################################
-                for study_id in other_job_ids:
-                    result_path = os.path.join(f"{script_path}/{study_id}/{freq_grid_search_dir_name}", f"{study_id}.pkl")
-                    input_study_pkl_file = os.path.join(f"{script_path}/{study_id}/{freq_grid_search_dir_name}", f"{study_id}.pkl")
-                    renamed_study_pkl_file = os.path.join(f"{script_path}/{study_id}/{freq_grid_search_dir_name}", f"{study_id}_renamed.pkl")
-                    if os.path.exists(input_study_pkl_file):
-                        input_study = load_mspeaks_from_pickle(input_study_pkl_file)
-                        input_alignment = alignment_df['Compound_ID_' + str(study_id)].copy()
-                        input_alignment.dropna(inplace=True)
+                ########################################################################################################
+                # rename the features in each study to correspond to the origin, remove the features that
+                # do not align to origin
+                ########################################################################################################
+                rename_inputs_to_origin(align_save_dir_freq_th,
+                                        multi_alignment_df=None,
+                                        input_name_list=None,
+                                        load_dir=None,
+                                        input_peak_obj_path_list=input_peak_obj_path_list)
 
-                        current_ids = input_alignment.values
-                        new_ids = input_alignment.index
-                        input_study.rename_selected_peaks(current_ids, new_ids, verbose=False)
-                        input_study.save_to_pickle(renamed_study_pkl_file)
+                # for study_id in other_job_ids:
+                #     result_path = os.path.join(f"{script_path}/{study_id}/{freq_grid_search_dir_name}",
+                #                                f"{study_id}.pkl")
+                #     input_study_pkl_file = os.path.join(f"{script_path}/{study_id}/{freq_grid_search_dir_name}",
+                #                                         f"{study_id}.pkl")
+                #     renamed_study_pkl_file = os.path.join(f"{script_path}/{study_id}/{freq_grid_search_dir_name}",
+                #                                           f"{study_id}_renamed.pkl")
+                #     if os.path.exists(input_study_pkl_file):
+                #         input_study = load_mspeaks_from_pickle(input_study_pkl_file)
+                #         input_alignment = alignment_df['Compound_ID_' + str(study_id)].copy()
+                #         input_alignment.dropna(inplace=True)
+                #
+                #         current_ids = input_alignment.values
+                #         new_ids = input_alignment.index
+                #         input_study.rename_selected_peaks(current_ids, new_ids, verbose=False)
+                #         input_study.save_to_pickle(renamed_study_pkl_file)
 
                 ############################################################################################################
                 # do stats on alignment results
@@ -441,8 +345,6 @@ if len(records) > 0:
                 # save the alignment results to a csv on gcp bucket
                 # mzlearn-webapp.appspot.com/mzlearn_pretraining/peak_combine_results/{job_id}/alignment_df.csv
                 # TODO: save the alignment results to a csv on gcp bucket based on threshold as well
-                # peak_combine_job_id = 1
-
                 gcp_file_path = f"mzlearn-webapp.appspot.com/mzlearn_pretraining/peak_combine_results/{peak_combine_job_id}/{freq_grid_search_dir_name}/alignment_df.csv"
                 with fs.open(gcp_file_path, 'w') as f:
                     alignment_df.to_csv(f, index=True)
@@ -479,7 +381,8 @@ if len(records) > 0:
                     print(study_id)
                     print(freq_grid_search_dir_name)
                     # input_study_pkl_file = os.path.join(output_dir, f'{result_name}_renamed.pkl')
-                    input_study_pkl_file = os.path.join(f"{script_path}/{study_id}/{freq_grid_search_dir_name}", f"{study_id}_renamed.pkl")
+                    input_study_pkl_file = os.path.join(f"{script_path}/{study_id}/{freq_grid_search_dir_name}",
+                                                        f"{study_id}_renamed.pkl")
                     if os.path.exists(input_study_pkl_file):
                         input_study = load_mspeaks_from_pickle(input_study_pkl_file)
                         subset_chosen = [i for i in chosen_feats if i in input_study.peak_intensity.index]
