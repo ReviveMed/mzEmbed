@@ -39,11 +39,6 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
     Returns:
         pandas.DataFrame: The multi-aligned DataFrame containing the alignment results.
     '''
-    # Function code here
-def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, save_dir, **kwargs):
-    '''
-    
-    '''
 
     origin_name = kwargs.get('origin_name', 'origin')
     input_name_list = kwargs.get('input_name_list', None)
@@ -205,7 +200,7 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
 # %% Rename the peaks in each study to correspond to the origin, removing peaks that don't align
 
 def rename_inputs_to_origin(save_dir, multi_alignment_df=None,
-                            input_name_list=None,load_dir=None):
+                            input_name_list=None,load_dir=None, input_peak_obj_path_list=None):
     
     paths_to_renamed_studies = []
     if multi_alignment_df is None:
@@ -220,19 +215,19 @@ def rename_inputs_to_origin(save_dir, multi_alignment_df=None,
         input_name_list = multi_alignment_df.columns.tolist()
         # input_name_list.remove(origin_name)
 
-    for input_name in input_name_list:
+    if input_peak_obj_path_list is None:
+        input_peak_obj_path_list = [os.path.join(load_dir,f'{input_name}_cleaned.pkl') for input_name in input_name_list]
+        renamed_input_study_path_list = [os.path.join(save_dir,f'{input_name}_renamed.pkl') for input_name in input_name_list]
 
-        renamed_input_study_path = os.path.join(save_dir,f'{input_name}_renamed.pkl')
+    for input_name, input_study_path, renamed_input_study_path in zip(input_name_list, input_peak_obj_path_list, renamed_input_study_path_list):
+
         if os.path.exists(renamed_input_study_path):
             print(f'{renamed_input_study_path} already exists')
             paths_to_renamed_studies.append(renamed_input_study_path)
             continue
 
-        input_study_path = os.path.join(load_dir,f'{input_name}_cleaned.pkl')
         if not os.path.exists(input_study_path):
             print(f'WARNING: could not find {input_study_path}')
-
-
 
         input_study = MSPeaks()
         input_study.load(input_study_path)

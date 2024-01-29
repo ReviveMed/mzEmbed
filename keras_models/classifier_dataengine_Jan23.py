@@ -643,8 +643,8 @@ if not os.path.exists(base_dir):
 
 date_name = 'hilic_pos_2024_jan_26_read_norm'
 # study_subset_name = 'subset all_studies with align score 0 from Eclipse_align_80_40_default'
-study_subset_name = 'subset all_studies with align score 0 from Merge_Jan25_align_80_40_default'
-# study_subset_name = 'subset all_studies with align score 0.25 from Merge_Jan25_align_80_40_default'
+# study_subset_name = 'subset all_studies with align score 0 from Merge_Jan25_align_80_40_default'
+study_subset_name = 'subset all_studies with align score 0.25 from Merge_Jan25_align_80_40_default'
 feat_subset_name = 'num_cohorts_thresh_0.5'
 task_name = 'combat_Benefit'
 input_dir = f'{base_dir}/{date_name}/{study_subset_name}/{feat_subset_name}/{task_name}'
@@ -691,7 +691,7 @@ if False:
 if True:
     # the number of hidden layers
     for n_layers in [0]:
-        for n_neurons in [64,128]:
+        for n_neurons in [128]:
             run_performance_eval(n_layers,n_neurons,'sigmoid',
                                 input_dir=input_dir,
                                 output_subdir='keras_autoencoder_models5',
