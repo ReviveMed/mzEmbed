@@ -184,7 +184,7 @@ if len(records) > 0:
     reference_job_freq_th = [float(i) / 100 for i in reference_job_freq_th]
 
     # change the job status to 2 meaning running
-    job_status = 1
+    job_status = 2
     query = (
         f"UPDATE app_pretrain_peak_combine_job_status SET job_status = %s WHERE id = %s")
     val = (job_status, peak_combine_job_id)
@@ -272,10 +272,11 @@ if len(records) > 0:
                 ########################################################################################################
                 # alignment happens here using
                 ########################################################################################################
+                other_job_ids = [str(i) for i in other_job_ids]
                 alignment_df = align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list,
                                                          align_save_dir_freq_th,
-                                                         origin_name=reference_job_id,
-                                                         input_name=other_job_ids,
+                                                         origin_name=str(reference_job_id),
+                                                         input_name_list=other_job_ids,
                                                          alignment_method=alignment_method)
                 alignment_df.to_csv(os.path.join(align_save_dir_freq_th, 'alignment_df.csv'), index=True)\
 
@@ -305,9 +306,7 @@ if len(records) > 0:
                              # common peaks is the count of rows from alignment_df that has no nan
                              'reference_cohort_peaks': alignment_df.shape[0]}
                 for study_id in other_job_ids:
-                    study_id = str(study_id)
-                    dummy_row[f"remaining_cohort_{study_id}_peaks"] = alignment_df[
-                        'Compound_ID_' + str(study_id)].count()
+                    dummy_row[f"remaining_cohort_{study_id}_peaks"] = alignment_df[str(study_id)].count()
 
                 dummy_row['common_peaks'] = (~alignment_df.isna()).all(axis=1).sum()
                 grid_search_summary_df = grid_search_summary_df.append(dummy_row, ignore_index=True)
@@ -384,7 +383,9 @@ if len(records) > 0:
                     input_study_pkl_file = os.path.join(f"{script_path}/{study_id}/{freq_grid_search_dir_name}",
                                                         f"{study_id}_renamed.pkl")
                     if os.path.exists(input_study_pkl_file):
-                        input_study = load_mspeaks_from_pickle(input_study_pkl_file)
+                        # input_study = load_mspeaks_from_pickle(input_study_pkl_file)
+                        input_study = MSPeaks()
+                        input_study.load(input_study_pkl_file)
                         subset_chosen = [i for i in chosen_feats if i in input_study.peak_intensity.index]
                         input_peaks = input_study.peak_intensity.loc[subset_chosen, :].copy()
                         input_peaks = np.log2(input_peaks)
