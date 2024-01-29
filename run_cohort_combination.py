@@ -90,9 +90,9 @@ save_json(prep_peaks_params,os.path.join(cleaned_peaks_obj_dir,'prep_peaks_param
 # assert os.path.exists(os.path.join(output_dir,'norm_settings',f'{norm_name}.json')), f'Norm function {norm_name} not found'
 
 # alignment_param_path = '/Users/jonaheaton/Desktop/alignment_analysis/Alignment_Params/Eclipse_50_50_Original.json'
-# alignment_param_path = '/Users/jonaheaton/Desktop/alignment_analysis/Alignment_Params/Eclipse_50_50_default.json'
+alignment_param_path = '/Users/jonaheaton/Desktop/alignment_analysis/Alignment_Params/Eclipse_50_50_default.json'
 # alignment_param_path = '/Users/jonaheaton/Desktop/alignment_analysis/Alignment_Params/metabCombiner_50_50_Jan23.json'
-alignment_param_path = '/Users/jonaheaton/Desktop/alignment_analysis/Alignment_Params/Merge_50_50_Jan25.json'
+# alignment_param_path = '/Users/jonaheaton/Desktop/alignment_analysis/Alignment_Params/Merge_50_50_Jan25.json'
 params = load_json(alignment_param_path)
 # Ideally I would also load the frequency threshold from the alignment params
 alignment_method = params['alignment_method']
@@ -144,7 +144,7 @@ initial_selected_studies_subset = ['ST001236','ST001237','ST001932','ST001519','
 
 # study_list = selected_studies_subset
 
-align_score_th = 0.3
+align_score_th = 0
 selected_subset_name = f'all_studies with align score {align_score_th}'
 
 
