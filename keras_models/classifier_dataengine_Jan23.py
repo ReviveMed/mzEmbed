@@ -564,7 +564,8 @@ def run_performance_eval(n_layers,n_neurons,activation,
         # epoch_list= [10,20,30,40,50,60,70,80,90,100,120,150,200,250]
         # epoch_list = [5,25,50,75,100,125,150,200,250,300,400,500,600,750,1000]
         # epoch_list = [50,100,150,250,500]
-        epoch_list = [75,125,250]
+        # epoch_list = [75,125,250]
+        epoch_list = [250]
         # epoch_list = [1000]
 
     output_dir = os.path.join(input_dir,output_subdir)
@@ -641,7 +642,7 @@ if not os.path.exists(base_dir):
 # input_dir = f'{base_dir}/data_2023_october/selected_studiesX 13/combat_mskcc_binary_task'
 # data_engine_path = '/Users/jonaheaton/Desktop/Data-engine'
 
-date_name = 'hilic_pos_2024_jan_26_read_norm'
+date_name = 'hilic_pos_2024_jan_29_read_norm'
 # study_subset_name = 'subset all_studies with align score 0 from Eclipse_align_80_40_default'
 # study_subset_name = 'subset all_studies with align score 0 from Merge_Jan25_align_80_40_default'
 study_subset_name = 'subset all_studies with align score 0.25 from Merge_Jan25_align_80_40_default'
