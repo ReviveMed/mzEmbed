@@ -22,10 +22,10 @@ sys.path.append(os.path.join(script_path, '..'))
 from study_alignment.utils_targets import peaks_to_targets_wrapper, process_targeted_data
 from study_alignment.utils_eclipse import align_ms_studies_with_Eclipse
 from study_alignment.utils_metabCombiner import align_ms_studies_with_metabCombiner, create_metaCombiner_grid_search
-from study_alignment.mspeaks import create_mspeaks_from_mzlearn_result, MSPeaks
+from study_alignment.mspeaks import create_mspeaks_from_mzlearn_result, MSPeaks, load_mspeaks_from_pickle
 from study_alignment.align_multi import *
 from study_alignment.align_pair import align_ms_studies
-from met_matching.metabolite_name_matching_main import refmet_query
+# from met_matching.metabolite_name_matching_main import refmet_query
 
 from study_alignment.utils_misc import change_param_freq_threshold, get_method_param_name
 from study_alignment.utils_misc import load_json, save_json, unravel_dict
@@ -184,7 +184,7 @@ if len(records) > 0:
     reference_job_freq_th = [float(i) / 100 for i in reference_job_freq_th]
 
     # change the job status to 2 meaning running
-    job_status = 2
+    job_status = 1
     query = (
         f"UPDATE app_pretrain_peak_combine_job_status SET job_status = %s WHERE id = %s")
     val = (job_status, peak_combine_job_id)
@@ -232,6 +232,7 @@ if len(records) > 0:
                 freq_grid_search_dir_name = f'{alignment_method}_reference_freq_th_{reference_freq_th}_freq_th_{freq_th}'
 
                 # get mspeak object for the reference study
+                print("get original study data")
                 origin_study = get_mspeak_from_job_id(script_path, str(reference_job_id), reference_freq_th)
 
                 # fill missing values
@@ -252,11 +253,10 @@ if len(records) > 0:
                     os.makedirs(align_save_dir_freq_th)
                 # save other studies to folder
                 input_peak_obj_path_list = []
-                other_job_ids = []
+                print("get other study data")
                 for study_id in other_job_ids:
+                    print(study_id)
                     # process rest of the jobs and aligin to origin_study
-                    # other_study_freq_th = 0.2
-                    other_job_ids.append(study_id)
                     # get mspeak object for the study_id study
                     new_study = get_mspeak_from_job_id(script_path, str(study_id), freq_th)
                     # fill missing values

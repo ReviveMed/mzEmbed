@@ -448,9 +448,9 @@ class MSPeaks:
 ######### Creation Functions #########
 #######################################################
 
-# def load_mspeaks_from_pickle(filename):
-#     with open(filename, 'rb') as f:
-#         return pickle.load(f)
+def load_mspeaks_from_pickle(filename):
+    with open(filename, 'rb') as f:
+        return pickle.load(f)
 
 
 def create_mspeaks(peak_info=None, sample_info=None, peak_intensity=None, targets_info=None, params_overall=None):
