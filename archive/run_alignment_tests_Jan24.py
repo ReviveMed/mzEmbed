@@ -25,6 +25,7 @@ from study_alignment.utils_eclipse import align_ms_studies_with_Eclipse
 from study_alignment.utils_metabCombiner import align_ms_studies_with_metabCombiner, create_metaCombiner_grid_search
 from study_alignment.mspeaks import create_mspeaks_from_mzlearn_result, MSPeaks
 
+from study_alignment.align_pair import align_ms_studies
 # from study_alignment import mspeaks as myms
 from met_matching.metabolite_name_matching_main import refmet_query
 
@@ -1126,7 +1127,7 @@ def change_param_freq_threshold(param_file_path,freq_th0,freq_th1):
     freq_th0_perc = int(100*freq_th0)
     freq_th1_perc = int(100*freq_th1)
     if 'method_param_name' not in run_params:
-        run_params['method_param_name'] =  get_method_param_name(run_params['param_name'])
+        run_params['alignment_name'] =  get_method_param_name(run_params['param_name'])
     run_params['param_name'] = run_params['alignment_method'] + f'_{freq_th0_perc}_{freq_th1_perc}' + '_' + run_params['method_param_name']
     save_path = os.path.join(param_file_dir, run_params['param_name'] + '.json')
     save_json(run_params, save_path)

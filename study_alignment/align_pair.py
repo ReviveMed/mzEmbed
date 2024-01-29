@@ -3,13 +3,15 @@ import json
 import pandas as pd
 from .utils_eclipse import align_ms_studies_with_Eclipse
 from .utils_metabCombiner import align_ms_studies_with_metabCombiner
+from .utils_merge import align_ms_studies_with_merge
 from .mspeaks import MSPeaks
 from .utils_targets import process_targeted_data
 from .utils_misc import load_json, save_json
 
 # %% align_ms_studies
 def align_ms_studies(origin_study, input_study, origin_name='origin', input_name='input',
-                     alignment_method='metabcombiner', alignment_params=None, save_dir=None):
+                     alignment_method='metabcombiner', alignment_params=None, save_dir=None,
+                     verbose=False, ret_score=False):
     '''
     Aligns two mass spectrometry studies using the specified alignment method.
 
@@ -37,28 +39,52 @@ def align_ms_studies(origin_study, input_study, origin_name='origin', input_name
             json.dump(alignment_params, fp)
 
     try:
-        if alignment_method.lower() == 'eclipse':
-            print('running Eclipse alignment')
+        if 'merge' in alignment_method.lower():
+            if verbose: print('running merge alignment')
+            alignment_result_df = align_ms_studies_with_merge(origin_study=origin_study, 
+                                                              input_study=input_study,
+                                                              origin_name=origin_name,
+                                                              input_name=input_name,
+                                                              params_list=alignment_params)
+                                                            #   save_dir=save_dir)
+        
+        elif 'eclipse' in alignment_method.lower():
+            if verbose: print('running Eclipse alignment')
             alignment_result_df = align_ms_studies_with_Eclipse(origin_study=origin_study, 
                                                                 input_study=input_study,
                                                                 origin_name=origin_name,
                                                                 input_name=input_name,
                                                                 alignment_params=alignment_params,
                                                                 clean_output=True)
-        elif (alignment_method.lower() == 'metabcombiner') or (alignment_method.lower() == 'metacombiner'):
-            print('running metabCombiner alignment')
+        elif ('metabcombiner' in alignment_method.lower()):
+        # elif (alignment_method.lower() == 'metabcombiner') or (alignment_method.lower() == 'metacombiner'):
+            if verbose: print('running metabCombiner alignment')
             alignment_result_df = align_ms_studies_with_metabCombiner(origin_study=origin_study, 
                                                                       input_study=input_study,
                                                                       origin_name=origin_name,
                                                                       input_name=input_name,
                                                                       alignment_params=alignment_params)
+            
+            
         else:
             raise NotImplementedError(f'{alignment_method} alignment method not implemented')
+    
+        # if we want to score the alignment
+        num_origin_peaks = origin_study.get_num_peaks()
+        num_input_peaks = input_study.get_num_peaks()
+        num_peaks = min(num_origin_peaks,num_input_peaks)
+        num_aligned_peaks = len(alignment_result_df)
+        alignment_score = num_aligned_peaks/num_peaks
+    
     except ValueError:
         print('alignment failed')
+        alignment_score = 0
 
     if (save_dir is not None) and (alignment_result_df is not None):
-        alignment_result_df.to_csv(filepath=os.path.join(save_dir, f'{input_name}_aligned_to_{origin_name}_with_{alignment_method}.csv'))
+        alignment_result_df.to_csv(os.path.join(save_dir, f'{input_name}_aligned_to_{origin_name}_with_{alignment_method}.csv'))
+
+    if ret_score:
+        return alignment_result_df, alignment_score
 
     return alignment_result_df
 

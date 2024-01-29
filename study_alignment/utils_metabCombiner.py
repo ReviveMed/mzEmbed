@@ -34,7 +34,8 @@ def get_metabCombiner_format(study_peaks,save_dir=None,study_name='study',max_nu
 
 def align_ms_studies_with_metabCombiner(origin_study,input_study,
                                         origin_name='origin',input_name='input',
-                                        save_dir=None,alignment_params=None):
+                                        save_dir=None,alignment_params=None,
+                                        alignment_savename='metabCombiner'):
 
     tmp_dir = os.makedirs('tmp', exist_ok=True)
     tmp_data1_path = os.path.join('tmp', 'data1.txt')
@@ -43,7 +44,10 @@ def align_ms_studies_with_metabCombiner(origin_study,input_study,
     tmp_params_path = os.path.join('tmp', 'params.json')
     
     if save_dir is not None:
-        output_path = os.path.join(save_dir, f'{input_name}_aligned_to_{origin_name}_match_ids.csv')
+        # a.to_csv(filepath=os.path.join(save_dir,f'{input_name}_aligned_to_{origin_name}.csv'))
+        # output_path = os.path.join(save_dir, f'{input_name}_aligned_to_{origin_name}_match_ids.csv')
+        # output_path = os.path.join(save_dir, f'{input_name}_aligned_to_{origin_name}_with_{alignment_savename}.csv')
+        output_path = os.path.join(save_dir, f'{input_name}_aligned_to_{origin_name}.csv')
 
     if alignment_params is None:
         alignment_params = {}
@@ -117,11 +121,14 @@ def create_metaCombiner_params(**kwargs):
     param_name = 'metabCombiner_{freq_th0}_{freq_th1}_{hash_string}'.format(freq_th0=freq_th0_perc,freq_th1=freq_th1_perc,hash_string=hash_string)
     alignment_method = 'metabCombiner'
 
-    alignment_params = {
-        'freq_th0' : freq_th0,
-        'freq_th1' : freq_th1,
+    params = {
         'param_name' : param_name,
         'alignment_method' : alignment_method,
+        'freq_th0' : freq_th0,
+        'freq_th1' : freq_th1,
+        'method_param_name' : hash_string, # this is used to identify the method parameters
+        # 'alignment_name' : hash_string, # this is used to identify the method-specific parameters
+        'hash_string': hash_string,
         'alignment_params' : {
             'binGap' : kwargs.get('binGap',0.005),
             'misspc1' : kwargs.get('misspc1',90),
@@ -133,7 +140,7 @@ def create_metaCombiner_params(**kwargs):
             'tolrtq' : kwargs.get('tolrtq',0.3),
         }
     }
-    return alignment_params
+    return params
 
 
 def create_metaCombiner_grid_search(save_dir,**kwargs):

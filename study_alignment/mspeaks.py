@@ -24,8 +24,8 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.impute import KNNImputer
-
-DEFAULT_VERBOSE = True
+import matplotlib.colors as mcolors
+DEFAULT_VERBOSE = False
 
 #######################################################
 # create a  class called MSPeaks
@@ -117,6 +117,17 @@ class MSPeaks:
         with open(file_path, 'rb') as file:
             self.from_dict(pickle.load(file))
 
+    def save(self,file_path):
+        if '.pkl' in file_path:
+            self.save_to_pickle(file_path)
+        else:
+            raise NotImplementedError
+        
+    def load(self,file_path):
+        if '.pkl' in file_path:
+            self.load_from_pickle(file_path)
+        else:
+            raise NotImplementedError
 
 
     def add_peak_info(self, info):
@@ -239,7 +250,16 @@ class MSPeaks:
             return self.peak_intensity[self.get_samples(freq_th)]
 
 
-    def rename_selected_peaks(self,current_ids,new_ids,verbose=DEFAULT_VERBOSE):
+    def rename_selected_peaks(self,current_ids_or_dict,new_ids=None,verbose=DEFAULT_VERBOSE):
+        if new_ids is None:
+            assert isinstance(current_ids_or_dict, dict), "Error: if new_ids is None, current_ids must be a dict."
+            rename_dict = current_ids_or_dict
+            new_ids = rename_dict.keys()
+            current_ids = rename_dict.values()
+        else:
+            current_ids = current_ids_or_dict
+            # rename_dict = dict(zip(current_ids,new_ids))
+
         # useful when we want to rename peaks to match a standard, such as when doing study-alignment
         if 'original_id' not in self.peak_info.columns:
             self.peak_info['original_id'] = self.peak_info.index
@@ -257,7 +277,11 @@ class MSPeaks:
         self._update_basic_info()
         return
 
-    def rename_selected_samples(self,current_ids,new_ids,verbose=DEFAULT_VERBOSE):
+    def rename_selected_samples(self,current_ids,new_ids=None,verbose=DEFAULT_VERBOSE):
+        if new_ids is None:
+            assert isinstance(current_ids, dict), "Error: if new_ids is None, current_ids must be a dict."
+            new_ids = current_ids.values()
+            current_ids = current_ids.keys()
         # useful when we want to rename samples to match a standard, such as when doing study-alignment
         removed_ids  = set(self.sample_info.index) - set(current_ids)
         if verbose: print(f"while renaming samples, Removed {len(removed_ids)} samples:\n{removed_ids}")
@@ -365,11 +389,56 @@ class MSPeaks:
     def umap_plot_peaks(self):
         raise NotImplementedError
     
+
+    def heirarchical_clustering_plot(self,save_path=None,plot_name=None,freq_cutoff=0.2,show_na='zero',):
+        vals = self.peak_intensity
+        vals = np.log2(vals+1)
+        nan_locs = self.missing_val_mask
+        if show_na=='zero':
+            vals[nan_locs] = 0
+            
+        peak_subset = self.get_peaks(freq_th=freq_cutoff)
+        vals = vals.loc[peak_subset]
+
+        # Create a continuous color map from values
+        row_col_values = self.sample_info['run_order']
+        norm = mcolors.Normalize(vmin=row_col_values.min(), vmax=row_col_values.max(), clip=True)
+        mapper = plt.cm.ScalarMappable(norm=norm, cmap=plt.get_cmap('turbo'))
+
+        # Convert values to colors
+        # row_colors = pd.Series(mapper.to_rgba(row_col_values))
+        row_colors = pd.Series([tuple(color) for color in mapper.to_rgba(row_col_values)])
+        row_colors.name = 'run_order'
+
+
+        sns.clustermap(vals.T, cmap='viridis', figsize=(10,10), cbar_kws={'label': 'log2(intensity)'},
+                       row_colors=row_colors)
+        if plot_name is None:
+            num_samples = len(self.sample_info.index)
+            num_feats = len(self.peak_info.index)
+            plot_name = f'{self.study_id} UMAP of Samples ({num_samples}, {num_feats} feats)'
+        
+        plt.title(plot_name)
+        plt.tight_layout()
+        if save_path is not None:
+            plt.savefig(save_path,dpi=300,bbox_inches='tight')
+            plt.close()
+
+
     def get_target_matches(self):
         raise NotImplementedError
     
-    def remove_outlier_samples(self):
-        raise NotImplementedError
+    def remove_outlier_samples(self,method=None):
+        if method is None:
+            method = 'low_frequency'
+        
+        if method == 'low_frequency':
+            # remove super low frequency peaks
+            self.apply_freq_th_on_peaks(freq_th=0.1,inplace=True)
+            # remove samples with too few peaks
+            self.apply_freq_th_on_samples(freq_th=0.1,inplace=True)
+        else:
+            raise NotImplementedError
     
     def remove_outlier_peaks(self):
         raise NotImplementedError
@@ -404,7 +473,7 @@ def create_mspeaks(peak_info=None, sample_info=None, peak_intensity=None, target
     return mspeaks_obj
 
 
-def create_mspeaks_from_mzlearn_result(result_dir,peak_subdir='final_peaks'):
+def create_mspeaks_from_mzlearn_result(result_dir,peak_subdir='final_peaks',peak_intensity='intensity_max'):
     # read in the peak_info
     peak_info_path = os.path.join(result_dir,peak_subdir,'peak_info.csv')
     if not os.path.exists(peak_info_path):
@@ -422,7 +491,7 @@ def create_mspeaks_from_mzlearn_result(result_dir,peak_subdir='final_peaks'):
 
     # read in the peak_intensity
     try:
-        peak_intensity = pd.read_csv(os.path.join(result_dir,peak_subdir,'intensity_max.csv'), index_col=0)
+        peak_intensity = pd.read_csv(os.path.join(result_dir,peak_subdir,f'{peak_intensity}.csv'), index_col=0)
     except FileNotFoundError:
         peak_intensity = None
 

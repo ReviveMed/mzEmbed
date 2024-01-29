@@ -4,6 +4,7 @@
 
 import json
 import os
+import numpy as np
 
 ###################
 ## Basic File I/O Functions
@@ -14,16 +15,26 @@ def load_json(file_path):
         data = json.load(f)
     return data
 
+def clean_for_json(data):
+    if isinstance(data, list):
+        data = [clean_for_json(d) for d in data]
+
+    if isinstance(data, dict):
+        # convert type int64 to int
+        for k,v in data.items():
+            if isinstance(v, np.int64):
+                data[k] = int(v)
+    return data
+
 def save_json(data, file_path):
-    # convert type int64 to int
-    for k,v in data.items():
-        if isinstance(v, np.int64):
-            data[k] = int(v)
+    data = clean_for_json(data)
     with open(file_path, 'w') as f:
         json.dump(data, f)
 
 def unravel_dict(d, prefix='a'):
     unravel = {}
+    if isinstance(d, list):
+        d = {str(i): v for i, v in enumerate(d)}
     for k, v in d.items():
         unravel[prefix + '_' + k] = v
     for k, v in list(unravel.items()):  # Create a copy of the items
