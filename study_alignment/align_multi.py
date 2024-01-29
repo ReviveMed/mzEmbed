@@ -34,7 +34,7 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
         fill_na_strategy (str): The strategy to fill missing values. Default is None.
         outlier_samples_removal_strategy (str): The strategy to remove outlier samples. Default is None.
         verbose (bool): Whether to print verbose output. Default is True.
-        save_cleaned_peak_obj (bool): Whether to save the cleaned MSPeaks objects. Default is False.
+        cleaned_peaks_obj_dir: where to save the cleaned MSPeaks objects. Default is None, which means they are not saved.
 
     Returns:
         pandas.DataFrame: The multi-aligned DataFrame containing the alignment results.
@@ -51,7 +51,7 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
     fill_na_strategy = kwargs.get('fill_na_strategy', None)
     outlier_samples_removal_strategy = kwargs.get('outlier_samples_removal_strategy', None)
     verbose = kwargs.get('verbose', True)
-    cleaned_peaks_obj_dir = kwargs.get('save_cleaned_peak_obj', None)
+    cleaned_peaks_obj_dir = kwargs.get('cleaned_peaks_obj_dir', None)
 
     # if norm_func is not None:
     #     peak_intensity_name = 'intensity_max_synthetic_norm'

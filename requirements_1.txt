@@ -1,0 +1,33 @@
+# Python v3.9
+matplotlib>=3.5.1
+networkx>=2.6
+numba>=0.51.2
+pandas>=1.3.5
+# ray>=1.12.0
+ray[default]>=1.12.0
+scikit-learn>=1.0.2
+scipy>=1.7.3
+statsmodels>=0.13.2
+numpy>=1.21.6
+Pillow>=9.5.0
+psutil>=5.9.0
+pymzml>=2.5.1
+torch>=1.11.0
+tqdm>=4.64.0
+trackpy>=0.5.0
+matplotlib_venn>=0.11.7
+seaborn
+feather-format
+python-Levenshtein
+google-cloud-storage
+gcsfs
+lxml
+bs4
+jupyter
+ipykernel
+umap-learn
+tensorflow
+keras
+lifelines
+openpyxl
+inmoose
