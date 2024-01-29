@@ -65,7 +65,7 @@ class MSPeaks:
                 'overall_MZ_min':self.overall_MZ_min,
                 'overall_MZ_max':self.overall_MZ_max,
         }
-        if no_pandas
+        if no_pandas:
             out_dict['peak_info'] = _df_to_dict(self.peak_info)
             out_dict['peak_intensity'] = _df_to_dict(self.peak_intensity)
             out_dict['missing_val_mask'] = _df_to_dict(self.missing_val_mask)
