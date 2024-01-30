@@ -1,5 +1,6 @@
 library(metabCombiner)
 library(jsonlite)
+library(shiny)
 
 main <- function(dataset1_path, dataset2_path, output_path, params_json_path) {
 
