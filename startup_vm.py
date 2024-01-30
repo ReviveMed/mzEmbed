@@ -100,10 +100,10 @@ def get_mspeak_from_job_id(script_path_mspeak, job_id, freq_th):
         params_overall_fild_path = f"{intermediate_folder_path}/params_overall.csv"
         # mzlearn-webapp.appspot.com/mzlearn/min/2023-12-08 15:41:42/params_overall.csv
         # download this file to local as well
-        blob = bucket.blob(params_overall_fild_path)
-        blob.download_to_filename(f"{dst_path}/params_overall.csv")
         download_from_bucket(bucket_name, sample_info_folder_path, f"{dst_path}/sample_info")
         download_from_bucket(bucket_name, final_peaks_folder_path, f"{dst_path}/final_peaks")
+        blob = bucket.blob(params_overall_fild_path)
+        blob.download_to_filename(f"{dst_path}/params_overall.csv")
     else:
         print("Did not download mzlearn_intermediate_results to local")
 
