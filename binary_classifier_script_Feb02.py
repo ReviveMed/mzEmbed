@@ -48,6 +48,8 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.regularizers import L1L2, l1, l2
 
 
+from sklearn_models.evaluation import generate_model_summary
+
 logistic_regression_param_grid = {
             'penalty': ['l1', 'l2'],
             'C': [0.005, 0.1, 0.5, 1, 2, 5, 10],
@@ -92,7 +94,9 @@ def create_sklearn_model_summary(base_model,model_name,param_grid,input_dir):
     if os.path.exists(f'{input_dir}/X_val.csv'):
         X_val = pd.read_csv(f'{input_dir}/X_val.csv',index_col=0)
         y_val = pd.read_csv(f'{input_dir}/y_val.csv',index_col=0)
-
+    if os.path.exists(f'{input_dir}/X_test_alt.csv'):
+        X_test_alt = pd.read_csv(f'{input_dir}/X_test_alt.csv',index_col=0)
+        y_test_alt = pd.read_csv(f'{input_dir}/y_test_alt.csv',index_col=0)
 
     output_dir = os.path.join(input_dir,'classical_models')
     os.makedirs(output_dir,exist_ok=True)
@@ -114,7 +118,7 @@ def create_sklearn_model_summary(base_model,model_name,param_grid,input_dir):
 
     results_list = []
     for ii in range(len(rs.cv_results_['params'])):
-        results_list.append({'val_scores': [], 'test_scores': [], 'train_scores': []})
+        results_list.append({'val_scores': [], 'test_scores': [], 'train_scores': [], 'test_alt_scores': []})
 
     num_repeats = 5
     if os.path.exists(f'{input_dir}/X_val.csv'):
@@ -134,6 +138,10 @@ def create_sklearn_model_summary(base_model,model_name,param_grid,input_dir):
 
                 pred_proba = model.predict_proba(X_train)[:,1]
                 results_list[ii]['train_scores'].append(roc_auc_score(y_train.values, pred_proba))
+
+                if os.path.exists(f'{input_dir}/X_test_alt.csv'):
+                    pred_proba = model.predict_proba(X_test_alt)[:,1]
+                    results_list[ii]['test_alt_scores'].append(roc_auc_score(y_test_alt.values, pred_proba))
     
     else:
         skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
@@ -151,8 +159,16 @@ def create_sklearn_model_summary(base_model,model_name,param_grid,input_dir):
                 pred_proba = model.predict_proba(X_train.iloc[train_index])[:,1]
                 results_list[ii]['train_scores'].append(roc_auc_score(y_train.iloc[train_index].values, pred_proba))
 
+                if os.path.exists(f'{input_dir}/X_test_alt.csv'):
+                    pred_proba = model.predict_proba(X_test_alt)[:,1]
+                    results_list[ii]['test_alt_scores'].append(roc_auc_score(y_test_alt.values, pred_proba))
+
 
     params_df = pd.DataFrame(rs.cv_results_['params'])
+    # if os.path.exists(f'{input_dir}/X_test_alt.csv'):
+    #     summary_df = pd.DataFrame(rs.cv_results_)[['mean_test_score','std_test_score','mean_train_score', 'std_train_score',
+    #                                                'mean_'
+    # else:
     summary_df = pd.DataFrame(rs.cv_results_)[['mean_test_score','std_test_score','mean_train_score', 'std_train_score']]
     summary_df.columns = ['RndGrid '+ col for col in summary_df.columns]
     summary_df = pd.concat([params_df,summary_df],axis=1)
@@ -323,7 +339,8 @@ def create_classifier_model(input_sz,
                               encoder_name = 'encoder_Aug23',
                               encoder_trainable=True,
                               my_output_dir=None,
-                              use_predefined_val=None):
+                              use_predefined_val=None,
+                              **kwargs):
 
     if my_output_dir is None:
         my_output_dir = input_dir
@@ -382,7 +399,7 @@ def run_network_tests(input_dir,epochs=50,batch_size=100,**kwargs):
         use_predefined_val = False
     else:
         use_predefined_val = kwargs['use_predefined_val']
-
+    use_alt_test = kwargs.get('use_alt_test',False)
     if 'custom_encoder_path' in kwargs:
         custom_encoder_path = kwargs['custom_encoder_path']
     else:
@@ -397,8 +414,11 @@ def run_network_tests(input_dir,epochs=50,batch_size=100,**kwargs):
         my_output_dir = input_dir
     
     X_train = pd.read_csv(f'{input_dir}/X_train.csv',index_col=0)
-    X_test = pd.read_csv(f'{input_dir}/X_test.csv',index_col=0)
     y_train = pd.read_csv(f'{input_dir}/y_train.csv',index_col=0)
+    if use_alt_test:
+        X_test_alt = pd.read_csv(f'{input_dir}/X_test_alt.csv',index_col=0)
+        y_test_alt = pd.read_csv(f'{input_dir}/y_test_alt.csv',index_col=0)
+    X_test = pd.read_csv(f'{input_dir}/X_test.csv',index_col=0)
     y_test = pd.read_csv(f'{input_dir}/y_test.csv',index_col=0)
     if use_predefined_val:
         X_val = pd.read_csv(f'{input_dir}/X_val.csv',index_col=0)
@@ -444,6 +464,7 @@ def run_network_tests(input_dir,epochs=50,batch_size=100,**kwargs):
         results['val_scores'] = []
         results['test_scores'] = []
         results['train_scores'] = []
+        results['test_alt_scores'] = []
 
     if use_predefined_val:
         n_repeats = 10
@@ -489,6 +510,13 @@ def run_network_tests(input_dir,epochs=50,batch_size=100,**kwargs):
                     preds = 1/(1+np.exp(-preds))
                     results['test_scores'].append(roc_auc_score(y_test, preds))
 
+                    if use_alt_test:
+                        preds = model.predict(X_test_alt)
+                        # transform the preds with a sigmoid
+                        preds = 1/(1+np.exp(-preds))
+                        results['test_alt_scores'].append(roc_auc_score(y_test_alt, preds))
+
+
     else:        
         k = 5
         skf = StratifiedKFold(n_splits=k,random_state=42,shuffle=True)
@@ -517,7 +545,7 @@ def run_network_tests(input_dir,epochs=50,batch_size=100,**kwargs):
                 model_name = results["model_name"]
                 print(f'model {encoder_name}, {model_name} fold {i}')
                 model.fit(X_train.iloc[train_index], y_train.iloc[train_index], epochs=epochs, batch_size=batch_size, verbose=0)
-
+                #TODO: save with conversion to probability from logits
                 # preds = model.predict(X_train.iloc[test_index])
                 # results['val_scores'].append(roc_auc_score(y_train.iloc[test_index], preds))
 
@@ -527,11 +555,17 @@ def run_network_tests(input_dir,epochs=50,batch_size=100,**kwargs):
                 # test_preds = model.predict(X_test)
                 # results['test_scores'].append(roc_auc_score(y_test, test_preds))
 
+                # if use_alt_test:
+                #     test_preds = model.predict(X_test_alt)
+                #     results['test_alt_scores'].append(roc_auc_score(y_test_alt, test_preds))
+
     for result in results_list:
         print(result['model_name'])
         print('Train: ', np.mean(result['train_scores']))
         print('Val: ', np.mean(result['val_scores']))
         print('Test: ', np.mean(result['test_scores']))
+        if use_alt_test:
+            print('Test Alt: ', np.mean(result['test_alt_scores']))
 
     # save model visualization
     keras.utils.plot_model(model, to_file=f'{my_result_output_dir}/model_{encoder_name}_{date_str}.png', show_shapes=True, show_layer_names=True, show_layer_activations=True)
@@ -543,12 +577,17 @@ def run_network_tests(input_dir,epochs=50,batch_size=100,**kwargs):
     result_df.to_csv(f'{my_result_output_dir}/results_{encoder_name}_{date_str}.csv')
 
     result_df_summary = result_df.groupby('model_name').mean().round(3)
-    result_df_summary.rename(columns={'val_scores': 'Val AUC', 'test_scores': 'Test AUC', 'train_scores': 'Train AUC'}, inplace=True)
+    result_df_summary.rename(columns={'val_scores': 'Val AUC', 'test_scores': 'Test AUC', 'train_scores': 'Train AUC', 'test_alt_scores': 'Test Alt AUC'}, inplace=True)
     # sort the columns
-    result_df_summary = result_df_summary[['Train AUC','Val AUC','Test AUC']]
+    if use_alt_test:
+        result_df_summary = result_df_summary[['Train AUC','Val AUC','Test AUC','Test Alt AUC']]
+    else:
+        result_df_summary = result_df_summary[['Train AUC','Val AUC','Test AUC']]
     result_df_summary['Train AUC Std'] = result_df.groupby('model_name').std()['train_scores'].round(3)
     result_df_summary['Val AUC Std'] = result_df.groupby('model_name').std()['val_scores'].round(3)
     result_df_summary['Test AUC Std'] = result_df.groupby('model_name').std()['test_scores'].round(3)
+    if use_alt_test:
+        result_df_summary['Test Alt AUC Std'] = result_df.groupby('model_name').std()['test_alt_scores'].round(3)
     result_df_summary.to_csv(f'{my_result_output_dir}/results_summary_{encoder_name}_{date_str}.csv')
 
 
@@ -566,7 +605,8 @@ def run_performance_eval(n_layers,n_neurons,activation,
                          epoch_list=None,
                          custom_encoder_path=None,
                          pretrain_filename=None,
-                         dropout_val=0):
+                         dropout_val=0,
+                         use_alt_test=False):
     
     if epoch_list is None:
         # epoch_list= [10,20,30,40,50,60,70,80,90,100,120,150,200,250]
@@ -632,7 +672,8 @@ def run_performance_eval(n_layers,n_neurons,activation,
                                     epochs=epochs,
                                     batch_size=32,
                                     my_output_dir=output_dir,
-                                    use_predefined_val=use_predefined_val)
+                                    use_predefined_val=use_predefined_val,
+                                    use_alt_test=use_alt_test)
 
     return
 
@@ -650,127 +691,160 @@ if not os.path.exists(base_dir):
 # input_dir = f'{base_dir}/data_2023_october/selected_studiesX 13/combat_mskcc_binary_task'
 # data_engine_path = '/Users/jonaheaton/Desktop/Data-engine'
 
-date_name = 'hilic_pos_2024_jan_29_read_norm'
+date_name = 'hilic_pos_2024_feb_02_read_norm'
 # study_subset_name = 'subset all_studies with align score 0 from Eclipse_align_80_40_default'
 # study_subset_name = 'subset all_studies with align score 0 from Merge_Jan25_align_80_40_default'
-study_subset_name = 'subset all_studies with align score 0.25 from Merge_Jan25_align_80_40_default'
+# study_subset_name = 'subset all_studies with align score 0.25 from Merge_Jan25_align_80_40_default'
 feat_subset_name = 'num_cohorts_thresh_0.5'
-task_name = 'combat_Benefit'
+# task_name = 'combat_Benefit'
 
-study_subset_name_list = ['subset all_studies with align score 0.25 from Merge_Jan25_align_80_40_default','subset all_studies with align score 0 from Eclipse_align_80_40_default']
+study_subset_name_list = [
+                        # 'subset all_studies with align score 0.35 from Merge_Jan25_align_80_40_fillna_avg',
+                        #   'subset all_studies with align score 0.4 from Merge_Jan25_align_80_40_fillna_avg',
+                          'subset all_studies with align score 0.3 from Merge_Jan25_align_80_40_fillna_avg',
+                          #'subset all_studies with align score 0.275 from Merge_Jan25_align_80_40_fillna_avg',
+                          'subset all_studies with align score 0.25 from Merge_Jan25_align_80_40_fillna_avg',
+                          #'subset all_studies with align score 0 from Merge_Jan25_align_80_40_fillna_avg']
+                            ]
 
-for study_subset_name in study_subset_name_list:
+# for task_name in ['std_1_Benefit','combat_Benefit']:
+for task_name in ['std_1_Benefit']:
+    for study_subset_name in study_subset_name_list:
 
-    input_dir = f'{base_dir}/{date_name}/{study_subset_name}/{feat_subset_name}/{task_name}'
+        input_dir = f'{base_dir}/{date_name}/{study_subset_name}/{feat_subset_name}/{task_name}'
 
-    if True:
+        skip_sklearn = False
+        # check if the sklearn models have already been run
+        sklearn_output_dir = os.path.join(input_dir,'classical_models')
+        if os.path.exists(sklearn_output_dir):
+            files_in_sklearn = [file for file in os.listdir(sklearn_output_dir) if file.endswith('.csv')]
+            for file in files_in_sklearn:
+                if 'decision_tree_summary' in file:
+                    print('sklearn models already run')
+                    skip_sklearn= True
+                    continue
 
-        # my_output_dir = f'/Users/jonaheaton/ReviveMed Dropbox/Jonah Eaton/development_CohortCombination/simple_networks_Aug_2023/datasets/Aug22_{freq_th}'
+
+        if (not skip_sklearn):
+
+            # my_output_dir = f'/Users/jonaheaton/ReviveMed Dropbox/Jonah Eaton/development_CohortCombination/simple_networks_Aug_2023/datasets/Aug22_{freq_th}'
+            # input_dir = data_engine_path
+
+
+            base_model = LogisticRegression
+            model_name = 'logistic_regression'
+            param_grid = logistic_regression_param_grid
+            create_sklearn_model_summary(base_model,model_name,param_grid,input_dir)
+
+            base_model = RandomForestClassifier
+            model_name = 'random_forest'
+            param_grid = random_forest_param_grid
+            create_sklearn_model_summary(base_model,model_name,param_grid,input_dir)
+
+            base_model = SVC
+            model_name = 'svc'
+            param_grid = svc_param_grid
+            create_sklearn_model_summary(base_model,model_name,param_grid,input_dir)
+
+            base_model = DecisionTreeClassifier
+            model_name = 'decision_tree'
+            param_grid = decision_tree_param_grid
+            create_sklearn_model_summary(base_model,model_name,param_grid,input_dir)
+
+            generate_model_summary(sklearn_output_dir)
+        else:
+            print('skipping rerun of sklearn models')
+            generate_model_summary(sklearn_output_dir)
+
+
+
+        # %%
+        if False:
+            run_performance_eval(n_layers=0,n_neurons=0,activation='sigmoid',
+                                    input_dir=input_dir,
+                                    output_subdir='adde_autoencoder_models3',
+                                    custom_encoder_path='/Users/jonaheaton/Desktop/cohort_combine_oct16/selected_studiesX 13/ADV_DE_Model_on_combat/ADV_encoder_ALL_DATASETS_EXCEPT_[0, 1]_32L_lam1_fold42_epochs1000.keras'
+                                    # custom_encoder_path= '/Users/jonaheaton/Desktop/cohort_combine_oct16/selected_studiesX 13/ADV_DE_Model_on_combat1/ADV_encoder_ALL_DATASETS_EXCEPT_[0, 1]_32L_lam1_fold42.keras'
+            )
+
+
+        if True:
+            output_file = f'{input_dir}/keras_autoencoder_models5/pretrained_decoder_0_128_sigmoid_0.2_L1_15_X_pretrain.csv.keras'
+            print(output_file)
+            # if os.path.exists(output_file):
+                # print('keras models already exist')
+                # continue
+
+            # the number of hidden layers
+            for n_layers in []:
+                for n_neurons in [128]:
+                    for dropout_val in [0,0.2]:
+                        run_performance_eval(n_layers,n_neurons,'sigmoid',
+                                            input_dir=input_dir,
+                                            epoch_list = [5,25],
+                                            dropout_val=dropout_val,
+                                            output_subdir='keras_autoencoder_models5',
+                                            # pretrain_filename='X_pretrain_farmm_and_rcc3_bs.csv')
+                                            # pretrain_filename='X_pretrain_rcc3_bs.csv')
+                                            pretrain_filename='X_pretrain.csv',
+                                            use_alt_test=True)
+
+
+            for n_layers in [1]:
+                for n_neurons in [128]:
+                    for dropout_val in [0,0.2,0.4]:
+                        run_performance_eval(n_layers,n_neurons,'sigmoid',
+                                            input_dir=input_dir,
+                                            epoch_list = [50,100],
+                                            dropout_val=dropout_val,
+                                            output_subdir='keras_autoencoder_models5',
+                                            # pretrain_filename='X_pretrain_farmm_and_rcc3_bs.csv')
+                                            # pretrain_filename='X_pretrain_rcc3_bs.csv')
+                                            pretrain_filename='X_pretrain.csv',
+                                            use_alt_test=True)
+
+                    # run_performance_eval(n_layers,n_neurons,'sigmoid',
+                    #                     input_dir=input_dir,
+                    #                     output_subdir='keras_autoencoder_models5',
+                    #                     # pretrain_filename='X_pretrain_farmm_and_rcc3_bs.csv')
+                    #                     pretrain_filename='X_pretrain_rcc3_bs.csv')
+                    #                     # pretrain_filename='X_pretrain.csv')
+
+
+        # # %%
+        # data_engine_path = '/Users/jonaheaton/Desktop/Data-engine'
         # input_dir = data_engine_path
 
+        # output_dir = os.path.join(input_dir,'autoencoder_models')
+        # os.makedirs(output_dir, exist_ok=True)
+        # encoder_name = '16_16_16_relu_L1'
 
-        base_model = LogisticRegression
-        model_name = 'logistic_regression'
-        param_grid = logistic_regression_param_grid
-        create_sklearn_model_summary(base_model,model_name,param_grid,input_dir)
+        # create_autoencoder_model(input_dir,
+        #                         encoder_name,
+        #                         epochs=500,
+        #                         batch_size=50,
+        #                         encoder_patience=10,
+        #                         activation='relu',
+        #                         l1_val=0.00001,
+        #                         dropout_val=0,
+        #                         bottleneck_sz=16,
+        #                         neuron_num_list=[16,16],
+        #                         pretrained_autoenoder=None,
+        #                         my_output_dir=output_dir)
 
-        base_model = RandomForestClassifier
-        model_name = 'random_forest'
-        param_grid = random_forest_param_grid
-        create_sklearn_model_summary(base_model,model_name,param_grid,input_dir)
+        # # %%
+        # encoder_list = ['16_16_16_relu_L1']
 
-        base_model = SVC
-        model_name = 'svc'
-        param_grid = svc_param_grid
-        create_sklearn_model_summary(base_model,model_name,param_grid,input_dir)
+        # for encoder_id in encoder_list:
+        #                 for epochs in [10,20,50,100,200]:
+        #                     for activation in ['relu']:
+        #                     # for activation in ['sigmoid','relu']:
 
-        base_model = DecisionTreeClassifier
-        model_name = 'decision_tree'
-        param_grid = decision_tree_param_grid
-        create_sklearn_model_summary(base_model,model_name,param_grid,input_dir)
-
-
-
-
-    # %%
-    if False:
-        run_performance_eval(n_layers=0,n_neurons=0,activation='sigmoid',
-                                input_dir=input_dir,
-                                output_subdir='adde_autoencoder_models3',
-                                custom_encoder_path='/Users/jonaheaton/Desktop/cohort_combine_oct16/selected_studiesX 13/ADV_DE_Model_on_combat/ADV_encoder_ALL_DATASETS_EXCEPT_[0, 1]_32L_lam1_fold42_epochs1000.keras'
-                                # custom_encoder_path= '/Users/jonaheaton/Desktop/cohort_combine_oct16/selected_studiesX 13/ADV_DE_Model_on_combat1/ADV_encoder_ALL_DATASETS_EXCEPT_[0, 1]_32L_lam1_fold42.keras'
-        )
-
-
-    if True:
-        # the number of hidden layers
-        for n_layers in [0]:
-            for n_neurons in [64,128]:
-                for dropout_val in [0,0.2]:
-                    run_performance_eval(n_layers,n_neurons,'sigmoid',
-                                        input_dir=input_dir,
-                                        epoch_list = [125,250],
-                                        dropout_val=dropout_val,
-                                        output_subdir='keras_autoencoder_models5',
-                                        # pretrain_filename='X_pretrain_farmm_and_rcc3_bs.csv')
-                                        # pretrain_filename='X_pretrain_rcc3_bs.csv')
-                                        pretrain_filename='X_pretrain.csv')
-
-
-        for n_layers in [1]:
-            for n_neurons in [16,32,64]:
-                for dropout_val in [0,0.2]:
-                    run_performance_eval(n_layers,n_neurons,'sigmoid',
-                                        input_dir=input_dir,
-                                        epoch_list = [250,500],
-                                        dropout_val=dropout_val,
-                                        output_subdir='keras_autoencoder_models5',
-                                        # pretrain_filename='X_pretrain_farmm_and_rcc3_bs.csv')
-                                        # pretrain_filename='X_pretrain_rcc3_bs.csv')
-                                        pretrain_filename='X_pretrain.csv')
-
-                # run_performance_eval(n_layers,n_neurons,'sigmoid',
-                #                     input_dir=input_dir,
-                #                     output_subdir='keras_autoencoder_models5',
-                #                     # pretrain_filename='X_pretrain_farmm_and_rcc3_bs.csv')
-                #                     pretrain_filename='X_pretrain_rcc3_bs.csv')
-                #                     # pretrain_filename='X_pretrain.csv')
-
-
-    # # %%
-    # data_engine_path = '/Users/jonaheaton/Desktop/Data-engine'
-    # input_dir = data_engine_path
-
-    # output_dir = os.path.join(input_dir,'autoencoder_models')
-    # os.makedirs(output_dir, exist_ok=True)
-    # encoder_name = '16_16_16_relu_L1'
-
-    # create_autoencoder_model(input_dir,
-    #                         encoder_name,
-    #                         epochs=500,
-    #                         batch_size=50,
-    #                         encoder_patience=10,
-    #                         activation='relu',
-    #                         l1_val=0.00001,
-    #                         dropout_val=0,
-    #                         bottleneck_sz=16,
-    #                         neuron_num_list=[16,16],
-    #                         pretrained_autoenoder=None,
-    #                         my_output_dir=output_dir)
-
-    # # %%
-    # encoder_list = ['16_16_16_relu_L1']
-
-    # for encoder_id in encoder_list:
-    #                 for epochs in [10,20,50,100,200]:
-    #                     for activation in ['relu']:
-    #                     # for activation in ['sigmoid','relu']:
-
-    #                         run_network_tests(input_dir,
-    #                                         n_neurons=0,
-    #                                         encoder_name=encoder_id,
-    #                                         n_layers=0,
-    #                                         activation=activation,
-    #                                         epochs=epochs,
-    #                                         batch_size=50,
-    #                                         my_output_dir=output_dir)
+        #                         run_network_tests(input_dir,
+        #                                         n_neurons=0,
+        #                                         encoder_name=encoder_id,
+        #                                         n_layers=0,
+        #                                         activation=activation,
+        #                                         epochs=epochs,
+        #                                         batch_size=50,
+        #                                         my_output_dir=output_dir)

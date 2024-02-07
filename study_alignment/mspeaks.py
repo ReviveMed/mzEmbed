@@ -527,6 +527,8 @@ def create_mspeaks_from_mzlearn_result(result_dir,peak_subdir='final_peaks',peak
 #######################################################
 
 def _df_to_dict(df):
+    if df is None:
+        return None
     return {
         "columns": list(df.columns),
         "rows": list(df.index),
@@ -534,6 +536,8 @@ def _df_to_dict(df):
     }
 
 def _dict_to_df(d):
+    if d is None:
+        return None
     return pd.DataFrame(data=d["values"], index=d["rows"], columns=d["columns"])
 
 

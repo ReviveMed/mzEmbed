@@ -246,6 +246,8 @@ def rename_inputs_to_origin(save_dir, multi_alignment_df=None,
 
     if renamed_input_obj_path_list is None:
         renamed_input_obj_path_list = [input_path.replace('.pkl','_renamed.pkl') for input_path in input_peak_obj_path_list]
+        if load_dir != save_dir:
+            renamed_input_obj_path_list = [path.replace(load_dir,save_dir) for path in renamed_input_obj_path_list]
 
     for input_name, input_study_path, renamed_input_study_path in zip(input_name_list, input_peak_obj_path_list, renamed_input_obj_path_list):
 
