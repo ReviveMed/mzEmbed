@@ -5,7 +5,7 @@ import numpy as np
 import os
 
 
-def create_sklearn_model_summary(model_output_dir):
+def generate_model_summary(model_output_dir):
     """
     Create a summary of the model performance from the output files of the sklearn model
     each metric in the summary is a weighted average, weights given by the validation AUC scores
@@ -48,3 +48,11 @@ def create_sklearn_model_summary(model_output_dir):
     # save to excel file
     summary_df.to_excel(os.path.join(model_output_dir,'summary.xlsx'))
     return summary_df
+
+
+if __name__ == '__main__':
+
+    model_output_dir = '/Users/jonaheaton/ReviveMed Dropbox/Jonah Eaton/development_CohortCombination/hilic_pos_2024_jan_29_read_norm/subset all_studies with align score 0.25 from Merge_Jan25_align_80_40_default/num_cohorts_thresh_0.5/combat_Benefit/classical_models'
+    # model_output_dir = '/Users/jonaheaton/ReviveMed Dropbox/Jonah Eaton/development_CohortCombination/hilic_pos_2024_jan_29_read_norm/subset all_studies with align score 0 from Eclipse_align_80_40_default/num_cohorts_thresh_0.5/combat_Benefit/classical_models'
+    print(model_output_dir)
+    generate_model_summary(model_output_dir)

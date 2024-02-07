@@ -53,8 +53,8 @@ class MSPeaks:
         self.num_samples = len(self.sample_info.index)
 
       
-    def to_dict(self):  
-        return {
+    def to_dict(self,no_pandas=True):  
+        out_dict ={
                 'num_peaks':self.num_peaks,
                 'num_samples':self.num_samples,
                 'peak_freq_th':self.peak_freq_th,
@@ -64,31 +64,41 @@ class MSPeaks:
                 'overall_RT_max':self.overall_RT_max,
                 'overall_MZ_min':self.overall_MZ_min,
                 'overall_MZ_max':self.overall_MZ_max,
-                # 'peak_info':self.peak_info.to_dict(),
-                # 'peak_intensity':self.peak_intensity.to_dict(),
-                # 'missing_val_mask':self.missing_val_mask.to_dict(),
-                # 'targets_info':self.targets_info.to_dict(),
-                # 'sample_info':self.sample_info.to_dict()
-                'peak_info': self.peak_info,
-                'peak_intensity': self.peak_intensity,
-                'missing_val_mask': self.missing_val_mask,
-                'targets_info': self.targets_info,
-                'sample_info': self.sample_info
         }
+        if no_pandas:
+            out_dict['peak_info'] = _df_to_dict(self.peak_info)
+            out_dict['peak_intensity'] = _df_to_dict(self.peak_intensity)
+            out_dict['missing_val_mask'] = _df_to_dict(self.missing_val_mask)
+            out_dict['targets_info'] = _df_to_dict(self.targets_info)
+            out_dict['sample_info'] = _df_to_dict(self.sample_info)
+        else:
+            out_dict['peak_info'] = self.peak_info
+            out_dict['peak_intensity'] = self.peak_intensity
+            out_dict['missing_val_mask'] = self.missing_val_mask
+            out_dict['targets_info'] = self.targets_info
+            out_dict['sample_info'] = self.sample_info
+        return out_dict
 
 
 
-    def from_dict(self,dict_obj):
-        # self.peak_info = pd.DataFrame.from_dict(dict_obj['peak_info'])
-        # self.peak_intensity = pd.DataFrame.from_dict(dict_obj['peak_intensity'])
-        # self.missing_val_mask = pd.DataFrame.from_dict(dict_obj['missing_val_mask'])
-        # self.targets_info = pd.DataFrame.from_dict(dict_obj['targets_info'])
-        # self.sample_info = pd.DataFrame.from_dict(dict_obj['sample_info'])
-        self.peak_info =dict_obj['peak_info']
-        self.peak_intensity = dict_obj['peak_intensity']
-        self.missing_val_mask = dict_obj['missing_val_mask']
-        self.targets_info = dict_obj['targets_info']
-        self.sample_info = dict_obj['sample_info']
+
+
+    def from_dict(self,dict_obj,no_pandas=True):
+  
+        if (no_pandas) and isinstance(dict_obj['peak_info'],dict):
+            self.peak_info = _dict_to_df(dict_obj['peak_info'])
+            self.peak_intensity = _dict_to_df(dict_obj['peak_intensity'])
+            self.missing_val_mask = _dict_to_df(dict_obj['missing_val_mask'])
+            self.targets_info = _dict_to_df(dict_obj['targets_info'])
+            self.sample_info = _dict_to_df(dict_obj['sample_info'])
+        elif isinstance(dict_obj['peak_info'],pd.DataFrame):
+            self.peak_info =dict_obj['peak_info']
+            self.peak_intensity = dict_obj['peak_intensity']
+            self.missing_val_mask = dict_obj['missing_val_mask']
+            self.targets_info = dict_obj['targets_info']
+            self.sample_info = dict_obj['sample_info']
+        else:
+            raise ImportError('Error: could not import MSPeaks. Please check the format of the dictionary object.')
         self.num_peaks = dict_obj['num_peaks']
         self.num_samples = dict_obj['num_samples']
         self.peak_freq_th = dict_obj['peak_freq_th']
@@ -515,6 +525,21 @@ def create_mspeaks_from_mzlearn_result(result_dir,peak_subdir='final_peaks',peak
 #######################################################
 ########### Helper functions ###########
 #######################################################
+
+def _df_to_dict(df):
+    if df is None:
+        return None
+    return {
+        "columns": list(df.columns),
+        "rows": list(df.index),
+        "values": df.values.tolist(),
+    }
+
+def _dict_to_df(d):
+    if d is None:
+        return None
+    return pd.DataFrame(data=d["values"], index=d["rows"], columns=d["columns"])
+
 
 
 def _compute_sample_freq_of_peaks(df,sample_list=None):

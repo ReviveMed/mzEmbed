@@ -16,7 +16,7 @@ from study_alignment.mspeaks import MSPeaks, create_mspeaks_from_mzlearn_result
 from study_alignment.utils_misc import load_json, save_json, get_method_param_name
 
 from inmoose.pycombat import pycombat_norm
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
 
 sys.path.append('/Users/jonaheaton/mzlearn/peak_picking_pipeline')
@@ -40,13 +40,15 @@ dropbox_dir = '/Users/jonaheaton/ReviveMed Dropbox/Jonah Eaton/'
 data_path = '/Users/jonaheaton/Desktop/Data-engine'
 other_data_path = '/Users/jonaheaton/Desktop/Hilic_pos'
 origin_name = 'ST001236_and_ST001237'
-origin_result_path = os.path.join(data_path,origin_name,'rcc1_rcc3_output_v1_2023-09-28-21-22-21-')
+# origin_result_path = os.path.join(data_path,origin_name,'rcc1_rcc3_output_v1_2023-09-28-21-22-21-')
+origin_result_path = os.path.join(data_path,origin_name,'rcc1_rcc3_output_v1_2023-10-20-13_55_12')
 # origin_metadata_file = os.path.join(data_path,origin_name,'sample_info.csv')
 
 
 cohort_combine_dir = os.path.join(dropbox_dir,'development_CohortCombination')
 norm_setting_dir = os.path.join(cohort_combine_dir,'norm_settings')
-output_dir = f'{cohort_combine_dir}/hilic_pos_2024_jan_29_read_norm'
+output_dir = f'{cohort_combine_dir}/hilic_pos_2024_feb_02_read_norm'
+# output_dir = f'{cohort_combine_dir}/hilic_pos_2024_feb_05_read_norm_poolmap'
 origin_metadata_file = f'{cohort_combine_dir}/rcc_sample_info3.csv'
 os.makedirs(output_dir,exist_ok=True)
 plots_dir = os.path.join(output_dir,'plots')
@@ -55,8 +57,9 @@ os.makedirs(norm_setting_dir,exist_ok=True)
 
 create_qc_plots = False
 
-prep_name = 'default'
-fill_na_strat = 'min'
+# prep_name = 'fillna_avg_poolmap'
+prep_name = 'fillna_avg'
+fill_na_strat = 'mean'
 origin_freq_th = 0.8
 norm_name = 'synthetic v1'
 read_norm_peaks = True
@@ -90,9 +93,9 @@ save_json(prep_peaks_params,os.path.join(cleaned_peaks_obj_dir,'prep_peaks_param
 # assert os.path.exists(os.path.join(output_dir,'norm_settings',f'{norm_name}.json')), f'Norm function {norm_name} not found'
 
 # alignment_param_path = '/Users/jonaheaton/Desktop/alignment_analysis/Alignment_Params/Eclipse_50_50_Original.json'
-alignment_param_path = '/Users/jonaheaton/Desktop/alignment_analysis/Alignment_Params/Eclipse_50_50_default.json'
+# alignment_param_path = '/Users/jonaheaton/Desktop/alignment_analysis/Alignment_Params/Eclipse_50_50_default.json'
 # alignment_param_path = '/Users/jonaheaton/Desktop/alignment_analysis/Alignment_Params/metabCombiner_50_50_Jan23.json'
-# alignment_param_path = '/Users/jonaheaton/Desktop/alignment_analysis/Alignment_Params/Merge_50_50_Jan25.json'
+alignment_param_path = '/Users/jonaheaton/Desktop/alignment_analysis/Alignment_Params/Merge_50_50_Jan25.json'
 params = load_json(alignment_param_path)
 # Ideally I would also load the frequency threshold from the alignment params
 alignment_method = params['alignment_method']
@@ -117,13 +120,26 @@ align_save_dir = os.path.join(output_dir,alignment_dir_name)
 os.makedirs(align_save_dir,exist_ok=True)
 save_json(params,os.path.join(align_save_dir,'params.json'))
 
+
+finetune_label_col_name = 'Benefit'
+finetune_label_col_list = [finetune_label_col_name]
+
+# finetune_label_col_name = 'MSKCC'
+# finetune_label_col_list = [finetune_label_col_name]
+
+# finetune_label_col_name = 'Multi'
+# finetune_label_col_list = ['Benefit','PFS','PFS_Event','OS_genomics','Event_genomics','ORR','ExtremeResponder','MSKCC',	'IMDC','Treatment','Sex','Region','study_week']
+
+
 # %% Choose the files used to apply the frequency threshold on the origin study
 origin_metadata = pd.read_csv(origin_metadata_file,index_col=0)
 # rename the index of metadata to include the study name
 origin_metadata.index = [f'{origin_name}_{y}' for y in origin_metadata.index]
 
 
-select_files = origin_metadata[origin_metadata['study_week'] =='baseline'].index.tolist()
+select_files = origin_metadata[(origin_metadata['study_week'] =='baseline') &
+                               (origin_metadata['phase'] ==3)].index.tolist()
+
 train_select_files = origin_metadata[(origin_metadata['study_week'] =='baseline') &
                              (origin_metadata['phase']==3) &
                             (origin_metadata['Treatment']=='NIVOLUMAB') &
@@ -142,8 +158,20 @@ test_select_file_alt = origin_metadata[(origin_metadata['study_week'] =='baselin
                              (origin_metadata['Benefit'].isin(['CB','NCB']))
                              ].index.tolist()
 
+# select_files = train_select_files+test_select_files
 
-select_files = train_select_files+test_select_files
+
+
+# If we want to fine-tune on more files, uncomment the following lines
+# train_select_files =origin_metadata[(origin_metadata['phase']==3)
+#                                      & (origin_metadata['Treatment'].isin(['NIVOLUMAB','EVEROLIMUS']))
+#                                     #  & (origin_metadata['study_week']== 'baseline')
+#                                      ].index.tolist() 
+# test_select_files = origin_metadata[(origin_metadata['phase']==1)
+#                                      & (origin_metadata['Treatment']=='NIVOLUMAB')
+#                                     #  & (origin_metadata['study_week']== 'baseline')
+#                                      ].index.tolist()
+# test_select_file_alt = []
 
 save_json(select_files,os.path.join(align_save_dir,'select_origin_files.json'))
 
@@ -153,7 +181,7 @@ initial_selected_studies_subset = ['ST001236','ST001237','ST001932','ST001519','
 
 # study_list = selected_studies_subset
 
-align_score_th = 0
+align_score_th = 0.4
 selected_subset_name = f'all_studies with align score {align_score_th}'
 
 
@@ -162,14 +190,15 @@ selected_subset_name = selected_subset_name + ' from ' + alignment_dir_name
 
 
 # %% specify the complete metadata
-new_metadata_file = f'{cohort_combine_dir}/metadata_oct13_new2.csv'
+new_metadata_file = f'{cohort_combine_dir}/metadata_oct13_new3.csv'
 assert os.path.exists(new_metadata_file)
 
 # %% specify the pretraining labels
 dataset_labels = f'{dropbox_dir}/Spreadsheets/pretraining datasets Q4/pretraining_dataset_labels.csv'
 labels_df = pd.read_csv(dataset_labels,index_col=0)
-pretrain_label_col = 'label6'
-assert pretrain_label_col in labels_df.columns
+# pretrain_label_col = 'label6'
+pretrain_label_col = 'Sex'
+# assert pretrain_label_col in labels_df.columns
 
 # %% specify the target data
 targeted_path = f'{dropbox_dir}/Benchmarking_Data/rcc3/verified_targets.csv'
@@ -182,14 +211,12 @@ targets_df = process_targeted_data(targeted_path)
 num_cohorts_thresh = 0.5
 
 # How to correct for cohort effects?
-cohort_correction_method = 'combat'
-
-
+# cohort_correction_method = 'combat'
+cohort_correction_method = 'std_1'
+# cohort_correction_method = 'zscore_1'
+task_name = f'{cohort_correction_method}_{finetune_label_col_name}'
 
 # %% What is the fine-tuning task?
-# finetune_label_col = 'survival class'
-finetune_label_col = 'Benefit'
-task_name = f'{cohort_correction_method}_{finetune_label_col}'
 
 training_files  = train_select_files
 test_files = test_select_files
@@ -305,10 +332,16 @@ def standardize_across_cohorts(combined_intensity,cohort_labels,method):
     assert len(combined_intensity.columns) == len(cohort_labels)
     
     if method == 'combat':
+        print('fill missing values with the sample mean')
+        combined_intensity.fillna(combined_intensity.mean(),inplace=True)
         data_corrected = pycombat_norm(combined_intensity,cohort_labels)
     elif method == 'raw':
+        print('fill missing values with the sample mean')
+        combined_intensity.fillna(combined_intensity.mean(),inplace=True)
         data_corrected = combined_intensity.copy()
     elif method =='min_max':
+        print('fill missing values with the sample mean')
+        combined_intensity.fillna(combined_intensity.mean(),inplace=True)
         data_corrected = combined_intensity.copy()
         for cohort in set(cohort_labels):
             cohort_idx = np.where(cohort_labels==cohort)[0]
@@ -317,20 +350,44 @@ def standardize_across_cohorts(combined_intensity,cohort_labels,method):
             data_corrected.iloc[:,cohort_idx] = cohort_data
 
     elif method == 'zscore_0':
+        print('avg along 0th dim:', combined_intensity.mean(axis=0).shape)
+        # combined_intensity.fillna(combined_intensity.mean(),inplace=True)
         data_corrected = combined_intensity.copy()
         for cohort in set(cohort_labels):
-            cohort_idx = np.where(cohort_labels==cohort)[0]
+            cohort_idx = np.where(np.array(cohort_labels)==cohort)[0]
             cohort_data = data_corrected.iloc[:,cohort_idx].copy()
-            cohort_data = (cohort_data-cohort_data.mean(axis=0))/cohort_data.std(axis=0)
-            cohort_data.fillna(0,inplace=True)
+            cohort_data.fillna(cohort_data.mean(),inplace=True)
+            cohort_data = StandardScaler().fit_transform(cohort_data)
+            # cohort_data = (cohort_data-cohort_data.mean(axis=0))/cohort_data.std(axis=0)
             data_corrected.iloc[:,cohort_idx] = cohort_data
     elif method == 'zscore_1':
+        print('avg along 1th dim:', combined_intensity.mean(axis=1).shape)
+        data_corrected = combined_intensity.copy()
+        # combined_intensity.fillna(combined_intensity.mean(),inplace=True)
+        for cohort in set(cohort_labels):
+            cohort_idx = np.where(np.array(cohort_labels)==cohort)[0]
+            cohort_data = data_corrected.iloc[:,cohort_idx].copy()
+            # (cohort_data.T).fillna(cohort_data.T.mean(),inplace=True)
+            cohort_data.fillna(cohort_data.mean(),inplace=True)
+            cohort_data = StandardScaler().fit_transform(cohort_data.T).T
+            # cohort_data = (cohort_data-cohort_data.mean(axis=1))/cohort_data.std(axis=1)
+            # cohort_data.fillna(0,inplace=True)
+            data_corrected.iloc[:,cohort_idx] = cohort_data
+    elif method == 'std_0':
+        combined_intensity.fillna(combined_intensity.mean(),inplace=True)
         data_corrected = combined_intensity.copy()
         for cohort in set(cohort_labels):
-            cohort_idx = np.where(cohort_labels==cohort)[0]
+            cohort_idx = np.where(np.array(cohort_labels)==cohort)[0]
             cohort_data = data_corrected.iloc[:,cohort_idx].copy()
-            cohort_data = (cohort_data-cohort_data.mean(axis=1))/cohort_data.std(axis=1)
-            cohort_data.fillna(0,inplace=True)
+            cohort_data = StandardScaler().fit_transform(cohort_data)
+            data_corrected.iloc[:,cohort_idx] = cohort_data     
+    elif method == 'std_1':     
+        combined_intensity.fillna(combined_intensity.mean(),inplace=True)   
+        data_corrected = combined_intensity.copy()    
+        for cohort in set(cohort_labels):
+            cohort_idx = np.where(np.array(cohort_labels)==cohort)[0]
+            cohort_data = data_corrected.iloc[:,cohort_idx].copy()
+            cohort_data = StandardScaler().fit_transform(cohort_data.T).T
             data_corrected.iloc[:,cohort_idx] = cohort_data
     else:
         raise ValueError(f'Invalid method: {method}')
@@ -366,7 +423,8 @@ if not os.path.exists(alignment_df_path):
     else:
         # origin_peak_obj_path = origin_study_pkl_file
         if read_norm_peaks:
-            origin_study = create_mspeaks_from_mzlearn_result(origin_result_path,peak_intensity='intensity_max_synthetic_norm')
+            # origin_study = create_mspeaks_from_mzlearn_result(origin_result_path,peak_intensity='intensity_max_synthetic_norm')
+            origin_study = create_mspeaks_from_mzlearn_result(origin_result_path,peak_intensity='intensity_max_pool_map_norm')
             if origin_study.peak_intensity is None:
                 raise ValueError('origin study peak intensity is None')
         else:
@@ -476,10 +534,9 @@ clean_input_path_list_txt_file = os.path.join(align_save_dir,'clean_input_path_l
 # with open(clean_input_path_list_txt_file) as f:
 #     clean_input_peak_obj_path_list = f.read().splitlines()
 
-paths_to_renamed_studies = rename_inputs_to_origin(
-                                        align_save_dir,
-                                        multi_alignment_df=alignment_df,
-                                        load_dir=cleaned_peaks_obj_dir)
+paths_to_renamed_studies = rename_inputs_to_origin(multi_alignment_df=alignment_df,
+                                        load_dir=cleaned_peaks_obj_dir,
+                                        save_dir=align_save_dir)
 
 
 
@@ -544,10 +601,11 @@ le.fit(metadata_df['Study'])
 metadata_df['Study_num'] = le.transform(metadata_df['Study'])
 
 # %% assign the user created labels to each study     
-for study_id in labels_df.index:
-    label_id  = labels_df.loc[study_id,pretrain_label_col]
-    label_id = label_id.strip(' ')
-    metadata_df.loc[metadata_df['Study']==study_id,pretrain_label_col] = label_id
+if pretrain_label_col not in metadata_df.columns:
+    for study_id in labels_df.index:
+        label_id  = labels_df.loc[study_id,pretrain_label_col]
+        label_id = label_id.strip(' ')
+        metadata_df.loc[metadata_df['Study']==study_id,pretrain_label_col] = label_id
 
 print(metadata_df[pretrain_label_col].value_counts())
 # check that there are no null values
@@ -584,6 +642,7 @@ plt.xlabel('Study')
 plt.ylabel('Number of features')
 plt.title('Number of features detected in each study')
 plt.savefig(os.path.join(selected_studies_dir,'num_features_in_each_study.png'),bbox_inches='tight')
+plt.close()
 
 if align_df.shape[1] > 1:
     basic_align_stats['best matched study'] = study_rankings.index[0]
@@ -601,6 +660,7 @@ plt.ylabel('Number of features')
 plt.title('Number of features found in how many studies')
 plt.savefig(os.path.join(selected_studies_dir,'num_features_by_number_of_studies.png'),bbox_inches='tight')
 print(f'Number of features detected in all studies: {np.sum(feat_count==num_studies)}')
+plt.close()
 
 ###################
 # %% Target data analysis on the subset of selected features
@@ -658,34 +718,32 @@ else:
     combined_study = origin_study.peak_intensity.loc[chosen_feats,:].copy()
     combined_study = np.log2(combined_study)
 
+    # if apply_standard_scale:
+    #     rcc1_samples = metadata_df[metadata_df['Study']=='ST001236'].index.tolist()
+    #     rcc3_samples = metadata_df[metadata_df['Study']=='ST001237'].index.tolist()
+    #     combined_study[rcc1_samples] = StandardScaler().fit_transform(combined_study[rcc1_samples].T).T
+    #     combined_study[rcc3_samples] = StandardScaler().fit_transform(combined_study[rcc3_samples].T).T
+
     for study_id in other_selected_studies:
         print(study_id)
-        for result_id in os.listdir(os.path.join(data_path,study_id)):
-            if '.' in result_id:
-                continue
-            if 'SKIP' in result_id:
-                continue
-            if 'meta' in result_id:
-                continue
-            if study_id not in selected_studies:
-                continue
+        if study_id not in selected_studies:
+            continue
 
-            result_path = os.path.join(data_path,study_id,result_id)
-            result_name = study_id#+'_'+result_id
-            input_study_pkl_file = os.path.join(align_save_dir,f'{result_name}_renamed.pkl')
-            if result_name == origin_name:
-                continue
+        result_name = study_id#+'_'+result_id
+        input_study_pkl_file = os.path.join(align_save_dir,f'{result_name}_cleaned_renamed.pkl')
+        if result_name == origin_name:
+            continue
 
-            if os.path.exists(input_study_pkl_file):
+        if os.path.exists(input_study_pkl_file):
 
-                input_study = MSPeaks()
-                input_study.load(input_study_pkl_file)
-                # print(input_study.sample_info)
-                subset_chosen = [i for i in chosen_feats if i in input_study.peak_intensity.index]
-                input_peaks = input_study.peak_intensity.loc[subset_chosen,:].copy()
-                input_peaks = np.log2(input_peaks)
-                # input_peaks = min_max_scale(input_peaks)
-                combined_study = combined_study.join(input_peaks,how='outer')
+            input_study = MSPeaks()
+            input_study.load(input_study_pkl_file)
+            # print(input_study.sample_info)
+            subset_chosen = [i for i in chosen_feats if i in input_study.peak_intensity.index]
+            input_peaks = input_study.peak_intensity.loc[subset_chosen,:].copy()
+            input_peaks = np.log2(input_peaks)
+            # input_peaks = min_max_scale(input_peaks)
+            combined_study = combined_study.join(input_peaks,how='outer')
 
     # Verify that the sample names are the same in the combined study as they are in the combined metadata
     common_cols = list(set(combined_study.columns).intersection(set(metadata_df.index)))            
@@ -698,7 +756,7 @@ else:
 
 
 #fill the un-found features using the mean of each sample
-combined_study.fillna(combined_study.mean(),inplace=True)
+# combined_study.fillna(combined_study.mean(),inplace=True)
 
 cohort_labels = metadata_df['Study_num'].to_list()
 
@@ -713,6 +771,51 @@ else:
 print(metadata_df[pretrain_label_col].isnull().sum())
 metadata_df[pretrain_label_col].to_csv(f'{select_feats_dir}/sample_{pretrain_label_col}.csv')
 
+####################
+# %% Look at the PCA of the combined study
+####################
+from sklearn.decomposition import PCA
+import seaborn as sns
+
+pca = PCA(n_components=2)
+pca_result = pca.fit_transform(data_corrected.T)
+
+pca_df = pd.DataFrame(pca_result,columns=['PC1','PC2'],index=data_corrected.columns)
+pca_df['Study'] = metadata_df['Study']
+pca_df['Study_num'] = metadata_df['Study_num']
+pca_df['label'] = metadata_df[pretrain_label_col]
+
+pca_df.to_csv(os.path.join(select_feats_dir,f'pca_df_{cohort_correction_method}.csv'))
+
+# plot the PCA
+sns.scatterplot(x='PC1',y='PC2',hue='Study',data=pca_df)
+plt.savefig(os.path.join(select_feats_dir,f'pca_plot_{cohort_correction_method}.png'),bbox_inches='tight')
+plt.title(cohort_correction_method)
+plt.close()
+
+
+##################
+# %% Look at the UMAP of the combined study
+##################
+
+import umap
+reducer = umap.UMAP()
+umap_result = reducer.fit_transform(data_corrected.T)
+
+umap_df = pd.DataFrame(umap_result,columns=['UMAP1','UMAP2'],index=data_corrected.columns)
+umap_df['Study'] = metadata_df['Study']
+umap_df['Study_num'] = metadata_df['Study_num']
+umap_df['label'] = metadata_df[pretrain_label_col]
+
+umap_df.to_csv(os.path.join(select_feats_dir,f'umap_df_{cohort_correction_method}.csv'))
+
+# plot the UMAP
+sns.scatterplot(x='UMAP1',y='UMAP2',hue='Study',data=umap_df)
+plt.savefig(os.path.join(select_feats_dir,f'umap_plot_{cohort_correction_method}'),bbox_inches='tight')
+plt.title(cohort_correction_method)
+plt.close()
+
+
 
 ###################
 # %% Create the task specific data
@@ -721,21 +824,22 @@ metadata_df[pretrain_label_col].to_csv(f'{select_feats_dir}/sample_{pretrain_lab
 task_dir = os.path.join(select_feats_dir,task_name)
 os.makedirs(task_dir,exist_ok=True)
 
-y_test_path = os.path.join(task_dir,'y_test_alt.csv')
+y_test_path = os.path.join(task_dir,'y_test.csv')
 
-if not os.path.exists(y_test_path):
+if True: #not os.path.exists(y_test_path):
 
     input_data = data_corrected.T
-    if finetune_label_col not in metadata_df.columns:
-        print(f'warning: {finetune_label_col} not in metadata_df.columns')
-        if finetune_label_col in origin_metadata.columns:
-            common_index = list(set(metadata_df.index).intersection(set(origin_metadata.index)))
-            metadata_df[finetune_label_col] = None
-            metadata_df.loc[common_index,finetune_label_col] = origin_metadata.loc[common_index,finetune_label_col]
-            print(f'found {finetune_label_col} in origin_metadata, adding to metadata_df on common index (N={len(common_index)}')
-        else:
-            print(f'warning: {finetune_label_col} also not in origin_metadata.columns')
-            raise ValueError(f'finetune_label_col {finetune_label_col} not in metadata_df.columns')
+    for finetune_label_col in finetune_label_col_list:
+        if finetune_label_col not in metadata_df.columns:
+            print(f'warning: {finetune_label_col} not in metadata_df.columns')
+            if finetune_label_col in origin_metadata.columns:
+                common_index = list(set(metadata_df.index).intersection(set(origin_metadata.index)))
+                metadata_df[finetune_label_col] = None
+                metadata_df.loc[common_index,finetune_label_col] = origin_metadata.loc[common_index,finetune_label_col]
+                print(f'found {finetune_label_col} in origin_metadata, adding to metadata_df on common index (N={len(common_index)}')
+            else:
+                print(f'warning: {finetune_label_col} also not in origin_metadata.columns')
+                raise ValueError(f'finetune_label_col {finetune_label_col} not in metadata_df.columns')
 
     # if training_files[0] not in metadata_df.index:
     #     print('warning: training_files[0] not in metadata_df.index')
@@ -744,7 +848,7 @@ if not os.path.exists(y_test_path):
         # validation_files = [f'{origin_name}_{x}' for x in validation_files]
 
     input_pretrain_labels = metadata_df[pretrain_label_col].copy()
-    input_finetune_labels = metadata_df[finetune_label_col].copy()
+    input_finetune_labels = metadata_df[finetune_label_col_list].copy()
 
     pretrain_files = [x for x in input_data.index if x not in training_files+test_files]
 
@@ -758,6 +862,9 @@ if not os.path.exists(y_test_path):
     X_finetune = input_data.loc[training_files,:].copy()
     X_test = input_data.loc[test_files,:].copy()
     X_test_alt = input_data.loc[test_select_file_alt,:].copy()
+
+    X_finetune.to_csv(os.path.join(task_dir,'X_finetune.csv'))
+    y_finetune.to_csv(os.path.join(task_dir,'y_finetune.csv'))
 
 
     if len(validation_files) == 0:
@@ -773,6 +880,9 @@ if not os.path.exists(y_test_path):
                                                             random_state=validation_rand_seed, 
                                                             stratify=None)
         validation_files = X_val.index.tolist()
+        # training_files_without_validation = X_train.index.tolist()
+        # y_val = input_finetune_labels.loc[validation_files].copy()
+        # y_train = input_finetune_labels.loc[training_files_without_validation].copy()
     else:
         X_train = X_finetune.copy()
         y_train = y_finetune.copy()
@@ -783,13 +893,14 @@ if not os.path.exists(y_test_path):
     X_train.to_csv(os.path.join(task_dir,'X_train.csv'))
     X_val.to_csv(os.path.join(task_dir,'X_val.csv'))
     X_test.to_csv(os.path.join(task_dir,'X_test.csv'))
-    X_test_alt.to_csv(os.path.join(task_dir,'X_test_alt.csv'))
 
     y_pretrain.to_csv(os.path.join(task_dir,'y_pretrain.csv'))
     y_train.to_csv(os.path.join(task_dir,'y_train.csv'))
     y_val.to_csv(os.path.join(task_dir,'y_val.csv'))
     y_test.to_csv(os.path.join(task_dir,'y_test.csv'))
-    y_test_alt.to_csv(os.path.join(task_dir,'y_test_alt.csv'))
+    if len(test_select_file_alt) > 0:
+        X_test_alt.to_csv(os.path.join(task_dir,'X_test_alt.csv'))
+        y_test_alt.to_csv(os.path.join(task_dir,'y_test_alt.csv'))
 
 else:
     print('task data already exists with the data')

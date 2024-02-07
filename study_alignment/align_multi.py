@@ -34,7 +34,7 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
         fill_na_strategy (str): The strategy to fill missing values. Default is None.
         outlier_samples_removal_strategy (str): The strategy to remove outlier samples. Default is None.
         verbose (bool): Whether to print verbose output. Default is True.
-        save_cleaned_peak_obj (bool): Whether to save the cleaned MSPeaks objects. Default is False.
+        cleaned_peaks_obj_dir: where to save the cleaned MSPeaks objects. Default is None, which means they are not saved.
 
     Returns:
         pandas.DataFrame: The multi-aligned DataFrame containing the alignment results.
@@ -51,7 +51,7 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
     fill_na_strategy = kwargs.get('fill_na_strategy', None)
     outlier_samples_removal_strategy = kwargs.get('outlier_samples_removal_strategy', None)
     verbose = kwargs.get('verbose', True)
-    cleaned_peaks_obj_dir = kwargs.get('save_cleaned_peak_obj', None)
+    cleaned_peaks_obj_dir = kwargs.get('cleaned_peaks_obj_dir', None)
 
     # if norm_func is not None:
     #     peak_intensity_name = 'intensity_max_synthetic_norm'
@@ -178,6 +178,9 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
         clean_input_path_list.append(clean_input_path)
 
     align_score_df = pd.DataFrame({'input_name':input_name_list,'align_score':align_score_list})
+    align_score_df.to_csv(os.path.join(save_dir,f'align_score_to_{origin_name}_df.csv'),index=False)
+    
+    align_score_df = pd.DataFrame({'input_name':input_name_list,origin_name:align_score_list})
     align_score_df.to_csv(os.path.join(save_dir,'align_score_df.csv'),index=False)
 
     # combine the pair-aligned DataFrame with the existing multi-aligned DataFrame
@@ -200,8 +203,32 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
 # %% Rename the peaks in each study to correspond to the origin, removing peaks that don't align
 
 def rename_inputs_to_origin(save_dir, multi_alignment_df=None,
-                            input_name_list=None,load_dir=None, input_peak_obj_path_list=None):
-    
+                            input_name_list=None,load_dir=None, 
+                            input_peak_obj_path_list=None,
+                            renamed_input_obj_path_list=None):
+    '''
+    Renames input studies to the origin study based on the alignment information provided in the multi_alignment_df.
+
+    Parameters:
+        - save_dir (str): The directory where the alignment information is saved.
+        - multi_alignment_df (pandas.DataFrame, optional): The alignment information dataframe. 
+            If not provided, it will be read from the 'alignment_df.csv' file in the save_dir.
+        - input_name_list (list, optional): The list of input study names to be renamed. 
+            If not provided, it will be extracted from the columns of the multi_alignment_df.
+        - load_dir (str, optional): The directory where the input study files are located. 
+            If not provided, it will be set to the save_dir.
+        - input_peak_obj_path_list (list, optional): The list of paths to the input study files. 
+            If not provided, it will be generated based on the input_name_list and load_dir.
+        - renamed_input_obj_path_list (list, optional): The list of paths to save the renamed 
+            input study files. If not provided, it will be generated based on the input_peak_obj_path_list.
+
+    Returns:
+        list: A list of paths to the renamed input study files.
+
+    Raises:
+        ValueError: If the input_name is not found in the columns of the multi_alignment_df.
+    '''
+
     paths_to_renamed_studies = []
     if multi_alignment_df is None:
         multi_alignment_df = pd.read_csv(os.path.join(save_dir,'alignment_df.csv'),index_col=0)
@@ -213,14 +240,16 @@ def rename_inputs_to_origin(save_dir, multi_alignment_df=None,
     
     if input_name_list is None:
         input_name_list = multi_alignment_df.columns.tolist()
-        # input_name_list.remove(origin_name)
 
     if input_peak_obj_path_list is None:
         input_peak_obj_path_list = [os.path.join(load_dir,f'{input_name}_cleaned.pkl') for input_name in input_name_list]
 
-    renamed_input_study_path_list = [input_path.replace('.pkl','_renamed.pkl') for input_path in input_peak_obj_path_list]
+    if renamed_input_obj_path_list is None:
+        renamed_input_obj_path_list = [input_path.replace('.pkl','_renamed.pkl') for input_path in input_peak_obj_path_list]
+        if load_dir != save_dir:
+            renamed_input_obj_path_list = [path.replace(load_dir,save_dir) for path in renamed_input_obj_path_list]
 
-    for input_name, input_study_path, renamed_input_study_path in zip(input_name_list, input_peak_obj_path_list, renamed_input_study_path_list):
+    for input_name, input_study_path, renamed_input_study_path in zip(input_name_list, input_peak_obj_path_list, renamed_input_obj_path_list):
 
         if os.path.exists(renamed_input_study_path):
             print(f'{renamed_input_study_path} already exists')
@@ -234,9 +263,6 @@ def rename_inputs_to_origin(save_dir, multi_alignment_df=None,
         input_study.load(input_study_path)
         assert input_study.study_id is not None, 'input study does not have a study_id'
         input_name = input_study.study_id
-        # if input_study.study_id != input_name:
-        #         raise ValueError(f'input study_id "{input_study.study_id}" does not match input_name "{input_name}"')
-                # print(f'WARNING: input study_id "{input_study.study_id}" does not match input_name "{input_name}"')
         
         if input_name not in multi_alignment_df.columns:
             raise ValueError(f'input_name {input_name} not found in multi_alignment_df columns')
@@ -246,7 +272,6 @@ def rename_inputs_to_origin(save_dir, multi_alignment_df=None,
 
         input_alignment = multi_alignment_df[input_name]
         input_alignment.dropna(inplace=True)
-        # input_study.rename_peaks(multi_alignment_df[input_name].dropna().to_dict())
         input_study.rename_selected_peaks(input_alignment.to_dict())
         input_study.save(renamed_input_study_path)
         paths_to_renamed_studies.append(renamed_input_study_path)
