@@ -11,6 +11,11 @@ import mysql.connector
 from mysql.connector.constants import ClientFlag
 from google.cloud import storage
 import gcsfs
+from sklearn.decomposition import PCA
+import seaborn as sns
+import umap
+import plotly.express as px
+from plotly.offline import plot
 
 from sklearn.neighbors import KNeighborsRegressor
 import matplotlib.pyplot as plt
@@ -24,6 +29,7 @@ from study_alignment.utils_eclipse import align_ms_studies_with_Eclipse
 from study_alignment.utils_metabCombiner import align_ms_studies_with_metabCombiner, create_metaCombiner_grid_search
 from study_alignment.mspeaks import create_mspeaks_from_mzlearn_result, MSPeaks, load_mspeaks_from_pickle
 from study_alignment.align_multi import *
+from study_alignment.standardize import standardize_across_cohorts
 from study_alignment.align_pair import align_ms_studies
 # from met_matching.metabolite_name_matching_main import refmet_query
 
@@ -134,6 +140,20 @@ def get_mspeak_from_job_id(script_path_mspeak, job_id, freq_th):
         study_mspeak.add_peak_intensity(normalized_intensity_df)
 
     return study_mspeak
+
+
+def upload_to_gcs(local_directory, bucket_name, gcs_path):
+    client = storage.Client()
+    bucket = client.get_bucket(bucket_name)
+
+    for root, dirs, files in os.walk(local_directory):
+        for file in files:
+            local_file_path = os.path.join(root, file)
+            relative_path = os.path.relpath(local_file_path, local_directory)
+            gcs_file_path = os.path.join(gcs_path, relative_path)
+
+            blob = bucket.blob(gcs_file_path)
+            blob.upload_from_filename(local_file_path)
 
 
 ########################################################################################################################
@@ -380,6 +400,10 @@ if len(records) > 0:
                 # load the reference study first and do log2 transformation
                 combined_study = origin_study.peak_intensity.loc[chosen_feats, :].copy()
                 combined_study = np.log2(combined_study)
+
+                # get all the file names for the origin_study
+                origin_study_file_list = origin_study.peak_intensity.columns.to_list()
+                study_id2file_name = {str(reference_job_id): origin_study_file_list}
                 # for each other study, load the peak intensity and do log2 transformation
                 for study_id in other_job_ids:
                     print(study_id)
@@ -391,6 +415,9 @@ if len(records) > 0:
                         # input_study = load_mspeaks_from_pickle(input_study_pkl_file)
                         input_study = MSPeaks()
                         input_study.load(input_study_pkl_file)
+                        input_study_file_list = input_study.peak_intensity.columns.to_list()
+                        # add a key to study_id2file_name
+                        study_id2file_name[str(study_id)] = input_study_file_list
                         subset_chosen = [i for i in chosen_feats if i in input_study.peak_intensity.index]
                         input_peaks = input_study.peak_intensity.loc[subset_chosen, :].copy()
                         input_peaks = np.log2(input_peaks)
@@ -402,16 +429,85 @@ if len(records) > 0:
                 combined_study.fillna(combined_study.mean(), inplace=True)
                 combined_study.to_csv(os.path.join(align_save_dir_freq_th, 'combined_study.csv'))
 
-                # correct for cohort effects
-                # cohort_labels = combined_meta_data['file_name'].to_list()
-                # data_corrected = standardize_across_cohorts(combined_study, cohort_labels, method=cohort_correction_method)
+                # TODO: correct for cohort effects using cohort_labels (study id)
+                # get the study_id2file_name
+                print(study_id2file_name.keys)
+                # build a metadata_df that has file_name, study_id
+                metadata_df = pd.DataFrame()
+                # use the columns from combined_study to build the metadata_df file_name column
+                metadata_df['file_name'] = combined_study.columns
+                # create a new column study_id, that is the study_id of the file_name from study_id2file_name
+                metadata_df['mzlearn_cohort_id'] = metadata_df['file_name'].apply(
+                    lambda x: [k for k, v in study_id2file_name.items() if x in v][0])
+                print(metadata_df)
 
+                # need to know the study id for each study used here use job id for each file
+                cohort_correction_method = 'combat'
+                cohort_labels = metadata_df['mzlearn_cohort_id'].to_list()
+                data_corrected = standardize_across_cohorts(combined_study, cohort_labels, method=cohort_correction_method)
+                # data_corrected = combined_study
+
+                # TODO: add save here to plot UMAP and PCA
+                ########################################################################################################
+                # %% Look at the PCA of the combined study
+                pca = PCA(n_components=2)
+                pca_result = pca.fit_transform(data_corrected.T)
+                pca_df = pd.DataFrame(pca_result, columns=['PC1', 'PC2'], index=data_corrected.columns)
+                pca_df['mzlearn_cohort_id'] = metadata_df['mzlearn_cohort_id'].to_list()
+                pca_df['file_name'] = metadata_df['file_name'].to_list()
+                # pca_df['Study_num'] = metadata_df['Study_num']
+                # pca_df['label'] = metadata_df[pretrain_label_col]
+                pca_df.to_csv(os.path.join(align_save_dir_freq_th, f'pca_df_{cohort_correction_method}.csv'))
+                graph = px.scatter(pca_df, x="PC1", y="PC2", color='mzlearn_cohort_id',
+                                   color_discrete_sequence=px.colors.qualitative.Plotly)
+                graph.update_traces(marker={'size': 4.5})
+                graph_div = plot({'data': graph}, output_type='div')
+                pickle.dump(graph_div, open(f'{align_save_dir_freq_th}/pca_plot.pkl', 'wb'))
+
+                # plot the PCA
+                # sns.scatterplot(x='PC1', y='PC2', hue='study_id', data=pca_df)
+                # plt.savefig(os.path.join(select_feats_dir, f'pca_plot_{cohort_correction_method}.png'),
+                #             bbox_inches='tight')
+                # plt.title(cohort_correction_method)
+                # plt.close()
+
+                ########################################################################################################
+                # %% Look at the UMAP of the combined study
+                reducer = umap.UMAP()
+                umap_result = reducer.fit_transform(data_corrected.T)
+
+                umap_df = pd.DataFrame(umap_result, columns=['UMAP1', 'UMAP2'], index=data_corrected.columns)
+                umap_df['mzlearn_cohort_id'] = metadata_df['mzlearn_cohort_id'].to_list()
+                umap_df['file_name'] = metadata_df['file_name'].to_list()
+                # umap_df['Study_num'] = metadata_df['Study_num']
+                # umap_df['label'] = metadata_df[pretrain_label_col]
+                umap_df.to_csv(os.path.join(align_save_dir_freq_th, f'umap_df_{cohort_correction_method}.csv'))
+                graph = px.scatter(umap_df, x="UMAP1", y="UMAP2", color='mzlearn_cohort_id',
+                                   color_discrete_sequence=px.colors.qualitative.Plotly)
+                graph.update_traces(marker={'size': 4.5})
+                graph_div = plot({'data': graph}, output_type='div')
+                pickle.dump(graph_div, open(f'{align_save_dir_freq_th}/umap_plot.pkl', 'wb'))
+                # plot the UMAP
+                # sns.scatterplot(x='UMAP1', y='UMAP2', hue='study_id', data=umap_df)
+                # plt.savefig(os.path.join(select_feats_dir, f'umap_plot_{cohort_correction_method}'),
+                #             bbox_inches='tight')
+                # plt.title(cohort_correction_method)
+                # plt.close()
+
+                ########################################################################################################
                 # save the combined peak intensity to gcp bucket
+                # gcp_file_path = f"mzlearn-webapp.appspot.com/mzlearn_pretraining/peak_combine_results/{peak_combine_job_id}/{freq_grid_search_dir_name}
+                # save all results to gcp as well
+                gcp_file_path = f"mzlearn_pretraining/peak_combine_results/{peak_combine_job_id}/{freq_grid_search_dir_name}"
+                # upload all files from folders: keras_autoencoder_models0 and classical_models to all_resuls_file_folder_gcp_path
+                bucket_name = 'mzlearn-webapp.appspot.com'
+                upload_to_gcs(align_save_dir_freq_th, bucket_name, gcp_file_path)
+
                 # mzlearn-webapp.appspot.com/mzlearn_pretraining/peak_combine_results/{job_id}/alignment_df.csv
-                gcp_file_path = f"mzlearn-webapp.appspot.com/mzlearn_pretraining/peak_combine_results/{peak_combine_job_id}/{freq_grid_search_dir_name}/combined_study.csv"
-                with fs.open(gcp_file_path, 'w') as f:
-                    combined_study.to_csv(f, index=True)
-                print("combined peak intensity saved to gcp bucket")
+                # gcp_file_path = f"mzlearn-webapp.appspot.com/mzlearn_pretraining/peak_combine_results/{peak_combine_job_id}/{freq_grid_search_dir_name}/combined_study.csv"
+                # with fs.open(gcp_file_path, 'w') as f:
+                #     combined_study.to_csv(f, index=True)
+                # print("combined peak intensity saved to gcp bucket")
 
     # save the grid search summary to gcp bucket
     print(grid_search_summary_df)
