@@ -6,7 +6,7 @@ import pandas as pd
 import json
 import os
 import numpy as np
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, train_test_split
 
 from prep import ClassifierDataset
 from train import run_train_classifier
@@ -18,6 +18,7 @@ def create_cross_validation_directories(input_dir, cv_splits=5,
                                         n_repeats=1,
                                         y_stratify_col='Benefit', cross_val_seed=42, 
                                         test_files_suffix=['','_alt'],
+                                        test_frac= 0.15,
                                         finetune_suffix='_finetune'):
     """
     Create cross-validation directories for finetuning a model.
@@ -34,8 +35,21 @@ def create_cross_validation_directories(input_dir, cv_splits=5,
     - save_dir (str): The directory path where the cross-validation directories are saved.
     """
 
-    X_test_files = [f'X_test{suffix}.csv' for suffix in test_files_suffix]
-    y_test_files = [f'y_test{suffix}.csv' for suffix in test_files_suffix]
+    if len(test_files_suffix) > 0:
+        X_test_files = [f'X_test{suffix}.csv' for suffix in test_files_suffix if os.path.exists(os.path.join(input_dir, f'X_test{suffix}.csv'))]
+        y_test_files = [f'y_test{suffix}.csv' for suffix in test_files_suffix if os.path.exists(os.path.join(input_dir, f'y_test{suffix}.csv'))]
+        assert len(X_test_files) == len(y_test_files), 'The number of test files does not match the number of y test files'
+
+    if len(X_test_files) > 0:
+        make_test_files = False
+    else:
+        make_test_files = True
+        X_test_files = [f'X_test_{y_stratify_col}.csv']
+        y_test_files = [f'y_test_{y_stratify_col}.csv']
+
+    # check if the X_test_files exist:
+    
+
 
     X_finetune_file = os.path.join(input_dir, f'X{finetune_suffix}.csv')
     y_finetune_file = os.path.join(input_dir, f'y{finetune_suffix}.csv')
@@ -48,6 +62,11 @@ def create_cross_validation_directories(input_dir, cv_splits=5,
     X_finetune = pd.read_csv(X_finetune_file, index_col=0)
     y_finetune = pd.read_csv(y_finetune_file, index_col=0)
     y_stratify = y_finetune[y_stratify_col]
+    if make_test_files:
+        X_finetune, X_test, y_finetune, y_test = train_test_split(X_finetune, y_finetune, test_size=test_frac, stratify=y_stratify, random_state=cross_val_seed)
+        X_test.to_csv(os.path.join(input_dir, X_test_files[0]))
+        y_test.to_csv(os.path.join(input_dir, y_test_files[0]))
+        y_stratify = y_finetune[y_stratify_col]
 
     for iter in range(n_repeats):
         skf = StratifiedKFold(n_splits=cv_splits, random_state=cross_val_seed+iter, shuffle=True)
@@ -81,14 +100,41 @@ def create_cross_validation_directories(input_dir, cv_splits=5,
 def run_cross_validation_pytorch_classifier(cv_dir,cv_splits,
                                     n_repeats=1,
                                     subdir='pytorch_models',
+                                    label_col='Benefit',
                                     label_mapper=None,
-                                    batch_size=32,
+                                    batch_size=64,
                                     test_files_suffix=['','_alt'],**kwargs):
 
     if label_mapper is None:
         label_mapper = {'CB': 1.0, 'NCB': 0.0, 'ICB': np.nan}
 
+    model_name = kwargs.get('model_name',None)
+    encoder_name = kwargs.get('encoder_name',None)
+    encoder_status = kwargs.get('encoder_status',None)
+    if (model_name is None) or (encoder_name is None) or (encoder_status is None):
+        raise ValueError('if you are running cross validation, the model_name, encoder_name, and encoder_status must be defined in kwargs')
+    output_summary_file = os.path.join(cv_dir, f'{model_name}_{encoder_status}_{encoder_name}_summary.csv')
+    
+
+    ####### Create AVG and STD columns of an existing summary file
+    if os.path.exists(output_summary_file):
+        print(f'{model_name}_{encoder_status}_{encoder_name}_summary.csv already exists in {cv_dir}')
+        # auc_summary = pd.read_csv(os.path.join(cv_dir, f'{model_name}_{encoder_status}_{encoder_name}_auroc.csv'), index_col=0)
+        # result_summary_avg = auc_summary.mean()
+        # result_summary_std = auc_summary.std()
+        # result_summary_avg.index = [f'AVG {col}' for col in result_summary_avg.index]
+        # result_summary_std.index = [f'STD {col}' for col in result_summary_std.index]
+        # result_summary = pd.concat([result_summary_avg, result_summary_std])
+        # result_summary.to_csv(output_summary_file)
+        return
+    
+    # else:
+    #     print('skip running the cross-validation')
+    #     return
+
+    ######## Run the cross-validation and gather the results
     gather_output = []
+    num_workers = 0
 
     for iter in range(n_repeats):
         for cv_num in range(cv_splits):
@@ -96,21 +142,21 @@ def run_cross_validation_pytorch_classifier(cv_dir,cv_splits,
             save_dir = os.path.join(input_dir, subdir)
             os.makedirs(save_dir, exist_ok=True)
 
-            train_dataset = ClassifierDataset(input_dir,subset='train',label_encoder=label_mapper)
-            val_dataset = ClassifierDataset(input_dir,subset='val',label_encoder=label_mapper)
+            train_dataset = ClassifierDataset(input_dir,subset='train',label_encoder=label_mapper,label_col=label_col)
+            val_dataset = ClassifierDataset(input_dir,subset='val',label_encoder=label_mapper,label_col=label_col)
             # print('size of training:', len(train_dataset))
             # print('size of validation:', len(val_dataset))
 
             dataloaders= {
-                'train': DataLoader(train_dataset, batch_size=batch_size, shuffle=True),
-                'val': DataLoader(val_dataset, batch_size=batch_size, shuffle=False),
+                'train': DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers),
+                'val': DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers),
             }
 
             # add all of the test subsets
             for test_subset in test_files_suffix:
                 if os.path.exists(os.path.join(input_dir, f'X_test{test_subset}.csv')):
-                    test_dataset = ClassifierDataset(input_dir,subset=f'test{test_subset}',label_encoder=label_mapper)
-                    dataloaders[f'test{test_subset}'] = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+                    test_dataset = ClassifierDataset(input_dir,subset=f'test{test_subset}',label_encoder=label_mapper,label_col=label_col)
+                    dataloaders[f'test{test_subset}'] = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
                     # print(f'size of testing{test_subset}:', len(test_dataset))
                 else:
                     print(f'X_test{test_subset}.csv does not exist in {input_dir}')
@@ -119,26 +165,33 @@ def run_cross_validation_pytorch_classifier(cv_dir,cv_splits,
             gather_output.append(output_data)
 
 
-    ## Summarize the important results
+    ####### Summarize the important results
     best_epoch_list = [output['best_epoch'] for output in gather_output]
-    testalt_auroc_list = [output['end_state_auroc']['test_alt'] for output in gather_output]
-    test_auroc_list = [output['end_state_auroc']['test'] for output in gather_output]
     val_auroc_list = [output['end_state_auroc']['val'] for output in gather_output]
     train_auroc_list = [output['end_state_auroc']['train'] for output in gather_output]
+    model_name = gather_output[0]['model_name']
+    auc_summary = pd.DataFrame({
+                    'best_epoch': best_epoch_list,
+                    'train_auroc': train_auroc_list,
+                    'val_auroc': val_auroc_list,})
+    
+    for test_subset in test_files_suffix:
+        if f'test{test_subset}' in gather_output[0]['end_state_auroc']:
+            test_auroc_list = [output['end_state_auroc'][f'test{test_subset}'] for output in gather_output]
+            auc_summary[f'test{test_subset}_auroc'] = test_auroc_list
+
     model_name = gather_output[0]['model_name']
     encoder_name = gather_output[0]['encoder_name']
     encoder_status = gather_output[0]['encoder_status']
     
-    auc_summary = pd.DataFrame({'best_epoch': best_epoch_list,
-                  'test_alt_auroc': testalt_auroc_list,
-                    'test_auroc': test_auroc_list,
-                    'val_auroc': val_auroc_list,
-                    'train_auroc': train_auroc_list})
     auc_summary.to_csv(os.path.join(cv_dir, f'{model_name}_{encoder_status}_{encoder_name}_auroc.csv'))
     
-
-    result_summary = auc_summary.mean()
-    result_summary.to_csv(os.path.join(cv_dir, f'{model_name}_{encoder_status}_{encoder_name}_summary.csv'))
+    result_summary_avg = auc_summary.mean()
+    result_summary_std = auc_summary.std()
+    result_summary_avg.index = [f'AVG {col}' for col in result_summary_avg.index]
+    result_summary_std.index = [f'STD {col}' for col in result_summary_std.index]
+    result_summary = pd.concat([result_summary_avg, result_summary_std])
+    result_summary.to_csv(output_summary_file)
 
     return
 
@@ -146,12 +199,34 @@ def run_cross_validation_pytorch_classifier(cv_dir,cv_splits,
 def run_cross_validation_sklearn_classifier(cv_dir,cv_splits,
                                     n_repeats=1,
                                     subdir='sklearn_models',
+                                    label_col='Benefit',
                                     label_mapper=None,
-                                    batch_size=32,
                                     test_files_suffix=['','_alt'],**kwargs):
     
     if label_mapper is None:
         label_mapper = {'CB': 1.0, 'NCB': 0.0, 'ICB': np.nan}
+
+
+    model_name = kwargs.get('model_name',None)
+    if model_name is None:
+        raise ValueError('if you are running cross validation, the model_name must be defined in kwargs')
+    
+    output_summary_file = os.path.join(cv_dir, f'{model_name}_summary.csv')
+    
+
+    ####### Create AVG and STD columns of an existing summary file
+    if os.path.exists(output_summary_file):
+        print(f'{model_name}_summary.csv already exists in {cv_dir}')
+        # auc_summary = pd.read_csv(os.path.join(cv_dir, f'{model_name}_auroc.csv'), index_col=0)
+        # result_summary_avg = auc_summary.mean()
+        # result_summary_std = auc_summary.std()
+        # result_summary_avg.index = [f'AVG {col}' for col in result_summary_avg.index]
+        # result_summary_std.index = [f'STD {col}' for col in result_summary_std.index]
+        # result_summary = pd.concat([result_summary_avg, result_summary_std])
+        # result_summary.to_csv(output_summary_file)
+        return
+
+
 
     gather_output = []
 
@@ -161,8 +236,8 @@ def run_cross_validation_sklearn_classifier(cv_dir,cv_splits,
             save_dir = os.path.join(input_dir, subdir)
             os.makedirs(save_dir, exist_ok=True)
 
-            train_dataset = ClassifierDataset(input_dir,subset='train',label_encoder=label_mapper)
-            val_dataset = ClassifierDataset(input_dir,subset='val',label_encoder=label_mapper)
+            train_dataset = ClassifierDataset(input_dir,subset='train',label_encoder=label_mapper,label_col=label_col)
+            val_dataset = ClassifierDataset(input_dir,subset='val',label_encoder=label_mapper,label_col=label_col)
             # print('size of training:', len(train_dataset))
             # print('size of validation:', len(val_dataset))
 
@@ -174,7 +249,7 @@ def run_cross_validation_sklearn_classifier(cv_dir,cv_splits,
             # add all of the test subsets
             for test_subset in test_files_suffix:
                 if os.path.exists(os.path.join(input_dir, f'X_test{test_subset}.csv')):
-                    test_dataset = ClassifierDataset(input_dir,subset=f'test{test_subset}',label_encoder=label_mapper)
+                    test_dataset = ClassifierDataset(input_dir,subset=f'test{test_subset}',label_encoder=label_mapper,label_col=label_col)
                     data_dict[f'test{test_subset}'] = test_dataset
                     # print(f'size of testing{test_subset}:', len(test_dataset))
                 else:
@@ -185,20 +260,26 @@ def run_cross_validation_sklearn_classifier(cv_dir,cv_splits,
 
     ## Summarize the important results
     # best_epoch_list = [output['best_epoch'] for output in gather_output]
-    testalt_auroc_list = [output['end_state_auroc']['test_alt'] for output in gather_output]
-    test_auroc_list = [output['end_state_auroc']['test'] for output in gather_output]
     val_auroc_list = [output['end_state_auroc']['val'] for output in gather_output]
     train_auroc_list = [output['end_state_auroc']['train'] for output in gather_output]
     model_name = gather_output[0]['model_name']
     auc_summary = pd.DataFrame({
-                  'test_alt_auroc': testalt_auroc_list,
-                    'test_auroc': test_auroc_list,
-                    'val_auroc': val_auroc_list,
-                    'train_auroc': train_auroc_list})
+                    'train_auroc': train_auroc_list,
+                    'val_auroc': val_auroc_list,})
+    
+    for test_subset in test_files_suffix:
+        if f'test{test_subset}' in gather_output[0]['end_state_auroc']:
+            test_auroc_list = [output['end_state_auroc'][f'test{test_subset}'] for output in gather_output]
+            auc_summary[f'test{test_subset}_auroc'] = test_auroc_list
+
     auc_summary.to_csv(os.path.join(cv_dir, f'{model_name}_auroc.csv'))
 
-    result_summary = auc_summary.mean()
-    result_summary.to_csv(os.path.join(cv_dir, f'{model_name}_{encoder_status}_{encoder_name}_summary.csv'))
+    result_summary_avg = auc_summary.mean()
+    result_summary_std = auc_summary.std()
+    result_summary_avg.index = [f'AVG {col}' for col in result_summary_avg.index]
+    result_summary_std.index = [f'STD {col}' for col in result_summary_std.index]
+    result_summary = pd.concat([result_summary_avg, result_summary_std])
+    result_summary.to_csv(output_summary_file)
 
     return
 
@@ -226,7 +307,7 @@ if __name__ == '__main__':
     
 # %% Run the cross-validation across sklearn models
 
-    if False:
+    if True:
         # test sklearn logistic regression
         run_cross_validation_sklearn_classifier(
             save_dir,
@@ -296,7 +377,6 @@ if __name__ == '__main__':
                                                         encoder_name=encoder_name,
                                                         encoder_kind=encoder_kind,
                                                         dropout_rate=dropout_rate)
-
 
 # %%
 

@@ -22,10 +22,11 @@ class PreTrainingDataset(Dataset):
 
 ######### Simple Dataset for Training a Classifier
 class ClassifierDataset(Dataset):
-    def __init__(self, input_dir, subset='train',label_encoder=None,y_dropna=True):
+    def __init__(self, input_dir, subset='train',label_col='Benefit',label_encoder=None,y_dropna=True):
         X_df = pd.read_csv(os.path.join(input_dir, f'X_{subset}.csv'), index_col=0)
         y_df = pd.read_csv(os.path.join(input_dir, f'y_{subset}.csv'), index_col=0)
-        y_df = y_df.iloc[:,0]
+        # y_df = y_df.iloc[:,0]
+        y_df = y_df[label_col]
         self.feature_ids = X_df.columns
 
         # check the data type
@@ -59,6 +60,7 @@ class ClassifierDataset(Dataset):
         self.sample_ids = X_df.index
 
     def __len__(self):
+        # return self.X.shape[1]
         return len(self.X)
     
     def __getitem__(self, idx):

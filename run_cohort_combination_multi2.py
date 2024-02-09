@@ -18,7 +18,7 @@ from study_alignment.utils_misc import load_json, save_json, get_method_param_na
 from inmoose.pycombat import pycombat_norm
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
-from study_alignment.standardize import min_max_scale, standardize_across_cohorts
+from study_alignment.standardize import min_max_scale, standardize_across_cohorts, fill_na_by_cohort
 
 sys.path.append('/Users/jonaheaton/mzlearn/peak_picking_pipeline')
 from utils_synth_norm import synthetic_normalization_Nov2023_wrapper_repeat
@@ -49,7 +49,7 @@ origin_result_path = os.path.join(data_path,origin_name,'rcc1_rcc3_output_v1_202
 cohort_combine_dir = os.path.join(dropbox_dir,'development_CohortCombination')
 norm_setting_dir = os.path.join(cohort_combine_dir,'norm_settings')
 # output_dir = f'{cohort_combine_dir}/hilic_pos_2024_feb_02_read_norm'
-output_dir = f'{cohort_combine_dir}/hilic_pos_2024_feb_05_read_norm_poolmap'
+output_dir = f'{cohort_combine_dir}/hilic_pos_2024_feb_09_read_norm_poolmap'
 # origin_metadata_file = f'{cohort_combine_dir}/rcc_sample_info3.csv'
 origin_metadata_file = f'{cohort_combine_dir}/clean_rcc_metadata.csv'
 os.makedirs(output_dir,exist_ok=True)
@@ -60,8 +60,8 @@ os.makedirs(norm_setting_dir,exist_ok=True)
 create_qc_plots = False
 
 # prep_name = 'fillna_avg_poolmap'
-prep_name = 'fillna_avg'
-fill_na_strat = 'mean'
+prep_name = 'poolmap'
+fill_na_strat = None
 origin_freq_th = 0.8
 norm_name = 'synthetic v1'
 read_norm_peaks = True
@@ -142,7 +142,7 @@ origin_metadata.index = [f'{origin_name}_{y}' for y in origin_metadata.index]
 
 
 select_files = origin_metadata[(origin_metadata['study_week'] =='baseline') &
-                               (origin_metadata['phase'] ==3)].index.tolist()
+                               (origin_metadata['phase'] =='RCC3')].index.tolist()
 
 # train_select_files = origin_metadata[(origin_metadata['study_week'] =='baseline') &
 #                              (origin_metadata['phase']==3) &
@@ -164,7 +164,8 @@ select_files = origin_metadata[(origin_metadata['study_week'] =='baseline') &
 
 # select_files = train_select_files+test_select_files
 
-
+print('select_files:')
+print(select_files)
 
 # If we want to fine-tune on more files, uncomment the following lines
 train_select_files =origin_metadata[(origin_metadata['phase']=='RCC3')
@@ -185,7 +186,7 @@ initial_selected_studies_subset = ['ST001236','ST001237','ST001932','ST001519','
 
 # study_list = selected_studies_subset
 
-align_score_th = 0.3
+align_score_th = 0.4
 selected_subset_name = f'all_studies with align score {align_score_th}'
 
 
@@ -768,7 +769,8 @@ cohort_labels = metadata_df['Study_num'].to_list()
 if os.path.exists(os.path.join(select_feats_dir,f'peak_intensity_{cohort_correction_method}.csv')):
     data_corrected = pd.read_csv(os.path.join(select_feats_dir,f'peak_intensity_{cohort_correction_method}.csv'),index_col=0)
 else:
-    data_corrected = standardize_across_cohorts(combined_study,cohort_labels,method=cohort_correction_method)
+    data_corrected = fill_na_by_cohort(combined_study,cohort_labels)
+    data_corrected = standardize_across_cohorts(data_corrected,cohort_labels,method=cohort_correction_method)
     data_corrected.to_csv(os.path.join(select_feats_dir,f'peak_intensity_{cohort_correction_method}.csv'))
 
 # check that there are no null values with the labels

@@ -703,7 +703,7 @@ study_subset_name_list = [
                         #   'subset all_studies with align score 0.4 from Merge_Jan25_align_80_40_fillna_avg',
                           'subset all_studies with align score 0.3 from Merge_Jan25_align_80_40_fillna_avg',
                           #'subset all_studies with align score 0.275 from Merge_Jan25_align_80_40_fillna_avg',
-                          'subset all_studies with align score 0.25 from Merge_Jan25_align_80_40_fillna_avg',
+                        #   'subset all_studies with align score 0.25 from Merge_Jan25_align_80_40_fillna_avg',
                           #'subset all_studies with align score 0 from Merge_Jan25_align_80_40_fillna_avg']
                             ]
 
@@ -729,6 +729,7 @@ for task_name in ['std_1_Benefit']:
 
             # my_output_dir = f'/Users/jonaheaton/ReviveMed Dropbox/Jonah Eaton/development_CohortCombination/simple_networks_Aug_2023/datasets/Aug22_{freq_th}'
             # input_dir = data_engine_path
+        
 
 
             base_model = LogisticRegression

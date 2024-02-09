@@ -11,6 +11,7 @@ import numpy as np
 from models import BinaryClassifier, MultiClassClassifier
 from models import VAE, AE  # Assuming models.py contains a VAE class
 
+# from sklearn.metrics import accuracy_score, roc_auc_score
 from torchmetrics import Accuracy, AUROC
 
 
@@ -28,18 +29,24 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
     head__dropout_rate = kwargs.get('dropout_rate', 0)
     class_weight = kwargs.get('class_weights', None)
     phase_list = kwargs.get('phase_list', None)
-
+    use_batch_norm = kwargs.get('use_batch_norm', False)
 
     encoder__hidden_size = kwargs.get('encoder_hidden_size', 64)
     encoder__num_hidden_layers = kwargs.get('encoder_num_hidden_layers', 1)
     encoder__dropout_rate = kwargs.get('encoder_dropout_rate', 0)
+    encoder__activation = kwargs.get('encoder_activation', 'leakyrelu')
+    encoder__use_batch_norm = kwargs.get('encoder_use_batch_norm', False)
+    encoder_act_on_latent_layer = kwargs.get('encoder_act_on_latent_layer', False)
 
     # learning Hyperparameters
     num_epochs = kwargs.get('num_epochs', 200)
     learning_rate = kwargs.get('learning_rate', .0001)
-    early_stopping_patience = kwargs.get('early_stopping_patience', 20)
+    encoder_learning_rate = kwargs.get('encoder_learning_rate', learning_rate)
+    early_stopping_patience = kwargs.get('early_stopping_patience', -1)
+    noise_factor = kwargs.get('noise_factor', 0)
 
     yesplot = kwargs.get('yesplot', True)
+    verbose = kwargs.get('verbose', False)
     how_average = kwargs.get('how_average', 'weighted')
     load_existing_model =  kwargs.get('load_existing_model', True)
     
@@ -56,6 +63,20 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
     pretrained_encoder_load_path = kwargs.get('pretrained_encoder_load_path', None)
     finetuned_encoder_save_path = os.path.join(save_dir, model_name+'_'+encoder_status+'_'+encoder_name+'_encoder-model.pth')
     
+    # check if the device is available
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    # elif torch.backends.mps.is_available():
+    #     device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+
+    batch_size = dataloaders['train'].batch_size
+    if (batch_size < 32):
+        # if dataset is small, then use the cpu
+        # I guess the evalaation doesn't need to be done on the gpu, but moving back and forth is slow
+        device = torch.device("cpu")
+
     if phase_list is None:
         phase_list = list(dataloaders.keys())
 
@@ -79,19 +100,24 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
         # 'batch_size': 32,
         'num_epochs': num_epochs,
         'learning_rate': learning_rate,
-        'early_stopping_patience': early_stopping_patience
+        'encoder_learning_rate': encoder_learning_rate,
+        'early_stopping_patience': early_stopping_patience,
+        'noise_factor': noise_factor,
         }
+
+    if early_stopping_patience < 0:
+        early_stopping_patience = num_epochs
 
     os.makedirs(save_dir, exist_ok=True)
     # Initialize model, criterion, and optimizer
     if num_classes==2:
         model = BinaryClassifier(latent_size, head__hidden_size, head__num_hidden_layers, head__dropout_rate,
-                                 activation=head__activation)
+                                 activation=head__activation, use_batch_norm=use_batch_norm)
         print('use Binary Classifier')
         task = 'binary'
     elif num_classes > 2:
         model = MultiClassClassifier(latent_size, head__hidden_size, num_classes, head__num_hidden_layers, head__dropout_rate,
-                                        activation=head__activation)
+                                        activation=head__activation, use_batch_norm=use_batch_norm)
         print('use Multi Classifier')
         task = 'multi'
     
@@ -99,10 +125,14 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
 
 
     if encoder_kind.lower() in ['vae']:
-        encoder_model = VAE(input_size, encoder__hidden_size, latent_size, encoder__num_hidden_layers, encoder__dropout_rate)
+        encoder_model = VAE(input_size, encoder__hidden_size, latent_size, encoder__num_hidden_layers, 
+                            encoder__dropout_rate, encoder__activation, use_batch_norm=encoder__use_batch_norm,
+                            act_on_latent_layer=encoder_act_on_latent_layer)
         print('use Variational Autoencoder (VAE)')
     elif encoder_kind.lower() in ['ae']:
-        encoder_model = AE(input_size, encoder__hidden_size, latent_size, encoder__num_hidden_layers, encoder__dropout_rate)
+        encoder_model = AE(input_size, encoder__hidden_size, latent_size, encoder__num_hidden_layers, 
+                           encoder__dropout_rate, encoder__activation, use_batch_norm=encoder__use_batch_norm,
+                            act_on_latent_layer=encoder_act_on_latent_layer)
         print('use Basic Autoencoder (AE)')
     else:
         raise ValueError(f'Encoder kind not recognized: {encoder_kind}')
@@ -127,6 +157,18 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
         assert input_size == pre_trained_output['model_hyperparameters']['input_size'], f'Input size mismatch: {input_size} vs {pre_trained_output["model_hyperparameters"]["input_size"]}'
         assert encoder__hidden_size == pre_trained_output['model_hyperparameters']['hidden_size'], f'Hidden size mismatch: {encoder__hidden_size} vs {pre_trained_output["model_hyperparameters"]["hidden_size"]}'
         assert encoder__num_hidden_layers == pre_trained_output['model_hyperparameters']['num_hidden_layers'], f'Number of hidden layers mismatch: {encoder__num_hidden_layers} vs {pre_trained_output["model_hyperparameters"]["num_hidden_layers"]}'
+        
+        ## encoder dropout only impacts training, so we don't need it be the same
+        # assert encoder__dropout_rate == pre_trained_output['model_hyperparameters']['dropout_rate'], f'Dropout rate mismatch: {encoder__dropout_rate} vs {pre_trained_output["model_hyperparameters"]["dropout_rate"]}'
+        
+        if 'activation' in pre_trained_output['model_hyperparameters']:
+            assert encoder__activation == pre_trained_output['model_hyperparameters']['activation'], f'Activation mismatch: {encoder__activation} vs {pre_trained_output["model_hyperparameters"]["activation"]}'
+        
+        if 'use_batch_norm' in pre_trained_output['model_hyperparameters']:
+            assert encoder__use_batch_norm == pre_trained_output['model_hyperparameters']['use_batch_norm'], f'Batch norm mismatch: {encoder__use_batch_norm} vs {pre_trained_output["model_hyperparameters"]["use_batch_norm"]}'
+
+        if 'act_on_latent_layer' in pre_trained_output['model_hyperparameters']:
+            assert encoder_act_on_latent_layer == pre_trained_output['model_hyperparameters']['act_on_latent_layer'], f'Act on latent layer mismatch: {encoder_act_on_latent_layer} vs {pre_trained_output["model_hyperparameters"]["act_on_latent_layer"]}'
 
         if (encoder_status.lower() == 'finetune') or (encoder_status.lower() == 'fixed'):
             encoder_model.load_state_dict(torch.load(pretrained_encoder_load_path))
@@ -145,18 +187,23 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
             param.requires_grad = False
 
 
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    # optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    # optimizer = optim.Adam(list(model.parameters()) + list(encoder_model.parameters()), lr=learning_rate)
+    encoder_optimizer = optim.Adam(encoder_model.parameters(), lr=encoder_learning_rate) # different learning rate for encoder
+    classifier_optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     if (load_existing_model) and (os.path.exists(model_save_path)):
-        model.load_state_dict(torch.load(model_save_path))
-        encoder_model.load_state_dict(torch.load(finetuned_encoder_save_path))
         # load the json output data
-        with open(output_save_path, 'r') as f:
-            output_data = json.load(f)
-
         print('found existing model, loading it')
-        # TODO: add option to further train the existing model
-        return output_data
+        if os.path.exists(output_save_path):
+            with open(output_save_path, 'r') as f:
+                output_data = json.load(f)
+            # TODO: add option to further train the existing model
+            return output_data
+        else:
+            model.load_state_dict(torch.load(model_save_path))
+            encoder_model.load_state_dict(torch.load(finetuned_encoder_save_path))
+            num_epochs = 0
     
 
     # Training loop with early stopping
@@ -167,11 +214,13 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
     auroc_history = {'train': [], 'val': []}
     patience_counter = 0
 
-    running_accuracy = Accuracy(task=task,average=how_average)
-    running_auroc = AUROC(task=task,average=how_average)
+    running_accuracy = Accuracy(task=task,average=how_average).to(device)
+    running_auroc = AUROC(task=task,average=how_average).to(device)
     # val_accuracy = Accuracy(task=task,average=how_average)
     # val_auroc = AUROC(task=task,average=how_average)
 
+    model = model.to(device)
+    encoder_model = encoder_model.to(device)
     for epoch in range(num_epochs):
         if patience_counter >= early_stopping_patience:
             model.load_state_dict(best_model_wts)
@@ -187,21 +236,41 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
             running_loss = 0.0
             running_auroc.reset()
             running_accuracy.reset()
+            
+            # epoch_preds = []
+            # epoch_targets = []
 
             for data in dataloaders[phase]:
                 X, y = data
+                X = X.to(device)
+                y = y.to(device)
                 y = y.view(-1,1)
-                optimizer.zero_grad()
+                # zero the parameter gradients, so they don't accumulate
+                # optimizer.zero_grad()
+                encoder_optimizer.zero_grad()
+                classifier_optimizer.zero_grad()
+
+                # noise injection for training to make model more robust
+                if (noise_factor>0) and (phase == 'train'):
+                    X = X + noise_factor * torch.randn_like(X)
+
 
                 with torch.set_grad_enabled(phase == 'train'):
                     X_encoded = encoder_model.transform(X)
-                    outputs = model(X_encoded)
+                    # the foward pass is used to build the computational graph to be used later during the backward pass
+                    outputs = model(X_encoded) 
                     loss = model.loss(outputs, y)
-                    # # outputs_probs = model.predict_proba(outputs)
+                    # # outputs_probs = model.predict_proba(X_encoded) #this runs a full forward pass which isn't necessary
                     outputs_probs = model.logits_to_proba(outputs)
+                    # epoch_preds.append(outputs_probs)
+                    # epoch_targets.append(y)
                     if phase == 'train':
+                        # calculate the backpropagation to find the gradients of the loss with respect to the model parameters
                         loss.backward()
-                        optimizer.step()
+                        # update the model parameters using the gradients using the optimizer
+                        # optimizer.step()
+                        encoder_optimizer.step()
+                        classifier_optimizer.step()
 
                 running_loss += loss.item() * X.size(0)
                 running_accuracy(outputs_probs, y)
@@ -209,14 +278,25 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
 
             epoch_loss = running_loss / len(dataloaders[phase].dataset)
             loss_history[phase].append(epoch_loss)
+            
+            # Alternative to using Torchmetrics
+            # epoch_preds = torch.cat(epoch_preds, dim=0)
+            # epoch_targets = torch.cat(epoch_targets, dim=0)
+            # epoch_accuracy = accuracy_score(epoch_targets, epoch_preds)
+            # epoch_auroc = roc_auc_score(epoch_targets, epoch_preds)
+
             epoch_accuracy = running_accuracy.compute().item()
             epoch_auroc = running_auroc.compute().item()
             acc_history[phase].append(epoch_accuracy)
             auroc_history[phase].append(epoch_auroc)
-            print(f'Epoch {epoch}/{num_epochs - 1}, {phase} loss: {epoch_loss:.6f}, \
-                  acc: {epoch_accuracy:.4f}, auroc: {epoch_auroc:.4f}')
+            if verbose:
+                print(f'Epoch {epoch}/{num_epochs - 1}, {phase} loss: {epoch_loss:.6f}, \
+                    acc: {epoch_accuracy:.4f}, auroc: {epoch_auroc:.4f}')
 
             if phase == 'val':
+                if epoch < early_stopping_patience/4:
+                    # don't take the best model from the first few epochs
+                    continue
                 if epoch_loss < best_val_loss:
                     best_epoch = epoch
                     best_val_loss = epoch_loss
@@ -237,6 +317,8 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
     end_state_losses = {}
     end_state_acc = {}
     end_state_auroc = {}
+    model = model.to('cpu') # for evaluation
+    encoder_model = encoder_model.to('cpu') # for evaluation
     for phase in phase_list:
         model.eval()
         running_loss = 0.0
@@ -260,7 +342,8 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
             end_state_acc[phase] = epoch_accuracy
             epoch_auroc = running_auroc.compute().item()
             end_state_auroc[phase] = epoch_auroc
-            print(f'End state {phase} loss: {epoch_loss:.6f}, acc: {epoch_accuracy:.4f}, auroc: {epoch_auroc:.4f}')
+            if verbose:
+                print(f'End state {phase} loss: {epoch_loss:.6f}, acc: {epoch_accuracy:.4f}, auroc: {epoch_auroc:.4f}')
 
     encoder_hyperparameters = encoder_model.get_hyperparameters()
     model_hyperparameters = model.get_hyperparameters()
@@ -294,12 +377,12 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
             plt.figure(figsize=(6,4))
             plt.plot(history['train'], label='train', lw=2)
             plt.plot(history['val'], label='val', lw=2)
-            plt.title(f'{model_name} with {encoder_name}')
+            plt.title(f'{model_name} with {encoder_status} {encoder_name}')
             plt.xlabel('Epoch')
             plt.ylabel(name)
             plt.legend()
             plt.tight_layout()
-            plt.savefig(os.path.join(save_dir, model_name+'_'+encoder_name+'_' +name+'.png'))
+            plt.savefig(os.path.join(save_dir, model_name+'_'+encoder_status+'_'+encoder_name+'_' +name+'.png'))
             plt.close()
 
     return output_data
@@ -374,7 +457,7 @@ if __name__ == '__main__':
 
     model = run_train_classifier(dataloaders,save_dir,
                                  pretrained_encoder_load_path=pretrained_encoder_load_path,
-                                model_name='BenefitClassifier4',
+                                model_name='C5',
                                 model_kind='BinaryClassifier',
                                 phase_list=['train', 'val', 'test', 'test_alt'],
                                 encoder_name='VAE',

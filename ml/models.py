@@ -10,7 +10,8 @@ from loss import CoxPHLoss
 ### Basic Multi-layer Perceptron
 class Dense_Layers(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, 
-        num_hidden_layers=1, dropout_rate=0.2, activation='leakyrelu'):
+        num_hidden_layers=1, dropout_rate=0.2, activation='leakyrelu',
+        use_batch_norm=False, act_on_output_layer=False):
         super(Dense_Layers, self).__init__()
 
         if activation == 'leakyrelu':
@@ -27,26 +28,103 @@ class Dense_Layers(nn.Module):
         if num_hidden_layers < 1:
             # raise ValueError('num_hidden_layers must be at least 1')
             self.network = nn.Sequential(
-                nn.Linear(input_size, output_size),
-                activation_func
-                )
-        else:        
-            self.network = nn.Sequential(
-                nn.Linear(input_size, hidden_size),
-                activation_func,
-                nn.Dropout(dropout_rate)
-            )
-            for _ in range(num_hidden_layers-1):
-                self.network.add_module('hidden_layer', nn.Sequential(
-                    nn.Linear(hidden_size, hidden_size),
+                nn.Linear(input_size, output_size))
+        else:
+            # this if else statement is a little hacky, but its needed for backwards compatibility
+            if use_batch_norm:
+                self.network = nn.Sequential(
+                    nn.Linear(input_size, hidden_size),
+                    nn.BatchNorm1d(hidden_size),
                     activation_func,
                     nn.Dropout(dropout_rate)
+                )
+                for _ in range(num_hidden_layers-1):
+                    self.network.add_module('hidden_layer', nn.Sequential(
+                        nn.Linear(hidden_size, hidden_size),
+                        nn.BatchNorm1d(hidden_size),
+                        activation_func,
+                        nn.Dropout(dropout_rate)
+                    ))
+                self.network.add_module('output_layer', nn.Sequential(
+                    nn.Linear(hidden_size, output_size),
                 ))
-            self.network.add_module('output_layer', nn.Sequential(
-                nn.Linear(hidden_size, output_size),
-            ))
+
+
+            else:
+                self.network = nn.Sequential(
+                    nn.Linear(input_size, hidden_size),
+                    activation_func,
+                    nn.Dropout(dropout_rate)
+                )
+                for _ in range(num_hidden_layers-1):
+                    self.network.add_module('hidden_layer', nn.Sequential(
+                        nn.Linear(hidden_size, hidden_size),
+                        activation_func,
+                        nn.Dropout(dropout_rate)
+                    ))
+                self.network.add_module('output_layer', nn.Sequential(
+                    nn.Linear(hidden_size, output_size),
+                ))
+            
+        if act_on_output_layer:
+            self.network.add_module('output_activation', activation_func)
+            self.network.add_module('output_dropout', nn.Dropout(dropout_rate))
+
+
     def forward(self, x):
         return self.network(x)
+
+
+## Basic Multi-layer Perceptron
+# class Dense_Layers(nn.Module):
+#     def __init__(self, input_size, hidden_size, output_size, 
+#         num_hidden_layers=1, dropout_rate=0.2, activation='leakyrelu',
+#         use_batch_norm=False):
+#         super(Dense_Layers, self).__init__()
+
+#         if activation == 'leakyrelu':
+#             activation_func = nn.LeakyReLU()
+#         elif activation == 'relu':
+#             activation_func = nn.ReLU()
+#         elif activation == 'tanh':
+#             activation_func = nn.Tanh()
+#         elif activation == 'sigmoid':
+#             activation_func = nn.Sigmoid()
+#         else:
+#             raise ValueError('activation must be one of "leakyrelu", "relu", "tanh", or "sigmoid"')
+
+#         if num_hidden_layers < 1:
+#             raise ValueError('num_hidden_layers must be at least 1')
+
+#         # Define the input layer
+#         self.input_layer =  nn.Sequential(nn.Linear(input_size, hidden_size))
+#         if use_batch_norm:
+#             self.input_layer.add_module('batch_norm', nn.BatchNorm1d(hidden_size))
+#         self.input_layer.add_module('activation', activation_func)
+#         self.input_layer.add_module('dropout', nn.Dropout(dropout_rate))
+
+#         # define the hidden layers
+#         self.hidden_layer = nn.Sequential(nn.Linear(hidden_size, hidden_size))
+#         if use_batch_norm:
+#             self.hidden_layer.add_module('batch_norm', nn.BatchNorm1d(hidden_size))
+#         self.hidden_layer.add_module('activation', activation_func)
+#         self.hidden_layer.add_module('dropout', nn.Dropout(dropout_rate))
+
+#         # define the output layer
+#         self.output_layer = nn.Sequential(nn.Linear(hidden_size, output_size))
+
+#         # self.network = nn.Sequential()
+#         # self.network.add_module('input_layer', self.input_layer)
+#         self.network = nn.Sequential(self.input_layer)
+#         for i in range(num_hidden_layers-1):
+#             # self.network.add_module(f'hidden_layer_{i}', self.hidden_layer)
+#             self.network.add_module(f'hidden_layer', self.hidden_layer)
+#         self.network.add_module('output_layer', self.output_layer)
+
+#     def forward(self, x):
+#         return self.network(x)
+
+
 
 
 ############ Autoencoder Models ############
@@ -54,7 +132,8 @@ class Dense_Layers(nn.Module):
 ### Variational Autoencoder
 class VAE(nn.Module):
     def __init__(self, input_size, hidden_size, latent_size,
-                 num_hidden_layers=1, dropout_rate=0,activation='leakyrelu'):
+                 num_hidden_layers=1, dropout_rate=0,
+                 activation='leakyrelu', use_batch_norm=False, act_on_latent_layer=False):
         super(VAE, self).__init__()
         self.latent_size = latent_size
         self.input_size = input_size
@@ -62,11 +141,14 @@ class VAE(nn.Module):
         self.num_hidden_layers = num_hidden_layers
         self.dropout_rate = dropout_rate
         self.activation = activation
+        self.use_batch_norm = use_batch_norm
         self.encoder = Dense_Layers(input_size, hidden_size, 2*latent_size, 
-                                    num_hidden_layers, dropout_rate, activation)
+                                    num_hidden_layers, dropout_rate, activation,
+                                    use_batch_norm,act_on_output_layer=act_on_latent_layer)
         
         self.decoder = Dense_Layers(latent_size, hidden_size, input_size,
-                                    num_hidden_layers, dropout_rate, activation)
+                                    num_hidden_layers, dropout_rate, activation,
+                                    use_batch_norm)
         
     def reparameterize(self, mu, log_var):
         std = torch.exp(0.5*log_var)
@@ -83,6 +165,7 @@ class VAE(nn.Module):
         return mu
 
     def loss(self, x, x_recon, mu, log_var):
+        # taking the average over the batch helps with stability
         recon_loss = F.mse_loss(x_recon, x, reduction='sum')
         kl_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
         return torch.div(torch.add(recon_loss, kl_loss), x.size(0))
@@ -103,13 +186,15 @@ class VAE(nn.Module):
                 'latent_size': self.latent_size,
                 'num_hidden_layers': self.num_hidden_layers,
                 'dropout_rate': self.dropout_rate,
-                'activation': self.activation}
+                'activation': self.activation,
+                'use_batch_norm': self.use_batch_norm}
     
     
 ### Autoencoder
 class AE(nn.Module):
     def __init__(self, input_size, hidden_size, latent_size,
-                 num_hidden_layers=1, dropout_rate=0,activation='leakyrelu'):
+                 num_hidden_layers=1, dropout_rate=0,
+                 activation='leakyrelu', use_batch_norm=False, act_on_latent_layer=False):
         super(AE, self).__init__()
         self.latent_size = latent_size
         self.input_size = input_size
@@ -117,11 +202,14 @@ class AE(nn.Module):
         self.num_hidden_layers = num_hidden_layers
         self.dropout_rate = dropout_rate
         self.activation = activation
+        self.use_batch_norm = use_batch_norm
         self.encoder = Dense_Layers(input_size, hidden_size, latent_size, 
-                                    num_hidden_layers, dropout_rate, activation)
+                                    num_hidden_layers, dropout_rate, activation,
+                                    use_batch_norm, act_on_output_layer=act_on_latent_layer)
         
         self.decoder = Dense_Layers(latent_size, hidden_size, input_size,
-                                    num_hidden_layers, dropout_rate, activation)
+                                    num_hidden_layers, dropout_rate, activation,
+                                    use_batch_norm)
         
     def forward(self, x):
         z = self.encoder(x)
@@ -131,8 +219,9 @@ class AE(nn.Module):
         return self.encoder(x)
     
     def loss(self, x, x_recon):
-        return F.mse_loss(x_recon, x, reduction='sum')
-        # return F.mse_loss(x_recon, x, reduction='mean')
+        # taking the average over the batch helps with stability
+        # return F.mse_loss(x_recon, x, reduction='sum')
+        return F.mse_loss(x_recon, x, reduction='mean')
     
     def forward_to_loss(self, x):
         z = self.encoder(x)
@@ -148,25 +237,29 @@ class AE(nn.Module):
                 'latent_size': self.latent_size,
                 'num_hidden_layers': self.num_hidden_layers,
                 'dropout_rate': self.dropout_rate,
-                'activation': self.activation}
+                'activation': self.activation,
+                'use_batch_norm': self.use_batch_norm}
 
 ############ Classification Models ############
     
 ### Binary Classifier
 class BinaryClassifier(nn.Module):
     def __init__(self, input_size, hidden_size, 
-                 num_hidden_layers=1, dropout_rate=0.2,activation='leakyrelu'):
+                 num_hidden_layers=1, dropout_rate=0.2,
+                 activation='leakyrelu', use_batch_norm=False):
         super(BinaryClassifier, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
         self.dropout_rate = dropout_rate
         self.activation = activation
+        self.use_batch_norm = use_batch_norm
         self.network = Dense_Layers(input_size, hidden_size,
                                     output_size=1, 
                                     num_hidden_layers=num_hidden_layers,
                                     dropout_rate=dropout_rate,
-                                    activation=activation)
+                                    activation=activation,
+                                    use_batch_norm=use_batch_norm)
 
         self.loss_func = nn.BCEWithLogitsLoss()
 
@@ -205,13 +298,15 @@ class BinaryClassifier(nn.Module):
                 'hidden_size': self.hidden_size,
                 'num_hidden_layers': self.num_hidden_layers,
                 'dropout_rate': self.dropout_rate,
-                'activation': self.activation}   
+                'activation': self.activation,
+                'use_batch_norm': self.use_batch_norm}   
 
 
 ### Multi-class Classifier
 class MultiClassClassifier(nn.Module):
     def __init__(self, input_size, hidden_size, num_classes, 
-                 num_hidden_layers=1, dropout_rate=0.2,activation='leakyrelu'):
+                 num_hidden_layers=1, dropout_rate=0.2,
+                 activation='leakyrelu', use_batch_norm=False):
         super(MultiClassClassifier, self).__init__()
         self.input_size = input_size
         self.num_classes = num_classes
@@ -219,11 +314,13 @@ class MultiClassClassifier(nn.Module):
         self.num_hidden_layers = num_hidden_layers
         self.dropout_rate = dropout_rate
         self.activation = activation
+        self.use_batch_norm = use_batch_norm
         self.network = Dense_Layers(input_size, hidden_size,
                                     output_size=num_classes, 
                                     num_hidden_layers=num_hidden_layers,
                                     dropout_rate=dropout_rate,
-                                    activation=activation)
+                                    activation=activation,
+                                    use_batch_norm=use_batch_norm)
         
         self.loss_func = nn.CrossEntropyLoss()
         # CrossEntropyLoss automatically applies softmax to the output layer
@@ -267,7 +364,8 @@ class MultiClassClassifier(nn.Module):
                 'num_classes': self.num_classes,
                 'num_hidden_layers': self.num_hidden_layers,
                 'dropout_rate': self.dropout_rate,
-                'activation': self.activation}
+                'activation': self.activation,
+                'use_batch_norm': self.use_batch_norm}
 
 
 ##### Regression Models #####
@@ -275,7 +373,8 @@ class MultiClassClassifier(nn.Module):
 ### Linear Regression
 class RegressionNN(nn.Module):
     def __init__(self, input_size, hidden_size, 
-                 num_hidden_layers=1, dropout_rate=0.2,activation='leakyrelu'):
+                 num_hidden_layers=1, dropout_rate=0.2,
+                 activation='leakyrelu', use_batch_norm=False):
         super(RegressionNN, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -286,7 +385,8 @@ class RegressionNN(nn.Module):
                                     output_size=1, 
                                     num_hidden_layers=num_hidden_layers,
                                     dropout_rate=dropout_rate,
-                                    activation=activation)
+                                    activation=activation,
+                                    use_batch_norm=use_batch_norm)
         
         self.loss_func = nn.MSELoss()
     
@@ -311,7 +411,8 @@ class RegressionNN(nn.Module):
 # TODO: not sure if this is the correct implementation
 class CoxNN(nn.Module):
     def __init__(self, input_size, hidden_size, 
-                 num_hidden_layers=1, dropout_rate=0.2,activation='leakyrelu'):
+                 num_hidden_layers=1, dropout_rate=0.2,
+                 activation='leakyrelu', use_batch_norm=False):
         super(CoxNN, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -322,7 +423,8 @@ class CoxNN(nn.Module):
                                     output_size=1, 
                                     num_hidden_layers=num_hidden_layers,
                                     dropout_rate=dropout_rate,
-                                    activation=activation)
+                                    activation=activation,
+                                    use_batch_norm=use_batch_norm)
         
         self.loss_func = CoxPHLoss()
     
@@ -346,4 +448,5 @@ class CoxNN(nn.Module):
                 'hidden_size': self.hidden_size,
                 'num_hidden_layers': self.num_hidden_layers,
                 'dropout_rate': self.dropout_rate,
-                'activation': self.activation}
+                'activation': self.activation,
+                'use_batch_norm': self.use_batch_norm}

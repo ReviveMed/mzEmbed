@@ -11,6 +11,38 @@ def min_max_scale(df):
     return df
 
 
+def fill_na_by_cohort(combined_intensity,cohort_labels,method='mean_1th'):
+    assert len(combined_intensity.columns) == len(cohort_labels)
+    # columns are samples, rows are features
+    for cohort in set(cohort_labels):
+        # cohort_idx = np.where(cohort_labels==cohort)[0]
+        cohort_idx = np.array(cohort_labels) == cohort
+        cohort_data = combined_intensity.iloc[:,cohort_idx].copy()
+        not_nan_fts = cohort_data.notna().sum(axis=1) > 0
+        cohort_data = cohort_data.loc[not_nan_fts].copy()
+
+        if method == 'mean_0th':
+            # average across the features
+            cohort_data.fillna(cohort_data.mean(),inplace=True)
+        elif method == 'mean_1th':
+            # average across the samples
+            cohort_dataT = cohort_data.T
+            cohort_dataT.fillna(cohort_dataT.mean(),inplace=True)
+            cohort_data = cohort_dataT.T
+        elif method == 'min_0th':
+            cohort_data.fillna(cohort_data.min(),inplace=True)
+        elif method == 'min_1th':
+            cohort_dataT = cohort_data.T
+            cohort_dataT.fillna(cohort_dataT.min(),inplace=True)
+            cohort_data = cohort_dataT.T
+        else:
+            raise ValueError(f'Invalid method: {method}')
+
+        combined_intensity.loc[cohort_data.index].iloc[:,cohort_idx] = cohort_data
+    return combined_intensity
+
+
+
 def standardize_across_cohorts(combined_intensity,cohort_labels,method):
     assert len(combined_intensity.columns) == len(cohort_labels)
     combined_intensity.fillna(combined_intensity.mean(),inplace=True)
