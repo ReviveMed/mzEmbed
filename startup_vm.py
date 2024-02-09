@@ -363,9 +363,9 @@ if len(records) > 0:
                 #         input_study.rename_selected_peaks(current_ids, new_ids, verbose=False)
                 #         input_study.save_to_pickle(renamed_study_pkl_file)
 
-                ############################################################################################################
+                ########################################################################################################
                 # do stats on alignment results
-                ############################################################################################################
+                ########################################################################################################
                 # save the alignment results to a csv on gcp bucket
                 # mzlearn-webapp.appspot.com/mzlearn_pretraining/peak_combine_results/{job_id}/alignment_df.csv
                 # TODO: save the alignment results to a csv on gcp bucket based on threshold as well
@@ -428,6 +428,11 @@ if len(records) > 0:
                 # Verify that the sample names are the same in the combined study as they are in the combined metadata
                 combined_study.fillna(combined_study.mean(), inplace=True)
                 combined_study.to_csv(os.path.join(align_save_dir_freq_th, 'combined_study.csv'))
+
+                # check if combined_study is empty
+                if combined_study.empty:
+                    print("combined_study is empty")
+                    continue
 
                 # TODO: correct for cohort effects using cohort_labels (study id)
                 # get the study_id2file_name
