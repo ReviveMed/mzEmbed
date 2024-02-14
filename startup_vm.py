@@ -451,6 +451,9 @@ if len(records) > 0:
                 cohort_labels = metadata_df['mzlearn_cohort_id'].to_list()
                 data_corrected = standardize_across_cohorts(combined_study, cohort_labels, method=cohort_correction_method)
                 # data_corrected = combined_study
+                # calculate number of peaks and number of files from data_corrected
+                num_peaks = data_corrected.shape[0]
+                num_files = data_corrected.shape[1]
 
                 # TODO: add save here to plot UMAP and PCA
                 ########################################################################################################
@@ -463,8 +466,12 @@ if len(records) > 0:
                 # pca_df['Study_num'] = metadata_df['Study_num']
                 # pca_df['label'] = metadata_df[pretrain_label_col]
                 pca_df.to_csv(os.path.join(align_save_dir_freq_th, f'pca_df_{cohort_correction_method}.csv'))
+                # plot the PCA and add file_name as hover and add title to show num_peaks and num_files
                 graph = px.scatter(pca_df, x="PC1", y="PC2", color='mzlearn_cohort_id',
-                                   color_discrete_sequence=px.colors.qualitative.Plotly)
+                                   color_discrete_sequence=px.colors.qualitative.Plotly,
+                                   title=f'PCA with {num_peaks} peaks and {num_files} files',
+                                   hover_name='file_name')
+
                 graph.update_traces(marker={'size': 4.5})
                 graph_div = plot({'data': graph}, output_type='div')
                 pickle.dump(graph_div, open(f'{align_save_dir_freq_th}/pca_plot.pkl', 'wb'))
@@ -488,7 +495,10 @@ if len(records) > 0:
                 # umap_df['label'] = metadata_df[pretrain_label_col]
                 umap_df.to_csv(os.path.join(align_save_dir_freq_th, f'umap_df_{cohort_correction_method}.csv'))
                 graph = px.scatter(umap_df, x="UMAP1", y="UMAP2", color='mzlearn_cohort_id',
-                                   color_discrete_sequence=px.colors.qualitative.Plotly)
+                                   color_discrete_sequence=px.colors.qualitative.Plotly,
+                                   title=f'UMAP with {num_peaks} peaks and {num_files} files',
+                                   hover_name='file_name'
+                                   )
                 graph.update_traces(marker={'size': 4.5})
                 graph_div = plot({'data': graph}, output_type='div')
                 pickle.dump(graph_div, open(f'{align_save_dir_freq_th}/umap_plot.pkl', 'wb'))
