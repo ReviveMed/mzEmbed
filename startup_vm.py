@@ -399,6 +399,7 @@ if len(records) > 0:
 
                 # load the reference study first and do log2 transformation
                 combined_study = origin_study.peak_intensity.loc[chosen_feats, :].copy()
+                combined_study_nan_mask = origin_study.missing_val_mask.loc[chosen_feats, :].copy()
                 combined_study = np.log2(combined_study)
 
                 # get all the file names for the origin_study
@@ -420,14 +421,18 @@ if len(records) > 0:
                         study_id2file_name[str(study_id)] = input_study_file_list
                         subset_chosen = [i for i in chosen_feats if i in input_study.peak_intensity.index]
                         input_peaks = input_study.peak_intensity.loc[subset_chosen, :].copy()
+                        input_study_nan_mask = input_study.missing_val_mask.loc[subset_chosen, :].copy()
                         input_peaks = np.log2(input_peaks)
                         # input_peaks = min_max_scale(input_peaks)
                         # combined_study = combined_study.join(input_peaks, lsuffix=reference_job_id, rsuffix=study_id, how='outer')
                         combined_study = combined_study.join(input_peaks, how='outer')
+                        combined_study_nan_mask = combined_study_nan_mask.join(input_study_nan_mask,  how='outer')
 
                 # Verify that the sample names are the same in the combined study as they are in the combined metadata
                 combined_study.fillna(combined_study.mean(), inplace=True)
                 combined_study.to_csv(os.path.join(align_save_dir_freq_th, 'combined_study.csv'))
+
+                print(combined_study_nan_mask)
 
                 # check if combined_study is empty
                 if combined_study.empty:
