@@ -222,10 +222,20 @@ if len(records) > 0:
     # build ms object settings
     origin_freq_th = reference_job_freq_th
     other_study_freq_th = other_job_freq_th
+
+    ####### Add these as new user-defined options ######
+    # NOTE: To save time, all of these options can be looped through AFTER the alignment has been computed
+    # NOTE (2): the fill na method is currently applied very early in the process before alignment, but it can be moved to after alignment
     fill_na_strat = 'min'
+    # fill_na_strat_list = ['min',''mean'','knn','min/2','median','log_mean','log_knn']
     num_cohorts_thresh = 0.5
-    align_save_dir = f"{script_path}/alignment_results"
+    # num_cohorts_thresh_list = [0,0.25,0.5,0.75]
     cohort_correction_method = 'combat'
+    # cohort_correction_method_list = ['combat','zscore','min_max','raw']
+    ###### end of new user-defined options ######
+
+    align_save_dir = f"{script_path}/alignment_results"
+
 
     # if no alignment folder exists, create one
     if not os.path.exists(align_save_dir):
