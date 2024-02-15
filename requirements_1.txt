@@ -31,3 +31,4 @@ keras
 lifelines
 openpyxl
 inmoose
+optuna
