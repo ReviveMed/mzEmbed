@@ -87,7 +87,7 @@ def get_mspeak_from_job_id(script_path_mspeak, job_id, freq_th):
     mzlearn_path = f"mzlearn/{user_id}/{job_time}"
 
     # download the mzlearn result needed for the combination
-    intermediate_folder_path = f"{mzlearn_path}/mzlearn_intermediate_results"
+    intermediate_folder_path = f"{mzlearn_path}"
     bucket_name = 'mzlearn-webapp.appspot.com'
     bucket = client.get_bucket(bucket_name)
     dst_path = f"{script_path_mspeak}/{job_id}/result-"  # local path to the folder to be saved
