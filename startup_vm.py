@@ -433,11 +433,12 @@ if len(records) > 0:
                 combined_study.to_csv(os.path.join(align_save_dir_freq_th, 'combined_study.csv'))
 
                 print(combined_study_nan_mask)
+                combined_study_nan_mask.fillna(True, inplace=True)
                 # combined_study_nan_mask do a transpose to get a new dataframe with file_name as index and peak intensity as columns
                 combined_study_nan_mask = combined_study_nan_mask.T
                 # calculate the number of missing values for each file (missing value for each row)
-                # that is count the NaN from each row and divide by the number of columns
-                combined_study_nan_mask['missing_values'] = combined_study_nan_mask.isna().sum(axis=1) / combined_study_nan_mask.shape[1]
+                # that is count the true from each row and divide by the number of columns
+                combined_study_nan_mask['missing_values'] = combined_study_nan_mask.sum(axis=1) / combined_study_nan_mask.shape[1]
                 # reformt the combined_study_nan_mask['missing_values'] to save only first 2 decimal points and convert to percentage
                 combined_study_nan_mask['missing_values'] = combined_study_nan_mask['missing_values'].apply(lambda x: round(x * 100, 2))
                 # add % to combined_study_nan_mask['missing_values'] value
@@ -477,11 +478,11 @@ if len(records) > 0:
                 pca_df = pd.DataFrame(pca_result, columns=['PC1', 'PC2'], index=data_corrected.columns)
                 pca_df['mzlearn_cohort_id'] = metadata_df['mzlearn_cohort_id'].to_list()
                 pca_df['file_name'] = metadata_df['file_name'].to_list()
-                pca_df['missing values percentage'] = combined_study_nan_mask['missing_values'].to_list()
+                pca_df['MV percentage'] = combined_study_nan_mask['missing_values'].to_list()
                 # pca_df['Study_num'] = metadata_df['Study_num']
                 # pca_df['label'] = metadata_df[pretrain_label_col]
                 pca_df.to_csv(os.path.join(align_save_dir_freq_th, f'pca_df_{cohort_correction_method}.csv'))
-                hover_data = ['missing values percentage']
+                hover_data = ['MV percentage']
                 # plot the PCA and add file_name as hover and add title to show num_peaks and num_files
                 graph = px.scatter(pca_df, x="PC1", y="PC2", color='mzlearn_cohort_id',
                                    color_discrete_sequence=px.colors.qualitative.Plotly,
@@ -508,11 +509,11 @@ if len(records) > 0:
                 umap_df = pd.DataFrame(umap_result, columns=['UMAP1', 'UMAP2'], index=data_corrected.columns)
                 umap_df['mzlearn_cohort_id'] = metadata_df['mzlearn_cohort_id'].to_list()
                 umap_df['file_name'] = metadata_df['file_name'].to_list()
-                umap_df['missing values percentage'] = combined_study_nan_mask['missing_values'].to_list()
+                umap_df['MV percentage'] = combined_study_nan_mask['missing_values'].to_list()
                 # umap_df['Study_num'] = metadata_df['Study_num']
                 # umap_df['label'] = metadata_df[pretrain_label_col]
                 umap_df.to_csv(os.path.join(align_save_dir_freq_th, f'umap_df_{cohort_correction_method}.csv'))
-                hover_data = ['missing values percentage']
+                hover_data = ['MV percentage']
                 graph = px.scatter(umap_df, x="UMAP1", y="UMAP2", color='mzlearn_cohort_id',
                                    color_discrete_sequence=px.colors.qualitative.Plotly,
                                    title=f'UMAP with {num_peaks} peaks and {num_files} files',
