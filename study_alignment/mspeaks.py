@@ -14,7 +14,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pickle
 import json
-import feather
+# import feather
 
 import umap
 import matplotlib.pyplot as plt
@@ -458,9 +458,9 @@ class MSPeaks:
 ######### Creation Functions #########
 #######################################################
 
-# def load_mspeaks_from_pickle(filename):
-#     with open(filename, 'rb') as f:
-#         return pickle.load(f)
+def load_mspeaks_from_pickle(filename):
+    with open(filename, 'rb') as f:
+        return pickle.load(f)
 
 
 def create_mspeaks(peak_info=None, sample_info=None, peak_intensity=None, targets_info=None, params_overall=None):
