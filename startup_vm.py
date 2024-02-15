@@ -434,6 +434,7 @@ if len(records) > 0:
 
                 print(combined_study_nan_mask)
                 combined_study_nan_mask.fillna(True, inplace=True)
+                combined_study_nan_mask.to_csv(os.path.join(align_save_dir_freq_th, 'combined_study_nan_mask.csv'))
                 # combined_study_nan_mask do a transpose to get a new dataframe with file_name as index and peak intensity as columns
                 combined_study_nan_mask = combined_study_nan_mask.T
                 # calculate the number of missing values for each file (missing value for each row)
@@ -460,9 +461,9 @@ if len(records) > 0:
                 metadata_df['mzlearn_cohort_id'] = metadata_df['file_name'].apply(
                     lambda x: [k for k, v in study_id2file_name.items() if x in v][0])
                 print(metadata_df)
+                metadata_df.to_csv(os.path.join(align_save_dir_freq_th, 'combined_study_cohort_ids.csv'))
 
                 # need to know the study id for each study used here use job id for each file
-                cohort_correction_method = 'combat'
                 cohort_labels = metadata_df['mzlearn_cohort_id'].to_list()
                 data_corrected = standardize_across_cohorts(combined_study, cohort_labels, method=cohort_correction_method)
                 # data_corrected = combined_study

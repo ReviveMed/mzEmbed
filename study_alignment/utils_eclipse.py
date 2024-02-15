@@ -25,9 +25,13 @@ def get_eclipse_format(study_peaks,study_name,log_intensity=False):
     # if scale_rt:
         # coor_info['RT'] = coor_info['RT']*10/coor_info['RT'].max()
     if log_intensity:
-        eclipse_df['Intensity'] = np.log10(study_peaks.peak_intensity.median(axis=1).values)
+        # eclipse_df['Intensity'] = np.log10(study_peaks.peak_intensity.median(axis=1).values)
+        # compute the median ignoring nans
+        eclipse_df['Intensity'] = np.log10(study_peaks.peak_intensity.median(axis=1,skipna=True).values)
     else:
-        eclipse_df['Intensity'] = study_peaks.peak_intensity.median(axis=1).values
+        # eclipse_df['Intensity'] = study_peaks.peak_intensity.median(axis=1).values
+        # compute the median ignoring nans
+        eclipse_df['Intensity'] = study_peaks.peak_intensity.median(axis=1,skipna=True).values
     # add information about the targets
     for col in study_peaks.peak_info.columns:
         if 'target' in col:

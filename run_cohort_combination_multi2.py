@@ -18,6 +18,7 @@ from study_alignment.utils_misc import load_json, save_json, get_method_param_na
 from inmoose.pycombat import pycombat_norm
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
+from study_alignment.standardize import min_max_scale, standardize_across_cohorts, fill_na_by_cohort
 
 sys.path.append('/Users/jonaheaton/mzlearn/peak_picking_pipeline')
 from utils_synth_norm import synthetic_normalization_Nov2023_wrapper_repeat
@@ -47,9 +48,10 @@ origin_result_path = os.path.join(data_path,origin_name,'rcc1_rcc3_output_v1_202
 
 cohort_combine_dir = os.path.join(dropbox_dir,'development_CohortCombination')
 norm_setting_dir = os.path.join(cohort_combine_dir,'norm_settings')
-output_dir = f'{cohort_combine_dir}/hilic_pos_2024_feb_02_read_norm'
-# output_dir = f'{cohort_combine_dir}/hilic_pos_2024_feb_05_read_norm_poolmap'
-origin_metadata_file = f'{cohort_combine_dir}/rcc_sample_info3.csv'
+# output_dir = f'{cohort_combine_dir}/hilic_pos_2024_feb_02_read_norm'
+output_dir = f'{cohort_combine_dir}/hilic_pos_2024_feb_09_read_norm_poolmap'
+# origin_metadata_file = f'{cohort_combine_dir}/rcc_sample_info3.csv'
+origin_metadata_file = f'{cohort_combine_dir}/clean_rcc_metadata.csv'
 os.makedirs(output_dir,exist_ok=True)
 plots_dir = os.path.join(output_dir,'plots')
 os.makedirs(plots_dir,exist_ok=True)
@@ -58,8 +60,8 @@ os.makedirs(norm_setting_dir,exist_ok=True)
 create_qc_plots = False
 
 # prep_name = 'fillna_avg_poolmap'
-prep_name = 'fillna_avg'
-fill_na_strat = 'mean'
+prep_name = 'poolmap'
+fill_na_strat = None
 origin_freq_th = 0.8
 norm_name = 'synthetic v1'
 read_norm_peaks = True
@@ -121,13 +123,15 @@ os.makedirs(align_save_dir,exist_ok=True)
 save_json(params,os.path.join(align_save_dir,'params.json'))
 
 
-finetune_label_col_name = 'Benefit'
-finetune_label_col_list = [finetune_label_col_name]
+# finetune_label_col_name = 'Benefit'
+# finetune_label_col_list = [finetune_label_col_name]
 
 # finetune_label_col_name = 'MSKCC'
 # finetune_label_col_list = [finetune_label_col_name]
 
-# finetune_label_col_name = 'Multi'
+finetune_label_col_name = 'Multi'
+finetune_label_col_list = ['Benefit','PFS','PFS_Event','OS','OS_Event','ORR','ExtremeResponder','MSKCC','Treatment',\
+                           'Sex','Region','study_week','Dose (mg/kg)','phase','Age_Group','Prior_2','Age']
 # finetune_label_col_list = ['Benefit','PFS','PFS_Event','OS_genomics','Event_genomics','ORR','ExtremeResponder','MSKCC',	'IMDC','Treatment','Sex','Region','study_week']
 
 
@@ -138,40 +142,41 @@ origin_metadata.index = [f'{origin_name}_{y}' for y in origin_metadata.index]
 
 
 select_files = origin_metadata[(origin_metadata['study_week'] =='baseline') &
-                               (origin_metadata['phase'] ==3)].index.tolist()
+                               (origin_metadata['phase'] =='RCC3')].index.tolist()
 
-train_select_files = origin_metadata[(origin_metadata['study_week'] =='baseline') &
-                             (origin_metadata['phase']==3) &
-                            (origin_metadata['Treatment']=='NIVOLUMAB') &
-                             (origin_metadata['Benefit'].isin(['CB','NCB']))
-                             ].index.tolist()
+# train_select_files = origin_metadata[(origin_metadata['study_week'] =='baseline') &
+#                              (origin_metadata['phase']==3) &
+#                             (origin_metadata['Treatment']=='NIVOLUMAB') &
+#                              (origin_metadata['Benefit'].isin(['CB','NCB']))
+#                              ].index.tolist()
 
-test_select_files = origin_metadata[(origin_metadata['study_week'] =='baseline') &
-                             (origin_metadata['phase']==1) &
-                             (origin_metadata['Treatment']=='NIVOLUMAB') &
-                             (origin_metadata['Dose (mg/kg)']>1) &
-                             (origin_metadata['Benefit'].isin(['CB','NCB']))
-                             ].index.tolist()
-test_select_file_alt = origin_metadata[(origin_metadata['study_week'] =='baseline') &
-                             (origin_metadata['phase']==1) &
-                             (origin_metadata['Treatment']=='NIVOLUMAB') &
-                             (origin_metadata['Benefit'].isin(['CB','NCB']))
-                             ].index.tolist()
+# test_select_files = origin_metadata[(origin_metadata['study_week'] =='baseline') &
+#                              (origin_metadata['phase']==1) &
+#                              (origin_metadata['Treatment']=='NIVOLUMAB') &
+#                              (origin_metadata['Dose (mg/kg)']>1) &
+#                              (origin_metadata['Benefit'].isin(['CB','NCB']))
+#                              ].index.tolist()
+# test_select_file_alt = origin_metadata[(origin_metadata['study_week'] =='baseline') &
+#                              (origin_metadata['phase']==1) &
+#                              (origin_metadata['Treatment']=='NIVOLUMAB') &
+#                              (origin_metadata['Benefit'].isin(['CB','NCB']))
+#                              ].index.tolist()
 
 # select_files = train_select_files+test_select_files
 
-
+print('select_files:')
+print(select_files)
 
 # If we want to fine-tune on more files, uncomment the following lines
-# train_select_files =origin_metadata[(origin_metadata['phase']==3)
-#                                      & (origin_metadata['Treatment'].isin(['NIVOLUMAB','EVEROLIMUS']))
-#                                     #  & (origin_metadata['study_week']== 'baseline')
-#                                      ].index.tolist() 
-# test_select_files = origin_metadata[(origin_metadata['phase']==1)
-#                                      & (origin_metadata['Treatment']=='NIVOLUMAB')
-#                                     #  & (origin_metadata['study_week']== 'baseline')
-#                                      ].index.tolist()
-# test_select_file_alt = []
+train_select_files =origin_metadata[(origin_metadata['phase']=='RCC3')
+                                     & (origin_metadata['Treatment'].isin(['NIVOLUMAB','EVEROLIMUS']))
+                                     & (origin_metadata['study_week']== 'baseline')
+                                     ].index.tolist() 
+test_select_files = origin_metadata[(origin_metadata['phase']=='RCC1')
+                                     & (origin_metadata['Treatment']=='NIVOLUMAB')
+                                     & (origin_metadata['study_week']== 'baseline')
+                                     ].index.tolist()
+test_select_file_alt = []
 
 save_json(select_files,os.path.join(align_save_dir,'select_origin_files.json'))
 
@@ -322,77 +327,77 @@ def get_list_available_study_ids(data_path):
     return study_id_list
 
 
-def min_max_scale(df):
-    overall_min = df.min().min()
-    overall_max = df.max().max()
-    df = (df-overall_min)/(overall_max-overall_min)
-    return df
+# def min_max_scale(df):
+#     overall_min = df.min().min()
+#     overall_max = df.max().max()
+#     df = (df-overall_min)/(overall_max-overall_min)
+#     return df
 
-def standardize_across_cohorts(combined_intensity,cohort_labels,method):
-    assert len(combined_intensity.columns) == len(cohort_labels)
+# def standardize_across_cohorts(combined_intensity,cohort_labels,method):
+#     assert len(combined_intensity.columns) == len(cohort_labels)
     
-    if method == 'combat':
-        print('fill missing values with the sample mean')
-        combined_intensity.fillna(combined_intensity.mean(),inplace=True)
-        data_corrected = pycombat_norm(combined_intensity,cohort_labels)
-    elif method == 'raw':
-        print('fill missing values with the sample mean')
-        combined_intensity.fillna(combined_intensity.mean(),inplace=True)
-        data_corrected = combined_intensity.copy()
-    elif method =='min_max':
-        print('fill missing values with the sample mean')
-        combined_intensity.fillna(combined_intensity.mean(),inplace=True)
-        data_corrected = combined_intensity.copy()
-        for cohort in set(cohort_labels):
-            cohort_idx = np.where(cohort_labels==cohort)[0]
-            cohort_data = data_corrected.iloc[:,cohort_idx].copy()
-            cohort_data = min_max_scale(cohort_data)
-            data_corrected.iloc[:,cohort_idx] = cohort_data
+#     if method == 'combat':
+#         print('fill missing values with the sample mean')
+#         combined_intensity.fillna(combined_intensity.mean(),inplace=True)
+#         data_corrected = pycombat_norm(combined_intensity,cohort_labels)
+#     elif method == 'raw':
+#         print('fill missing values with the sample mean')
+#         combined_intensity.fillna(combined_intensity.mean(),inplace=True)
+#         data_corrected = combined_intensity.copy()
+#     elif method =='min_max':
+#         print('fill missing values with the sample mean')
+#         combined_intensity.fillna(combined_intensity.mean(),inplace=True)
+#         data_corrected = combined_intensity.copy()
+#         for cohort in set(cohort_labels):
+#             cohort_idx = np.where(cohort_labels==cohort)[0]
+#             cohort_data = data_corrected.iloc[:,cohort_idx].copy()
+#             cohort_data = min_max_scale(cohort_data)
+#             data_corrected.iloc[:,cohort_idx] = cohort_data
 
-    elif method == 'zscore_0':
-        print('avg along 0th dim:', combined_intensity.mean(axis=0).shape)
-        # combined_intensity.fillna(combined_intensity.mean(),inplace=True)
-        data_corrected = combined_intensity.copy()
-        for cohort in set(cohort_labels):
-            cohort_idx = np.where(np.array(cohort_labels)==cohort)[0]
-            cohort_data = data_corrected.iloc[:,cohort_idx].copy()
-            cohort_data.fillna(cohort_data.mean(),inplace=True)
-            cohort_data = StandardScaler().fit_transform(cohort_data)
-            # cohort_data = (cohort_data-cohort_data.mean(axis=0))/cohort_data.std(axis=0)
-            data_corrected.iloc[:,cohort_idx] = cohort_data
-    elif method == 'zscore_1':
-        print('avg along 1th dim:', combined_intensity.mean(axis=1).shape)
-        data_corrected = combined_intensity.copy()
-        # combined_intensity.fillna(combined_intensity.mean(),inplace=True)
-        for cohort in set(cohort_labels):
-            cohort_idx = np.where(np.array(cohort_labels)==cohort)[0]
-            cohort_data = data_corrected.iloc[:,cohort_idx].copy()
-            # (cohort_data.T).fillna(cohort_data.T.mean(),inplace=True)
-            cohort_data.fillna(cohort_data.mean(),inplace=True)
-            cohort_data = StandardScaler().fit_transform(cohort_data.T).T
-            # cohort_data = (cohort_data-cohort_data.mean(axis=1))/cohort_data.std(axis=1)
-            # cohort_data.fillna(0,inplace=True)
-            data_corrected.iloc[:,cohort_idx] = cohort_data
-    elif method == 'std_0':
-        combined_intensity.fillna(combined_intensity.mean(),inplace=True)
-        data_corrected = combined_intensity.copy()
-        for cohort in set(cohort_labels):
-            cohort_idx = np.where(np.array(cohort_labels)==cohort)[0]
-            cohort_data = data_corrected.iloc[:,cohort_idx].copy()
-            cohort_data = StandardScaler().fit_transform(cohort_data)
-            data_corrected.iloc[:,cohort_idx] = cohort_data     
-    elif method == 'std_1':     
-        combined_intensity.fillna(combined_intensity.mean(),inplace=True)   
-        data_corrected = combined_intensity.copy()    
-        for cohort in set(cohort_labels):
-            cohort_idx = np.where(np.array(cohort_labels)==cohort)[0]
-            cohort_data = data_corrected.iloc[:,cohort_idx].copy()
-            cohort_data = StandardScaler().fit_transform(cohort_data.T).T
-            data_corrected.iloc[:,cohort_idx] = cohort_data
-    else:
-        raise ValueError(f'Invalid method: {method}')
+#     elif method == 'zscore_0':
+#         print('avg along 0th dim:', combined_intensity.mean(axis=0).shape)
+#         # combined_intensity.fillna(combined_intensity.mean(),inplace=True)
+#         data_corrected = combined_intensity.copy()
+#         for cohort in set(cohort_labels):
+#             cohort_idx = np.where(np.array(cohort_labels)==cohort)[0]
+#             cohort_data = data_corrected.iloc[:,cohort_idx].copy()
+#             cohort_data.fillna(cohort_data.mean(),inplace=True)
+#             cohort_data = StandardScaler().fit_transform(cohort_data)
+#             # cohort_data = (cohort_data-cohort_data.mean(axis=0))/cohort_data.std(axis=0)
+#             data_corrected.iloc[:,cohort_idx] = cohort_data
+#     elif method == 'zscore_1':
+#         print('avg along 1th dim:', combined_intensity.mean(axis=1).shape)
+#         data_corrected = combined_intensity.copy()
+#         # combined_intensity.fillna(combined_intensity.mean(),inplace=True)
+#         for cohort in set(cohort_labels):
+#             cohort_idx = np.where(np.array(cohort_labels)==cohort)[0]
+#             cohort_data = data_corrected.iloc[:,cohort_idx].copy()
+#             # (cohort_data.T).fillna(cohort_data.T.mean(),inplace=True)
+#             cohort_data.fillna(cohort_data.mean(),inplace=True)
+#             cohort_data = StandardScaler().fit_transform(cohort_data.T).T
+#             # cohort_data = (cohort_data-cohort_data.mean(axis=1))/cohort_data.std(axis=1)
+#             # cohort_data.fillna(0,inplace=True)
+#             data_corrected.iloc[:,cohort_idx] = cohort_data
+#     elif method == 'std_0':
+#         combined_intensity.fillna(combined_intensity.mean(),inplace=True)
+#         data_corrected = combined_intensity.copy()
+#         for cohort in set(cohort_labels):
+#             cohort_idx = np.where(np.array(cohort_labels)==cohort)[0]
+#             cohort_data = data_corrected.iloc[:,cohort_idx].copy()
+#             cohort_data = StandardScaler().fit_transform(cohort_data)
+#             data_corrected.iloc[:,cohort_idx] = cohort_data     
+#     elif method == 'std_1':     
+#         combined_intensity.fillna(combined_intensity.mean(),inplace=True)   
+#         data_corrected = combined_intensity.copy()    
+#         for cohort in set(cohort_labels):
+#             cohort_idx = np.where(np.array(cohort_labels)==cohort)[0]
+#             cohort_data = data_corrected.iloc[:,cohort_idx].copy()
+#             cohort_data = StandardScaler().fit_transform(cohort_data.T).T
+#             data_corrected.iloc[:,cohort_idx] = cohort_data
+#     else:
+#         raise ValueError(f'Invalid method: {method}')
 
-    return data_corrected
+#     return data_corrected
 
 
 # %%
@@ -764,7 +769,8 @@ cohort_labels = metadata_df['Study_num'].to_list()
 if os.path.exists(os.path.join(select_feats_dir,f'peak_intensity_{cohort_correction_method}.csv')):
     data_corrected = pd.read_csv(os.path.join(select_feats_dir,f'peak_intensity_{cohort_correction_method}.csv'),index_col=0)
 else:
-    data_corrected = standardize_across_cohorts(combined_study,cohort_labels,method=cohort_correction_method)
+    data_corrected = fill_na_by_cohort(combined_study,cohort_labels)
+    data_corrected = standardize_across_cohorts(data_corrected,cohort_labels,method=cohort_correction_method)
     data_corrected.to_csv(os.path.join(select_feats_dir,f'peak_intensity_{cohort_correction_method}.csv'))
 
 # check that there are no null values with the labels
@@ -774,46 +780,47 @@ metadata_df[pretrain_label_col].to_csv(f'{select_feats_dir}/sample_{pretrain_lab
 ####################
 # %% Look at the PCA of the combined study
 ####################
-from sklearn.decomposition import PCA
-import seaborn as sns
+if False:
+    from sklearn.decomposition import PCA
+    import seaborn as sns
 
-pca = PCA(n_components=2)
-pca_result = pca.fit_transform(data_corrected.T)
+    pca = PCA(n_components=2)
+    pca_result = pca.fit_transform(data_corrected.T)
 
-pca_df = pd.DataFrame(pca_result,columns=['PC1','PC2'],index=data_corrected.columns)
-pca_df['Study'] = metadata_df['Study']
-pca_df['Study_num'] = metadata_df['Study_num']
-pca_df['label'] = metadata_df[pretrain_label_col]
+    pca_df = pd.DataFrame(pca_result,columns=['PC1','PC2'],index=data_corrected.columns)
+    pca_df['Study'] = metadata_df['Study']
+    pca_df['Study_num'] = metadata_df['Study_num']
+    pca_df['label'] = metadata_df[pretrain_label_col]
 
-pca_df.to_csv(os.path.join(select_feats_dir,f'pca_df_{cohort_correction_method}.csv'))
+    pca_df.to_csv(os.path.join(select_feats_dir,f'pca_df_{cohort_correction_method}.csv'))
 
-# plot the PCA
-sns.scatterplot(x='PC1',y='PC2',hue='Study',data=pca_df)
-plt.savefig(os.path.join(select_feats_dir,f'pca_plot_{cohort_correction_method}.png'),bbox_inches='tight')
-plt.title(cohort_correction_method)
-plt.close()
+    # plot the PCA
+    sns.scatterplot(x='PC1',y='PC2',hue='Study',data=pca_df)
+    plt.savefig(os.path.join(select_feats_dir,f'pca_plot_{cohort_correction_method}.png'),bbox_inches='tight')
+    plt.title(cohort_correction_method)
+    plt.close()
 
 
 ##################
 # %% Look at the UMAP of the combined study
 ##################
+if False:
+    import umap
+    reducer = umap.UMAP()
+    umap_result = reducer.fit_transform(data_corrected.T)
 
-import umap
-reducer = umap.UMAP()
-umap_result = reducer.fit_transform(data_corrected.T)
+    umap_df = pd.DataFrame(umap_result,columns=['UMAP1','UMAP2'],index=data_corrected.columns)
+    umap_df['Study'] = metadata_df['Study']
+    umap_df['Study_num'] = metadata_df['Study_num']
+    umap_df['label'] = metadata_df[pretrain_label_col]
 
-umap_df = pd.DataFrame(umap_result,columns=['UMAP1','UMAP2'],index=data_corrected.columns)
-umap_df['Study'] = metadata_df['Study']
-umap_df['Study_num'] = metadata_df['Study_num']
-umap_df['label'] = metadata_df[pretrain_label_col]
+    umap_df.to_csv(os.path.join(select_feats_dir,f'umap_df_{cohort_correction_method}.csv'))
 
-umap_df.to_csv(os.path.join(select_feats_dir,f'umap_df_{cohort_correction_method}.csv'))
-
-# plot the UMAP
-sns.scatterplot(x='UMAP1',y='UMAP2',hue='Study',data=umap_df)
-plt.savefig(os.path.join(select_feats_dir,f'umap_plot_{cohort_correction_method}'),bbox_inches='tight')
-plt.title(cohort_correction_method)
-plt.close()
+    # plot the UMAP
+    sns.scatterplot(x='UMAP1',y='UMAP2',hue='Study',data=umap_df)
+    plt.savefig(os.path.join(select_feats_dir,f'umap_plot_{cohort_correction_method}'),bbox_inches='tight')
+    plt.title(cohort_correction_method)
+    plt.close()
 
 
 
@@ -848,7 +855,8 @@ if True: #not os.path.exists(y_test_path):
         # validation_files = [f'{origin_name}_{x}' for x in validation_files]
 
     input_pretrain_labels = metadata_df[pretrain_label_col].copy()
-    input_finetune_labels = metadata_df[finetune_label_col_list].copy()
+    # input_finetune_labels = metadata_df[finetune_label_col_list].copy()
+    input_finetune_labels = origin_metadata[finetune_label_col_list].copy()
 
     pretrain_files = [x for x in input_data.index if x not in training_files+test_files]
 
@@ -866,41 +874,46 @@ if True: #not os.path.exists(y_test_path):
     X_finetune.to_csv(os.path.join(task_dir,'X_finetune.csv'))
     y_finetune.to_csv(os.path.join(task_dir,'y_finetune.csv'))
 
-
-    if len(validation_files) == 0:
-        try:
-            X_train, X_val, y_train, y_val = train_test_split(X_finetune, y_finetune, 
-                                                            test_size=validation_frac, 
-                                                            random_state=validation_rand_seed, 
-                                                            stratify=y_finetune)
-        except ValueError:
-            # y_finetune is not a format that can be stratified
-            X_train, X_val, y_train, y_val = train_test_split(X_finetune, y_finetune, 
-                                                            test_size=validation_frac, 
-                                                            random_state=validation_rand_seed, 
-                                                            stratify=None)
-        validation_files = X_val.index.tolist()
-        # training_files_without_validation = X_train.index.tolist()
-        # y_val = input_finetune_labels.loc[validation_files].copy()
-        # y_train = input_finetune_labels.loc[training_files_without_validation].copy()
-    else:
-        X_train = X_finetune.copy()
-        y_train = y_finetune.copy()
-        X_val = input_data.loc[:,validation_files].copy()
-        y_val = input_finetune_labels.loc[validation_files].copy()
-
     X_pretrain.to_csv(os.path.join(task_dir,'X_pretrain.csv'))
-    X_train.to_csv(os.path.join(task_dir,'X_train.csv'))
-    X_val.to_csv(os.path.join(task_dir,'X_val.csv'))
-    X_test.to_csv(os.path.join(task_dir,'X_test.csv'))
-
     y_pretrain.to_csv(os.path.join(task_dir,'y_pretrain.csv'))
-    y_train.to_csv(os.path.join(task_dir,'y_train.csv'))
-    y_val.to_csv(os.path.join(task_dir,'y_val.csv'))
+
+    X_test.to_csv(os.path.join(task_dir,'X_test.csv'))
     y_test.to_csv(os.path.join(task_dir,'y_test.csv'))
     if len(test_select_file_alt) > 0:
         X_test_alt.to_csv(os.path.join(task_dir,'X_test_alt.csv'))
         y_test_alt.to_csv(os.path.join(task_dir,'y_test_alt.csv'))
+    
+    try:
+        if len(validation_files) == 0:
+            try:
+                X_train, X_val, y_train, y_val = train_test_split(X_finetune, y_finetune, 
+                                                                test_size=validation_frac, 
+                                                                random_state=validation_rand_seed, 
+                                                                stratify=y_finetune)
+            except ValueError:
+                # y_finetune is not a format that can be stratified
+                X_train, X_val, y_train, y_val = train_test_split(X_finetune, y_finetune, 
+                                                                test_size=validation_frac, 
+                                                                random_state=validation_rand_seed, 
+                                                                stratify=None)
+            validation_files = X_val.index.tolist()
+            # training_files_without_validation = X_train.index.tolist()
+            # y_val = input_finetune_labels.loc[validation_files].copy()
+            # y_train = input_finetune_labels.loc[training_files_without_validation].copy()
+        else:
+            X_train = X_finetune.copy()
+            y_train = y_finetune.copy()
+            X_val = input_data.loc[:,validation_files].copy()
+            y_val = input_finetune_labels.loc[validation_files].copy()
+
+        X_train.to_csv(os.path.join(task_dir,'X_train.csv'))
+        X_val.to_csv(os.path.join(task_dir,'X_val.csv'))
+
+        y_train.to_csv(os.path.join(task_dir,'y_train.csv'))
+        y_val.to_csv(os.path.join(task_dir,'y_val.csv'))
+    except ValueError:
+            print('no validation and training subset created')
+            pass
 
 else:
     print('task data already exists with the data')
