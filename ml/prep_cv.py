@@ -8,7 +8,7 @@ import os
 import numpy as np
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
-from prep import ClassifierDataset
+from prep import ClassifierDataset, PreTrainingDataset
 from train import run_train_classifier
 from sklearn_models import run_train_sklearn_model
 
@@ -138,6 +138,7 @@ def run_cross_validation_pytorch_classifier(cv_dir,cv_splits,
 
     for iter in range(n_repeats):
         for cv_num in range(cv_splits):
+            print(f'running cross-validation {cv_num} iteration {iter}')
             input_dir = os.path.join(cv_dir, f'cross_val_split_{cv_num}_{iter}')
             save_dir = os.path.join(input_dir, subdir)
             os.makedirs(save_dir, exist_ok=True)

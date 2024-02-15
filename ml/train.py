@@ -36,7 +36,7 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
     encoder__dropout_rate = kwargs.get('encoder_dropout_rate', 0)
     encoder__activation = kwargs.get('encoder_activation', 'leakyrelu')
     encoder__use_batch_norm = kwargs.get('encoder_use_batch_norm', False)
-    encoder_act_on_latent_layer = kwargs.get('encoder_act_on_latent_layer', False)
+    encoder_act_on_latent = kwargs.get('encoder_act_on_latent', False)
 
     # learning Hyperparameters
     num_epochs = kwargs.get('num_epochs', 200)
@@ -49,6 +49,7 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
     verbose = kwargs.get('verbose', False)
     how_average = kwargs.get('how_average', 'weighted')
     load_existing_model =  kwargs.get('load_existing_model', True)
+    save_finetuned_model = kwargs.get('save_finetuned_model', False)
     
 
     model_name = kwargs.get('model_name', 'Classifier')
@@ -88,13 +89,16 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
         num_classes = len(torch.unique(y_train))
 
     if (class_weight is not None) and (len(class_weight) == num_classes):
-        class_weight = torch.tensor(class_weight, dtype=torch.float32)
+        if isinstance(class_weight, list):
+            class_weight = torch.tensor(class_weight, dtype=torch.float32)
     elif class_weight is not None:
         y_train = dataloaders['train'].dataset[:][1]
-        class_weight = 1 / torch.bincount(y_train)
+        class_weight = 1 / torch.bincount(y_train.long())
     else:
         class_weight = None
 
+    dataset_size_dct = {phase: len(dataloaders[phase].dataset) for phase in phase_list}
+    batch_size_dct = {phase: dataloaders[phase].batch_size for phase in phase_list}
 
     learning_parameters = {
         # 'batch_size': 32,
@@ -103,6 +107,9 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
         'encoder_learning_rate': encoder_learning_rate,
         'early_stopping_patience': early_stopping_patience,
         'noise_factor': noise_factor,
+        'class_weight': class_weight.numpy().tolist() if class_weight is not None else None,
+        'dataset_sizes': dataset_size_dct,
+        'batch_sizes': batch_size_dct
         }
 
     if early_stopping_patience < 0:
@@ -113,12 +120,12 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
     if num_classes==2:
         model = BinaryClassifier(latent_size, head__hidden_size, head__num_hidden_layers, head__dropout_rate,
                                  activation=head__activation, use_batch_norm=use_batch_norm)
-        print('use Binary Classifier')
+        if verbose: print('use Binary Classifier')
         task = 'binary'
     elif num_classes > 2:
         model = MultiClassClassifier(latent_size, head__hidden_size, num_classes, head__num_hidden_layers, head__dropout_rate,
                                         activation=head__activation, use_batch_norm=use_batch_norm)
-        print('use Multi Classifier')
+        if verbose: print('use Multi Classifier')
         task = 'multi'
     
     model.define_loss(class_weight=class_weight)
@@ -127,13 +134,13 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
     if encoder_kind.lower() in ['vae']:
         encoder_model = VAE(input_size, encoder__hidden_size, latent_size, encoder__num_hidden_layers, 
                             encoder__dropout_rate, encoder__activation, use_batch_norm=encoder__use_batch_norm,
-                            act_on_latent_layer=encoder_act_on_latent_layer)
-        print('use Variational Autoencoder (VAE)')
+                            act_on_latent_layer=encoder_act_on_latent)
+        if verbose: print('use Variational Autoencoder (VAE)')
     elif encoder_kind.lower() in ['ae']:
         encoder_model = AE(input_size, encoder__hidden_size, latent_size, encoder__num_hidden_layers, 
                            encoder__dropout_rate, encoder__activation, use_batch_norm=encoder__use_batch_norm,
-                            act_on_latent_layer=encoder_act_on_latent_layer)
-        print('use Basic Autoencoder (AE)')
+                            act_on_latent_layer=encoder_act_on_latent)
+        if verbose: print('use Basic Autoencoder (AE)')
     else:
         raise ValueError(f'Encoder kind not recognized: {encoder_kind}')
 
@@ -145,7 +152,7 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
         if not os.path.exists(pre_trained_output_path):
             raise ValueError(f'Pre-trained model output not found at {pre_trained_output_path}')
 
-        print('using pre-trained model for encoder')    
+        # print('using pre-trained model for encoder')    
         with open(pre_trained_output_path, 'r') as f:
             pre_trained_output = json.load(f)
         
@@ -155,8 +162,9 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
         assert encoder_name.lower() == pretrained_encoder_name.lower(), f'Encoder name mismatch: {encoder_name} vs {pretrained_encoder_name}'
         assert latent_size == pre_trained_output['model_hyperparameters']['latent_size'], f'Latent size mismatch: {latent_size} vs {pre_trained_output["model_hyperparameters"]["latent_size"]}'
         assert input_size == pre_trained_output['model_hyperparameters']['input_size'], f'Input size mismatch: {input_size} vs {pre_trained_output["model_hyperparameters"]["input_size"]}'
-        assert encoder__hidden_size == pre_trained_output['model_hyperparameters']['hidden_size'], f'Hidden size mismatch: {encoder__hidden_size} vs {pre_trained_output["model_hyperparameters"]["hidden_size"]}'
         assert encoder__num_hidden_layers == pre_trained_output['model_hyperparameters']['num_hidden_layers'], f'Number of hidden layers mismatch: {encoder__num_hidden_layers} vs {pre_trained_output["model_hyperparameters"]["num_hidden_layers"]}'
+        if encoder__num_hidden_layers > 0:
+            assert encoder__hidden_size == pre_trained_output['model_hyperparameters']['hidden_size'], f'Hidden size mismatch: {encoder__hidden_size} vs {pre_trained_output["model_hyperparameters"]["hidden_size"]}'
         
         ## encoder dropout only impacts training, so we don't need it be the same
         # assert encoder__dropout_rate == pre_trained_output['model_hyperparameters']['dropout_rate'], f'Dropout rate mismatch: {encoder__dropout_rate} vs {pre_trained_output["model_hyperparameters"]["dropout_rate"]}'
@@ -168,7 +176,7 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
             assert encoder__use_batch_norm == pre_trained_output['model_hyperparameters']['use_batch_norm'], f'Batch norm mismatch: {encoder__use_batch_norm} vs {pre_trained_output["model_hyperparameters"]["use_batch_norm"]}'
 
         if 'act_on_latent_layer' in pre_trained_output['model_hyperparameters']:
-            assert encoder_act_on_latent_layer == pre_trained_output['model_hyperparameters']['act_on_latent_layer'], f'Act on latent layer mismatch: {encoder_act_on_latent_layer} vs {pre_trained_output["model_hyperparameters"]["act_on_latent_layer"]}'
+            assert encoder_act_on_latent == pre_trained_output['model_hyperparameters']['act_on_latent_layer'], f'Act on latent layer mismatch: {encoder_act_on_latent} vs {pre_trained_output["model_hyperparameters"]["act_on_latent_layer"]}'
 
         if (encoder_status.lower() == 'finetune') or (encoder_status.lower() == 'fixed'):
             encoder_model.load_state_dict(torch.load(pretrained_encoder_load_path))
@@ -208,7 +216,8 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
 
     # Training loop with early stopping
     best_val_loss = float('inf')
-    best_epoch = 0
+    best_model_wts = None
+    best_epoch = -1
     loss_history = {'train': [], 'val': []}
     acc_history = {'train': [], 'val': []}
     auroc_history = {'train': [], 'val': []}
@@ -222,12 +231,14 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
     model = model.to(device)
     encoder_model = encoder_model.to(device)
     for epoch in range(num_epochs):
-        if patience_counter >= early_stopping_patience:
+        if (patience_counter >= early_stopping_patience) and (best_model_wts is not None):
             model.load_state_dict(best_model_wts)
-            print('Early stopping')
+            if verbose: print('Early stopping at epoch', epoch)
             break
 
         for phase in ['train', 'val']:
+            if phase not in dataloaders:
+                continue
             if phase == 'train':
                 model.train()
             else:
@@ -294,7 +305,7 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
                     acc: {epoch_accuracy:.4f}, auroc: {epoch_auroc:.4f}')
 
             if phase == 'val':
-                if epoch < early_stopping_patience/4:
+                if epoch < early_stopping_patience/8:
                     # don't take the best model from the first few epochs
                     continue
                 if epoch_loss < best_val_loss:
@@ -307,10 +318,12 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
 
 
     # Save model state dict
-    torch.save(model.state_dict(), model_save_path)
-    torch.save(encoder_model.state_dict(), finetuned_encoder_save_path)
+    if save_finetuned_model:
+        torch.save(model.state_dict(), model_save_path)
+        torch.save(encoder_model.state_dict(), finetuned_encoder_save_path)
 
-
+    if best_epoch < 0:
+        best_epoch = num_epochs - 1
 
     # Evaluate model on training, validation, and test datasets
     phase_sizes = {phase: len(dataloaders[phase].dataset) for phase in phase_list}

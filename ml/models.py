@@ -142,6 +142,7 @@ class VAE(nn.Module):
         self.dropout_rate = dropout_rate
         self.activation = activation
         self.use_batch_norm = use_batch_norm
+        self.act_on_latent_layer = act_on_latent_layer
         self.encoder = Dense_Layers(input_size, hidden_size, 2*latent_size, 
                                     num_hidden_layers, dropout_rate, activation,
                                     use_batch_norm,act_on_output_layer=act_on_latent_layer)
@@ -187,7 +188,8 @@ class VAE(nn.Module):
                 'num_hidden_layers': self.num_hidden_layers,
                 'dropout_rate': self.dropout_rate,
                 'activation': self.activation,
-                'use_batch_norm': self.use_batch_norm}
+                'use_batch_norm': self.use_batch_norm,
+                'act_on_latent_layer': self.act_on_latent_layer}
     
     
 ### Autoencoder
@@ -203,6 +205,7 @@ class AE(nn.Module):
         self.dropout_rate = dropout_rate
         self.activation = activation
         self.use_batch_norm = use_batch_norm
+        self.act_on_latent_layer = act_on_latent_layer
         self.encoder = Dense_Layers(input_size, hidden_size, latent_size, 
                                     num_hidden_layers, dropout_rate, activation,
                                     use_batch_norm, act_on_output_layer=act_on_latent_layer)
@@ -238,7 +241,8 @@ class AE(nn.Module):
                 'num_hidden_layers': self.num_hidden_layers,
                 'dropout_rate': self.dropout_rate,
                 'activation': self.activation,
-                'use_batch_norm': self.use_batch_norm}
+                'use_batch_norm': self.use_batch_norm,
+                'act_on_latent_layer': self.act_on_latent_layer}
 
 ############ Classification Models ############
     
@@ -266,8 +270,14 @@ class BinaryClassifier(nn.Module):
     def define_loss(self, class_weight=None, reduction='mean'):
         self.class_weight = class_weight
         self.reduction = reduction
-        self.loss_func = nn.BCEWithLogitsLoss(weight=class_weight,
-                                                reduction=reduction)
+        # self.loss_func = nn.BCEWithLogitsLoss(weight=class_weight,
+                                                # reduction=reduction)
+        # pos weight = # of negative samples / # of positive samples
+        # class_weight = [1/(# of negative samples), 1/(# of positive samples)]
+        # so pos_weight = (1/neg_weight)/(1/pos_weight) = pos_weight/neg_weight
+        pos_weight = class_weight[1]/class_weight[0]
+        self.loss_func = nn.BCEWithLogitsLoss(reduction=reduction,
+                                                pos_weight=pos_weight)
 
     def forward(self, x):
         return self.network(x)
