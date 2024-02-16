@@ -250,6 +250,7 @@ def run_classification_training(dataloaders,**kwargs):
         for phase in ['train', 'val']:
             if phase not in dataloaders:
                 continue
+            phase_size = len(dataloaders[phase].dataset)
             if phase == 'train':
                 model.train()
             else:
@@ -262,13 +263,14 @@ def run_classification_training(dataloaders,**kwargs):
             # epoch_preds = []
             # epoch_targets = []
 
-            for data in dataloaders[phase]:
+            for batch_idx, data in enumerate(dataloaders[phase]):
                 X, y = data
                 X = X.to(device)
                 y = y.to(device)
                 # y = y.view(-1,1) # works with binary classification
                 y = y.squeeze().long() # works with multiclass classification
 
+                trained_so_far = epoch * phase_size + batch_idx 
                 # zero the parameter gradients, so they don't accumulate
                 optimizer.zero_grad()
 
@@ -290,6 +292,12 @@ def run_classification_training(dataloaders,**kwargs):
                         loss.backward()
                         # update the model parameters using the gradients using the optimizer
                         optimizer.step()
+
+                    if batch_idx % 10 == 0:
+                        print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                            epoch, batch_idx * len(X), phase_size,
+                                100. * trained_so_far / phase_size, loss.item()))
+
 
                 running_loss += loss.item() * X.size(0)
                 running_accuracy(outputs_probs, y)
