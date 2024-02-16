@@ -233,6 +233,7 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
     for epoch in range(num_epochs):
         if (patience_counter >= early_stopping_patience) and (best_model_wts is not None):
             model.load_state_dict(best_model_wts)
+            encoder_model.load_state_dict(best_encoder_wts)
             if verbose: print('Early stopping at epoch', epoch)
             break
 
@@ -312,6 +313,7 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
                     best_epoch = epoch
                     best_val_loss = epoch_loss
                     best_model_wts = model.state_dict()
+                    best_encoder_wts = encoder_model.state_dict()
                     patience_counter = 0
                 else:
                     patience_counter += 1

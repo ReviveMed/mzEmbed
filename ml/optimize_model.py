@@ -14,35 +14,7 @@ from prep import ClassifierDataset,  PreTrainingDataset
 # from functools import partial
 from pretrain import run_train_autoencoder
 from train import run_train_classifier
-
-
-def round_to_even(n):
-    if n % 2 == 0:
-        return n
-    else:
-        return n + 1
-
-def get_clean_batch_sz(len_dataset, org_batch_sz):
-    # due to batch normalization, we want the batches to be as clean as possible
-    curr_remainder = len_dataset % org_batch_sz
-    max_iter = 100
-    if org_batch_sz >= len_dataset:
-        return org_batch_sz
-    if (curr_remainder == 0) or (curr_remainder > org_batch_sz/2):
-        return org_batch_sz
-    else:
-        batch_sz = org_batch_sz
-        iter = 0
-        while (curr_remainder != 0) and (curr_remainder < batch_sz/2) and (iter < max_iter):
-            iter += 1
-            if batch_sz < org_batch_sz/2:
-                batch_sz = 2*org_batch_sz
-            batch_sz -= 1
-            curr_remainder = len_dataset % batch_sz
-        if iter >= max_iter:
-            print('Warning: Could not find a clean batch size')
-        # print('old batch size:', org_batch_sz, 'new batch size:', batch_sz, 'remainder:', curr_remainder)
-        return batch_sz
+from misc import round_to_even, get_clean_batch_sz
 
 
 def full_train(data_dir, **kwargs):
@@ -259,7 +231,7 @@ def objective(trial):
         'latent_size': round_to_even(trial.suggest_int('latent_size', 1, 160, log=True)),
         'encoder_hidden_size_mult': trial.suggest_float('encoder_hidden_size_mult', 1, 2.5, step=0.1),
         # 'encoder_hidden_layers': trial.suggest_int('encoder_hidden_layers', 0, 4),
-        'encoder_hidden_layers': trial.suggest_int('encoder_hidden_layers', 1, 4),
+        'encoder_hidden_layers': trial.suggest_int('encoder_hidden_layers', 0, 4),
         'encoder_batch_norm': trial.suggest_categorical('encoder_batch_norm', [True, False]),
         'encoder_name': 'encoder',
         'encoder_act_on_latent': True,
@@ -326,7 +298,7 @@ if __name__ == "__main__":
 
     # Create a study object and optimize the objective function
     study = optuna.create_study(direction='maximize', study_name=study_name, storage=storage_name, load_if_exists=True)
-    study.optimize(objective, n_trials=25)
+    study.optimize(objective, n_trials=200)
 
     
 
