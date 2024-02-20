@@ -466,12 +466,16 @@ if len(records) > 0:
                 metadata_df.to_csv(os.path.join(align_save_dir_freq_th, 'combined_study_cohort_ids.csv'))
 
                 # need to know the study id for each study used here use job id for each file
-                cohort_labels = metadata_df['mzlearn_cohort_id'].to_list()
-                data_corrected = standardize_across_cohorts(combined_study, cohort_labels, method=cohort_correction_method)
-                # data_corrected = combined_study
-                # calculate number of peaks and number of files from data_corrected
-                num_peaks = data_corrected.shape[0]
-                num_files = data_corrected.shape[1]
+                try:
+                    cohort_labels = metadata_df['mzlearn_cohort_id'].to_list()
+                    data_corrected = standardize_across_cohorts(combined_study, cohort_labels, method=cohort_correction_method)
+                    # data_corrected = combined_study
+                    # calculate number of peaks and number of files from data_corrected
+                    num_peaks = data_corrected.shape[0]
+                    num_files = data_corrected.shape[1]
+                except Exception as e:
+                    print(f'Error in standardization: {e}')
+                    continue
 
                 # TODO: add save here to plot UMAP and PCA
                 ########################################################################################################
