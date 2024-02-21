@@ -34,7 +34,7 @@ def get_model(model_kind, input_size, **kwargs):
 
 def classifier_training_wrapper(data_dir,**kwargs):
 
-    n_subsets = kwargs.get('n_subsets', 5)
+    n_subsets = kwargs.get('n_subsets', 4)
     label_col = kwargs.get('label_col', 'cohort')
     label_encoder = kwargs.get('label_encoder', None)
     val_fraction = kwargs.get('val_fraction', 0.1)
@@ -120,6 +120,7 @@ def run_classification_training(dataloaders,**kwargs):
     user_model_hyperparameters = kwargs.get('model_hyperparameters', None)
     model_eval_funcs = kwargs.get('model_eval_funcs', None)
     load_model_path = kwargs.get('load_model_path', None)
+    reset_model_history = kwargs.get('reset_model_history', False)
 
     # learning hyperparameters
     optimizer_kind = kwargs.get('optimizer_kind', 'Adam')
@@ -140,6 +141,10 @@ def run_classification_training(dataloaders,**kwargs):
         model_save_path = None
         output_save_path = None
 
+
+    if not isinstance(load_model_path, str):
+        load_model_path = model_save_path
+        reset_model_history = False
 
     if device is None:
         if torch.cuda.is_available():
@@ -179,11 +184,13 @@ def run_classification_training(dataloaders,**kwargs):
     if (class_weight is not None) and (len(class_weight) == num_classes):
         if isinstance(class_weight, list):
             class_weight = torch.tensor(class_weight, dtype=torch.float32)
-    elif class_weight is not None:
+    
+    # elif class_weight is not None:
+    else:
         y_train = dataloaders['train'].dataset[:][1]
         class_weight = 1 / torch.bincount(y_train.long())
-    else:
-        class_weight = None
+    # else:
+    #     class_weight = None
 
     if optimizer_kind == 'Adam':
         # from TGEM paper:
@@ -229,8 +236,39 @@ def run_classification_training(dataloaders,**kwargs):
 
 
     if load_model_path:
-        print('Loading model from:', load_model_path)
-        model.load_state_dict(torch.load(load_model_path))
+        # if os.path.exists(load_model_path):
+            # model.load_state_dict(torch.load(load_model_path))
+        #     pretrained_model 
+        #     model.load_state_dict(torch.load(load_model_path))
+        #     pretrained_model = torch.load(load_model_path)
+        #     ignore_keys = ['fc.weight', 'fc.bias']
+        #     state_dict = {k: v for k, v in pretrained_model.state_dict().items() if k not in ignore_keys}
+        #     model.load_state_dict(state_dict, strict=False)
+
+        load_output_path = load_model_path.replace('_model.pth', '_output.json')
+        if (os.path.exists(load_output_path)) and (os.path.exists(load_model_path)):
+            
+            with open(load_output_path, 'r') as f:
+                load_output_data = json.load(f)
+            # best_val_loss = load_output_data['best_val_loss']
+            # best_epoch = load_output_data['best_epoch']
+            
+            try:
+                model.load_state_dict(torch.load(load_model_path))
+                print('Loaded model:', load_model_path)
+            except RuntimeError:
+                pretrained_model = get_model(model_kind, **load_output_data['model_hyperparameters'])
+                pretrained_model.load_state_dict(torch.load(load_model_path))
+                ignore_keys = ['fc.weight', 'fc.bias']
+                state_dict = {k: v for k, v in pretrained_model.state_dict().items() if k not in ignore_keys}
+                model.load_state_dict(state_dict, strict=False)
+                print('Loaded (pre-trained on other task) model:', load_model_path)
+
+            if (not reset_model_history):
+                loss_history = load_output_data['loss_history']
+                acc_history = load_output_data['acc_history']
+                auroc_history = load_output_data['auroc_history']
+                print('Loaded model history:', load_model_path)
 
 
     model.define_loss(class_weight=class_weight)
@@ -346,7 +384,6 @@ def run_classification_training(dataloaders,**kwargs):
     end_state_acc = {}
     end_state_auroc = {}
     model = model.to('cpu') # for evaluation
-    encoder_model = encoder_model.to('cpu') # for evaluation
     for phase in phase_list:
         model.eval()
         running_loss = 0.0
@@ -357,8 +394,7 @@ def run_classification_training(dataloaders,**kwargs):
                 X, y = data
                 # y = y.view(-1,1) # works with binary classification
                 y = y.squeeze().long() # works with multiclass classification
-                X_encoded = encoder_model.transform(X)
-                outputs = model(X_encoded)
+                outputs = model(X)
                 loss = model.loss(outputs, y)
                 outputs_probs = model.logits_to_proba(outputs)
                 running_loss += loss.item() * X.size(0)
@@ -396,7 +432,7 @@ def run_classification_training(dataloaders,**kwargs):
 
     if output_save_path:
         with open(output_save_path, 'w') as f:
-            json.dump(output_data, f)
+            json.dump(output_data, f, indent=4)
 
     if yesplot:
         for history, name in zip([loss_history, acc_history, auroc_history], ['loss', 'acc', 'auroc']):
@@ -417,11 +453,8 @@ def run_classification_training(dataloaders,**kwargs):
 if __name__ == '__main__':
 
     dropbox_dir = get_dropbox_dir()
-    data_dir = os.path.join(dropbox_dir, 'development_CohortCombination','reconstruction_study_feb16')
     model_kind = 'TGEM'
     model_name = 'tgem'
-    save_dir = os.path.join(data_dir,'models_feb16')
-    os.makedirs(save_dir, exist_ok=True)
 
     hyperparameters = {
         'n_head' : 5,
@@ -429,15 +462,56 @@ if __name__ == '__main__':
         'd_ff' : 1024,
         'dropout_rate': 0.3,
         'act_fun': "linear"}
+
+    if False:
+        data_dir = os.path.join(dropbox_dir, 'development_CohortCombination','reconstruction_study_feb16')
+        save_dir = os.path.join(data_dir,'models_feb16')
+        os.makedirs(save_dir, exist_ok=True)
+
+        load_model_path = os.path.join(save_dir, 'tgem_0_model.pth')
+        
+        classifier_training_wrapper(data_dir,
+                                    model_kind=model_kind,
+                                    model_name=model_name,
+                                    model_hyperparameters=hyperparameters,
+                                    save_dir=save_dir,
+                                    early_stopping=-1,
+                                    num_epochs=10,
+                                    batch_size=16,
+                                    learning_rate=1e-3,
+                                    load_model_path=load_model_path,
+                                    label_col = 'cohort',
+                                    label_encoder = None,
+                                    n_subsets = 4,
+                                    yesplot=True,
+                                    verbose=True)
     
-    classifier_training_wrapper(data_dir,
-                                model_kind=model_kind,
-                                model_name=model_name,
-                                model_hyperparameters=hyperparameters,
-                                save_dir=save_dir,
-                                early_stopping=-1,
-                                num_epochs=10,
-                                batch_size=16,
-                                learning_rate=1e-3,
-                                yesplot=True,
-                                verbose=True)
+
+    if True:
+        data_dir = os.path.join(dropbox_dir, 'development_CohortCombination','mskcc_prediction_study_feb19')
+        load_model_dir = os.path.join(dropbox_dir, 'development_CohortCombination','reconstruction_study_feb16','models_feb16')
+        
+        save_dir = os.path.join(data_dir,'tgem_models_feb20_noise')
+        os.makedirs(save_dir, exist_ok=True)
+        # os.makedirs(save_dir, exist_ok=True)
+        load_model_path = os.path.join(load_model_dir, 'tgem_0_model.pth')
+        # load_model_path = True
+
+        label_mapping = {'FAVORABLE': 1, 'POOR': 0, 'INTERMEDIATE': np.nan}
+        classifier_training_wrapper(data_dir,
+                                    model_kind=model_kind,
+                                    model_name=model_name,
+                                    model_hyperparameters=hyperparameters,
+                                    save_dir=save_dir,
+                                    early_stopping=-1,
+                                    num_epochs=10,
+                                    batch_size=16,
+                                    learning_rate=1e-3,
+                                    load_model_path=load_model_path,
+                                    noise_factor = 0.1,
+                                    label_col = 'MSKCC',
+                                    label_encoder = label_mapping,
+                                    n_subsets = 30,
+                                    yesplot=True,
+                                    verbose=True,
+                                    reset_model_history=False)

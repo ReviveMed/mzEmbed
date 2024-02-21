@@ -584,17 +584,19 @@ class res_connect(nn.Module):
 
 
 class TGEM(torch.nn.Module):
-    def __init__(self, input_size,  n_head, num_classes, dropout_rate, act_fun, 
+    def __init__(self, input_size,  n_head, num_classes, dropout_rate=0.3, act_fun='linear', 
                  query_gene=64, d_ff=1024, mode=0):
         super(TGEM, self).__init__()
         self.n_head = n_head
         self.input_size = input_size
         self.num_classes = num_classes
         self.d_ff = d_ff
+        self.dropout_rate = dropout_rate
         self.act_fun = act_fun
         # mode 1 is not working right now.
         self.mode = mode
-        
+        self.query_gene = query_gene #in original version, this was not a object parameter 
+
         if self.act_fun == 'relu':
             self.activation_func = torch.nn.ReLU()
         elif self.act_fun == 'leakyrelu':
@@ -608,7 +610,6 @@ class TGEM(torch.nn.Module):
 
 
         self.activation_func 
-        self.query_gene = query_gene #in original version, this was not a object parameter 
         self.mulitiattention1 = mulitiattention( self.n_head, self.input_size, query_gene,
                                                 mode)
         self.mulitiattention2 = mulitiattention( self.n_head, self.input_size, query_gene,
@@ -679,6 +680,7 @@ class TGEM(torch.nn.Module):
                 'query_gene': self.query_gene,
                 'num_classes': self.num_classes,
                 'd_ff': self.d_ff,
+                'dropout_rate': self.dropout_rate,
                 'act_fun': self.act_fun}        
 
 
