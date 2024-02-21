@@ -385,7 +385,7 @@ def run_train_classifier(dataloaders,save_dir,**kwargs):
         }
 
     with open(output_save_path, 'w') as f:
-        json.dump(output_data, f)
+        json.dump(output_data, f, indent=4)
 
     if yesplot:
         for history, name in zip([loss_history, acc_history, auroc_history], ['loss', 'acc', 'auroc']):

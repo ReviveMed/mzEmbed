@@ -383,12 +383,12 @@ if __name__ == '__main__':
 
     # Set up logging
     optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
-    study_name = 'unsupervised_feb15'
+    study_name = 'unsupervised_feb19'
     storage_name = 'sqlite:///{}.db'.format(study_name)
 
     # Create a study object and optimize the objective function
-    study = optuna.create_study(direction='maximize', study_name=study_name, storage=storage_name, load_if_exists=True)
-    study.optimize(objective, n_trials=10)
+    study = optuna.create_study(direction='minimize', study_name=study_name, storage=storage_name, load_if_exists=True)
+    study.optimize(objective, n_trials=100)
 
 
     # dropbox_dir = get_dropbox_dir()

@@ -12,7 +12,7 @@ def get_dropbox_dir():
 
 
 def normalize_loss(current_loss, loss_avg=1, beta=0, current_epoch=1):
-    # normalize the loss by its average
+    # normalize the loss by its average, useful when creating multi-output models
     if beta  == 0:
         loss_avg = (loss_avg*current_epoch + current_loss.item()) / (current_epoch + 1)
     else:

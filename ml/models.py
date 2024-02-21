@@ -179,6 +179,12 @@ class VAE(nn.Module):
         x_recon = self.decoder(z)
         return self.loss(x, x_recon, mu, log_var)
 
+    def transform_with_loss(self, x):
+        mu, log_var = self.encoder(x).chunk(2, dim=1)
+        z = self.reparameterize(mu, log_var)
+        x_recon = self.decoder(z)
+        return mu, self.loss(x, x_recon, mu, log_var)
+
     def generate(self, z):
         return self.decoder(z)
     
@@ -231,6 +237,11 @@ class AE(nn.Module):
         z = self.encoder(x)
         x_recon = self.decoder(z)
         return self.loss(x, x_recon)
+
+    def transform_with_loss(self, x):
+        z = self.encoder(x)
+        x_recon = self.decoder(z)
+        return z, self.loss(x, x_recon)
 
     def generate(self, z):
         return self.decoder(z)
