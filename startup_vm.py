@@ -417,6 +417,19 @@ if len(records) > 0:
                 # get all the file names for the origin_study
                 origin_study_file_list = origin_study.peak_intensity.columns.to_list()
                 study_id2file_name = {str(reference_job_id): origin_study_file_list}
+
+                # get the cohort labels for the origin_study
+                # read the database entry for the origin_study based on the job_id
+                study_id2cohort_label = {}
+                try:
+                    query = f"select cohort_label from app_user_job_status where id = {reference_job_id}"
+                    cursor.execute(query)
+                    records = cursor.fetchall()
+                    study_id2cohort_label[str(reference_job_id)] = records[0][0]
+                except Exception as e:
+                    print(f'Error in reading cohort labels: {e}')
+                    study_id2cohort_label[str(reference_job_id)] = "NA"
+
                 # for each other study, load the peak intensity and do log2 transformation
                 for study_id in other_job_ids:
                     print(study_id)
@@ -431,6 +444,15 @@ if len(records) > 0:
                         input_study_file_list = input_study.peak_intensity.columns.to_list()
                         # add a key to study_id2file_name
                         study_id2file_name[str(study_id)] = input_study_file_list
+                        # add the key to study_id2cohort_label
+                        try:
+                            query = f"select cohort_label from app_user_job_status where id = {study_id}"
+                            cursor.execute(query)
+                            records = cursor.fetchall()
+                            study_id2cohort_label[str(study_id)] = records[0][0]
+                        except Exception as e:
+                            print(f'Error in reading cohort labels: {e}')
+                            study_id2cohort_label[str(study_id)] = "NA"
                         subset_chosen = [i for i in chosen_feats if i in input_study.peak_intensity.index]
                         input_peaks = input_study.peak_intensity.loc[subset_chosen, :].copy()
                         input_study_nan_mask = input_study.missing_val_mask.loc[subset_chosen, :].copy()
@@ -493,7 +515,12 @@ if len(records) > 0:
                 pca = PCA(n_components=2)
                 pca_result = pca.fit_transform(data_corrected.T)
                 pca_df = pd.DataFrame(pca_result, columns=['PC1', 'PC2'], index=data_corrected.columns)
-                pca_df['mzlearn_cohort_id'] = metadata_df['mzlearn_cohort_id'].to_list()
+                # edit the metadata_df['mzlearn_cohort_id'].to_list() list to inclucde cohort label
+                mzlearn_cohort_ids = metadata_df['mzlearn_cohort_id'].to_list()
+                new_mzlearn_cohort_ids = []
+                for mzlearn_cohort_id in mzlearn_cohort_ids:
+                    new_mzlearn_cohort_ids.append(f"{mzlearn_cohort_id} ({study_id2cohort_label[mzlearn_cohort_id]})")
+                pca_df['mzlearn_cohort_id'] = new_mzlearn_cohort_ids
                 pca_df['file_name'] = metadata_df['file_name'].to_list()
                 pca_df['MV percentage'] = combined_study_nan_mask['missing_values'].to_list()
                 # pca_df['Study_num'] = metadata_df['Study_num']
@@ -524,7 +551,7 @@ if len(records) > 0:
                 umap_result = reducer.fit_transform(data_corrected.T)
 
                 umap_df = pd.DataFrame(umap_result, columns=['UMAP1', 'UMAP2'], index=data_corrected.columns)
-                umap_df['mzlearn_cohort_id'] = metadata_df['mzlearn_cohort_id'].to_list()
+                umap_df['mzlearn_cohort_id'] = new_mzlearn_cohort_ids
                 umap_df['file_name'] = metadata_df['file_name'].to_list()
                 umap_df['MV percentage'] = combined_study_nan_mask['missing_values'].to_list()
                 # umap_df['Study_num'] = metadata_df['Study_num']
