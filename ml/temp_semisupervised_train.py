@@ -8,6 +8,7 @@ from models import AE, MultiClassClassifier, BinaryClassifier
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 def train_semisupervised(dataloaders,encoder,head,adversary,**kwargs):
 
@@ -24,6 +25,8 @@ def train_semisupervised(dataloaders,encoder,head,adversary,**kwargs):
     verbose = kwargs.get('verbose', True)
     save_dir = kwargs.get('save_dir', None)
     end_state_eval_funcs = kwargs.get('end_state_eval_funcs', {})
+    adversarial_mini_epochs = kwargs.get('adversarial_mini_epochs', 20)
+    yes_plot = kwargs.get('yes_plot', True)
 
     if save_dir is not None:
         save_trained_model = True
@@ -66,15 +69,12 @@ def train_semisupervised(dataloaders,encoder,head,adversary,**kwargs):
         'phase_list': phase_list,
         'phase_sizes': dataset_size_dct,
         'batch_sizes': batch_size_dct,
+        'adversarial_mini_epochs': adversarial_mini_epochs,
     }
 
     if early_stopping_patience < 0:
         early_stopping_patience = num_epochs
 
-    # define the loss functions for the head and adversary
-        # this should be done ahead of time
-    # head.define_loss(**head_info)
-    # adversary.define_loss(**adversary_info)
 
     # define the losses averages across the epochs
     encoder_loss_avg = 1
@@ -91,10 +91,18 @@ def train_semisupervised(dataloaders,encoder,head,adversary,**kwargs):
     adversary_optimizer = torch.optim.Adam(adversary.parameters(), lr=learning_rate)
 
     # define the loss history and best params with associated losses
-    loss_history = {'train': [], 'val': []}
-    encoder_loss_history = {'train': [], 'val': []}
-    head_loss_history = {'train': [], 'val': []}
-    adversary_loss_history = {'train': [], 'val': []}
+    loss_history = {
+        'encoder': {'train': [], 'val': []},
+        'head': {'train': [], 'val': []},
+        'adversary': {'train': [], 'val': []},
+        'joint': {'train': [], 'val': []},
+        'epoch' : {'train': [], 'val': []},
+        'raw_encoder': {'train': [], 'val': []},
+        'raw_head': {'train': [], 'val': []},
+        'raw_adversary': {'train': [], 'val': []},
+        'redo_adversary': {'train': [], 'val': []},
+        'redo_adversary_raw': {'train': [], 'val': []},
+    }
     best_loss = {'encoder': 1e10, 'head': 1e10, 'adversary': 1e10, 'joint': 1e10, 'epoch': 0}
     best_wts = {'encoder': encoder.state_dict(), 'head': head.state_dict(), 'adversary': adversary.state_dict()}
     eval_history = {'train': {}, 'val': {}}
@@ -122,7 +130,8 @@ def train_semisupervised(dataloaders,encoder,head,adversary,**kwargs):
                 head.eval()
                 adversary.eval()
 
-            running_losses = {'encoder': 0, 'head': 0, 'adversary': 0, 'joint': 0}
+            running_losses = {'encoder': 0, 'head': 0, 'adversary': 0, 'joint': 0, \
+                              'raw_encoder': 0, 'raw_head': 0, 'raw_adversary': 0}
             # running_outputs = {'y_head': [], 'y_adversary': []}
             epoch_head_outputs = torch.tensor([])
             epoch_adversary_outputs = torch.tensor([])
@@ -155,6 +164,10 @@ def train_semisupervised(dataloaders,encoder,head,adversary,**kwargs):
 
                     y_adversary_output = adversary(z2)
                     adversary_loss = adversary.loss(y_adversary_output, y_adversary)
+
+                    running_losses['raw_encoder'] += encoder_loss.item()
+                    running_losses['raw_head'] += head_loss.item()
+                    running_losses['raw_adversary'] += adversary_loss.item()
 
                     # running_outputs['y_head'].append(y_head_output)
                     # running_outputs['y_adversary'].append(y_adversary_output)
@@ -193,13 +206,13 @@ def train_semisupervised(dataloaders,encoder,head,adversary,**kwargs):
                     elif phase == 'val':
 
                         encoder_loss, _ = normalize_loss(
-                            encoder_loss, encoder_loss_avg, 0, curr_batch)
+                            encoder_loss, encoder_loss_avg, 0, -1)
                         
                         head_loss, _ = normalize_loss(
-                            head_loss, head_loss_avg, 0, curr_batch)
+                            head_loss, head_loss_avg, 0, -1)
                         
                         adversary_loss, _ = normalize_loss(
-                            adversary_loss, adversary_loss_avg, 0, curr_batch)
+                            adversary_loss, adversary_loss_avg, 0, -1)
                         
                         joint_loss = (encoder_weight*encoder_loss + \
                             head_weight*head_loss - \
@@ -211,10 +224,42 @@ def train_semisupervised(dataloaders,encoder,head,adversary,**kwargs):
                     running_losses['adversary'] += adversary_loss.item()
                     running_losses['joint'] += joint_loss.item()
 
-            loss_history[phase].append(running_losses['joint']/len(dataloaders[phase]))
-            encoder_loss_history[phase].append(running_losses['encoder']/len(dataloaders[phase]))
-            head_loss_history[phase].append(running_losses['head']/len(dataloaders[phase]))
-            adversary_loss_history[phase].append(running_losses['adversary']/len(dataloaders[phase]))
+            
+            ########  Train the adversary on the fixed latent space for a few epochs
+            encoder.eval()
+            head.eval()
+            for mini_epoch in range(adversarial_mini_epochs):       
+                for batch_idx, data in enumerate(dataloaders[phase]):
+                    X, y_head, y_adversary = data
+                    X = X.to(device)
+                    y_adversary = y_adversary.to(device)
+
+                    # noise injection for training to make model more robust
+                    if (noise_factor>0):
+                        X = X + noise_factor * torch.randn_like(X)
+
+                    with torch.set_grad_enabled(phase == 'train'):
+                        z = encoder.transform(X).detach()
+                        z.requires_grad = True
+                        adversary_optimizer.zero_grad()
+                        y_adversary_output = adversary(z)
+                        adversary_loss = adversary.loss(y_adversary_output, y_adversary)
+                        adversary_loss, _ = normalize_loss(
+                            adversary_loss, adversary_loss_avg, 0, -1)
+                        if phase == 'train':
+                            adversary_loss.backward()
+                            adversary_optimizer.step()
+            
+            ############ end of training adversary on fixed latent space
+
+            loss_history['encoder'][phase].append(running_losses['encoder']/len(dataloaders[phase]))
+            loss_history['head'][phase].append(running_losses['head']/len(dataloaders[phase]))
+            loss_history['adversary'][phase].append(running_losses['adversary']/len(dataloaders[phase]))
+            loss_history['joint'][phase].append(running_losses['joint']/len(dataloaders[phase]))
+            loss_history['epoch'][phase].append(epoch)
+            loss_history['raw_encoder'][phase].append(running_losses['raw_encoder']/len(dataloaders[phase]))
+            loss_history['raw_head'][phase].append(running_losses['raw_head']/len(dataloaders[phase]))
+            loss_history['raw_adversary'][phase].append(running_losses['raw_adversary']/len(dataloaders[phase]))
 
             for eval_name, eval_func in end_state_eval_funcs.items():
                 if eval_name not in eval_history[phase]:
@@ -228,16 +273,16 @@ def train_semisupervised(dataloaders,encoder,head,adversary,**kwargs):
                                                     adversary = adversary))
 
             if (verbose) and (epoch % 10 == 0):
-                print(f'Epoch [{epoch+1}/{num_epochs}], {phase} Loss: {loss_history[phase][-1]:.4f}')
+                print(f'Epoch [{epoch+1}/{num_epochs}], {phase} Loss: {loss_history["joint"][phase][-1]:.4f}')
                 for eval_name, eval_list in eval_history[phase].items():
                     print(f'{phase} {eval_name} {eval_list[-1]}')
 
             if phase == 'val':
-                if loss_history[phase][-1] < best_loss['joint']:
-                    best_loss['joint'] = loss_history[phase][-1]
-                    best_loss['encoder'] = encoder_loss_history[phase][-1]
-                    best_loss['head'] = head_loss_history[phase][-1]
-                    best_loss['adversary'] = adversary_loss_history[phase][-1]
+                if loss_history['joint'][phase][-1] < best_loss['joint']:
+                    best_loss['joint'] = loss_history['joint'][phase][-1]
+                    best_loss['encoder'] = loss_history['encoder'][phase][-1]
+                    best_loss['head'] = loss_history['head'][phase][-1]
+                    best_loss['adversary'] = loss_history['adversary'][phase][-1]
                     best_loss['epoch'] = epoch
                     best_wts['encoder'] = encoder.state_dict()
                     best_wts['head'] = head.state_dict()
@@ -246,6 +291,77 @@ def train_semisupervised(dataloaders,encoder,head,adversary,**kwargs):
                 else:
                     patience_counter += 1
 
+    #############
+    # retrain the adversarial classifier on the fixed latent space
+    redo_adversary_loss_avg = 1
+    for epoch in range(num_epochs):
+        for phase in ['train','val']:
+            encoder.eval()
+            head.eval()
+            if phase == 'train':
+                adversary.train()
+            else:
+                adversary.eval()
+            
+            num_batches = len(dataloaders[phase])
+            running_losses = {'redo_adversary_raw': 0, 'redo_adversary': 0}
+            epoch_adversary_outputs = torch.tensor([])
+            epoch_adversary_targets = torch.tensor([])
+            for batch_idx, data in enumerate(dataloaders[phase]):
+                X, y_head, y_adversary = data
+                X = X.to(device)
+                y_adversary = y_adversary.to(device)
+
+                # noise injection for training to make model more robust
+                if (noise_factor>0):
+                    X = X + noise_factor * torch.randn_like(X)
+
+                with torch.set_grad_enabled(phase == 'train'):
+                    z = encoder.transform(X).detach()
+                    z.requires_grad = True
+                    adversary_optimizer.zero_grad()
+                    y_adversary_output = adversary(z)
+                    adversary_loss = adversary.loss(y_adversary_output, y_adversary)
+                    running_losses['redo_adversary_raw'] += adversary_loss.item()
+                    epoch_adversary_outputs = torch.cat((epoch_adversary_outputs, y_adversary_output), 0)
+                    epoch_adversary_targets = torch.cat((epoch_adversary_targets, y_adversary), 0)
+                    if phase == 'train':
+                        curr_batch = num_batches*epoch + batch_idx
+                        adversary_loss, redo_adversary_loss_avg = normalize_loss(
+                            adversary_loss, redo_adversary_loss_avg, 0, curr_batch)
+                        running_losses['redo_adversary'] += adversary_loss.item()
+                        adversary_loss.backward()
+                        adversary_optimizer.step()
+                    else:
+                        adversary_loss, _ = normalize_loss(
+                            adversary_loss, redo_adversary_loss_avg, 0, curr_batch)
+                        running_losses['redo_adversary'] += adversary_loss.item()
+
+            loss_history['redo_adversary'][phase].append(running_losses['redo_adversary']/len(dataloaders[phase]))
+            loss_history['redo_adversary_raw'][phase].append(running_losses['redo_adversary_raw']/len(dataloaders[phase]))
+
+            for eval_name, eval_func in end_state_eval_funcs.items():
+                if not ('adversary' in eval_name):
+                    continue
+                if 'redo_'+eval_name not in eval_history[phase]:
+                    eval_history[phase]['redo_'+eval_name] = []
+                    
+                eval_history[phase]['redo_'+eval_name].append(eval_func(head_ouputs = None,
+                                                    head_targets = None,
+                                                    adversary_outputs = epoch_adversary_outputs,
+                                                    adversary_targets = epoch_adversary_targets,
+                                                    head = None,
+                                                    adversary = adversary))
+
+            if (verbose) and (epoch % 10 == 0):
+                print(f'Epoch [{epoch+1}/{num_epochs}], {phase} Loss: {loss_history["redo_adversary"][phase][-1]:.4f}')
+                for eval_name, eval_list in eval_history[phase].items():
+                    if not ('redo' in eval_name):
+                        continue
+                    print(f'{phase} {eval_name} {eval_list[-1]}')
+
+    #############
+                
 
     if save_trained_model:
         torch.save(encoder.state_dict(), encoder_save_path)
@@ -312,7 +428,8 @@ def train_semisupervised(dataloaders,encoder,head,adversary,**kwargs):
 
             if verbose:
                 print(f'End state {phase} Losses: {end_state_losses[phase]}')
-
+                for eval_name, eval_val in end_state_eval[phase].items():
+                    print(f'{phase} {eval_name} {eval_val:.4f}')
 
     encoder_hyperparams = encoder.get_hyperparameters()
     head_hyperparams = head.get_hyperparameters()
@@ -320,35 +437,60 @@ def train_semisupervised(dataloaders,encoder,head,adversary,**kwargs):
 
     output_data = {
         'learning_parameters': learning_parameters,
+        'end_state_losses': end_state_losses,
         'end_state_eval': end_state_eval,
+        'best_loss': best_loss,
+        'loss_history': loss_history,
         'encoder': {
-            # 'hyperparameters': encoder_hyperparams,
-            'loss_history': encoder_loss_history,
-            'end_state_losses': end_state_losses,
-            'best_loss': best_loss,
+            'hyperparameters': encoder_hyperparams,
+            # 'loss_history': encoder_loss_history,
+            # 'end_state_losses': end_state_losses,
+            # 'best_loss': best_loss,
             # 'best_wts': best_wts,
             'loss_avg': encoder_loss_avg,
         },
         'head': {
-            # 'hyperparameters': head_hyperparams,
-            'loss_history': head_loss_history,
-            'end_state_losses': end_state_losses,
-            'best_loss': best_loss,
+            'hyperparameters': head_hyperparams,
+            # 'loss_history': head_loss_history,
+            # 'end_state_losses': end_state_losses,
+            # 'best_loss': best_loss,
             # 'best_wts': best_wts,
             'loss_avg': head_loss_avg,
         },
         'adversary': {
-            # 'hyperparameters': adversary_hyperparams,
-            'loss_history': adversary_loss_history,
-            'end_state_losses': end_state_losses,
-            'best_loss': best_loss,
+            'hyperparameters': adversary_hyperparams,
+            # 'loss_history': adversary_loss_history,
+            # 'end_state_losses': end_state_losses,
+            # 'best_loss': best_loss,
             # 'best_wts': best_wts,
             'loss_avg': adversary_loss_avg,
         },
     }
 
-    # with open(output_save_path, 'w') as f:
-    #     json.dump(output_data, f, indent=4)
+    with open(output_save_path, 'w') as f:
+        json.dump(output_data, f, indent=4)
+
+    if yes_plot:
+        for key in loss_history.keys():
+            if key == 'epoch':
+                continue
+            plt.plot(loss_history[key]['train'], label='train', color='blue', lw=2)
+            plt.plot(loss_history[key]['val'], label='val', color='orange', lw=2)
+            plt.legend()
+            plt.xlabel('Epoch')
+            plt.title(key + ' loss')
+            plt.title(key + ' loss')
+            plt.savefig(os.path.join(save_dir, key+'_loss.png'))
+            plt.close()
+
+        for key in eval_history['train'].keys():
+            plt.plot(eval_history['train'][key], label='train', color='blue', lw=2)
+            plt.plot(eval_history['val'][key], label='val', color='orange', lw=2)
+            plt.legend()
+            plt.xlabel('Epoch')
+            plt.title(key + ' eval')
+            plt.savefig(os.path.join(save_dir, key+'_eval.png'))
+            plt.close()
 
     return encoder, head, adversary, output_data
 
@@ -356,10 +498,10 @@ def train_semisupervised(dataloaders,encoder,head,adversary,**kwargs):
 # %%
 # if __name__ == "__main__":
 test_adversarial_dir = '/Users/jonaheaton/rcc4_mzlearn4-5/test_adversarial'
-output_dir = os.path.join(test_adversarial_dir, 'adversarial_network_Feb21_1')
+output_dir = os.path.join(test_adversarial_dir, 'adversarial_network_Feb21_7')
 os.makedirs(output_dir, exist_ok=True)
 batch_size = 64
-num_epochs = 100
+num_epochs = 150
 
 
 # create data loaders
@@ -435,7 +577,7 @@ test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 # %%
 # create the models
 input_dim = X_train.shape[1]                                      
-latent_dim = 16
+latent_dim = 32
 encoder = AE(input_size=input_dim, latent_size=latent_dim, hidden_size=32, num_hidden_layers=2, 
                 dropout_rate=0.2,use_batch_norm=True,act_on_latent_layer=True)
 head = BinaryClassifier(latent_dim, hidden_size=4, num_hidden_layers=2)
@@ -505,10 +647,10 @@ encoder, head, adversary, output_data = train_semisupervised(dataloader_dct,enco
                      save_dir=output_dir,
                     num_epochs=num_epochs,
                     learning_rate=0.001,
-                    encoder_weight=0.5,
-                    head_weight=2,
-                    adversary_weight=2,
+                    encoder_weight=1,
+                    head_weight=1,
+                    adversary_weight=10,
                     end_state_eval_funcs=end_state_eval_funcs)
 
 
-print(output_data)
+# print(output_data)

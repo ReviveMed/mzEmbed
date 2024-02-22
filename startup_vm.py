@@ -228,9 +228,9 @@ if len(records) > 0:
     # NOTE (2): the fill na method is currently applied very early in the process before alignment, but it can be moved to after alignment
     fill_na_strat = 'min'
     # fill_na_strat_list = ['min',''mean'','knn','min/2','median','log_mean','log_knn']
-    num_cohorts_thresh = 0.5
+    num_cohorts_thresh = 0.25
     # num_cohorts_thresh_list = [0,0.25,0.5,0.75]
-    cohort_correction_method = 'combat'
+    cohort_correction_method = 'zscore'
     # cohort_correction_method_list = ['combat','zscore','min_max','raw']
     ###### end of new user-defined options ######
 
