@@ -9,8 +9,8 @@ from sklearn.preprocessing import LabelEncoder, OneHotEncoder
  
 ######### Simple Dataset for Pretraining an Autoencoder
 class PreTrainingDataset(Dataset):
-    def __init__(self, input_dir):
-        X_df = pd.read_csv(os.path.join(input_dir, 'X_pretrain.csv'), index_col=0)
+    def __init__(self, input_dir, subset='pretrain'):
+        X_df = pd.read_csv(os.path.join(input_dir, f'X_{subset}.csv'), index_col=0)
         self.X = torch.tensor(X_df.values, dtype=torch.float32)
 
     def __len__(self):
