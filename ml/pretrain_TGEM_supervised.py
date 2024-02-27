@@ -488,16 +488,20 @@ if __name__ == '__main__':
     
 
     if True:
-        data_dir = os.path.join(dropbox_dir, 'development_CohortCombination','mskcc_prediction_study_feb19')
+        data_dir = os.path.join(dropbox_dir, 'development_CohortCombination','benefit_study_feb20')
+        # data_dir = os.path.join(dropbox_dir, 'development_CohortCombination','mskcc_prediction_study_feb19')
         load_model_dir = os.path.join(dropbox_dir, 'development_CohortCombination','reconstruction_study_feb16','models_feb16')
         
-        save_dir = os.path.join(data_dir,'tgem_models_feb20_noise')
+        save_dir = os.path.join(data_dir,'tgem_models_feb25_noise')
         os.makedirs(save_dir, exist_ok=True)
         # os.makedirs(save_dir, exist_ok=True)
         load_model_path = os.path.join(load_model_dir, 'tgem_0_model.pth')
         # load_model_path = True
 
-        label_mapping = {'FAVORABLE': 1, 'POOR': 0, 'INTERMEDIATE': np.nan}
+        # label_mapping = {'FAVORABLE': 1, 'POOR': 0, 'INTERMEDIATE': np.nan}
+        label_mapping = {'CB': 1, 'NCB': 0, 'ICB': np.nan}
+        # label_col = 'MSKCC'
+        label_col = 'Benefit'
         classifier_training_wrapper(data_dir,
                                     model_kind=model_kind,
                                     model_name=model_name,
@@ -509,7 +513,7 @@ if __name__ == '__main__':
                                     learning_rate=1e-3,
                                     load_model_path=load_model_path,
                                     noise_factor = 0.1,
-                                    label_col = 'MSKCC',
+                                    label_col = label_col,
                                     label_encoder = label_mapping,
                                     n_subsets = 30,
                                     yesplot=True,
