@@ -259,12 +259,12 @@ def run_unsupervised_pretraining(dataloaders,**kwargs):
         running_recon_loss = 0.0
         with torch.inference_mode():
             for inputs in dataloaders[phase]:
-                    loss = model.forward_to_loss(inputs)
-                    z = model.transform(inputs)
-                    recon = model.generate(z)
-                    recon_loss = torch.mean((recon - inputs)**2)
-            running_loss += loss.item() * inputs.size(0)
-            running_recon_loss += recon_loss.item() * inputs.size(0)
+                loss = model.forward_to_loss(inputs)
+                z = model.transform(inputs)
+                recon = model.generate(z)
+                recon_loss = torch.mean((recon - inputs)**2)
+                running_loss += loss.item() * inputs.size(0)
+                running_recon_loss += recon_loss.item() * inputs.size(0)
         epoch_loss = running_loss / len(dataloaders[phase].dataset)
         epoch_recon_loss = running_recon_loss / len(dataloaders[phase].dataset)
         end_state_losses[phase] = epoch_loss
