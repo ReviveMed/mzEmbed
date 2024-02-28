@@ -188,6 +188,10 @@ class VAE(nn.Module):
     def generate(self, z):
         return self.decoder(z)
     
+    def reset_weights(self):
+        self.encoder.apply(self._reset_weights)
+        self.decoder.apply(self._reset_weights)
+
     def get_hyperparameters(self):
         return {'input_size': self.input_size,
                 'hidden_size': self.hidden_size,
@@ -246,6 +250,16 @@ class AE(nn.Module):
 
     def generate(self, z):
         return self.decoder(z)
+
+    def reset_weights(self):
+        # self.encoder.apply(self._reset_weights)
+        # self.decoder.apply(self._reset_weights)
+        for layer in self.encoder.children():
+            if hasattr(layer, 'reset_weights'):
+                layer.reset_weights()
+        for layer in self.decoder.children():
+            if hasattr(layer, 'reset_weights'):
+                layer.reset_weights()
 
     def get_hyperparameters(self):
         return {'input_size': self.input_size,

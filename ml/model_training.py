@@ -1,5 +1,4 @@
-# %%
-# Combine Autoencoder with Adversarial Network and Classifier Head on the Pre-training Dataset
+
 
 import torch
 from misc import normalize_loss
@@ -12,9 +11,53 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+from torchmetrics import Accuracy, AUROC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 
+##################################################################################
+##################################################################################
+######### for training the compound model
+
+class CompoundDataset(Dataset):
+    def __init__(self, X, y_head, y_adv, other=None):
+        self.X = torch.tensor(X.to_numpy(), dtype=torch.float32)
+        self.y_head = torch.tensor(y_head.to_numpy(), dtype=torch.float32)
+        self.y_adv = torch.tensor(y_adv.to_numpy(), dtype=torch.float32)
+        if other is None:
+            self.other = torch.tensor(np.zeros((len(X), 1)), dtype=torch.float32)
+        else:
+            self.other = other
+
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.y_head[idx], self.y_adv[idx], self.other[idx]
+    
+    def get_class_weights_head(self):
+        y_no_nan = self.y_head[~torch.isnan(self.y_head)]
+        y_int = y_no_nan.int()
+        return 1/torch.bincount(y_int)
+    
+    def get_class_weights_adv(self):
+        y_no_nan = self.y_adv[~torch.isnan(self.y_adv)]
+        y_int = y_no_nan.int()
+        return 1/torch.bincount(y_int)
+    
+    def get_num_classes_head(self):
+        y_no_nan = self.y_head[~torch.isnan(self.y_head)]
+        return len(y_no_nan.unique())
+    
+    def get_num_classes_adv(self):
+        y_no_nan = self.y_adv[~torch.isnan(self.y_adv)]
+        return len(y_no_nan.unique())
+
+
+
+##################################################################################
+##################################################################################
 
 def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
 
@@ -351,12 +394,8 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
 
         knn = KNeighborsClassifier(n_neighbors=adversary.num_classes, weights='distance')
         knn.fit(latent_space, y_adv_train)
-        # adversary_acc = balanced_accuracy_score(y_adv_test, knn.predict(test_latent_space))
-        # print(f'KNN Adversary accuracy: {adversary_acc:.4f}')
-        if adversary.num_classes > 2:
-            adversary_auc = roc_auc_score(y_adv_test, knn.predict_proba(test_latent_space), average='weighted', multi_class='ovo')
-        else:
-            adversary_auc = roc_auc_score(y_adv_test, knn.predict_proba(test_latent_space)[:,1], average='weighted')
+
+        adversary_auc = evaluate_auc(torch.tensor(knn.predict_proba(test_latent_space)), torch.tensor(y_adv_test), adversary)
         print(f'KMM Adversary AUC: {adversary_auc:.4f}')
 
         sklearn_adversary_eval = {
@@ -366,12 +405,9 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
 
         rdf = RandomForestClassifier(n_estimators=100, class_weight='balanced')
         rdf.fit(latent_space, y_adv_train)
-        # adversary_acc = balanced_accuracy_score(y_adv_test, rdf.predict(test_latent_space))
-        # print(f'Random Forest Adversary accuracy: {adversary_acc:.4f}')
-        if adversary.num_classes > 2:
-            adversary_auc = roc_auc_score(y_adv_test, rdf.predict_proba(test_latent_space), average='weighted', multi_class='ovo')
-        else:
-            adversary_auc = roc_auc_score(y_adv_test, rdf.predict_proba(test_latent_space)[:,1], average='weighted')
+
+        adversary_auc = evaluate_auc(torch.tensor(rdf.predict_proba(test_latent_space)), torch.tensor(y_adv_test), adversary)
+
         print(f'Random Forest Adversary AUC: {adversary_auc:.4f}')
 
         # sklearn_adversary_eval['RandomForest_accuracy'] = adversary_acc
@@ -504,192 +540,47 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
     return encoder, head, adversary, output_data
 
 
-from sklearn.metrics import accuracy_score, roc_auc_score, balanced_accuracy_score
+# %%
+##################################################################################
+##################################################################################
 
-
-def evaluate_head_accuracy(head_ouputs, head_targets, adversary_outputs, adversary_targets, head, adversary):
-    if len(head_ouputs) == 0:
+# Classifier Evaluation Functions
+def evaluate_auc(outputs, targets, model):
+    if len(outputs) == 0:
         return 0
-    head_probs = head.logits_to_proba(head_ouputs.detach()).numpy()
-    head_preds = np.round(head_probs)
-    head_acc = balanced_accuracy_score(head_targets, head_preds)
-    return head_acc
-
-def evaluate_adversary_accuracy(head_ouputs, head_targets, adversary_outputs, adversary_targets,head, adversary):
-    if len(adversary_outputs) == 0:
-        return 0
-    adversary_probs = adversary.logits_to_proba(adversary_outputs.detach()).numpy()
-    adversary_preds = np.round(adversary_probs)
-    adversary_acc = balanced_accuracy_score(adversary_targets, adversary_preds)
-    return adversary_acc
-
-def evaluate_head_auc(head_ouputs, head_targets, adversary_outputs, adversary_targets, head, adversary):
-    if len(head_ouputs) == 0:
-        return 0
-    head_probs = head.logits_to_proba(head_ouputs.detach()).numpy()
-    if head.num_classes > 2:
-        head_auc = roc_auc_score(head_targets, head_probs,
-                                average='weighted', multi_class='ovo')
+    probs = model.logits_to_proba(outputs.detach()).numpy()
+    nan_mask = ~torch.isnan(targets)
+    probs = probs[nan_mask]
+    targets = targets[nan_mask]
+    if model.num_classes > 2:
+        task = 'binary'
     else:
-        head_auc = roc_auc_score(head_targets, head_probs,
-                                average='weighted')
-    return head_auc
+        task = 'multi'
+
+    metric = AUROC(task=task,average='weighted')
+    metric(probs,targets)
+    return metric.compute().item()
+
 
 def evaluate_adversary_auc(head_ouputs, head_targets, adversary_outputs, adversary_targets,head, adversary):
-    if len(adversary_outputs) == 0:
-        return 0
-    adversary_probs = adversary.logits_to_proba(adversary_outputs.detach()).numpy()
-    if adversary.num_classes > 2:
-        adversary_auc = roc_auc_score(adversary_targets, adversary_probs,
-                                    average='weighted', multi_class='ovo')
-    else:
-        adversary_auc = roc_auc_score(adversary_targets, adversary_probs,
-                                    average='weighted')
-    return adversary_auc
+    return evaluate_auc(adversary_outputs, adversary_targets, adversary)
+
+def evaluate_head_auc(head_ouputs, head_targets, adversary_outputs, adversary_targets,head, adversary):
+    return evaluate_auc(head_ouputs, head_targets, head)
+
+# would be better to integrate the adversary into the model class
+# def get_ensemble_eval_funcs(model):
+#     eval_funcs = {
+#         'head_auc': lambda outputs, targets: evaluate_auc(outputs, targets, model),
+#     }
+#     if model.adversary is not None:
+#         eval_funcs['adversary_auc'] = lambda outputs, targets: evaluate_auc(outputs, targets, model.adversary)
+#     return eval_funcs
 
 end_state_eval_funcs = {
-    # 'head_accuracy': evaluate_head_accuracy,
-    # 'adversary_accuracy': evaluate_adversary_accuracy,
     'head_auc': evaluate_head_auc,
     'adversary_auc': evaluate_adversary_auc
 }
 
-# %%
-# if __name__ == "__main__":
-test_adversarial_dir = '/Users/jonaheaton/ReviveMed Dropbox/Jonah Eaton/development_CohortCombination/reconstruction_study_feb16'
-output_dir = os.path.join(test_adversarial_dir, 'adversarial_network_Feb25')
-os.makedirs(output_dir, exist_ok=True)
-
-batch_size = 64
-num_epochs = 500
-encoder_weight = 1
-head_weight = 0.5
-adversary_weight = 1
-
-# subset_num = 0
-for subset_num in [0]:
-    model_subdir = f'test5_{subset_num}'
-    model_dir = os.path.join(output_dir, model_subdir)
-    os.makedirs(model_dir, exist_ok=True)
-
-    X_train = pd.read_csv(os.path.join(test_adversarial_dir, f'X_train_{subset_num}.csv'),index_col=0)
-    y_train = pd.read_csv(os.path.join(test_adversarial_dir, f'y_train_{subset_num}.csv'),index_col=0)
-    X_test = pd.read_csv(os.path.join(test_adversarial_dir, f'X_test_{subset_num}.csv'),index_col=0)
-    y_test = pd.read_csv(os.path.join(test_adversarial_dir, f'y_test_{subset_num}.csv'),index_col=0)
-
-
-    head_col = 'cohort'
-    adv_col = 'study'
-    num_clin_vars = 1
-
-    class EncoderDataset(Dataset):
-        def __init__(self, X, y_head, y_adv, clin_vars=None):
-            self.X = torch.tensor(X.to_numpy(), dtype=torch.float32)
-            self.y_head = torch.tensor(y_head.to_numpy(), dtype=torch.float32)
-            self.y_adv = torch.tensor(y_adv.to_numpy(), dtype=torch.float32)
-            if clin_vars is not None:
-                self.clin_vars = torch.tensor(clin_vars.to_numpy(), dtype=torch.float32)
-            else:
-                self.clin_vars = torch.tensor(np.zeros((X.shape[0], 0)), dtype=torch.float32)
-
-
-
-        def __len__(self):
-            return len(self.X)
-
-        def __getitem__(self, idx):
-            return self.X[idx], self.y_head[idx], self.y_adv[idx], self.clin_vars[idx]
-        
-        def get_class_weights_head(self):
-            y_no_nan = self.y_head[~torch.isnan(self.y_head)]
-            y_int = y_no_nan.int()
-            return 1/torch.bincount(y_int)
-        
-        def get_class_weights_adv(self):
-            y_no_nan = self.y_adv[~torch.isnan(self.y_adv)]
-            y_int = y_no_nan.int()
-            return 1/torch.bincount(y_int)
-        
-        def get_num_classes_head(self):
-            return len(self.y_head.unique())
-        
-        def get_num_classes_adv(self):
-            return len(self.y_adv.unique())
-
-
-    train_dataset = EncoderDataset(X_train, y_train[head_col], y_train[adv_col])
-
-    num_classes_head = train_dataset.get_num_classes_head()
-    num_classes_adv = train_dataset.get_num_classes_adv()
-
-    weights_head = train_dataset.get_class_weights_head()
-    weights_adv = train_dataset.get_class_weights_adv()
-
-    # Split the training dataset into training and validation sets
-    train_size = int(0.85 * len(train_dataset))
-    val_size = len(train_dataset) - train_size
-
-    train_dataset, val_dataset = torch.utils.data.random_split(train_dataset, [train_size, val_size])
-    test_dataset = EncoderDataset(X_test, y_test[head_col], y_test[adv_col])
-
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-
-    # %%
-    # create the models
-    input_dim = X_train.shape[1]                                      
-    latent_dim = 32
-    # encoder = AE(input_size=input_dim, latent_size=latent_dim, hidden_size=32, num_hidden_layers=1, 
-    #                 dropout_rate=0.2,use_batch_norm=True,act_on_latent_layer=True, activation='tanh')
-
-    encoder = VAE(input_size=input_dim, latent_size=latent_dim, hidden_size=32, num_hidden_layers=1, 
-                    dropout_rate=0,use_batch_norm=True,act_on_latent_layer=True, activation='tanh')
-
-    if num_classes_head > 2:
-        head = MultiClassClassifier(latent_dim+num_clin_vars, hidden_size=4, num_hidden_layers=1, num_classes=num_classes_head)
-    else:
-        head = BinaryClassifier(latent_dim+num_clin_vars, hidden_size=4, num_hidden_layers=1)
-
-    if num_classes_adv > 2:
-        adversary = MultiClassClassifier(latent_dim, hidden_size=4, num_hidden_layers=1, num_classes=num_classes_adv)
-    else:
-        adversary = BinaryClassifier(latent_dim, hidden_size=4, num_hidden_layers=1)
-
-    head_info = {'class_weight': weights_head, 'num_classes': num_classes_head}
-    adversary_info = {'class_weight': weights_adv, 'num_classes': num_classes_adv}
-
-    head.define_loss(class_weight=weights_head)
-    adversary.define_loss(class_weight=weights_adv)
-
-
-    # %%
-    dataloader_dct = {'train': train_loader, 'val': val_loader, 'test': test_loader}
-
-
-
-    # %%
-
-    # TODO: allow adversary to have extra training
-    # TODO: retrain adversary on fixed latent space at the end of training
-    # TODO: allow for multiple heads and multiple adversaries   
-    # TODO define loss-weights in the model object
-    # TODO ordinal category loss and head
-    # TODO: Update the TGEM model to be a encoder-style model class "TGEM_Encoder"
-    # TODO: add a "task" (binary, regression, multi, etc) to the model class
-    # TODO: add a "goal" (reduce, adversarial, primary) (method: define_goal)
-
-    encoder, head, adversary, output_data = train_compound_model(dataloader_dct,encoder,head,adversary,
-                        save_dir=model_dir,
-                        num_epochs=num_epochs,
-                        learning_rate=0.0005,
-                        noise_factor= 0.05,
-                        encoder_weight=encoder_weight,
-                        head_weight=head_weight,
-                        adversary_weight=adversary_weight,
-                        end_state_eval_funcs=end_state_eval_funcs)
-
-
-    # print(output_data)
+##################################################################################
+##################################################################################

@@ -14,7 +14,6 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import roc_auc_score, accuracy_score
 from torchmetrics import Accuracy, AUROC
 # from sklearn.externals import joblib
-from prep import ClassifierDataset
 
 logistic_regression_param_grid = {
             'penalty': ['l1', 'l2'],
