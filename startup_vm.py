@@ -509,69 +509,73 @@ if len(records) > 0:
                     print(f'Error in standardization: {e}')
                     continue
 
-                # TODO: add save here to plot UMAP and PCA
                 ########################################################################################################
                 # %% Look at the PCA of the combined study
-                pca = PCA(n_components=2)
-                pca_result = pca.fit_transform(data_corrected.T)
-                pca_df = pd.DataFrame(pca_result, columns=['PC1', 'PC2'], index=data_corrected.columns)
-                # edit the metadata_df['mzlearn_cohort_id'].to_list() list to inclucde cohort label
-                mzlearn_cohort_ids = metadata_df['mzlearn_cohort_id'].to_list()
-                new_mzlearn_cohort_ids = []
-                for mzlearn_cohort_id in mzlearn_cohort_ids:
-                    new_mzlearn_cohort_ids.append(f"{mzlearn_cohort_id} ({study_id2cohort_label[mzlearn_cohort_id]})")
-                pca_df['mzlearn_cohort_id'] = new_mzlearn_cohort_ids
-                pca_df['file_name'] = metadata_df['file_name'].to_list()
-                pca_df['MV percentage'] = combined_study_nan_mask['missing_values'].to_list()
-                # pca_df['Study_num'] = metadata_df['Study_num']
-                # pca_df['label'] = metadata_df[pretrain_label_col]
-                pca_df.to_csv(os.path.join(align_save_dir_freq_th, f'pca_df_{cohort_correction_method}.csv'))
-                hover_data = ['MV percentage']
-                # plot the PCA and add file_name as hover and add title to show num_peaks and num_files
-                graph = px.scatter(pca_df, x="PC1", y="PC2", color='mzlearn_cohort_id',
-                                   color_discrete_sequence=px.colors.qualitative.Plotly,
-                                   title=f'PCA with {num_peaks} peaks and {num_files} files',
-                                   hover_name='file_name',
-                                   hover_data=hover_data)
+                # fill nan with  0
+                try:
+                    data_corrected = data_corrected.fillna(0)
+                    pca = PCA(n_components=2)
+                    pca_result = pca.fit_transform(data_corrected.T)
+                    pca_df = pd.DataFrame(pca_result, columns=['PC1', 'PC2'], index=data_corrected.columns)
+                    # edit the metadata_df['mzlearn_cohort_id'].to_list() list to inclucde cohort label
+                    mzlearn_cohort_ids = metadata_df['mzlearn_cohort_id'].to_list()
+                    new_mzlearn_cohort_ids = []
+                    for mzlearn_cohort_id in mzlearn_cohort_ids:
+                        new_mzlearn_cohort_ids.append(f"{mzlearn_cohort_id} ({study_id2cohort_label[mzlearn_cohort_id]})")
+                    pca_df['mzlearn_cohort_id'] = new_mzlearn_cohort_ids
+                    pca_df['file_name'] = metadata_df['file_name'].to_list()
+                    pca_df['MV percentage'] = combined_study_nan_mask['missing_values'].to_list()
+                    # pca_df['Study_num'] = metadata_df['Study_num']
+                    # pca_df['label'] = metadata_df[pretrain_label_col]
+                    pca_df.to_csv(os.path.join(align_save_dir_freq_th, f'pca_df_{cohort_correction_method}.csv'))
+                    hover_data = ['MV percentage']
+                    # plot the PCA and add file_name as hover and add title to show num_peaks and num_files
+                    graph = px.scatter(pca_df, x="PC1", y="PC2", color='mzlearn_cohort_id',
+                                       color_discrete_sequence=px.colors.qualitative.Plotly,
+                                       title=f'PCA with {num_peaks} peaks and {num_files} files',
+                                       hover_name='file_name',
+                                       hover_data=hover_data)
 
-                graph.update_traces(marker={'size': 4.5})
-                graph_div = plot({'data': graph}, output_type='div')
-                pickle.dump(graph_div, open(f'{align_save_dir_freq_th}/pca_plot.pkl', 'wb'))
+                    graph.update_traces(marker={'size': 4.5})
+                    graph_div = plot({'data': graph}, output_type='div')
+                    pickle.dump(graph_div, open(f'{align_save_dir_freq_th}/pca_plot.pkl', 'wb'))
 
-                # plot the PCA
-                # sns.scatterplot(x='PC1', y='PC2', hue='study_id', data=pca_df)
-                # plt.savefig(os.path.join(select_feats_dir, f'pca_plot_{cohort_correction_method}.png'),
-                #             bbox_inches='tight')
-                # plt.title(cohort_correction_method)
-                # plt.close()
+                    # plot the PCA
+                    # sns.scatterplot(x='PC1', y='PC2', hue='study_id', data=pca_df)
+                    # plt.savefig(os.path.join(select_feats_dir, f'pca_plot_{cohort_correction_method}.png'),
+                    #             bbox_inches='tight')
+                    # plt.title(cohort_correction_method)
+                    # plt.close()
 
-                ########################################################################################################
-                # %% Look at the UMAP of the combined study
-                reducer = umap.UMAP()
-                umap_result = reducer.fit_transform(data_corrected.T)
+                    ########################################################################################################
+                    # %% Look at the UMAP of the combined study
+                    reducer = umap.UMAP()
+                    umap_result = reducer.fit_transform(data_corrected.T)
 
-                umap_df = pd.DataFrame(umap_result, columns=['UMAP1', 'UMAP2'], index=data_corrected.columns)
-                umap_df['mzlearn_cohort_id'] = new_mzlearn_cohort_ids
-                umap_df['file_name'] = metadata_df['file_name'].to_list()
-                umap_df['MV percentage'] = combined_study_nan_mask['missing_values'].to_list()
-                # umap_df['Study_num'] = metadata_df['Study_num']
-                # umap_df['label'] = metadata_df[pretrain_label_col]
-                umap_df.to_csv(os.path.join(align_save_dir_freq_th, f'umap_df_{cohort_correction_method}.csv'))
-                hover_data = ['MV percentage']
-                graph = px.scatter(umap_df, x="UMAP1", y="UMAP2", color='mzlearn_cohort_id',
-                                   color_discrete_sequence=px.colors.qualitative.Plotly,
-                                   title=f'UMAP with {num_peaks} peaks and {num_files} files',
-                                   hover_name='file_name',
-                                   hover_data=hover_data)
-                graph.update_traces(marker={'size': 4.5})
-                graph_div = plot({'data': graph}, output_type='div')
-                pickle.dump(graph_div, open(f'{align_save_dir_freq_th}/umap_plot.pkl', 'wb'))
-                # plot the UMAP
-                # sns.scatterplot(x='UMAP1', y='UMAP2', hue='study_id', data=umap_df)
-                # plt.savefig(os.path.join(select_feats_dir, f'umap_plot_{cohort_correction_method}'),
-                #             bbox_inches='tight')
-                # plt.title(cohort_correction_method)
-                # plt.close()
+                    umap_df = pd.DataFrame(umap_result, columns=['UMAP1', 'UMAP2'], index=data_corrected.columns)
+                    umap_df['mzlearn_cohort_id'] = new_mzlearn_cohort_ids
+                    umap_df['file_name'] = metadata_df['file_name'].to_list()
+                    umap_df['MV percentage'] = combined_study_nan_mask['missing_values'].to_list()
+                    # umap_df['Study_num'] = metadata_df['Study_num']
+                    # umap_df['label'] = metadata_df[pretrain_label_col]
+                    umap_df.to_csv(os.path.join(align_save_dir_freq_th, f'umap_df_{cohort_correction_method}.csv'))
+                    hover_data = ['MV percentage']
+                    graph = px.scatter(umap_df, x="UMAP1", y="UMAP2", color='mzlearn_cohort_id',
+                                       color_discrete_sequence=px.colors.qualitative.Plotly,
+                                       title=f'UMAP with {num_peaks} peaks and {num_files} files',
+                                       hover_name='file_name',
+                                       hover_data=hover_data)
+                    graph.update_traces(marker={'size': 4.5})
+                    graph_div = plot({'data': graph}, output_type='div')
+                    pickle.dump(graph_div, open(f'{align_save_dir_freq_th}/umap_plot.pkl', 'wb'))
+                    # plot the UMAP
+                    # sns.scatterplot(x='UMAP1', y='UMAP2', hue='study_id', data=umap_df)
+                    # plt.savefig(os.path.join(select_feats_dir, f'umap_plot_{cohort_correction_method}'),
+                    #             bbox_inches='tight')
+                    # plt.title(cohort_correction_method)
+                    # plt.close()
+                except Exception as e:
+                    print(f'Error in PCA and UMAP: {e}')
 
                 ########################################################################################################
                 # save the combined peak intensity to gcp bucket
