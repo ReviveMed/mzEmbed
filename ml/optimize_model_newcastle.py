@@ -256,8 +256,8 @@ def objective(trial):
         'finetune_batch_size': 32,
         'finetune_noise_injection': max(trial.suggest_float('finetune_noise_injection', -0.05, 0.25, step=0.01),0),
         'finetune_encoder_status': 'finetune',
-        'finetune_label_col': 'MSKCC',
-        'finetune_n_subsets': 30,
+        'finetune_label_col': 'fibro_binary',
+        'finetune_n_subsets': 10,
         'verbose': False,
         'yesplot': False,
     }
@@ -267,14 +267,16 @@ def objective(trial):
     if search_space['finetune_early_stopping'] == -1:
         search_space['finetune_val_frac'] = 0
     search_space['finetune_encoder_lr'] = search_space['finetune_lr']
+    search_space['finetune_label_encoder'] = {'high': 1, 'low': 0}
 
     # Run the full training process
-    data_dir = '/Users/jonaheaton/Desktop/mskcc_study_feb13'
+    data_dir = '/Users/jonaheaton/Desktop/newcastle_nash_study_feb20/alignment_1/results'
+    # data_dir = '/Users/jonaheaton/Desktop/newcastle_nash_study_feb20/alignment_3/results'
 
     # create a directory to using the trial id
     datetime_start_str = trial.datetime_start.strftime('%Y%m%d_%H%M%S')
     trial_id = datetime_start_str + '_' + str(trial.number).zfill(4) 
-    save_dir = os.path.join(data_dir, 'models_feb13', trial_id)
+    save_dir = os.path.join(data_dir, 'models_feb20', trial_id)
     search_space['save_dir'] = save_dir
     os.makedirs(save_dir, exist_ok=True)
     # save the search space to a json file
@@ -293,7 +295,7 @@ if __name__ == "__main__":
 
     # Set up logging
     optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
-    study_name = 'mskcc_prediction_feb15'
+    study_name = 'newcastle_prediction_feb20_1'
     storage_name = 'sqlite:///{}.db'.format(study_name)
 
     # Create a study object and optimize the objective function

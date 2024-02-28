@@ -228,8 +228,8 @@ def objective(trial):
     search_space = {
         'encoder_kind': trial.suggest_categorical('encoder_kind', ['AE', 'VAE']),
         'activation': trial.suggest_categorical('activation', ['tanh', 'leakyrelu','sigmoid']),
-        'latent_size': round_to_even(trial.suggest_int('latent_size', 1, 160, log=True)),
-        'encoder_hidden_size_mult': trial.suggest_float('encoder_hidden_size_mult', 1, 2.5, step=0.1),
+        'latent_size': round_to_even(trial.suggest_int('latent_size', 2, 160, log=True)),
+        'encoder_hidden_size_mult': trial.suggest_float('encoder_hidden_size_mult', 1, 2, step=0.1),
         # 'encoder_hidden_layers': trial.suggest_int('encoder_hidden_layers', 0, 4),
         'encoder_hidden_layers': trial.suggest_int('encoder_hidden_layers', 0, 4),
         'encoder_batch_norm': trial.suggest_categorical('encoder_batch_norm', [True, False]),
@@ -249,14 +249,14 @@ def objective(trial):
         'pretrain_noise_injection': max(trial.suggest_float('pretrain_noise_injection', -0.05, 0.1, step=0.01),0),
         'finetune_dropout': 0,
         'finetune_epochs': trial.suggest_int('finetune_epochs', 25, 500, step=25),
-        'finetune_encoder_dropout': trial.suggest_float('finetune_encoder_dropout', 0.0, 0.5, step=0.05),
+        'finetune_encoder_dropout': trial.suggest_float('finetune_encoder_dropout', 0.0, 0.4, step=0.05),
         'finetune_early_stopping': trial.suggest_categorical('finetune_early_stopping', [-1,20]),
         'finetune_lr': trial.suggest_float('finetune_lr', 1e-5, 1e-2, log=True),
         'finetune_val_frac': 0.15,
         'finetune_batch_size': 32,
-        'finetune_noise_injection': max(trial.suggest_float('finetune_noise_injection', -0.05, 0.25, step=0.01),0),
+        'finetune_noise_injection': max(trial.suggest_float('finetune_noise_injection', -0.01, 0.25, step=0.01),0),
         'finetune_encoder_status': 'finetune',
-        'finetune_label_col': 'MSKCC',
+        # 'finetune_label_col': 'MSKCC',
         'finetune_n_subsets': 30,
         'verbose': False,
         'yesplot': False,
@@ -268,21 +268,54 @@ def objective(trial):
         search_space['finetune_val_frac'] = 0
     search_space['finetune_encoder_lr'] = search_space['finetune_lr']
 
-    # Run the full training process
-    data_dir = '/Users/jonaheaton/Desktop/mskcc_study_feb13'
+    datetime_start_str = trial.datetime_start.strftime('%Y%m%d_%H%M%S')
+    trial_id = datetime_start_str + '_' + str(trial.number).zfill(4)
+
+    # Run the full training process on Benefit Data
+    data_dir2 = '/Users/jonaheaton/Desktop/benefit_study_feb20'
+    finetune_label_col2 = 'Benefit'
+    finetune_label_encoder2 = {'CB': 1, 'NCB': 0, 'ICB': np.nan}
+    save_dir = os.path.join(data_dir2, 'models_feb20', trial_id)
+    search_space['finetune_label_col'] = finetune_label_col2
+    search_space['finetune_label_encoder'] = finetune_label_encoder2
+    search_space['save_dir'] = save_dir
+    os.makedirs(save_dir, exist_ok=True)
+    # save the search space to a json file
+    with open(os.path.join(save_dir, 'search_space.json'), 'w') as f:
+        json.dump(search_space, f, indent=4)
+
+    avg_cv_AUC2 = full_train(data_dir2, **search_space)
+    print(f'avg_cv_AUC for {finetune_label_col2}:', avg_cv_AUC2)
+
+
+    # Run the full training process on MSKCC data
+    data_dir1 = '/Users/jonaheaton/Desktop/mskcc_study_feb13'
+    finetune_label_col1 = 'MSKCC'
+    finetune_label_encoder1 = {'FAVORABLE': 1, 'POOR': 0, 'INTERMEDIATE': np.nan}
 
     # create a directory to using the trial id
-    datetime_start_str = trial.datetime_start.strftime('%Y%m%d_%H%M%S')
-    trial_id = datetime_start_str + '_' + str(trial.number).zfill(4) 
-    save_dir = os.path.join(data_dir, 'models_feb13', trial_id)
+    save_dir = os.path.join(data_dir1, 'models_feb20', trial_id)
+    search_space['finetune_label_col'] = finetune_label_col1
+    search_space['finetune_label_encoder'] = finetune_label_encoder1
     search_space['save_dir'] = save_dir
     os.makedirs(save_dir, exist_ok=True)
     # save the search space to a json file
     with open(os.path.join(save_dir, 'search_space.json'), 'w') as f:
         json.dump(search_space, f, indent=4)
         
-    avg_cv_AUC = full_train(data_dir, **search_space)
-    print('avg_cv_AUC:', avg_cv_AUC)
+    avg_cv_AUC1 = full_train(data_dir1, **search_space)
+    print(f'avg_cv_AUC for {finetune_label_col1}:', avg_cv_AUC1)
+
+
+    # print(f'avg_cv_AUC for {finetune_label_col1}:', avg_cv_AUC1)
+    print(f'avg_cv_AUC for {finetune_label_col2}:', avg_cv_AUC2)
+
+    # create a directory to using the trial id
+
+    avg_cv_AUC = (avg_cv_AUC1 + avg_cv_AUC2) / 2
+    print(f'avg_cv_AUC:', avg_cv_AUC)
+
+
     return avg_cv_AUC
 
 
@@ -293,7 +326,7 @@ if __name__ == "__main__":
 
     # Set up logging
     optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
-    study_name = 'mskcc_prediction_feb15'
+    study_name = 'dual_prediction_feb20'
     storage_name = 'sqlite:///{}.db'.format(study_name)
 
     # Create a study object and optimize the objective function

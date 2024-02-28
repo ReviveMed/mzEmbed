@@ -232,7 +232,7 @@ def run_train_autoencoder(dataloaders,save_dir,**kwargs):
 
 
     with open(output_save_path, 'w') as f:
-        json.dump(output_data, f)
+        json.dump(output_data, f, indent=4)
 
     return output_data
 
