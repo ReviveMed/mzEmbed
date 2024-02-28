@@ -87,14 +87,14 @@ def get_mspeak_from_job_id(script_path_mspeak, job_id, freq_th):
     mzlearn_path = f"mzlearn/{user_id}/{job_time}"
 
     # download the mzlearn result needed for the combination
-    intermediate_folder_path = f"{mzlearn_path}/mzlearn_intermediate_results"
+    intermediate_folder_path = f"{mzlearn_path}"
     bucket_name = 'mzlearn-webapp.appspot.com'
     bucket = client.get_bucket(bucket_name)
     dst_path = f"{script_path_mspeak}/{job_id}/result-"  # local path to the folder to be saved
     # try to donwload the folder from gcp to local
     # if gcp patch exists then download
     # mzlearn-webapp.appspot.com/mzlearn/min/2023-09-29 15:43:35/mzlearn_intermediate_results
-    full_intermediate_folder_path = f"mzlearn-webapp.appspot.com/{mzlearn_path}/mzlearn_intermediate_results"
+    full_intermediate_folder_path = f"mzlearn-webapp.appspot.com/{mzlearn_path}"
     if fs.exists(full_intermediate_folder_path):
         print("try to download mzlearn_intermediate_results to local")
         # when downloading only need the
@@ -106,10 +106,12 @@ def get_mspeak_from_job_id(script_path_mspeak, job_id, freq_th):
         params_overall_fild_path = f"{intermediate_folder_path}/params_overall.csv"
         # mzlearn-webapp.appspot.com/mzlearn/min/2023-12-08 15:41:42/params_overall.csv
         # download this file to local as well
-        download_from_bucket(bucket_name, sample_info_folder_path, f"{dst_path}/sample_info")
-        download_from_bucket(bucket_name, final_peaks_folder_path, f"{dst_path}/final_peaks")
-        blob = bucket.blob(params_overall_fild_path)
-        blob.download_to_filename(f"{dst_path}/params_overall.csv")
+        # check if local file eixts, if not then download
+        if not os.path.exists(f"{dst_path}/params_overall.csv"):
+            download_from_bucket(bucket_name, sample_info_folder_path, f"{dst_path}/sample_info")
+            download_from_bucket(bucket_name, final_peaks_folder_path, f"{dst_path}/final_peaks")
+            blob = bucket.blob(params_overall_fild_path)
+            blob.download_to_filename(f"{dst_path}/params_overall.csv")
     else:
         print("Did not download mzlearn_intermediate_results to local")
 
@@ -415,6 +417,19 @@ if len(records) > 0:
                 # get all the file names for the origin_study
                 origin_study_file_list = origin_study.peak_intensity.columns.to_list()
                 study_id2file_name = {str(reference_job_id): origin_study_file_list}
+
+                # get the cohort labels for the origin_study
+                # read the database entry for the origin_study based on the job_id
+                study_id2cohort_label = {}
+                try:
+                    query = f"select cohort_label from app_user_job_status where id = {reference_job_id}"
+                    cursor.execute(query)
+                    records = cursor.fetchall()
+                    study_id2cohort_label[str(reference_job_id)] = records[0][0]
+                except Exception as e:
+                    print(f'Error in reading cohort labels: {e}')
+                    study_id2cohort_label[str(reference_job_id)] = "NA"
+
                 # for each other study, load the peak intensity and do log2 transformation
                 for study_id in other_job_ids:
                     print(study_id)
@@ -429,6 +444,15 @@ if len(records) > 0:
                         input_study_file_list = input_study.peak_intensity.columns.to_list()
                         # add a key to study_id2file_name
                         study_id2file_name[str(study_id)] = input_study_file_list
+                        # add the key to study_id2cohort_label
+                        try:
+                            query = f"select cohort_label from app_user_job_status where id = {study_id}"
+                            cursor.execute(query)
+                            records = cursor.fetchall()
+                            study_id2cohort_label[str(study_id)] = records[0][0]
+                        except Exception as e:
+                            print(f'Error in reading cohort labels: {e}')
+                            study_id2cohort_label[str(study_id)] = "NA"
                         subset_chosen = [i for i in chosen_feats if i in input_study.peak_intensity.index]
                         input_peaks = input_study.peak_intensity.loc[subset_chosen, :].copy()
                         input_study_nan_mask = input_study.missing_val_mask.loc[subset_chosen, :].copy()
@@ -474,71 +498,84 @@ if len(records) > 0:
                 metadata_df.to_csv(os.path.join(align_save_dir_freq_th, 'combined_study_cohort_ids.csv'))
 
                 # need to know the study id for each study used here use job id for each file
-                cohort_labels = metadata_df['mzlearn_cohort_id'].to_list()
-                data_corrected = standardize_across_cohorts(combined_study, cohort_labels, method=cohort_correction_method)
-                # data_corrected = combined_study
-                # calculate number of peaks and number of files from data_corrected
-                num_peaks = data_corrected.shape[0]
-                num_files = data_corrected.shape[1]
+                try:
+                    cohort_labels = metadata_df['mzlearn_cohort_id'].to_list()
+                    data_corrected = standardize_across_cohorts(combined_study, cohort_labels, method=cohort_correction_method)
+                    # data_corrected = combined_study
+                    # calculate number of peaks and number of files from data_corrected
+                    num_peaks = data_corrected.shape[0]
+                    num_files = data_corrected.shape[1]
+                except Exception as e:
+                    print(f'Error in standardization: {e}')
+                    continue
 
-                # TODO: add save here to plot UMAP and PCA
                 ########################################################################################################
                 # %% Look at the PCA of the combined study
-                pca = PCA(n_components=2)
-                pca_result = pca.fit_transform(data_corrected.T)
-                pca_df = pd.DataFrame(pca_result, columns=['PC1', 'PC2'], index=data_corrected.columns)
-                pca_df['mzlearn_cohort_id'] = metadata_df['mzlearn_cohort_id'].to_list()
-                pca_df['file_name'] = metadata_df['file_name'].to_list()
-                pca_df['MV percentage'] = combined_study_nan_mask['missing_values'].to_list()
-                # pca_df['Study_num'] = metadata_df['Study_num']
-                # pca_df['label'] = metadata_df[pretrain_label_col]
-                pca_df.to_csv(os.path.join(align_save_dir_freq_th, f'pca_df_{cohort_correction_method}.csv'))
-                hover_data = ['MV percentage']
-                # plot the PCA and add file_name as hover and add title to show num_peaks and num_files
-                graph = px.scatter(pca_df, x="PC1", y="PC2", color='mzlearn_cohort_id',
-                                   color_discrete_sequence=px.colors.qualitative.Plotly,
-                                   title=f'PCA with {num_peaks} peaks and {num_files} files',
-                                   hover_name='file_name',
-                                   hover_data=hover_data)
+                # fill nan with  0
+                try:
+                    data_corrected = data_corrected.fillna(0)
+                    pca = PCA(n_components=2)
+                    pca_result = pca.fit_transform(data_corrected.T)
+                    pca_df = pd.DataFrame(pca_result, columns=['PC1', 'PC2'], index=data_corrected.columns)
+                    # edit the metadata_df['mzlearn_cohort_id'].to_list() list to inclucde cohort label
+                    mzlearn_cohort_ids = metadata_df['mzlearn_cohort_id'].to_list()
+                    new_mzlearn_cohort_ids = []
+                    for mzlearn_cohort_id in mzlearn_cohort_ids:
+                        new_mzlearn_cohort_ids.append(f"{mzlearn_cohort_id} ({study_id2cohort_label[mzlearn_cohort_id]})")
+                    pca_df['mzlearn_cohort_id'] = new_mzlearn_cohort_ids
+                    pca_df['file_name'] = metadata_df['file_name'].to_list()
+                    pca_df['MV percentage'] = combined_study_nan_mask['missing_values'].to_list()
+                    # pca_df['Study_num'] = metadata_df['Study_num']
+                    # pca_df['label'] = metadata_df[pretrain_label_col]
+                    pca_df.to_csv(os.path.join(align_save_dir_freq_th, f'pca_df_{cohort_correction_method}.csv'))
+                    hover_data = ['MV percentage']
+                    # plot the PCA and add file_name as hover and add title to show num_peaks and num_files
+                    graph = px.scatter(pca_df, x="PC1", y="PC2", color='mzlearn_cohort_id',
+                                       color_discrete_sequence=px.colors.qualitative.Plotly,
+                                       title=f'PCA with {num_peaks} peaks and {num_files} files',
+                                       hover_name='file_name',
+                                       hover_data=hover_data)
 
-                graph.update_traces(marker={'size': 4.5})
-                graph_div = plot({'data': graph}, output_type='div')
-                pickle.dump(graph_div, open(f'{align_save_dir_freq_th}/pca_plot.pkl', 'wb'))
+                    graph.update_traces(marker={'size': 4.5})
+                    graph_div = plot({'data': graph}, output_type='div')
+                    pickle.dump(graph_div, open(f'{align_save_dir_freq_th}/pca_plot.pkl', 'wb'))
 
-                # plot the PCA
-                # sns.scatterplot(x='PC1', y='PC2', hue='study_id', data=pca_df)
-                # plt.savefig(os.path.join(select_feats_dir, f'pca_plot_{cohort_correction_method}.png'),
-                #             bbox_inches='tight')
-                # plt.title(cohort_correction_method)
-                # plt.close()
+                    # plot the PCA
+                    # sns.scatterplot(x='PC1', y='PC2', hue='study_id', data=pca_df)
+                    # plt.savefig(os.path.join(select_feats_dir, f'pca_plot_{cohort_correction_method}.png'),
+                    #             bbox_inches='tight')
+                    # plt.title(cohort_correction_method)
+                    # plt.close()
 
-                ########################################################################################################
-                # %% Look at the UMAP of the combined study
-                reducer = umap.UMAP()
-                umap_result = reducer.fit_transform(data_corrected.T)
+                    ########################################################################################################
+                    # %% Look at the UMAP of the combined study
+                    reducer = umap.UMAP()
+                    umap_result = reducer.fit_transform(data_corrected.T)
 
-                umap_df = pd.DataFrame(umap_result, columns=['UMAP1', 'UMAP2'], index=data_corrected.columns)
-                umap_df['mzlearn_cohort_id'] = metadata_df['mzlearn_cohort_id'].to_list()
-                umap_df['file_name'] = metadata_df['file_name'].to_list()
-                umap_df['MV percentage'] = combined_study_nan_mask['missing_values'].to_list()
-                # umap_df['Study_num'] = metadata_df['Study_num']
-                # umap_df['label'] = metadata_df[pretrain_label_col]
-                umap_df.to_csv(os.path.join(align_save_dir_freq_th, f'umap_df_{cohort_correction_method}.csv'))
-                hover_data = ['MV percentage']
-                graph = px.scatter(umap_df, x="UMAP1", y="UMAP2", color='mzlearn_cohort_id',
-                                   color_discrete_sequence=px.colors.qualitative.Plotly,
-                                   title=f'UMAP with {num_peaks} peaks and {num_files} files',
-                                   hover_name='file_name',
-                                   hover_data=hover_data)
-                graph.update_traces(marker={'size': 4.5})
-                graph_div = plot({'data': graph}, output_type='div')
-                pickle.dump(graph_div, open(f'{align_save_dir_freq_th}/umap_plot.pkl', 'wb'))
-                # plot the UMAP
-                # sns.scatterplot(x='UMAP1', y='UMAP2', hue='study_id', data=umap_df)
-                # plt.savefig(os.path.join(select_feats_dir, f'umap_plot_{cohort_correction_method}'),
-                #             bbox_inches='tight')
-                # plt.title(cohort_correction_method)
-                # plt.close()
+                    umap_df = pd.DataFrame(umap_result, columns=['UMAP1', 'UMAP2'], index=data_corrected.columns)
+                    umap_df['mzlearn_cohort_id'] = new_mzlearn_cohort_ids
+                    umap_df['file_name'] = metadata_df['file_name'].to_list()
+                    umap_df['MV percentage'] = combined_study_nan_mask['missing_values'].to_list()
+                    # umap_df['Study_num'] = metadata_df['Study_num']
+                    # umap_df['label'] = metadata_df[pretrain_label_col]
+                    umap_df.to_csv(os.path.join(align_save_dir_freq_th, f'umap_df_{cohort_correction_method}.csv'))
+                    hover_data = ['MV percentage']
+                    graph = px.scatter(umap_df, x="UMAP1", y="UMAP2", color='mzlearn_cohort_id',
+                                       color_discrete_sequence=px.colors.qualitative.Plotly,
+                                       title=f'UMAP with {num_peaks} peaks and {num_files} files',
+                                       hover_name='file_name',
+                                       hover_data=hover_data)
+                    graph.update_traces(marker={'size': 4.5})
+                    graph_div = plot({'data': graph}, output_type='div')
+                    pickle.dump(graph_div, open(f'{align_save_dir_freq_th}/umap_plot.pkl', 'wb'))
+                    # plot the UMAP
+                    # sns.scatterplot(x='UMAP1', y='UMAP2', hue='study_id', data=umap_df)
+                    # plt.savefig(os.path.join(select_feats_dir, f'umap_plot_{cohort_correction_method}'),
+                    #             bbox_inches='tight')
+                    # plt.title(cohort_correction_method)
+                    # plt.close()
+                except Exception as e:
+                    print(f'Error in PCA and UMAP: {e}')
 
                 ########################################################################################################
                 # save the combined peak intensity to gcp bucket
