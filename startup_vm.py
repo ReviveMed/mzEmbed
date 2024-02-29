@@ -406,6 +406,9 @@ if len(records) > 0:
                 chosen_feats = alignment_df.index[feat_count >= num_studies * num_cohorts_thresh].tolist()
                 print(f'Number of features selected: {len(chosen_feats)}')
 
+                # remove nan from chosen_feats
+                chosen_feats = [i for i in chosen_feats if i in origin_study.peak_intensity.index]
+
                 select_feats_dir = os.path.join(align_save_dir_freq_th, feat_thresh_name)
                 os.makedirs(select_feats_dir, exist_ok=True)
 
