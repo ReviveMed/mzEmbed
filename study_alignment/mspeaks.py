@@ -47,6 +47,8 @@ class MSPeaks:
         self.overall_RT_max = np.nan
         self.overall_MZ_min = np.nan
         self.overall_MZ_max = np.nan
+        # self.max_peaks_th = None
+        # self.max_samples_th = None
 
     def _update_basic_info(self):
         self.num_peaks = len(self.peak_info.index)
@@ -209,19 +211,25 @@ class MSPeaks:
         self.num_samples = len(self.sample_info.index)
 
 
-    def get_peaks(self,freq_th=0,sample_subset=None):
+    def get_peaks(self,freq_th=0,sample_subset=None,max_samples_th=None):
+        # return the peaks that are present in at least freq_th fraction of samples OR in at least max_samples_th samples
         if self.peak_intensity is None:
             return self.peak_info.index
-        # return the peaks that are present in at least freq_th fraction of samples
+        if max_samples_th is None:
+            max_samples_th = len(self.sample_info.index)
         freq  = _compute_sample_freq_of_peaks(~self.missing_val_mask,sample_list=sample_subset)
-        return self.peak_info.loc[freq>freq_th].index
+        num_samples = (~self.missing_val_mask).sum(axis=1)
+        return self.peak_info.loc[ (freq >= freq_th) | (num_samples >= max_samples_th) ].index
 
-    def get_samples(self,freq_th=0,peak_subset=None):
-        # return the samples that have at least freq_th fraction of peaks
+    def get_samples(self,freq_th=0,peak_subset=None,max_peaks_th=None):
+        # return the samples that have at least freq_th fraction of peaks OR has at least max_peaks_th peaks
         if self.peak_intensity is None:
             return self.sample_info.index
+        if max_peaks_th is None:
+            max_peaks_th = len(self.peak_info.index)
         freq  = _compute_peak_freq_of_samples(~self.missing_val_mask,peak_list=peak_subset)
-        return self.sample_info.loc[freq>freq_th].index
+        num_peaks = (~self.missing_val_mask).sum(axis=0)
+        return self.sample_info.loc[ (freq >= freq_th) | (num_peaks >= max_peaks_th) ].index
 
     def get_num_peaks(self,freq_th=0):
         return len(self.get_peaks(freq_th))
@@ -233,28 +241,30 @@ class MSPeaks:
         freq  = _compute_sample_freq_of_peaks(self.peak_intensity,sample_list=sample_subset)
         return freq.mean()
 
-    def apply_freq_th_on_peaks(self,freq_th=0.4,inplace=True,sample_subset=None):
+    def apply_freq_th_on_peaks(self,freq_th=0.4,inplace=True,sample_subset=None,max_samples_th=None):
         #suggest to apply this BEFORE apply_freq_th_on_samples
         if inplace:
-            peak_subset = self.get_peaks(freq_th, sample_subset)
+            peak_subset = self.get_peaks(freq_th, sample_subset,max_samples_th)
             self.peak_intensity = self.peak_intensity.loc[peak_subset]
             self.missing_val_mask = self.missing_val_mask.loc[peak_subset]
             self.peak_info = self.peak_info.loc[self.peak_intensity.index]
             self.num_peaks = len(self.peak_info.index)
             self.peak_freq_th = freq_th
+            # self.max_samples_th = max_samples_th
             self._update_basic_info()
         else:
             return self.peak_intensity.loc[self.get_peaks(freq_th)]
 
-    def apply_freq_th_on_samples(self,freq_th=0.1,inplace=True,peak_subset=None):
+    def apply_freq_th_on_samples(self,freq_th=0.1,inplace=True,peak_subset=None,max_peaks_th=None):
         # assert self.peak_freq_th > 0.2, "Error: peak_freq_th must be greater than 0.2"
         if inplace:
-            sample_subset = self.get_samples(freq_th, peak_subset)
+            sample_subset = self.get_samples(freq_th, peak_subset,max_peaks_th)
             self.peak_intensity = self.peak_intensity[sample_subset]
             self.missing_val_mask = self.missing_val_mask[sample_subset]
             self.sample_info = self.sample_info.loc[self.peak_intensity.columns]
             self.num_samples = len(self.sample_info.index)
             self.sample_freq_th = freq_th
+            # self.max_peaks_th = max_peaks_th
             self._update_basic_info()
         else:
             return self.peak_intensity[self.get_samples(freq_th)]

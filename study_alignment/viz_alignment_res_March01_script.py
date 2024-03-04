@@ -23,8 +23,10 @@ import umap
 dropbox_dir = get_dropbox_dir()
 base_dir = os.path.join(dropbox_dir, 'development_CohortCombination','alignment_RCC_2024_Feb_27')
 
+ref_freq = 0.4
+input_freq = 0.2
 matt_ft_dir = os.path.join(base_dir, 'matt_top_fts')
-data_dir = os.path.join(base_dir, 'alignment_id_32', 'merge_reference_freq_th_0.4_freq_th_0.2')
+data_dir = os.path.join(base_dir, 'alignment_id_31', f'merge_reference_freq_th_{ref_freq}_freq_th_{input_freq}')
 
 cohort_ids_to_labels_file = os.path.join(base_dir, 'cohort_ids_to_labels.xlsx')
 save_dir = os.path.join(data_dir,'plots')
@@ -54,7 +56,50 @@ for f in matt_ft_files:
     print(ft_name + ': ' + str(len(ft)))
 
 
+# %% [markdown]
+# ## Import the RCC Results
 
+# %%
+rcc_peak_info_file = os.path.join(base_dir, 'rcc_result', 'peak_info.csv')
+rcc_peak_info_df = pd.read_csv(rcc_peak_info_file, index_col=0)
+
+rcc_peak_info_df = rcc_peak_info_df[rcc_peak_info_df['freq'] >= ref_freq].copy()
+
+print(f'Number of peaks in the reference cohort after {ref_freq} filter: ', rcc_peak_info_df.shape[0])
+
+
+# %% RCC Targets
+    
+rcc_matched_targets_file = os.path.join(base_dir,'rcc_result', 'matched_targets HILIC POSITIVE ION MODE.csv')
+rcc_matched_targets_df = pd.read_csv(rcc_matched_targets_file, index_col=0)
+rcc_matched_targets_df.loc[rcc_peak_info_df.index]
+
+potential_feats = rcc_matched_targets_df[rcc_matched_targets_df['potential_target']].index.to_list()
+print('Number of features that potentially match to a target metabolite: ', len(potential_feats))
+
+double_match_ids = rcc_matched_targets_df[rcc_matched_targets_df['potential_target_count'] > 1]
+num_double_match = double_match_ids.shape[0]
+print('Number of features that potentially match to more than one target metabolite: ', double_match_ids.shape[0])
+print(rcc_matched_targets_df.loc[double_match_ids.index, 'potential_target_id'])
+
+# here are the double matches in RCC, two are the same metabolite (but different adducts?)
+# FT3202                           tryptophanTryptophan_μM
+# FT3237                           kynurenineKynurenine_μM
+# FT8451    C18:1 LPC plasmalogen_AC18:1 LPC plasmalogen_B
+
+
+potential_feat_names = rcc_matched_targets_df.loc[potential_feats]['potential_target_id'].unique()
+# print('Number of potential feature names: ', len(potential_feat_names))
+print(potential_feat_names)
+
+print('Number of target metabolite captured: ', len(potential_feat_names))
+
+# for now don't remove the double counts, since they are NOT actually double counts
+num_rcc_targets_found =  len(potential_feat_names)
+rcc_target_feats = potential_feats
+
+# add to the matt ft dictionary
+matt_ft_dict['rcc_targets'] = rcc_target_feats
 
 # %%
 # Helper functions to finding the number and percentage of captured features
@@ -67,6 +112,13 @@ def get_captured_perc(matt_ft_list, align_ft_list):
     matt_capture_perc = len(captured_fts) / len(matt_ft_list)
     align_capture_perc = len(captured_fts) / len(align_ft_list)
     return matt_capture_perc, align_capture_perc
+
+
+# check that the Matt feats are found in the RCC peaks
+print('In the original RCC dataset at the {} frequency threshold:'.format(ref_freq))
+for matt_ft_name, matt_ft_list in matt_ft_dict.items():
+    captured_peaks = get_captured_fts(matt_ft_list, rcc_peak_info_df.index)
+    print(f'Number of {matt_ft_name} captured: {len(captured_peaks)} out of {len(matt_ft_list)}')
 
 # %% [markdown]
 # ## Import the Alignment Results
@@ -105,7 +157,7 @@ cohort_id_to_study_id = metadata_df.groupby('cohort_id')['Study ID'].first().to_
 # %%
 # information about the reference cohort
 ref_cohort_id = '541'
-num_ref_cohort_peaks = np.nan
+num_ref_cohort_peaks = rcc_peak_info_df.shape[0]
 #TODO Save the number of peaks in the reference cohort used for alignment
 
 # %%
@@ -440,7 +492,7 @@ if False:
 ## Helper Functions
 
 def compute_peak_robustness(alignment_df, nan_mask, metadata_summary,metadata_df,
-                            ref_id=ref_cohort_id,group_col='Cohort ID Expanded'):
+                            ref_id=ref_cohort_id,group_col='Study ID Expanded'):
 
     # num_samples = metadata_df[group_col].value_counts()
 
@@ -521,6 +573,14 @@ nan_mask.columns = nan_mask.columns.astype(str)
 
 # %%
 peak_robustness_dct = compute_peak_robustness(alignment_df, nan_mask, metadata_summary, metadata_df)
+
+# %%
+v = peak_robustness_dct['Found, Cohort Equal Weighted']
+sns.histplot(v, bins=np.linspace(0,1,31))
+
+
+# %%
+
 
 # for k,v in peak_robustness_dct.items():
 
@@ -725,6 +785,40 @@ plt.close()
 # ### Choose a subset of the aligned peaks
 
 # %%
+
+
+
+
+align_summary_bool = align_summary.astype(bool)
+align_counts = align_summary_bool.sum(axis=0)
+
+
+# %%
+# Cluster map of the aligned peaks
+
+# add extra information to the Align Summary columns (such as the number of samples in each cohort, and peak score)
+align_summary_plot = align_summary.copy()
+align_summary_bool = align_summary.astype(bool)
+align_counts = align_summary_bool.sum(axis=0)
+align_summary_plot.columns = [
+    f'{c} (Nfiles={cohort_id_to_sample_num.loc[c].values[0]}, Npeaks={align_counts[c]:.0f}, Align%={cohort_id_to_align_score[c]:.2f})' 
+    for c in align_summary.columns]
+
+
+
+row_colors = pd.Series([cohort_id_to_color[c] for c in align_summary.columns])
+row_colors.index = align_summary_plot.columns
+row_colors.name = 'Cohort Label'
+
+
+g = sns.clustermap(align_summary_plot.astype(bool).astype(int).T, cmap='viridis', figsize=(10,10), 
+            row_colors=row_colors)
+
+plt.setp(g.ax_heatmap.get_xticklabels(), visible=False)
+plt.xlabel('Aligned Features')
+
+
+
 
 
 # %%

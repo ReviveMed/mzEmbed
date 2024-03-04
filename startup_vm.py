@@ -124,6 +124,7 @@ def get_mspeak_from_job_id(script_path_mspeak, job_id, freq_th):
     # TODO: use removed outliers to build sample_subset
     study_mspeak.apply_freq_th_on_peaks(freq_th=freq_th,
                                         inplace=True,
+                                        max_samples_th=max_samples_th, #default np.inf
                                         )
 
     # use pool_map normalization if possible, else use synthetic normalization
