@@ -7,6 +7,36 @@ import os
 import numpy as np
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
  
+
+######### The simpliest Dataset
+
+class SimpleDataset(Dataset):
+    def __init__(self, X, y):
+        self.X = torch.tensor(X.to_numpy(), dtype=torch.float32)
+        self.y = torch.tensor(y.to_numpy(), dtype=torch.float32)
+
+    def __len__(self):
+        return self.X.shape[0]
+    
+    def __getitem__(self, idx):
+        return self.X[idx], self.y[idx]
+
+class SimpleDataset_withMask(Dataset):
+    def __init__(self, X, y, nans=None):
+        self.X = torch.tensor(X.to_numpy(), dtype=torch.float32)
+        self.y = torch.tensor(y.to_numpy(), dtype=torch.float32)
+        if nans is None:
+            self.nans = torch.tensor(np.zeros(X.shape[0]), dtype=torch.bool)
+        else:
+            self.nans = torch.tensor(nans.to_numpy(), dtype=torch.bool)
+
+    def __len__(self):
+        return self.X.shape[0]
+    
+    def __getitem__(self, idx):
+        return self.X[idx], self.y[idx], self.nans[idx]
+
+
 ######### Simple Dataset for Pretraining an Autoencoder
 class PreTrainingDataset(Dataset):
     def __init__(self, input_dir, subset='pretrain'):
@@ -18,6 +48,7 @@ class PreTrainingDataset(Dataset):
     
     def __getitem__(self, idx):
         return self.X[idx]
+
 
 
 ######### Simple Dataset for Training a Classifier

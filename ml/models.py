@@ -188,6 +188,10 @@ class VAE(nn.Module):
     def generate(self, z):
         return self.decoder(z)
     
+    def reset_weights(self):
+        self.encoder.apply(self._reset_weights)
+        self.decoder.apply(self._reset_weights)
+
     def get_hyperparameters(self):
         return {'input_size': self.input_size,
                 'hidden_size': self.hidden_size,
@@ -196,7 +200,8 @@ class VAE(nn.Module):
                 'dropout_rate': self.dropout_rate,
                 'activation': self.activation,
                 'use_batch_norm': self.use_batch_norm,
-                'act_on_latent_layer': self.act_on_latent_layer}
+                'act_on_latent_layer': self.act_on_latent_layer,
+                'model_kind': 'VAE'}
     
     
 ### Autoencoder
@@ -246,6 +251,16 @@ class AE(nn.Module):
     def generate(self, z):
         return self.decoder(z)
 
+    def reset_weights(self):
+        # self.encoder.apply(self._reset_weights)
+        # self.decoder.apply(self._reset_weights)
+        for layer in self.encoder.children():
+            if hasattr(layer, 'reset_weights'):
+                layer.reset_weights()
+        for layer in self.decoder.children():
+            if hasattr(layer, 'reset_weights'):
+                layer.reset_weights()
+
     def get_hyperparameters(self):
         return {'input_size': self.input_size,
                 'hidden_size': self.hidden_size,
@@ -254,7 +269,8 @@ class AE(nn.Module):
                 'dropout_rate': self.dropout_rate,
                 'activation': self.activation,
                 'use_batch_norm': self.use_batch_norm,
-                'act_on_latent_layer': self.act_on_latent_layer}
+                'act_on_latent_layer': self.act_on_latent_layer,
+                'model_kind': 'AE'}
 
 ############ Classification Models ############
     
@@ -269,6 +285,7 @@ class BinaryClassifier(nn.Module):
         self.num_hidden_layers = num_hidden_layers
         self.dropout_rate = dropout_rate
         self.activation = activation
+        self.num_classes = 2
         self.use_batch_norm = use_batch_norm
         self.network = Dense_Layers(input_size, hidden_size,
                                     output_size=1, 
@@ -303,14 +320,16 @@ class BinaryClassifier(nn.Module):
     def predict(self, x, threshold=0.5):
         return (self.predict_proba(x) > threshold).float()
 
-    def loss(self, y_logits, y_true, ignore_nan=False):
+    def loss(self, y_logits, y_true, ignore_nan=True):
         # if class_weight is None:
             # class_weight = torch.tensor([1, 1], dtype=torch.float32)
         if ignore_nan:
             mask = ~torch.isnan(y_true)
-            return self.loss_func(y_logits[mask], y_true[mask]) 
+            if mask.sum() == 0:
+                return torch.tensor(0, dtype=torch.float32)
+            return self.loss_func(y_logits[mask].squeeze(), y_true[mask]) 
         else:
-            return self.loss_func(y_logits, y_true)
+            return self.loss_func(y_logits.squeeze(), y_true)
             # return F.binary_cross_entropy_with_logits(y_logits, y_true, 
             #                                 reduction=reduction,
             #                                 weight= class_weight)
@@ -321,7 +340,7 @@ class BinaryClassifier(nn.Module):
                 'num_hidden_layers': self.num_hidden_layers,
                 'dropout_rate': self.dropout_rate,
                 'activation': self.activation,
-                'use_batch_norm': self.use_batch_norm}   
+                'use_batch_norm': self.use_batch_norm}
 
 
 ### Multi-class Classifier
@@ -367,12 +386,14 @@ class MultiClassClassifier(nn.Module):
     def predict(self, x):
         return torch.argmax(self.predict_proba(x), dim=1)
 
-    def loss(self, y_logits, y_true, ignore_nan=False):
+    def loss(self, y_logits, y_true, ignore_nan=True):
         if ignore_nan:
             mask = ~torch.isnan(y_true)
-            return self.loss_func(y_logits[mask], y_true[mask])
+            if mask.sum() == 0:
+                return torch.tensor(0, dtype=torch.float32)
+            return self.loss_func(y_logits[mask], y_true[mask].long())
         else:
-            return self.loss_func(y_logits, y_true)
+            return self.loss_func(y_logits, y_true.long())
             # return F.cross_entropy(y_logits, y_true,
             #                         weight=self.class_weight,
             #                         reduction=self.reduction)
@@ -581,6 +602,76 @@ class res_connect(nn.Module):
     def forward(self, x, out):
         ###Apply residual connection to any sublayer with the same size
         return x + self.norm(self.dropout(out))
+
+
+
+
+class TGEM_Encoder(torch.nn.Module):
+    def __init__(self, input_size,  n_head, dropout_rate=0.3, act_fun='linear', 
+                 query_gene=64, d_ff=1024, mode=0):
+        super(TGEM_Encoder, self).__init__()
+        self.n_head = n_head
+        self.input_size = input_size
+        self.d_ff = d_ff
+        self.dropout_rate = dropout_rate
+        self.act_fun = act_fun
+        # mode 1 is not working right now.
+        self.mode = mode
+        self.query_gene = query_gene #in original version, this was not a object parameter 
+
+        if self.act_fun == 'relu':
+            self.activation_func = torch.nn.ReLU()
+        elif self.act_fun == 'leakyrelu':
+            self.activation_func = torch.nn.LeakyReLU(0.1)
+        elif self.act_fun == 'gelu':
+            self.activation_func = torch.nn.GELU()
+        elif self.act_fun == 'linear':
+            self.activation_func = torch.nn.Identity()
+        else:
+            raise ValueError('{} is not a valid activation function'.format(self.act_fun))
+
+
+        self.activation_func 
+        self.mulitiattention1 = mulitiattention( self.n_head, self.input_size, query_gene,
+                                                mode)
+        self.mulitiattention2 = mulitiattention( self.n_head, self.input_size, query_gene,
+                                                mode)
+        self.mulitiattention3 = mulitiattention( self.n_head, self.input_size, query_gene,
+                                                mode)
+        self.ffn1 = nn.Linear(self.input_size, self.d_ff)
+        self.ffn2 = nn.Linear(self.d_ff, self.input_size)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.sublayer = res_connect(input_size, dropout_rate)
+    
+
+    def feedforward(self, x):
+        out = F.relu(self.ffn1(x))
+        out = self.ffn2(self.dropout(out))
+        return out
+
+    def forward(self, x):
+
+        out_attn = self.mulitiattention1(x)
+        out_attn_1 = self.sublayer(x, out_attn)
+        out_attn_2 = self.mulitiattention2(out_attn_1)
+        out_attn_2 = self.sublayer(out_attn_1, out_attn_2)
+        out_attn_3 = self.mulitiattention3(out_attn_2)
+        out_attn_3 = self.sublayer(out_attn_2, out_attn_3)
+        y_output = self.activation_func(out_attn_3)
+        # y_output = F.log_softmax(y_output, dim=1) # not as numerically stable as using CrossEntropyLoss
+
+        return y_output
+    
+    def get_hyperparameters(self):
+        return {
+                'n_head': self.n_head,
+                'input_size': self.input_size,
+                'query_gene': self.query_gene,
+                'd_ff': self.d_ff,
+                'dropout_rate': self.dropout_rate,
+                'act_fun': self.act_fun}        
+
+
 
 
 class TGEM(torch.nn.Module):

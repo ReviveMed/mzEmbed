@@ -14,7 +14,6 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import roc_auc_score, accuracy_score
 from torchmetrics import Accuracy, AUROC
 # from sklearn.externals import joblib
-from prep import ClassifierDataset
 
 logistic_regression_param_grid = {
             'penalty': ['l1', 'l2'],
@@ -67,7 +66,7 @@ def run_train_sklearn_model(data_dict,save_dir,**kwargs):
 
     if base_model is None:
         if model_kind == 'logistic_regression':
-            base_model = LogisticRegression()
+            base_model = LogisticRegression(max_iter=1000)
             if param_grid is None:
                 param_grid = logistic_regression_param_grid
         elif model_kind == 'random_forest':

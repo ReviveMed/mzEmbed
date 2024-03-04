@@ -18,6 +18,8 @@ def normalize_loss(current_loss, loss_avg=1, beta=0, current_epoch=1):
         return new_loss, loss_avg
     if beta  == 0:
         loss_avg = (loss_avg*current_epoch + current_loss.item()) / (current_epoch + 1)
+    elif beta < 0:
+        loss_avg = 1
     else:
         loss_avg = beta * loss_avg + (1 - beta) * current_loss.item()
 
