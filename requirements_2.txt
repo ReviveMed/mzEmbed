@@ -173,6 +173,9 @@ sympy==1.12
 tbb==2021.10.0
 tensorboard==2.15.1
 tensorboard-data-server==0.7.2
+tensorflow==2.15.0
+tensorflow-estimator==2.15.0
+tensorflow-io-gcs-filesystem==0.34.0
 termcolor==2.3.0
 terminado==0.17.1
 threadpoolctl==3.2.0
@@ -199,4 +202,3 @@ widgetsnbextension==4.0.9
 wrapt==1.14.1
 yarl==1.9.2
 zipp==3.17.0
-optuna

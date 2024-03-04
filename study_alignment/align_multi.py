@@ -30,6 +30,7 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
         alignment_params (dict): Additional parameters for the alignment method. Default is None.
         origin_freq_th (float): The frequency threshold for the origin study. Default is None.
         input_freq_th (float): The frequency threshold for the input studies. Default is None.
+        max_samples_th (int): Alternative to Freq threshold, peak can ignores the frequency threshold if peak is found in more than max_samples_th number of samples. Default is None.
         origin_select_files (list): A list of files to apply the frequency threshold on in the origin study. Default is None.
         fill_na_strategy (str): The strategy to fill missing values. Default is None.
         outlier_samples_removal_strategy (str): The strategy to remove outlier samples. Default is None.
@@ -46,6 +47,7 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
     alignment_params = kwargs.get('alignment_params', None)
     origin_freq_th = kwargs.get('origin_freq_th', None)
     input_freq_th = kwargs.get('input_freq_th', None)
+    max_samples_th = kwargs.get('max_samples_th', None)
     norm_func = kwargs.get('norm_func', None)
     origin_select_files = kwargs.get('origin_select_files', None)
     fill_na_strategy = kwargs.get('fill_na_strategy', None)
@@ -95,11 +97,11 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
         if origin_freq_th is not None:
             #TODO check that the origin_select_files are in the origin_study
             origin_study.apply_freq_th_on_peaks(freq_th=origin_freq_th,
-                                            inplace=True,
-                                            sample_subset=origin_select_files)
+                                            sample_subset=origin_select_files,
+                                            max_samples_th=max_samples_th)
             
         if (norm_func is not None) and (not skip_norm):
-            origin_study.apply_freq_th_on_peaks(freq_th=0.1)
+            origin_study.apply_freq_th_on_peaks(freq_th=0.1, max_samples_th=max_samples_th)
             origin_study.normalize_intensity(norm_func=norm_func)
 
         if fill_na_strategy is not None:
@@ -134,9 +136,9 @@ def align_multiple_ms_studies(origin_peak_obj_path, input_peak_obj_path_list, sa
 
             if input_freq_th is not None:
                 input_study.apply_freq_th_on_peaks(freq_th=input_freq_th,
-                                                inplace=True)
+                                                 max_samples_th=max_samples_th)
             if (norm_func is not None) and (not skip_norm):
-                input_study.apply_freq_th_on_peaks(freq_th=0.1)
+                input_study.apply_freq_th_on_peaks(freq_th=0.1, max_samples_th=max_samples_th)
                 input_study.normalize_intensity(norm_func=norm_func)
             
             if fill_na_strategy is not None:
