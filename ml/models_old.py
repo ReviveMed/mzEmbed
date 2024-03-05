@@ -1,52 +1,13 @@
 # %%
 import torch
 from torch import nn
-from torch import Tensor
 import torch.nn.functional as F
+from loss import CoxPHLoss
 from torch.utils.checkpoint import checkpoint as cp
 
+#TODO add option for batch normalization
+#TODO add option for different activation functions
 
-####################################################################################
-# Helper functions
-def get_model(model_kind, input_size, **kwargs):
-
-    if model_kind == 'NA':
-        model = DummyModel()
-    elif model_kind == 'VAE':
-        model = VAE(input_size = input_size, **kwargs)
-    elif model_kind == 'AE':
-        model = AE(input_size = input_size, **kwargs)
-    elif model_kind == 'TGEM':
-        model = TGEM(input_size = input_size, **kwargs)
-    elif model_kind == 'BinaryClassifier':
-        model = BinaryClassifier(input_size = input_size, **kwargs)
-    elif model_kind == 'MultiClassClassifier':
-        model = MultiClassClassifier(input_size = input_size, **kwargs)
-    else:
-        raise ValueError('model_kind not recognized')
-    return model
-
-
-# create a dummy model
-class DummyModel(nn.Module):
-    def __init__(self):
-        super(DummyModel, self).__init__()
-        self.fc = nn.Identity()
-        self.goal = 'NA'
-
-    def forward(self, x):
-        return self.fc(x)
-
-    def loss(self, y_pred, y_true):
-        return torch.tensor(0, dtype=torch.float32)
-
-    def reset_params(self):
-        pass
-
-    def get_hyperparameters(self):
-        return {'model_kind': 'NA'}
-
-#########################################################
 ### Basic Multi-layer Perceptron
 class Dense_Layers(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, 
@@ -114,6 +75,59 @@ class Dense_Layers(nn.Module):
     def forward(self, x):
         return self.network(x)
 
+
+## Basic Multi-layer Perceptron
+# class Dense_Layers(nn.Module):
+#     def __init__(self, input_size, hidden_size, output_size, 
+#         num_hidden_layers=1, dropout_rate=0.2, activation='leakyrelu',
+#         use_batch_norm=False):
+#         super(Dense_Layers, self).__init__()
+
+#         if activation == 'leakyrelu':
+#             activation_func = nn.LeakyReLU()
+#         elif activation == 'relu':
+#             activation_func = nn.ReLU()
+#         elif activation == 'tanh':
+#             activation_func = nn.Tanh()
+#         elif activation == 'sigmoid':
+#             activation_func = nn.Sigmoid()
+#         else:
+#             raise ValueError('activation must be one of "leakyrelu", "relu", "tanh", or "sigmoid"')
+
+#         if num_hidden_layers < 1:
+#             raise ValueError('num_hidden_layers must be at least 1')
+
+#         # Define the input layer
+#         self.input_layer =  nn.Sequential(nn.Linear(input_size, hidden_size))
+#         if use_batch_norm:
+#             self.input_layer.add_module('batch_norm', nn.BatchNorm1d(hidden_size))
+#         self.input_layer.add_module('activation', activation_func)
+#         self.input_layer.add_module('dropout', nn.Dropout(dropout_rate))
+
+#         # define the hidden layers
+#         self.hidden_layer = nn.Sequential(nn.Linear(hidden_size, hidden_size))
+#         if use_batch_norm:
+#             self.hidden_layer.add_module('batch_norm', nn.BatchNorm1d(hidden_size))
+#         self.hidden_layer.add_module('activation', activation_func)
+#         self.hidden_layer.add_module('dropout', nn.Dropout(dropout_rate))
+
+#         # define the output layer
+#         self.output_layer = nn.Sequential(nn.Linear(hidden_size, output_size))
+
+#         # self.network = nn.Sequential()
+#         # self.network.add_module('input_layer', self.input_layer)
+#         self.network = nn.Sequential(self.input_layer)
+#         for i in range(num_hidden_layers-1):
+#             # self.network.add_module(f'hidden_layer_{i}', self.hidden_layer)
+#             self.network.add_module(f'hidden_layer', self.hidden_layer)
+#         self.network.add_module('output_layer', self.output_layer)
+
+#     def forward(self, x):
+#         return self.network(x)
+
+
+
+
 ############ Autoencoder Models ############
 
 ### Variational Autoencoder
@@ -122,7 +136,6 @@ class VAE(nn.Module):
                  num_hidden_layers=1, dropout_rate=0,
                  activation='leakyrelu', use_batch_norm=False, act_on_latent_layer=False):
         super(VAE, self).__init__()
-        self.goal = 'encode'
         self.latent_size = latent_size
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -175,14 +188,9 @@ class VAE(nn.Module):
     def generate(self, z):
         return self.decoder(z)
     
-    # def reset_weights(self):
-    #     self.encoder.apply(self._reset_weights)
-    #     self.decoder.apply(self._reset_weights)
-
-    def reset_params(self):
-        for layer in self.children():
-            if hasattr(layer, 'reset_parameters'):
-                layer.reset_parameters()
+    def reset_weights(self):
+        self.encoder.apply(self._reset_weights)
+        self.decoder.apply(self._reset_weights)
 
     def get_hyperparameters(self):
         return {'input_size': self.input_size,
@@ -202,7 +210,6 @@ class AE(nn.Module):
                  num_hidden_layers=1, dropout_rate=0,
                  activation='leakyrelu', use_batch_norm=False, act_on_latent_layer=False):
         super(AE, self).__init__()
-        self.goal = 'encode'
         self.latent_size = latent_size
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -244,10 +251,15 @@ class AE(nn.Module):
     def generate(self, z):
         return self.decoder(z)
 
-    def reset_params(self):
-        for layer in self.children():
-            if hasattr(layer, 'reset_parameters'):
-                layer.reset_parameters()
+    def reset_weights(self):
+        # self.encoder.apply(self._reset_weights)
+        # self.decoder.apply(self._reset_weights)
+        for layer in self.encoder.children():
+            if hasattr(layer, 'reset_weights'):
+                layer.reset_weights()
+        for layer in self.decoder.children():
+            if hasattr(layer, 'reset_weights'):
+                layer.reset_weights()
 
     def get_hyperparameters(self):
         return {'input_size': self.input_size,
@@ -260,23 +272,19 @@ class AE(nn.Module):
                 'act_on_latent_layer': self.act_on_latent_layer,
                 'model_kind': 'AE'}
 
-#########################################################
 ############ Classification Models ############
     
 ### Binary Classifier
 class BinaryClassifier(nn.Module):
     def __init__(self, input_size, hidden_size, 
                  num_hidden_layers=1, dropout_rate=0.2,
-                 activation='leakyrelu', use_batch_norm=False,num_classes=2):
+                 activation='leakyrelu', use_batch_norm=False):
         super(BinaryClassifier, self).__init__()
-        self.goal = 'classify'
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
         self.dropout_rate = dropout_rate
         self.activation = activation
-        if num_classes != 2:
-            raise ValueError('num_classes must be 2 for BinaryClassifier')
         self.num_classes = 2
         self.use_batch_norm = use_batch_norm
         self.network = Dense_Layers(input_size, hidden_size,
@@ -313,6 +321,8 @@ class BinaryClassifier(nn.Module):
         return (self.predict_proba(x) > threshold).float()
 
     def loss(self, y_logits, y_true, ignore_nan=True):
+        # if class_weight is None:
+            # class_weight = torch.tensor([1, 1], dtype=torch.float32)
         if ignore_nan:
             mask = ~torch.isnan(y_true)
             if mask.sum() == 0:
@@ -323,11 +333,6 @@ class BinaryClassifier(nn.Module):
             # return F.binary_cross_entropy_with_logits(y_logits, y_true, 
             #                                 reduction=reduction,
             #                                 weight= class_weight)
-
-    def reset_params(self):
-        for layer in self.children():
-            if hasattr(layer, 'reset_parameters'):
-                layer.reset_parameters()
 
     def get_hyperparameters(self):
         return {'input_size': self.input_size,
@@ -344,7 +349,6 @@ class MultiClassClassifier(nn.Module):
                  num_hidden_layers=1, dropout_rate=0.2,
                  activation='leakyrelu', use_batch_norm=False):
         super(MultiClassClassifier, self).__init__()
-        self.goal = 'classify'
         self.input_size = input_size
         self.num_classes = num_classes
         self.hidden_size = hidden_size
@@ -397,11 +401,6 @@ class MultiClassClassifier(nn.Module):
     def forward_to_loss(self, x, y_true):
         return self.loss(self.forward(x), y_true)
 
-    def reset_params(self):
-        for layer in self.children():
-            if hasattr(layer, 'reset_parameters'):
-                layer.reset_parameters()
-
     def get_hyperparameters(self):
         return {'input_size': self.input_size,
                 'hidden_size': self.hidden_size,
@@ -411,7 +410,7 @@ class MultiClassClassifier(nn.Module):
                 'activation': self.activation,
                 'use_batch_norm': self.use_batch_norm}
 
-#########################################################
+
 ##### Regression Models #####
         
 ### Linear Regression
@@ -420,7 +419,6 @@ class RegressionNN(nn.Module):
                  num_hidden_layers=1, dropout_rate=0.2,
                  activation='leakyrelu', use_batch_norm=False):
         super(RegressionNN, self).__init__()
-        self.goal = 'regress'
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -446,11 +444,6 @@ class RegressionNN(nn.Module):
             return self.loss_func(y_pred, y_true)
             # return F.mse_loss(y_pred, y_true, reduction='mean')
         
-    def reset_params(self):
-        for layer in self.children():
-            if hasattr(layer, 'reset_parameters'):
-                layer.reset_parameters()
-
     def get_hyperparameters(self):
         return {'input_size': self.input_size,
                 'hidden_size': self.hidden_size,
@@ -464,7 +457,6 @@ class CoxNN(nn.Module):
                  num_hidden_layers=1, dropout_rate=0.2,
                  activation='leakyrelu', use_batch_norm=False):
         super(CoxNN, self).__init__()
-        self.goal = 'regress'
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -502,7 +494,7 @@ class CoxNN(nn.Module):
                 'activation': self.activation,
                 'use_batch_norm': self.use_batch_norm}
     
-#########################################################
+
 ### TGEM Models ###
 # The batch size isn't used for anything?!
         
@@ -618,7 +610,6 @@ class TGEM_Encoder(torch.nn.Module):
     def __init__(self, input_size,  n_head, dropout_rate=0.3, act_fun='linear', 
                  query_gene=64, d_ff=1024, mode=0):
         super(TGEM_Encoder, self).__init__()
-        self.goal = 'encode'
         self.n_head = n_head
         self.input_size = input_size
         self.d_ff = d_ff
@@ -687,7 +678,6 @@ class TGEM(torch.nn.Module):
     def __init__(self, input_size,  n_head, num_classes, dropout_rate=0.3, act_fun='linear', 
                  query_gene=64, d_ff=1024, mode=0):
         super(TGEM, self).__init__()
-        self.goal = 'classify'
         self.n_head = n_head
         self.input_size = input_size
         self.num_classes = num_classes
@@ -826,53 +816,3 @@ class TGEMRegression(TGEM):
         y_pred = self.fc(out_attn_3)
 
         return y_pred
-    
-
-#########################################################
-#########################################################
-## Custom Loss Functions
-#########################################################
-
-def cox_ph_loss_sorted(log_h: Tensor, events: Tensor, eps: float = 1e-7) -> Tensor:
-    """Requires the input to be sorted by descending duration time.
-    See DatasetDurationSorted.
-
-    We calculate the negative log of $(\frac{h_i}{\sum_{j \in R_i} h_j})^d$,
-    where h = exp(log_h) are the hazards and R is the risk set, and d is event.
-
-    We just compute a cumulative sum, and not the true Risk sets. This is a
-    limitation, but simple and fast.
-    """
-    if events.dtype is torch.bool:
-        events = events.float()
-    events = events.view(-1)
-    log_h = log_h.view(-1)
-    gamma = log_h.max()
-    log_cumsum_h = log_h.sub(gamma).exp().cumsum(0).add(eps).log().add(gamma)
-    return - log_h.sub(log_cumsum_h).mul(events).sum().div(events.sum())
-
-def cox_ph_loss(log_h: Tensor, durations: Tensor, events: Tensor, eps: float = 1e-7) -> Tensor:
-    """Loss for CoxPH model. If data is sorted by descending duration, see `cox_ph_loss_sorted`.
-
-    We calculate the negative log of $(\frac{h_i}{\sum_{j \in R_i} h_j})^d$,
-    where h = exp(log_h) are the hazards and R is the risk set, and d is event.
-
-    We just compute a cumulative sum, and not the true Risk sets. This is a
-    limitation, but simple and fast.
-    """
-    idx = durations.sort(descending=True)[1]
-    events = events[idx]
-    log_h = log_h[idx]
-    return cox_ph_loss_sorted(log_h, events, eps)
-
-class CoxPHLoss(torch.nn.Module):
-    """Loss for CoxPH model. If data is sorted by descending duration, see `cox_ph_loss_sorted`.
-
-    We calculate the negative log of $(\frac{h_i}{\sum_{j \in R_i} h_j})^d$,
-    where h = exp(log_h) are the hazards and R is the risk set, and d is event.
-
-    We just compute a cumulative sum, and not the true Risk sets. This is a
-    limitation, but simple and fast.
-    """
-    def forward(self, log_h: Tensor, durations: Tensor, events: Tensor) -> Tensor:
-        return cox_ph_loss(log_h, durations, events)

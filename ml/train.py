@@ -1,483 +1,620 @@
+
+
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, random_split
-# from torchvision import datasets, transforms
+from misc import normalize_loss
 import json
 import os
-import matplotlib.pyplot as plt
+import torch.nn.functional as F
+from models import AE, MultiClassClassifier, BinaryClassifier, VAE
+from torch.utils.data import Dataset, DataLoader
+import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
-from models import BinaryClassifier, MultiClassClassifier
-from models import VAE, AE  # Assuming models.py contains a VAE class
-
-# from sklearn.metrics import accuracy_score, roc_auc_score
 from torchmetrics import Accuracy, AUROC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier
+
+##################################################################################
+##################################################################################
+######### for training the compound model
+
+class CompoundDataset(Dataset):
+    def __init__(self, X, y_head, y_adv, other=None):
+        self.X = torch.tensor(X.to_numpy(), dtype=torch.float32)
+        self.y_head = torch.tensor(y_head.to_numpy(), dtype=torch.float32)
+        self.y_adv = torch.tensor(y_adv.to_numpy(), dtype=torch.float32)
+        if other is None:
+            self.other = torch.tensor(np.zeros((len(X), 1)), dtype=torch.float32)
+        else:
+            self.other = other
 
 
-def run_train_classifier(dataloaders,save_dir,**kwargs):
+    def __len__(self):
+        return len(self.X)
 
-    assert isinstance(dataloaders, dict)
+    def __getitem__(self, idx):
+        return self.X[idx], self.y_head[idx], self.y_adv[idx], self.other[idx]
     
-    # Model hyperparameters
-    input_size = kwargs.get('input_size', None)
-    head__hidden_size = kwargs.get('hidden_size', 64)
-    latent_size = kwargs.get('latent_size', 32)
-    head__activation = kwargs.get('activation', 'leakyrelu')
-    num_classes = kwargs.get('num_classes', None)
-    head__num_hidden_layers = kwargs.get('num_hidden_layers', 1)
-    head__dropout_rate = kwargs.get('dropout_rate', 0)
-    class_weight = kwargs.get('class_weights', None)
-    phase_list = kwargs.get('phase_list', None)
-    use_batch_norm = kwargs.get('use_batch_norm', False)
+    def get_class_weights_head(self):
+        y_no_nan = self.y_head[~torch.isnan(self.y_head)]
+        y_int = y_no_nan.int()
+        return 1/torch.bincount(y_int)
+    
+    def get_class_weights_adv(self):
+        y_no_nan = self.y_adv[~torch.isnan(self.y_adv)]
+        y_int = y_no_nan.int()
+        return 1/torch.bincount(y_int)
+    
+    def get_num_classes_head(self):
+        y_no_nan = self.y_head[~torch.isnan(self.y_head)]
+        return len(y_no_nan.unique())
+    
+    def get_num_classes_adv(self):
+        y_no_nan = self.y_adv[~torch.isnan(self.y_adv)]
+        return len(y_no_nan.unique())
 
-    encoder__hidden_size = kwargs.get('encoder_hidden_size', 64)
-    encoder__num_hidden_layers = kwargs.get('encoder_num_hidden_layers', 1)
-    encoder__dropout_rate = kwargs.get('encoder_dropout_rate', 0)
-    encoder__activation = kwargs.get('encoder_activation', 'leakyrelu')
-    encoder__use_batch_norm = kwargs.get('encoder_use_batch_norm', False)
-    encoder_act_on_latent = kwargs.get('encoder_act_on_latent', False)
 
-    # learning Hyperparameters
-    num_epochs = kwargs.get('num_epochs', 200)
-    learning_rate = kwargs.get('learning_rate', .0001)
-    encoder_learning_rate = kwargs.get('encoder_learning_rate', learning_rate)
+
+##################################################################################
+##################################################################################
+
+def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
+
+    learning_rate = kwargs.get('learning_rate', kwargs.get('lr', 0.001))
+    
+    num_epochs = kwargs.get('num_epochs', 10)
+    encoder_weight = kwargs.get('encoder_weight', 1)
+    head_weight = kwargs.get('head_weight', 1)
+    adversary_weight = kwargs.get('adversary_weight', 1)
     early_stopping_patience = kwargs.get('early_stopping_patience', -1)
     noise_factor = kwargs.get('noise_factor', 0)
+    phase_list = kwargs.get('phase_list', None)
+    loss_avg_beta = kwargs.get('loss_avg_beta', 0)
+    scheduler_kind = kwargs.get('scheduler_kind', None)
+    scheduler_kwargs = kwargs.get('scheduler_kwargs', {})
+    # head_info = kwargs.get('head_info', None)
+    # adversary_info = kwargs.get('adversary_info', None)
+    verbose = kwargs.get('verbose', True)
+    save_dir = kwargs.get('save_dir', None)
+    end_state_eval_funcs = kwargs.get('end_state_eval_funcs', {})
+    adversarial_mini_epochs = kwargs.get('adversarial_mini_epochs', 20)
+    yes_plot = kwargs.get('yes_plot', True)
 
-    yesplot = kwargs.get('yesplot', True)
-    verbose = kwargs.get('verbose', False)
-    how_average = kwargs.get('how_average', 'weighted')
-    load_existing_model =  kwargs.get('load_existing_model', True)
-    save_finetuned_model = kwargs.get('save_finetuned_model', False)
-    
-
-    model_name = kwargs.get('model_name', 'Classifier')
-    model_kind = kwargs.get('model_kind', 'Classifier')
-
-    encoder_name = kwargs.get('encoder_name', 'BasicEncoder')
-    encoder_kind = kwargs.get('encoder_kind', 'AE')
-    encoder_status = kwargs.get('encoder_status', 'finetune')
-
-    model_save_path = os.path.join(save_dir, model_name+'_'+encoder_status+'_'+encoder_name+'_head-model.pth')
-    output_save_path = os.path.join(save_dir, model_name+'_'+encoder_status+'_'+encoder_name+'_output.json')
-    pretrained_encoder_load_path = kwargs.get('pretrained_encoder_load_path', None)
-    finetuned_encoder_save_path = os.path.join(save_dir, model_name+'_'+encoder_status+'_'+encoder_name+'_encoder-model.pth')
-    
-    # check if the device is available
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    # elif torch.backends.mps.is_available():
-    #     device = torch.device("mps")
+    if save_dir is not None:
+        save_trained_model = True
+        encoder_save_path = os.path.join(save_dir, 'encoder.pth')
+        head_save_path = os.path.join(save_dir, 'head.pth')
+        adversary_save_path = os.path.join(save_dir, 'adversary.pth')
+        output_save_path = os.path.join(save_dir, 'output.json')
     else:
-        device = torch.device("cpu")
-
-    batch_size = dataloaders['train'].batch_size
-    if (batch_size < 32):
-        # if dataset is small, then use the cpu
-        # I guess the evalaation doesn't need to be done on the gpu, but moving back and forth is slow
-        device = torch.device("cpu")
+        save_trained_model = False
+    
 
     if phase_list is None:
         phase_list = list(dataloaders.keys())
-
-    if input_size is None:
-        input_size = dataloaders['train'].dataset[0][0].shape[0]
-
-    if num_classes is None:
-        y_train = dataloaders['train'].dataset[:][1]
-        num_classes = len(torch.unique(y_train))
-
-    if (class_weight is not None) and (len(class_weight) == num_classes):
-        if isinstance(class_weight, list):
-            class_weight = torch.tensor(class_weight, dtype=torch.float32)
-    elif class_weight is not None:
-        y_train = dataloaders['train'].dataset[:][1]
-        class_weight = 1 / torch.bincount(y_train.long())
-    else:
-        class_weight = None
+    
+    if scheduler_kind is not None:
+        raise NotImplementedError('Scheduler not yet implemented')
+    # if scheduler_kind is not None:
+    #     'scheduler_kind': 'ReduceLROnPlateau',
+    #         'scheduler_kwargs': {
+    #             'factor': 0.1,
+    #             'patience': 5,
+    #             'min_lr': 1e-6
+    #         }
 
     dataset_size_dct = {phase: len(dataloaders[phase].dataset) for phase in phase_list}
     batch_size_dct = {phase: dataloaders[phase].batch_size for phase in phase_list}
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
 
     learning_parameters = {
-        # 'batch_size': 32,
-        'num_epochs': num_epochs,
         'learning_rate': learning_rate,
-        'encoder_learning_rate': encoder_learning_rate,
+        'num_epochs': num_epochs,
         'early_stopping_patience': early_stopping_patience,
         'noise_factor': noise_factor,
-        'class_weight': class_weight.numpy().tolist() if class_weight is not None else None,
-        'dataset_sizes': dataset_size_dct,
-        'batch_sizes': batch_size_dct
-        }
+        'encoder_weight': encoder_weight,
+        'head_weight': head_weight,
+        'adversary_weight': adversary_weight,
+        'phase_list': phase_list,
+        'phase_sizes': dataset_size_dct,
+        'batch_sizes': batch_size_dct,
+        'adversarial_mini_epochs': adversarial_mini_epochs,
+        'loss_avg_beta': loss_avg_beta,
+    }
 
     if early_stopping_patience < 0:
         early_stopping_patience = num_epochs
 
-    os.makedirs(save_dir, exist_ok=True)
-    # Initialize model, criterion, and optimizer
-    if num_classes==2:
-        model = BinaryClassifier(latent_size, head__hidden_size, head__num_hidden_layers, head__dropout_rate,
-                                 activation=head__activation, use_batch_norm=use_batch_norm)
-        if verbose: print('use Binary Classifier')
-        task = 'binary'
-    elif num_classes > 2:
-        model = MultiClassClassifier(latent_size, head__hidden_size, num_classes, head__num_hidden_layers, head__dropout_rate,
-                                        activation=head__activation, use_batch_norm=use_batch_norm)
-        if verbose: print('use Multi Classifier')
-        task = 'multi'
-    
-    model.define_loss(class_weight=class_weight)
 
+    # define the losses averages across the epochs
+    encoder_loss_avg = 1
+    head_loss_avg = 1
+    adversary_loss_avg = 1
 
-    if encoder_kind.lower() in ['vae']:
-        encoder_model = VAE(input_size, encoder__hidden_size, latent_size, encoder__num_hidden_layers, 
-                            encoder__dropout_rate, encoder__activation, use_batch_norm=encoder__use_batch_norm,
-                            act_on_latent_layer=encoder_act_on_latent)
-        if verbose: print('use Variational Autoencoder (VAE)')
-    elif encoder_kind.lower() in ['ae']:
-        encoder_model = AE(input_size, encoder__hidden_size, latent_size, encoder__num_hidden_layers, 
-                           encoder__dropout_rate, encoder__activation, use_batch_norm=encoder__use_batch_norm,
-                            act_on_latent_layer=encoder_act_on_latent)
-        if verbose: print('use Basic Autoencoder (AE)')
+    encoder.to(device)
+    head.to(device)
+    adversary.to(device)
+
+    # define the optimizers
+    encoder_optimizer = torch.optim.Adam(encoder.parameters(), lr=learning_rate)
+    if head_weight > 0:
+        head_optimizer = torch.optim.Adam(head.parameters(), lr=learning_rate)
     else:
-        raise ValueError(f'Encoder kind not recognized: {encoder_kind}')
-
-    if pretrained_encoder_load_path is not None:
-        if not os.path.exists(pretrained_encoder_load_path):
-            raise ValueError(f'Pre-trained model not found at {pretrained_encoder_load_path}')
-        
-        pre_trained_output_path = pretrained_encoder_load_path.replace('_model.pth', '_output.json')
-        if not os.path.exists(pre_trained_output_path):
-            raise ValueError(f'Pre-trained model output not found at {pre_trained_output_path}')
-
-        # print('using pre-trained model for encoder')    
-        with open(pre_trained_output_path, 'r') as f:
-            pre_trained_output = json.load(f)
-        
-        pretrained_encoder_name = pre_trained_output['model_name']
-        pretrained_encoder_kind = pre_trained_output['model_kind']
-        assert encoder_kind.lower() == pretrained_encoder_kind.lower(), f'Encoder kind mismatch: {encoder_kind} vs {pretrained_encoder_kind}'
-        assert encoder_name.lower() == pretrained_encoder_name.lower(), f'Encoder name mismatch: {encoder_name} vs {pretrained_encoder_name}'
-        assert latent_size == pre_trained_output['model_hyperparameters']['latent_size'], f'Latent size mismatch: {latent_size} vs {pre_trained_output["model_hyperparameters"]["latent_size"]}'
-        assert input_size == pre_trained_output['model_hyperparameters']['input_size'], f'Input size mismatch: {input_size} vs {pre_trained_output["model_hyperparameters"]["input_size"]}'
-        assert encoder__num_hidden_layers == pre_trained_output['model_hyperparameters']['num_hidden_layers'], f'Number of hidden layers mismatch: {encoder__num_hidden_layers} vs {pre_trained_output["model_hyperparameters"]["num_hidden_layers"]}'
-        if encoder__num_hidden_layers > 0:
-            assert encoder__hidden_size == pre_trained_output['model_hyperparameters']['hidden_size'], f'Hidden size mismatch: {encoder__hidden_size} vs {pre_trained_output["model_hyperparameters"]["hidden_size"]}'
-        
-        ## encoder dropout only impacts training, so we don't need it be the same
-        # assert encoder__dropout_rate == pre_trained_output['model_hyperparameters']['dropout_rate'], f'Dropout rate mismatch: {encoder__dropout_rate} vs {pre_trained_output["model_hyperparameters"]["dropout_rate"]}'
-        
-        if 'activation' in pre_trained_output['model_hyperparameters']:
-            assert encoder__activation == pre_trained_output['model_hyperparameters']['activation'], f'Activation mismatch: {encoder__activation} vs {pre_trained_output["model_hyperparameters"]["activation"]}'
-        
-        if 'use_batch_norm' in pre_trained_output['model_hyperparameters']:
-            assert encoder__use_batch_norm == pre_trained_output['model_hyperparameters']['use_batch_norm'], f'Batch norm mismatch: {encoder__use_batch_norm} vs {pre_trained_output["model_hyperparameters"]["use_batch_norm"]}'
-
-        if 'act_on_latent_layer' in pre_trained_output['model_hyperparameters']:
-            assert encoder_act_on_latent == pre_trained_output['model_hyperparameters']['act_on_latent_layer'], f'Act on latent layer mismatch: {encoder_act_on_latent} vs {pre_trained_output["model_hyperparameters"]["act_on_latent_layer"]}'
-
-        if (encoder_status.lower() == 'finetune') or (encoder_status.lower() == 'fixed'):
-            encoder_model.load_state_dict(torch.load(pretrained_encoder_load_path))
-            print('Pre-trained model loaded from:', pretrained_encoder_load_path)
-        elif encoder_status.lower() == 'random':
-            print('Randomly initializing the encoder')
-
-
-
-    # set the encoder to allow finetuning if not fixed
-    if (encoder_status.lower() == 'finetune') or (encoder_status.lower() == 'random'):
-        for param in encoder_model.parameters():
-            param.requires_grad = True
-    elif encoder_status.lower() == 'fixed':
-        for param in encoder_model.parameters():
-            param.requires_grad = False
-
-
-    # optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    # optimizer = optim.Adam(list(model.parameters()) + list(encoder_model.parameters()), lr=learning_rate)
-    encoder_optimizer = optim.Adam(encoder_model.parameters(), lr=encoder_learning_rate) # different learning rate for encoder
-    classifier_optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-
-    if (load_existing_model) and (os.path.exists(model_save_path)):
-        # load the json output data
-        print('found existing model, loading it')
-        if os.path.exists(output_save_path):
-            with open(output_save_path, 'r') as f:
-                output_data = json.load(f)
-            # TODO: add option to further train the existing model
-            return output_data
-        else:
-            model.load_state_dict(torch.load(model_save_path))
-            encoder_model.load_state_dict(torch.load(finetuned_encoder_save_path))
-            num_epochs = 0
+        head_optimizer = None
     
+    if adversary_weight > 0:
+        adversary_optimizer = torch.optim.Adam(adversary.parameters(), lr=learning_rate)
+    else:
+        adversary_optimizer = None
 
-    # Training loop with early stopping
-    best_val_loss = float('inf')
-    best_model_wts = None
-    best_epoch = -1
-    loss_history = {'train': [], 'val': []}
-    acc_history = {'train': [], 'val': []}
-    auroc_history = {'train': [], 'val': []}
+    # define the loss history and best params with associated losses
+    loss_history = {
+        'encoder': {'train': [], 'val': []},
+        'head': {'train': [], 'val': []},
+        'adversary': {'train': [], 'val': []},
+        'joint': {'train': [], 'val': []},
+        'epoch' : {'train': [], 'val': []},
+        'raw_encoder': {'train': [], 'val': []},
+        'raw_head': {'train': [], 'val': []},
+        'raw_adversary': {'train': [], 'val': []},
+    }
+    best_loss = {'encoder': 1e10, 'head': 1e10, 'adversary': 1e10, 'joint': 1e10, 'epoch': 0}
+    best_wts = {'encoder': encoder.state_dict(), 'head': head.state_dict(), 'adversary': adversary.state_dict()}
+    eval_history = {'train': {}, 'val': {}}
     patience_counter = 0
 
-    running_accuracy = Accuracy(task=task,average=how_average).to(device)
-    running_auroc = AUROC(task=task,average=how_average).to(device)
-    # val_accuracy = Accuracy(task=task,average=how_average)
-    # val_auroc = AUROC(task=task,average=how_average)
-
-    model = model.to(device)
-    encoder_model = encoder_model.to(device)
+    # start the training loop
     for epoch in range(num_epochs):
-        if (patience_counter >= early_stopping_patience) and (best_model_wts is not None):
-            model.load_state_dict(best_model_wts)
-            encoder_model.load_state_dict(best_encoder_wts)
-            if verbose: print('Early stopping at epoch', epoch)
+        if patience_counter > early_stopping_patience:
+            print('Early stopping at epoch', epoch)
+            encoder.load_state_dict(best_wts['encoder'])
+            head.load_state_dict(best_wts['head'])
+            adversary.load_state_dict(best_wts['adversary'])
             break
+
 
         for phase in ['train', 'val']:
             if phase not in dataloaders:
                 continue
             if phase == 'train':
-                model.train()
+                encoder.train()
+                head.train()
+                adversary.train()
             else:
-                model.eval()
+                encoder.eval()
+                head.eval()
+                adversary.eval()
 
-            running_loss = 0.0
-            running_auroc.reset()
-            running_accuracy.reset()
-            
-            # epoch_preds = []
-            # epoch_targets = []
+            running_losses = {'encoder': 0, 'head': 0, 'adversary': 0, 'joint': 0, \
+                              'raw_encoder': 0, 'raw_head': 0, 'raw_adversary': 0}
+            # running_outputs = {'y_head': [], 'y_adversary': []}
+            epoch_head_outputs = torch.tensor([])
+            epoch_adversary_outputs = torch.tensor([])
+            epoch_head_targets = torch.tensor([])
+            epoch_adversary_targets = torch.tensor([])
+            num_batches = len(dataloaders[phase])
 
-            for data in dataloaders[phase]:
-                X, y = data
+            for batch_idx, data in enumerate(dataloaders[phase]):
+                X, y_head, y_adversary, clin_vars = data
                 X = X.to(device)
-                y = y.to(device)
-                y = y.view(-1,1)
-                # zero the parameter gradients, so they don't accumulate
-                # optimizer.zero_grad()
-                encoder_optimizer.zero_grad()
-                classifier_optimizer.zero_grad()
+                y_head = y_head.to(device)
+                y_adversary = y_adversary.to(device)
+                clin_vars = clin_vars.to(device)
 
                 # noise injection for training to make model more robust
                 if (noise_factor>0) and (phase == 'train'):
                     X = X + noise_factor * torch.randn_like(X)
 
-
+                encoder_optimizer.zero_grad()
+                if head_weight > 0:
+                    head_optimizer.zero_grad()
+                if adversary_weight > 0:
+                    adversary_optimizer.zero_grad()
                 with torch.set_grad_enabled(phase == 'train'):
-                    X_encoded = encoder_model.transform(X)
-                    # the foward pass is used to build the computational graph to be used later during the backward pass
-                    outputs = model(X_encoded) 
-                    loss = model.loss(outputs, y)
-                    # # outputs_probs = model.predict_proba(X_encoded) #this runs a full forward pass which isn't necessary
-                    outputs_probs = model.logits_to_proba(outputs)
-                    # epoch_preds.append(outputs_probs)
-                    # epoch_targets.append(y)
+                    if encoder_weight > 0:
+                        z, encoder_loss = encoder.transform_with_loss(X)
+                    else:
+                        z = encoder.transform(X)
+                        encoder_loss = torch.tensor(0)
+                    
+                    if head_weight > 0:
+                        y_head_output = head(torch.cat((z, clin_vars), 1))
+                    else:
+                        y_head_output = torch.tensor([])
+                
+                    head_loss = head.loss(y_head_output, y_head)
+                    # else:
+                    # y_head_output = torch.tensor([])
+                    # head_loss = torch.tensor(0)
+
+                    if adversary_weight > 0:
+                        z2 = z.detach()
+                        z2.requires_grad = True
+
+                        y_adversary_output = adversary(z2)
+                        adversary_loss = adversary.loss(y_adversary_output, y_adversary)
+                    else:
+                        y_adversary_output = torch.tensor([])
+                        adversary_loss = torch.tensor(0)
+
+                    running_losses['raw_encoder'] += encoder_loss.item()
+                    running_losses['raw_head'] += head_loss.item()
+                    running_losses['raw_adversary'] += adversary_loss.item()
+
+                    # running_outputs['y_head'].append(y_head_output)
+                    # running_outputs['y_adversary'].append(y_adversary_output)
+                    epoch_head_outputs = torch.cat((epoch_head_outputs, y_head_output), 0)
+                    epoch_adversary_outputs = torch.cat((epoch_adversary_outputs, y_adversary_output), 0)
+                    epoch_head_targets = torch.cat((epoch_head_targets, y_head), 0)
+                    epoch_adversary_targets = torch.cat((epoch_adversary_targets, y_adversary), 0)
+                    
+                    curr_batch = num_batches*epoch + batch_idx
                     if phase == 'train':
-                        # calculate the backpropagation to find the gradients of the loss with respect to the model parameters
-                        loss.backward()
-                        # update the model parameters using the gradients using the optimizer
-                        # optimizer.step()
+
+                        if encoder_weight > 0:
+                            encoder_loss, encoder_loss_avg = normalize_loss(
+                                encoder_loss, encoder_loss_avg, loss_avg_beta, curr_batch)
+
+                        if head_weight > 0:
+                            head_loss, head_loss_avg = normalize_loss(
+                                head_loss, head_loss_avg, loss_avg_beta, curr_batch)
+
+                        if adversary_weight > 0:
+                            adversary_loss, adversary_loss_avg = normalize_loss(
+                                adversary_loss, adversary_loss_avg, loss_avg_beta, curr_batch)
+
+                        joint_loss = (encoder_weight*encoder_loss + \
+                            head_weight*head_loss - \
+                            adversary_weight*adversary_loss)
+                        joint_loss.backward(retain_graph=True)
+                        
                         encoder_optimizer.step()
-                        classifier_optimizer.step()
+                        if head_weight > 0:
+                            head_optimizer.step()
 
-                running_loss += loss.item() * X.size(0)
-                running_accuracy(outputs_probs, y)
-                running_auroc(outputs_probs, y)
+                        if adversary_weight > 0:
+                            # zero the adversarial optimizer again
+                            adversary_optimizer.zero_grad()
 
-            epoch_loss = running_loss / len(dataloaders[phase].dataset)
-            loss_history[phase].append(epoch_loss)
+                            # Backward pass and optimize the adversarial classifiers
+                            adversary_loss.backward()
+                            adversary_optimizer.step()
+
+                    elif phase == 'val':
+
+                        if encoder_weight > 0:
+                            encoder_loss, _ = normalize_loss(
+                                encoder_loss, encoder_loss_avg, loss_avg_beta, -1)
+                        
+                        if head_weight > 0:
+                            head_loss, _ = normalize_loss(
+                                head_loss, head_loss_avg, loss_avg_beta, -1)
+                        
+                        if adversary_weight > 0:
+                            adversary_loss, _ = normalize_loss(
+                                adversary_loss, adversary_loss_avg, loss_avg_beta, -1)
+                        
+                        joint_loss = (encoder_weight*encoder_loss + \
+                            head_weight*head_loss - \
+                            adversary_weight*adversary_loss)
+                    
+
+                    running_losses['encoder'] += encoder_loss.item()
+                    running_losses['head'] += head_loss.item()
+                    running_losses['adversary'] += adversary_loss.item()
+                    running_losses['joint'] += joint_loss.item()
+
             
-            # Alternative to using Torchmetrics
-            # epoch_preds = torch.cat(epoch_preds, dim=0)
-            # epoch_targets = torch.cat(epoch_targets, dim=0)
-            # epoch_accuracy = accuracy_score(epoch_targets, epoch_preds)
-            # epoch_auroc = roc_auc_score(epoch_targets, epoch_preds)
+            ########  Train the adversary on the fixed latent space for a few epochs
+            if (adversary_weight > 0) and (phase == 'train'):
+                encoder.eval()
+                head.eval()
+                for mini_epoch in range(adversarial_mini_epochs):       
+                    for batch_idx, data in enumerate(dataloaders[phase]):
+                        X, y_head, y_adversary, clin_vars = data
+                        X = X.to(device)
+                        y_adversary = y_adversary.to(device)
 
-            epoch_accuracy = running_accuracy.compute().item()
-            epoch_auroc = running_auroc.compute().item()
-            acc_history[phase].append(epoch_accuracy)
-            auroc_history[phase].append(epoch_auroc)
-            if verbose:
-                print(f'Epoch {epoch}/{num_epochs - 1}, {phase} loss: {epoch_loss:.6f}, \
-                    acc: {epoch_accuracy:.4f}, auroc: {epoch_auroc:.4f}')
+                        # noise injection for training to make model more robust
+                        if (noise_factor>0):
+                            X = X + noise_factor * torch.randn_like(X)
+
+                        with torch.set_grad_enabled(phase == 'train'):
+                            z = encoder.transform(X).detach()
+                            z.requires_grad = True
+                            adversary_optimizer.zero_grad()
+                            y_adversary_output = adversary(z)
+                            adversary_loss = adversary.loss(y_adversary_output, y_adversary)
+                            adversary_loss, _ = normalize_loss(
+                                adversary_loss, adversary_loss_avg, 0, -1)
+                            if phase == 'train':
+                                adversary_loss.backward()
+                                adversary_optimizer.step()
+            
+            ############ end of training adversary on fixed latent space
+
+            loss_history['encoder'][phase].append(running_losses['encoder']/len(dataloaders[phase]))
+            loss_history['head'][phase].append(running_losses['head']/len(dataloaders[phase]))
+            loss_history['adversary'][phase].append(running_losses['adversary']/len(dataloaders[phase]))
+            loss_history['joint'][phase].append(running_losses['joint']/len(dataloaders[phase]))
+            loss_history['epoch'][phase].append(epoch)
+            loss_history['raw_encoder'][phase].append(running_losses['raw_encoder']/len(dataloaders[phase]))
+            loss_history['raw_head'][phase].append(running_losses['raw_head']/len(dataloaders[phase]))
+            loss_history['raw_adversary'][phase].append(running_losses['raw_adversary']/len(dataloaders[phase]))
+
+            for eval_name, eval_func in end_state_eval_funcs.items():
+                if ('head' in eval_name) and (epoch_head_outputs.size(0) == 0):
+                    continue
+                if ('adversary' in eval_name) and (epoch_adversary_outputs.size(0) == 0):
+                    continue
+
+                if eval_name not in eval_history[phase]:
+                    eval_history[phase][eval_name] = []
+                    
+                eval_history[phase][eval_name].append(eval_func(head_ouputs = epoch_head_outputs,
+                                                    head_targets = epoch_head_targets,
+                                                    adversary_outputs = epoch_adversary_outputs,
+                                                    adversary_targets = epoch_adversary_targets,
+                                                    head = head,
+                                                    adversary = adversary))
+
+            if (verbose) and (epoch % 10 == 0):
+                print(f'Epoch [{epoch+1}/{num_epochs}], {phase} Loss: {loss_history["joint"][phase][-1]:.4f}')
+                if encoder_weight > 0:
+                    print(f'{phase} Encoder Loss: {loss_history["encoder"][phase][-1]:.4f}')
+                for eval_name, eval_list in eval_history[phase].items():
+                    print(f'{phase} {eval_name} {eval_list[-1]}')
 
             if phase == 'val':
-                if epoch < early_stopping_patience/8:
-                    # don't take the best model from the first few epochs
-                    continue
-                if epoch_loss < best_val_loss:
-                    best_epoch = epoch
-                    best_val_loss = epoch_loss
-                    best_model_wts = model.state_dict()
-                    best_encoder_wts = encoder_model.state_dict()
+                if loss_history['joint'][phase][-1] < best_loss['joint']:
+                    best_loss['joint'] = loss_history['joint'][phase][-1]
+                    best_loss['encoder'] = loss_history['encoder'][phase][-1]
+                    best_loss['head'] = loss_history['head'][phase][-1]
+                    best_loss['adversary'] = loss_history['adversary'][phase][-1]
+                    best_loss['epoch'] = epoch
+                    best_wts['encoder'] = encoder.state_dict()
+                    best_wts['head'] = head.state_dict()
+                    best_wts['adversary'] = adversary.state_dict()
                     patience_counter = 0
                 else:
                     patience_counter += 1
 
+    #############
+   # Test the effectiveness of the adversary using an sklearn classifiers
+    # on the latent space
 
-    # Save model state dict
-    if save_finetuned_model:
-        torch.save(model.state_dict(), model_save_path)
-        torch.save(encoder_model.state_dict(), finetuned_encoder_save_path)
+    if adversary_weight > 0:      
+        encoder.eval()
+        head.eval()
+        adversary.eval()
+        latent_space = torch.tensor([])
+        y_adv_train = torch.tensor([])
 
-    if best_epoch < 0:
-        best_epoch = num_epochs - 1
+        for data in dataloaders['train']:
+            X, y_head, y_adversary, clin_vars = data
+            X = X.to(device)
+            z = encoder.transform(X)
+            latent_space = torch.cat((latent_space, z), 0)
+            y_adv_train = torch.cat((y_adv_train, y_adversary), 0)
 
-    # Evaluate model on training, validation, and test datasets
-    phase_sizes = {phase: len(dataloaders[phase].dataset) for phase in phase_list}
+        latent_space = latent_space.detach().numpy()
+        y_adv_train = y_adv_train.detach().numpy()
+
+        test_latent_space = torch.tensor([])
+        y_adv_test = torch.tensor([])
+        for data in dataloaders['test']:
+            X, y_head, y_adversary, clin_vars = data
+            X = X.to(device)
+            z = encoder.transform(X)
+            test_latent_space = torch.cat((test_latent_space, z), 0)
+            y_adv_test = torch.cat((y_adv_test, y_adversary), 0)
+
+        test_latent_space = test_latent_space.detach().numpy()
+        y_adv_test = y_adv_test.detach().numpy()
+        
+
+        knn = KNeighborsClassifier(n_neighbors=adversary.num_classes, weights='distance')
+        knn.fit(latent_space, y_adv_train)
+
+        adversary_auc = evaluate_auc(torch.tensor(knn.predict_proba(test_latent_space)), torch.tensor(y_adv_test), adversary)
+        print(f'KMM Adversary AUC: {adversary_auc:.4f}')
+
+        sklearn_adversary_eval = {
+            # 'KNN_accuracy': adversary_acc,
+            'KNN_auc': adversary_auc,
+        }
+
+        rdf = RandomForestClassifier(n_estimators=100, class_weight='balanced')
+        rdf.fit(latent_space, y_adv_train)
+
+        adversary_auc = evaluate_auc(torch.tensor(rdf.predict_proba(test_latent_space)), torch.tensor(y_adv_test), adversary)
+
+        print(f'Random Forest Adversary AUC: {adversary_auc:.4f}')
+
+        # sklearn_adversary_eval['RandomForest_accuracy'] = adversary_acc
+        sklearn_adversary_eval['RandomForest_auc'] = adversary_auc
+    else:
+        sklearn_adversary_eval = {}
+
+
+    #############
+                
+
+    if save_trained_model:
+        torch.save(encoder.state_dict(), encoder_save_path)
+        torch.save(head.state_dict(), head_save_path)
+        torch.save(adversary.state_dict(), adversary_save_path)
+
+    if best_loss['epoch'] < 0:
+        best_loss['epoch'] = epoch
+
+    # evaluate the model on datasets
     end_state_losses = {}
-    end_state_acc = {}
-    end_state_auroc = {}
-    model = model.to('cpu') # for evaluation
-    encoder_model = encoder_model.to('cpu') # for evaluation
+    end_state_eval = {}
+    encoder.to('cpu')
+    head.to('cpu')
+    adversary.to('cpu')
     for phase in phase_list:
-        model.eval()
-        running_loss = 0.0
-        running_accuracy.reset()
-        running_auroc.reset()
+        if phase not in dataloaders:
+            continue
+        encoder.eval()
+        head.eval()
+        adversary.eval()
+        recon_loss = torch.tensor(0.0)
+        head_loss = torch.tensor(0.0)
+        adversary_loss = torch.tensor(0.0)
+        head_ouputs = torch.tensor([])
+        adversary_outputs = torch.tensor([])
+        head_targets = torch.tensor([])
+        adversary_targets = torch.tensor([])
         with torch.inference_mode():
             for data in dataloaders[phase]:
-                X, y = data
-                y = y.view(-1,1)
-                X_encoded = encoder_model.transform(X)
-                outputs = model(X_encoded)
-                loss = model.loss(outputs, y)
-                outputs_probs = model.logits_to_proba(outputs)
-                running_loss += loss.item() * X.size(0)
-                running_accuracy(outputs_probs, y)
-                running_auroc(outputs_probs, y)
+                X, y_head, y_adversary, clin_vars = data
+                X = X
+                y_head = y_head
+                y_adversary = y_adversary
+                z = encoder.transform(X)
+                X_recon = encoder.generate(z)
+                recon_loss += F.mse_loss(X_recon, X)* X.size(0)
+                y_head_output = head(torch.cat((z, clin_vars), 1))
+                y_adversary_output = adversary(z)
+                # if head_weight > 0:
+                head_loss += head.loss(y_head_output, y_head) * y_head.size(0)
+                # if adversary_weight > 0:
+                adversary_loss += adversary.loss(y_adversary_output, y_adversary) * y_adversary.size(0)
+                head_ouputs = torch.cat((head_ouputs, y_head_output), 0)
+                adversary_outputs = torch.cat((adversary_outputs, y_adversary_output), 0)
+                head_targets = torch.cat((head_targets, y_head), 0)
+                adversary_targets = torch.cat((adversary_targets, y_adversary), 0)
 
-            epoch_loss = running_loss / len(dataloaders[phase].dataset)
-            end_state_losses[phase] = epoch_loss
-            epoch_accuracy = running_accuracy.compute().item()
-            end_state_acc[phase] = epoch_accuracy
-            epoch_auroc = running_auroc.compute().item()
-            end_state_auroc[phase] = epoch_auroc
+            recon_loss = recon_loss / len(dataloaders[phase].dataset)
+            head_loss = head_loss / len(dataloaders[phase].dataset)
+            adversary_loss = adversary_loss / len(dataloaders[phase].dataset)
+            end_state_losses[phase] = {
+                'reconstruction': recon_loss.item(),
+                'head': head_loss.item(),
+                'adversary': adversary_loss.item(),
+                }
+            
+            end_state_eval[phase] = {}
+            for eval_name, eval_func in end_state_eval_funcs.items():
+                end_state_eval[phase][eval_name] = eval_func(head_ouputs=head_ouputs,
+                                                head_targets=head_targets,
+                                                adversary_outputs=adversary_outputs,
+                                                adversary_targets=adversary_targets,
+                                                head=head,
+                                                adversary=adversary)
+
             if verbose:
-                print(f'End state {phase} loss: {epoch_loss:.6f}, acc: {epoch_accuracy:.4f}, auroc: {epoch_auroc:.4f}')
+                print(f'End state {phase} Losses: {end_state_losses[phase]}')
+                for eval_name, eval_val in end_state_eval[phase].items():
+                    print(f'{phase} {eval_name} {eval_val:.4f}')
 
-    encoder_hyperparameters = encoder_model.get_hyperparameters()
-    model_hyperparameters = model.get_hyperparameters()
+    encoder_hyperparams = encoder.get_hyperparameters()
+    head_hyperparams = head.get_hyperparameters()
+    adversary_hyperparams = adversary.get_hyperparameters()
 
     output_data = {
-            'model_name': model_name,
-            'model_kind': model_kind,
-            'encoder_name': encoder_name,
-            'encoder_kind': encoder_kind,
-            'encoder_status': encoder_status,
-            'encoder_pretrained_path': pretrained_encoder_load_path,
-            'model_hyperparameters': model_hyperparameters,
-            'encoder_hyperparameters': encoder_hyperparameters,
-            'learning_parameters': learning_parameters,
-            'best_val_loss': best_val_loss,
-            'best_epoch': best_epoch,
-            'phase_sizes': phase_sizes,
-            'end_state_losses': end_state_losses,
-            'end_state_acc': end_state_acc,
-            'end_state_auroc': end_state_auroc,
-            'loss_history': loss_history,
-            'acc_history': acc_history,
-            'auroc_history': auroc_history
-        }
+        'learning_parameters': learning_parameters,
+        'end_state_losses': end_state_losses,
+        'end_state_eval': end_state_eval,
+        'sklearn_adversary_eval': sklearn_adversary_eval,
+        'best_loss': best_loss,
+        'loss_history': loss_history,
+        'encoder': {
+            'hyperparameters': encoder_hyperparams,
+            'loss_avg': encoder_loss_avg,
+        },
+        'head': {
+            'hyperparameters': head_hyperparams,
+            'loss_avg': head_loss_avg,
+        },
+        'adversary': {
+            'hyperparameters': adversary_hyperparams,
+            'loss_avg': adversary_loss_avg,
+        },
+    }
 
     with open(output_save_path, 'w') as f:
         json.dump(output_data, f, indent=4)
 
-    if yesplot:
-        for history, name in zip([loss_history, acc_history, auroc_history], ['loss', 'acc', 'auroc']):
-            plt.figure(figsize=(6,4))
-            plt.plot(history['train'], label='train', lw=2)
-            plt.plot(history['val'], label='val', lw=2)
-            plt.title(f'{model_name} with {encoder_status} {encoder_name}')
-            plt.xlabel('Epoch')
-            plt.ylabel(name)
+    if yes_plot:
+        for key in loss_history.keys():
+            if key == 'epoch':
+                continue
+            plt.plot(loss_history[key]['train'], label='train', color='blue', lw=2)
+            plt.plot(loss_history[key]['val'], label='val', color='orange', lw=2)
             plt.legend()
-            plt.tight_layout()
-            plt.savefig(os.path.join(save_dir, model_name+'_'+encoder_status+'_'+encoder_name+'_' +name+'.png'))
+            plt.xlabel('Epoch')
+            plt.title(key + ' loss')
+            plt.title(key + ' loss')
+            plt.savefig(os.path.join(save_dir, key+'_loss.png'))
             plt.close()
 
-    return output_data
+        for key in eval_history['train'].keys():
+            plt.plot(eval_history['train'][key], label='train', color='blue', lw=2)
+            plt.plot(eval_history['val'][key], label='val', color='orange', lw=2)
+            plt.legend()
+            plt.xlabel('Epoch')
+            plt.title(key + ' eval')
+            plt.savefig(os.path.join(save_dir, key+'_eval.png'))
+            plt.close()
 
-###########################
-# %% Run the training
-###########################
+    return encoder, head, adversary, output_data
 
-from prep import ClassifierDataset
 
-if __name__ == '__main__':
+# %%
+##################################################################################
+##################################################################################
 
-    # Example usage
-    # dataloaders = {
-    #     'train': train_loader,
-    #     'val': val_loader,
-    #     'test': test_loader
-    # }
-    # run_train_classifier(dataloaders,save_dir,**kwargs)
-    # pass
-
-    base_dir = '/Users/jonaheaton/Library/CloudStorage/Dropbox-ReviveMed/Jonah Eaton/development_CohortCombination'
-    if not os.path.exists(base_dir):
-        base_dir = '/Users/jonaheaton/ReviveMed Dropbox/Jonah Eaton/development_CohortCombination'
-
-    date_name = 'hilic_pos_2024_feb_02_read_norm'
-    feat_subset_name = 'num_cohorts_thresh_0.5'
-    study_subset_name= 'subset all_studies with align score 0.3 from Merge_Jan25_align_80_40_fillna_avg'
-    task_name = 'std_1_Benefit'
-    input_dir = f'{base_dir}/{date_name}/{study_subset_name}/{feat_subset_name}/{task_name}'
-    save_dir = os.path.join(input_dir, 'fine_tuned')
-    os.makedirs(save_dir, exist_ok=True)
-
-    label_mapper = {'CB': 1.0, 'NCB': 0.0, 'ICB': np.nan}
-    pretrained_encoder_load_path = os.path.join(input_dir, 'vae_model', 'VAE_model.pth')
-    # pretrained_encoder_load_path = os.path.join(input_dir, 'vae_model', 'AE_model.pth')
-    # pretrained_encoder_load_path = None
-
-    if os.path.exists(os.path.join(save_dir, 'test_alt_dataset.pth')):
-        train_dataset = torch.load(os.path.join(save_dir, 'train_dataset.pth'))
-        val_dataset = torch.load(os.path.join(save_dir, 'val_dataset.pth'))
-        test_dataset = torch.load(os.path.join(save_dir, 'test_dataset.pth'))
-        test_alt_dataset = torch.load(os.path.join(save_dir, 'test_alt_dataset.pth'))
-    else:
-        # train_dataset = ClassifierDataset(input_dir,subset='train')
-        # label_encoder = train_dataset.get_label_encoder()
-        # val_dataset = ClassifierDataset(input_dir,subset='val',label_encoder=label_encoder)
-        # test_dataset = ClassifierDataset(input_dir,subset='test',label_encoder=label_encoder)
-
-        train_dataset = ClassifierDataset(input_dir,subset='train',label_encoder=label_mapper)
-        val_dataset = ClassifierDataset(input_dir,subset='val',label_encoder=label_mapper)
-        test_dataset = ClassifierDataset(input_dir,subset='test',label_encoder=label_mapper)
-        test_alt_dataset = ClassifierDataset(input_dir,subset='test',label_encoder=label_mapper)
-
-        # torch.save(train_dataset, os.path.join(save_dir, 'train_dataset.pth'))
-        # torch.save(val_dataset, os.path.join(save_dir, 'val_dataset.pth'))
-        # torch.save(test_dataset, os.path.join(save_dir, 'test_dataset.pth'))
-        # torch.save(test_alt_dataset, os.path.join(save_dir, 'test_alt_dataset.pth'))
-
-    print('size of training:', len(train_dataset))
-    print('size of validation:', len(val_dataset))
-    print('size of test:', len(test_dataset))
-    print('size of test_alt:', len(test_alt_dataset))
-
-    batch_size = 32
-    dataloaders= {
-        'train': DataLoader(train_dataset, batch_size=batch_size, shuffle=True),
-        'val': DataLoader(val_dataset, batch_size=batch_size, shuffle=False),
-        'test': DataLoader(test_dataset, batch_size=batch_size, shuffle=False),
-        'test_alt': DataLoader(test_alt_dataset, batch_size=batch_size, shuffle=False)
-    }
-
-    model = run_train_classifier(dataloaders,save_dir,
-                                 pretrained_encoder_load_path=pretrained_encoder_load_path,
-                                model_name='C5',
-                                model_kind='BinaryClassifier',
-                                phase_list=['train', 'val', 'test', 'test_alt'],
-                                encoder_name='VAE',
-                                encoder_kind='VAE',
-                                dropout_rate=0.5,
-                                activation='sigmoid')
+# Classifier Evaluation Functions
+def evaluate_auc(outputs, targets, model):
+    if len(outputs) == 0:
+        return 0
     
-                                 
+    if model.goal != 'classify':
+        return np.nan
+    
+    probs = model.logits_to_proba(outputs.detach()) #.numpy()
+    nan_mask = ~torch.isnan(targets)
+    # probs = probs[nan_mask]
+    # targets = targets[nan_mask].long()
+    if model.num_classes == 2:
+        task = 'binary'
+    else:
+        task = 'multiclass'
+
+    metric = AUROC(task=task,average='weighted',num_classes=model.num_classes)
+    metric(probs[nan_mask],targets[nan_mask].long())
+    return metric.compute().item()
+
+
+def evaluate_adversary_auc(head_ouputs, head_targets, adversary_outputs, adversary_targets,head, adversary):
+    return evaluate_auc(adversary_outputs, adversary_targets, adversary)
+
+def evaluate_head_auc(head_ouputs, head_targets, adversary_outputs, adversary_targets,head, adversary):
+    return evaluate_auc(head_ouputs, head_targets, head)
+
+# would be better to integrate the adversary into the model class
+# def get_ensemble_eval_funcs(model):
+#     eval_funcs = {
+#         'head_auc': lambda outputs, targets: evaluate_auc(outputs, targets, model),
+#     }
+#     if model.adversary is not None:
+#         eval_funcs['adversary_auc'] = lambda outputs, targets: evaluate_auc(outputs, targets, model.adversary)
+#     return eval_funcs
+
+
+def get_end_state_eval_funcs():
+    end_state_eval_funcs = {
+        'head_auc': evaluate_head_auc,
+        'adversary_auc': evaluate_adversary_auc
+    }
+    return end_state_eval_funcs
+
+##################################################################################
+##################################################################################
