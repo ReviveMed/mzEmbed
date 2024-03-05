@@ -324,7 +324,7 @@ if len(records) > 0:
 
         # get mspeak object for the reference study
         print("get original study data")
-        origin_study = get_mspeak_from_job_id(script_path, str(reference_job_id), reference_freq_th, max_num_samples)
+        origin_study = get_mspeak_from_job_id(script_path, str(reference_job_id), reference_freq_th, None)
 
         # fill missing values
         origin_study.fill_missing_values(method=fill_na_strat)
