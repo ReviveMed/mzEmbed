@@ -70,7 +70,7 @@ def get_dropbox_dir():
 
 ####################################################################################
 
-def encode_df_col(df, col, val_mapper=None):
+def encode_df_col(df, col, val_mapper=None, suffix='_encoded'):
     # Encode text features as integers
     if val_mapper is None:
         vals = df[col].unique()
@@ -78,7 +78,7 @@ def encode_df_col(df, col, val_mapper=None):
         vals = vals[~pd.isnull(vals)]
         sorted_vals = np.sort(vals)
         val_mapper = {val: i for i, val in enumerate(sorted_vals)}
-    df[col + '_encoded'] = df[col].map(val_mapper)
+    df[col + suffix] = df[col].map(val_mapper)
     return df, val_mapper
 
 

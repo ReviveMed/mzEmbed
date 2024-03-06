@@ -15,13 +15,25 @@ import sys
 # Main functions
 ####################################################################################
 
+DATA_DIR = 'data'
+RESULT_DIR = 'results'
+TRIAL_DIR = 'trials'
+
+goal_col = 'Nivo Benefit BINARY'
+
 def objective(trial):
 
     ############################
     # load the data
-    X_data = pd.read_csv('data/X.csv', index_col=0)
-    y_data = pd.read_csv('data/y_encoded.csv', index_col=0)
-    splits = pd.read_csv('data/splits.csv', index_col=0)
+    splits_subdir = "['MSKCC', 'Treatment', 'Benefit'] finetune_folds" 
+    trail_dir = TRIAL_DIR
+    data_dir = DATA_DIR
+    result_dir = RESULT_DIR
+
+
+    X_data = pd.read_csv(f'{data_dir}/X.csv', index_col=0)
+    y_data = pd.read_csv(f'{data_dir}/y.csv', index_col=0)
+    splits = pd.read_csv(f'{data_dir}/{splits_subdir}/splits.csv', index_col=0)
 
     latent_size = trial.suggest_int('latent_size', 4, 100, log=True)
     activation = trial.suggest_categorical('activation', ['tanh', 'leakyrelu','sigmoid'])
@@ -29,7 +41,7 @@ def objective(trial):
         ################
         ## General ##
 
-        'save_dir': os.path.join('result', f'trial_{trial.number}'),
+        'save_dir': os.path.join(trail_dir, f'trial_{trial.datetime}__{trial.number}'),
         'encoder_kind': trial.suggest_categorical('encoder_kind', ['AE', 'VAE']),
         'encoder_kwargs': {
             'activation': activation,
@@ -44,7 +56,7 @@ def objective(trial):
         # 'y_pretrain_cols': ['Cohort Label_encoded', 'Study ID_encoded'],
         # 'y_finetune_cols': ['Benefit_encoded', 'Sex_encoded'], 
         'y_pretrain_cols': ['Cohort Label_encoded', 'Study ID_encoded'],
-        'y_finetune_cols': ['MSKCC_encoded', 'Sex_encoded'],    
+        'y_finetune_cols': [goal_col, 'Sex BINARY'],    
         'num_folds': 50,
 
         ################
@@ -387,41 +399,56 @@ if __name__ == '__main__':
 
     # download the data
     # data_url = 'https://www.dropbox.com/scl/fo/fa3n7sw8fgktnz6q91ffo/h?rlkey=edbdekkhuju5r88kkdo1garmn&dl=1'
-    data_url = 'https://www.dropbox.com/scl/fo/s84uv107pibjrm4qyuj2g/h?rlkey=kd8kiblafboxgp5rw4ht8qxzd&dl=1'
-    save_dir = 'data'
-    result_dir = 'result'
-    os.makedirs(result_dir, exist_ok=True)
-    os.makedirs(save_dir, exist_ok=True)
-    if not os.path.exists('data/X.csv'):
-        download_data_dir(data_url, save_dir)
+    data_url = 'https://www.dropbox.com/scl/fo/d1yqlmyafvu8tzujlg4nk/h?rlkey=zrxfapacmgb6yxsmonw4yt986&dl=1'
+    data_dir = DATA_DIR
+    result_dir = RESULT_DIR
+    trails_dir = TRIAL_DIR
+    gcp_save_loc = 'March_6_Data'
+    study_name = goal_col + '_study_0'
 
+
+    os.makedirs(result_dir, exist_ok=True)
+    os.makedirs(trails_dir, exist_ok=True)
+    os.makedirs(data_dir, exist_ok=True)
+    if not os.path.exists(f'{data_dir}/X.csv'):
+        download_data_dir(data_url, data_dir)
+
+
+    mapper_file = f'{data_dir}/mappers.json'
+    if not os.path.exists(mapper_file):
+        mapper_dict = {}
 
     # if not os.path.exists('data/y_encoded.csv'):
-    if True:
-        y = pd.read_csv('data/y.csv')
-        # y_encoded, mapper1 = encode_df_col(y, 'Benefit', {'NCB': 0, 'CB': 1, 'ICB': np.nan})
-        y_encoded, mapper1 = encode_df_col(y, 'MSKCC', {'POOR': 0, 'FAVORABLE': 1, 'INTERMEDIATE': np.nan})
-        y_encoded, mapper2 = encode_df_col(y_encoded, 'Sex')
-        y_encoded, mapper3 = encode_df_col(y_encoded, 'Cohort Label')
-        y_encoded, mapper4 = encode_df_col(y_encoded, 'Study ID')
-        y_encoded.to_csv('data/y_encoded.csv', index=False)
-        mappers = {'MSKCC': mapper1, 'Sex': mapper2, 'Cohort Label': mapper3, 'Study ID': mapper4}
-        with open('data/mappers.json', 'w') as f:
-            json.dump(mappers, f, indent=4)
+    y = pd.read_csv(f'{data_dir}/y.csv', index_col=0)
+    
+    if 'Sex BINARY' not in y.columns:
+        y, mapper = encode_df_col(y, 'Sex', encode_df_col=' BINARY')
+        mapper_dict['Sex'] = mapper
+
+    if 'Cohort Label_encoded' not in y.columns:
+        y, mapper = encode_df_col(y, 'Cohort Label')
+        mapper_dict['Cohort Label'] = mapper
+
+    if 'Study ID_encoded' not in y.columns:
+        y, mapper = encode_df_col(y, 'Study ID')
+        mapper_dict['Study ID'] = mapper
 
 
+    with open(f'{data_dir}/mappers.json', 'w') as f:
+        json.dump(mapper_dict, f, indent=4)
+
+    y.to_csv(f'{data_dir}/y.csv')
 
 
     # Set up logging
     optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
-    study_name = 'study_3'
     # save the study in a sqlite database located in result_dir
     storage_loc = f'{result_dir}/{study_name}.db'
     if not os.path.exists(storage_loc):
         print("checking if study exists on GCP")
-        if check_file_exists_in_bucket('test', f'{study_name}.db'):
+        if check_file_exists_in_bucket(gcp_save_loc, f'{study_name}.db'):
             print("downloading study from GCP")
-            download_file_from_bucket('test', f'{study_name}.db', local_path=result_dir)
+            download_file_from_bucket(gcp_save_loc, f'{study_name}.db', local_path=result_dir)
 
     storage_name = f'sqlite:///{storage_loc}'
 
@@ -436,11 +463,13 @@ if __name__ == '__main__':
                                 pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=20, interval_steps=5))
     
     try:
-        study.optimize(objective, n_trials=85)
+        study.optimize(objective, n_trials=50)
     except Exception as e:
         print(e)
     # finally:
 
 
     # we need to upload the results to GCP
-    upload_file_to_bucket(storage_loc, 'test', verbose=True)
+    upload_file_to_bucket(storage_loc, gcp_save_loc, verbose=True)
+
+    # optuna-dashboard sqlite:///study_3.db
