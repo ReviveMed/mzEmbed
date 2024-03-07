@@ -15,9 +15,11 @@ import sys
 # Main functions
 ####################################################################################
 
-DATA_DIR = 'data'
-RESULT_DIR = 'results'
-TRIAL_DIR = 'trials'
+temp_dir = '/Users/jonaheaton/Desktop/temp'
+
+DATA_DIR = f'{temp_dir}/data'
+RESULT_DIR = f'{temp_dir}/results'
+TRIAL_DIR = f'{temp_dir}/trials'
 
 goal_col = 'Nivo Benefit BINARY'
 
@@ -41,7 +43,7 @@ def objective(trial):
         ################
         ## General ##
 
-        'save_dir': os.path.join(trail_dir, f'trial_{trial.datetime}__{trial.number}'),
+        'save_dir': os.path.join(trail_dir, f'trial_{trial.datetime_start}__{trial.number}'),
         'encoder_kind': trial.suggest_categorical('encoder_kind', ['AE', 'VAE']),
         'encoder_kwargs': {
             'activation': activation,
@@ -417,12 +419,15 @@ if __name__ == '__main__':
     mapper_file = f'{data_dir}/mappers.json'
     if not os.path.exists(mapper_file):
         mapper_dict = {}
+    else:
+        with open(mapper_file, 'r') as f:
+            mapper_dict = json.load(f)
 
     # if not os.path.exists('data/y_encoded.csv'):
     y = pd.read_csv(f'{data_dir}/y.csv', index_col=0)
     
     if 'Sex BINARY' not in y.columns:
-        y, mapper = encode_df_col(y, 'Sex', encode_df_col=' BINARY')
+        y, mapper = encode_df_col(y, 'Sex', suffix=' BINARY')
         mapper_dict['Sex'] = mapper
 
     if 'Cohort Label_encoded' not in y.columns:

@@ -18,7 +18,11 @@ RUN apt-get update
 RUN apt-get install -y git
 # Install useful system packages
 RUN apt-get install -y screen htop
-
+# RUN apt-get update && apt-get install -y \
+#     pkg-config \
+#     libmariadb-dev-compat \
+#     default-libmysqlclient-dev \
+    # libmysqlclient-dev
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements_4.txt
 
