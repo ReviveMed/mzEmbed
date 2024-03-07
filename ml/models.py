@@ -315,11 +315,11 @@ class BinaryClassifier(nn.Module):
     def loss(self, y_logits, y_true, ignore_nan=True):
         if ignore_nan:
             mask = ~torch.isnan(y_true)
-            if mask.sum() == 0:
+            if mask.sum().item() == 0:
                 return torch.tensor(0, dtype=torch.float32)
-            return self.loss_func(y_logits[mask].squeeze(), y_true[mask]) 
+            return self.loss_func(y_logits[mask].squeeze(), y_true[mask].squeeze())
         else:
-            return self.loss_func(y_logits.squeeze(), y_true)
+            return self.loss_func(y_logits.squeeze(), y_true.squeeze())
             # return F.binary_cross_entropy_with_logits(y_logits, y_true, 
             #                                 reduction=reduction,
             #                                 weight= class_weight)
@@ -385,7 +385,7 @@ class MultiClassClassifier(nn.Module):
     def loss(self, y_logits, y_true, ignore_nan=True):
         if ignore_nan:
             mask = ~torch.isnan(y_true)
-            if mask.sum() == 0:
+            if mask.sum().item() == 0:
                 return torch.tensor(0, dtype=torch.float32)
             return self.loss_func(y_logits[mask], y_true[mask].long())
         else:
@@ -441,6 +441,8 @@ class RegressionNN(nn.Module):
     def loss(self, y_pred, y_true, ignore_nan=False):
         if ignore_nan:
             mask = ~torch.isnan(y_true)
+            if mask.sum().item() == 0:
+                return torch.tensor(0, dtype=torch.float32)
             return self.loss_func(y_pred[mask], y_true[mask])
         else:
             return self.loss_func(y_pred, y_true)
@@ -485,6 +487,8 @@ class CoxNN(nn.Module):
     def loss(self, y_output, durations, events, ignore_nan=False):
         if ignore_nan:
             mask = ~torch.isnan(durations)
+            if mask.sum().item() == 0:
+                return torch.tensor(0, dtype=torch.float32)
             return self.loss_func(y_output[mask], durations[mask], events[mask])
         else:
             return self.loss_func(y_output, durations, events)

@@ -1,7 +1,7 @@
 # Use an official Python runtime as a parent image
 FROM python:3.9-slim
 
-LABEL Description="ReviveMed Linux environment for mz_embed_engine analysis using Python and R"
+LABEL Description="ReviveMed Linux environment for mz_embed_engine analysis using Python (R to be added later)"
 LABEL tags="revivemed-mz_embed_engine"
 
 # Set the working directory in the container
@@ -18,16 +18,18 @@ RUN apt-get update
 RUN apt-get install -y git
 # Install useful system packages
 RUN apt-get install -y screen htop
-# RUN apt-get update && apt-get install -y \
-#     pkg-config \
-#     libmariadb-dev-compat \
-#     default-libmysqlclient-dev \
-    # libmysqlclient-dev
+RUN apt-get install -y build-essential
+RUN apt-get install -y pkg-config
+RUN apt-get install -y libmariadb-dev-compat
+
+RUN pip install --upgrade pip
+RUN pip install mysqlclient
+
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements_4.txt
 
-# Make port 80 available to the world outside this container
-EXPOSE 80
+# Make port 8080 available to the world outside this container
+EXPOSE 8080
 
 # Define environment variable
 ENV NAME World
@@ -41,9 +43,8 @@ ENV NAME World
 # If you want to make changes to your code without having to rebuild the docker image
 # docker run -p 4000:80 -v $(pwd):/app your-image-name
 
-# sudo docker pull dockerrevivemed/mz_embed_engine:v1.0
-# sudo docker run -p 4000:80 dockerrevivemed/mz_embed_engine:v1.0
-# sudo docker run -it dockerrevivemed/mz_embed_engine:v1.0 /bin/bash
+# docker pull dockerrevivemed/mz_embed_engine:v1.1
+# docker run -it -p 8080:8080 -v ~/mz_embed_engine:/app dockerrevivemed/mz_embed_engine:v1.1 /bin/bash
 
 # git clone https://jonaheaton@bitbucket.org/revivemed/mz_embed_engine.git
 # git stash

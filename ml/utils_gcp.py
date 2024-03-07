@@ -5,7 +5,8 @@ from google.cloud import storage
 import gcsfs
 
 fs = gcsfs.GCSFileSystem()
-client = storage.Client()
+# client = storage.Client()
+client = storage.Client(project='mzlearn-webapp')
 
 gcp_root_path = f'Data-engine/JonahData'
 # gcp_root_path = f'Data-engine'

@@ -79,7 +79,7 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
     save_dir = kwargs.get('save_dir', None)
     end_state_eval_funcs = kwargs.get('end_state_eval_funcs', {})
     adversarial_mini_epochs = kwargs.get('adversarial_mini_epochs', 20)
-    yes_plot = kwargs.get('yes_plot', True)
+    yes_plot = kwargs.get('yes_plot', False)
 
     if save_dir is not None:
         save_trained_model = True
@@ -178,6 +178,7 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
 
 
         for phase in ['train', 'val']:
+            print('Phase', phase)
             if phase not in dataloaders:
                 continue
             if phase == 'train':
@@ -221,15 +222,14 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
                         z = encoder.transform(X)
                         encoder_loss = torch.tensor(0)
                     
+
                     if head_weight > 0:
                         y_head_output = head(torch.cat((z, clin_vars), 1))
+                        head_loss = head.loss(y_head_output, y_head)
                     else:
                         y_head_output = torch.tensor([])
+                        head_loss = torch.tensor(0)
                 
-                    head_loss = head.loss(y_head_output, y_head)
-                    # else:
-                    # y_head_output = torch.tensor([])
-                    # head_loss = torch.tensor(0)
 
                     if adversary_weight > 0:
                         z2 = z.detach()
