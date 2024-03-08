@@ -27,7 +27,7 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 goal_col = 'Nivo Benefit BINARY'
 # goal_col = 'MSKCC BINARY'
-study_name = goal_col + '_study_march08_0'
+study_name = goal_col + '_study_march08_1'
 
 
 def objective(trial):
@@ -43,6 +43,8 @@ def objective(trial):
     X_data = pd.read_csv(f'{data_dir}/X.csv', index_col=0)
     y_data = pd.read_csv(f'{data_dir}/y.csv', index_col=0)
     splits = pd.read_csv(f'{data_dir}/{splits_subdir}/splits.csv', index_col=0)
+    nan_data = pd.read_csv(f'{data_dir}/nans.csv', index_col=0)
+
 
     latent_size = trial.suggest_int('latent_size', 4, 100, log=True)
     activation = trial.suggest_categorical('activation', ['tanh', 'leakyrelu','sigmoid'])
@@ -69,6 +71,8 @@ def objective(trial):
         'num_folds': 50,
         # 'num_folds': 5,
         'hold_out_str': 'Validation',
+        'finetune_peak_freq_th': 0.8,
+        'overall_peak_freq_th': 0,
 
         ################
         ## Pretrain ##
@@ -154,6 +158,26 @@ def objective(trial):
     if save_dir is None:
         raise ValueError('save_dir must be defined')
     os.makedirs(save_dir, exist_ok=True)
+
+
+    # filter the features?
+    finetune_peak_freq_th = kwargs.get('finetune_peak_freq_th', 0)
+    overall_peak_freq_th = kwargs.get('overall_peak_freq_th', 0)
+    
+    peak_freq = nan_data.sum(axis=0)/nan_data.shape[0]
+    chosen_peaks_0 = peak_freq[peak_freq>overall_peak_freq_th].index.to_list()
+    
+    finetune_peak_freq = nan_data.loc[splits.index].sum(axis=0)/len(splits.index)
+    chosen_peaks_1 =  finetune_peak_freq[finetune_peak_freq>finetune_peak_freq_th].index.to_list()
+
+    chosen_feats = list(set(chosen_peaks_0) & set(chosen_peaks_1))
+    input_size = len(chosen_feats)
+    if input_size < 5:
+        raise ValueError('Not enough peaks to train the model')
+    
+    X_data = X_data[chosen_feats]
+    trial.set_user_attr('number of input peaks', input_size)
+
 
     # save the kwargs to json
     save_json(kwargs, os.path.join(save_dir, 'kwargs.json'))
