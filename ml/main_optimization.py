@@ -659,7 +659,7 @@ if __name__ == '__main__':
                                 pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=20, interval_steps=5))
     
     try:
-        study.optimize(objective, n_trials=1)
+        study.optimize(objective, n_trials=100)#, show_progress_bar=True, timeout=3600*24*7, gc_after_trial=True)
     except Exception as e:
         print(e)
     # finally:
