@@ -43,8 +43,8 @@ ENV NAME World
 # If you want to make changes to your code without having to rebuild the docker image
 # docker run -p 4000:80 -v $(pwd):/app your-image-name
 
-# docker pull dockerrevivemed/mz_embed_engine:v1.1
-# docker run -it -p 8080:8080 -v ~/mz_embed_engine:/app dockerrevivemed/mz_embed_engine:v1.1 /bin/bash
+# docker pull dockerrevivemed/mz_embed_engine:v1.2
+# docker run -it -p 8080:8080 -v ~/mz_embed_engine:/app dockerrevivemed/mz_embed_engine:v1.2 /bin/bash
 
 # git clone https://jonaheaton@bitbucket.org/revivemed/mz_embed_engine.git
 # git stash

@@ -50,7 +50,31 @@ svc_param_grid = {
 
 
 
-def run_train_sklearn_model(data_dict,save_dir,**kwargs):
+def run_train_sklearn_model(data_dict, save_dir, **kwargs):
+    """
+    Trains a sklearn model using the provided data and saves the model and results.
+
+    Args:
+        data_dict (dict): A dictionary containing the training data (and optionally validation and test data)
+            for the model. The keys are the phase names and the values are the data objects.
+            Currently the data objects are assumed to be torch tensors.
+        save_dir (str): The directory path where the model and results will be saved.
+        **kwargs: Additional keyword arguments for configuring the model training.
+            - model_name (str, optional): The name of the model. If not provided, the default name will be used.
+            - model_kind (str, optional): The kind of model to train. Default is 'logistic_regression'.
+            - param_grid (dict, optional): The parameter grid for hyperparameter tuning. Default is None.
+            - base_model (object, optional): The base model object. If not provided, a default model will be used based on the model_kind.
+            - phase_list (list, optional): The list of phases to train the model on. If not provided, all phases in the data_dict will be used.
+            - num_classes (int, optional): The number of classes in the target variable. If not provided, it will be inferred from the training data.
+            - feat_subset (object, optional): The feature subset selection object. Default is None.
+
+    Returns:
+        dict: A dictionary containing the model information and evaluation results.
+
+    Raises:
+        ValueError: If the model name is not recognized.
+        NotImplementedError: If feature subset selection is not yet implemented.
+    """
 
     # check that the input directory exists
     if not os.path.exists(save_dir):
@@ -111,7 +135,7 @@ def run_train_sklearn_model(data_dict,save_dir,**kwargs):
     # create the model
     if (param_grid is not None) and (len(param_grid) > 0):
         model = RandomizedSearchCV(base_model, param_distributions=param_grid, 
-                                n_iter=100, cv=5, verbose=2, random_state=42, n_jobs=-1)
+                                n_iter=100, cv=5, verbose=0, random_state=42, n_jobs=-1, scoring='roc_auc')
     
     
         model.fit(X_train, y_train)

@@ -6,7 +6,7 @@ import json
 from models import get_model
 from train import CompoundDataset, train_compound_model, get_end_state_eval_funcs
 from misc import get_dropbox_dir, download_data_dir, download_data_file, round_to_even, encode_df_col
-from utils_gcp import upload_file_to_bucket, download_file_from_bucket, check_file_exists_in_bucket, upload_path_to_bucket
+from utils_gcp import upload_file_to_bucket, download_file_from_bucket, check_file_exists_in_bucket
 import optuna
 import logging
 import sys
@@ -21,18 +21,14 @@ DATA_DIR = f'{BASE_DIR}/data'
 RESULT_DIR = f'{BASE_DIR}/results'
 TRIAL_DIR = f'{BASE_DIR}/trials'
 storage_name = 'optuna'
-USE_WEBAPP_DB = True
-SAVE_TRIALS = True
-WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
-# goal_col = 'Nivo Benefit BINARY'
-goal_col = 'MSKCC BINARY'
+goal_col = 'Nivo Benefit BINARY'
 
 def objective(trial):
 
     ############################
     # load the data
-    splits_subdir = f"{goal_col} finetune_folds" 
+    splits_subdir = "['MSKCC', 'Treatment', 'Benefit'] finetune_folds" 
     trail_dir = TRIAL_DIR
     data_dir = DATA_DIR
     result_dir = RESULT_DIR
@@ -64,8 +60,8 @@ def objective(trial):
         # 'y_finetune_cols': ['Benefit_encoded', 'Sex_encoded'], 
         'y_pretrain_cols': ['Cohort Label_encoded', 'Study ID_encoded'],
         'y_finetune_cols': [goal_col, 'Sex BINARY'],    
-        'num_folds': 50,
-        # 'num_folds': 5,
+        # 'num_folds': 50,
+        'num_folds': 5,
 
         ################
         ## Pretrain ##
@@ -79,8 +75,8 @@ def objective(trial):
         'pretrain_adv_kwargs' : {
             },
         'pretrain_kwargs': {
-            # 'num_epochs': 1,
-            'num_epochs': trial.suggest_int('pretrain_epochs', 50, 500,log=True),
+            'num_epochs': 1,
+            # 'num_epochs': trial.suggest_int('pretrain_epochs', 50, 1000,log=True),
             'lr': trial.suggest_float('pretrain_lr', 0.0001, 0.01, log=True),
             'encoder_weight': 1,
             'head_weight': 0,
@@ -110,8 +106,8 @@ def objective(trial):
         'finetune_adv_kwargs' : {
             },
         'finetune_kwargs': {
-            # 'num_epochs': 2,
-            'num_epochs': trial.suggest_int('finetune_epochs', 25, 250,log=True),
+            'num_epochs': 2,
+            # 'num_epochs': trial.suggest_int('finetune_epochs', 25, 500,log=True),
             'lr': trial.suggest_float('finetune_lr', 0.0001, 0.01, log=True),
             'encoder_weight': 0,
             'head_weight': 1,
@@ -415,7 +411,7 @@ if __name__ == '__main__':
     result_dir = RESULT_DIR
     trails_dir = TRIAL_DIR
     gcp_save_loc = 'March_6_Data'
-    study_name = goal_col + '_study_march07'
+    study_name = goal_col + '_study_0'
 
 
     os.makedirs(result_dir, exist_ok=True)
@@ -457,23 +453,15 @@ if __name__ == '__main__':
 
     # Set up logging
     optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
-    
-    
-    if USE_WEBAPP_DB:
-        print('using webapp database')
-        storage_name = WEBAPP_DB_LOC
-    else:
-        print('use local sqlite database downloaded from GCP bucket')
-        # save the study in a sqlite database located in result_dir
-        storage_loc = f'{result_dir}/{storage_name}.db'
-        if not os.path.exists(storage_loc):
-            print("checking if study exists on GCP")
-            if check_file_exists_in_bucket(gcp_save_loc, f'{storage_name}.db'):
-                print("downloading study from GCP")
-                download_file_from_bucket(gcp_save_loc, f'{storage_name}.db', local_path=result_dir)
+    # save the study in a sqlite database located in result_dir
+    storage_loc = f'{result_dir}/{storage_name}.db'
+    if not os.path.exists(storage_loc):
+        print("checking if study exists on GCP")
+        if check_file_exists_in_bucket(gcp_save_loc, f'{storage_name}.db'):
+            print("downloading study from GCP")
+            download_file_from_bucket(gcp_save_loc, f'{storage_name}.db', local_path=result_dir)
 
-        storage_name = f'sqlite:///{storage_loc}'
-
+    storage_name = f'sqlite:///{storage_loc}'
 
 
 
@@ -486,19 +474,13 @@ if __name__ == '__main__':
                                 pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=20, interval_steps=5))
     
     try:
-        study.optimize(objective, n_trials=8)
+        study.optimize(objective, n_trials=5)
     except Exception as e:
         print(e)
     # finally:
 
 
-    if not USE_WEBAPP_DB:
-        # we need to upload the results to GCP if not using the webapp DB
-        upload_file_to_bucket(storage_loc, gcp_save_loc, verbose=True)
-
-    if SAVE_TRIALS:
-        upload_path_to_bucket(trails_dir, gcp_save_loc, verbose=True)
-        # delete the data in the trials dir
-        os.system(f'rm -r {trails_dir}/*')
+    # we need to upload the results to GCP
+    upload_file_to_bucket(storage_loc, gcp_save_loc, verbose=True)
 
     # optuna-dashboard sqlite:///study_3.db

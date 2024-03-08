@@ -178,7 +178,7 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
 
 
         for phase in ['train', 'val']:
-            print('Phase', phase)
+            # print('Phase', phase)
             if phase not in dataloaders:
                 continue
             if phase == 'train':
@@ -241,6 +241,25 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
                         y_adversary_output = torch.tensor([])
                         adversary_loss = torch.tensor(0)
 
+                    # check if the losses are nan
+                    if torch.isnan(encoder_loss):
+                        if batch_idx == 0:
+                            print('Encoder loss is nan!')
+                        encoder_loss = torch.tensor(0)
+
+                    if torch.isnan(head_loss):
+                        if batch_idx == 0:
+                            print('Head loss is nan!')
+                        # print('Head loss is nan!')
+                        head_loss = torch.tensor(0)
+
+
+                    # new addition, if join loss is 0, then only nans are present
+                    # we don't want to backpropagate
+                    if (encoder_loss.item() == 0) and (head_loss.item() == 0):
+                        print('skipping backprop')
+                        continue
+
                     running_losses['raw_encoder'] += encoder_loss.item()
                     running_losses['raw_head'] += head_loss.item()
                     running_losses['raw_adversary'] += adversary_loss.item()
@@ -253,6 +272,7 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
                     epoch_adversary_targets = torch.cat((epoch_adversary_targets, y_adversary), 0)
                     
                     curr_batch = num_batches*epoch + batch_idx
+
                     if phase == 'train':
 
                         if encoder_weight > 0:
@@ -270,8 +290,10 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
                         joint_loss = (encoder_weight*encoder_loss + \
                             head_weight*head_loss - \
                             adversary_weight*adversary_loss)
+                        
                         joint_loss.backward(retain_graph=True)
                         
+
                         encoder_optimizer.step()
                         if head_weight > 0:
                             head_optimizer.step()
