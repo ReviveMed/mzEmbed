@@ -27,7 +27,7 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 goal_col = 'Nivo Benefit BINARY'
 # goal_col = 'MSKCC BINARY'
-study_name = goal_col + '_study_march08_1'
+study_name = goal_col + '_study_march08_2'
 
 
 def objective(trial):
@@ -71,8 +71,8 @@ def objective(trial):
         'num_folds': 50,
         # 'num_folds': 5,
         'hold_out_str': 'Validation',
-        'finetune_peak_freq_th': 0.8,
-        'overall_peak_freq_th': 0,
+        'finetune_peak_freq_th': trial.suggest_float('finetune_peak_freq_th', 0, 0.9, step=0.1),
+        'overall_peak_freq_th': trial.suggest_float('overall_peak_freq_th', 0, 0.5, step=0.1),
 
         ################
         ## Pretrain ##
@@ -164,14 +164,15 @@ def objective(trial):
     finetune_peak_freq_th = kwargs.get('finetune_peak_freq_th', 0)
     overall_peak_freq_th = kwargs.get('overall_peak_freq_th', 0)
     
-    peak_freq = nan_data.sum(axis=0)/nan_data.shape[0]
+    peak_freq = 1- nan_data.sum(axis=0)/nan_data.shape[0]
     chosen_peaks_0 = peak_freq[peak_freq>overall_peak_freq_th].index.to_list()
     
-    finetune_peak_freq = nan_data.loc[splits.index].sum(axis=0)/len(splits.index)
+    finetune_peak_freq = 1- nan_data.loc[splits.index].sum(axis=0)/len(splits.index)
     chosen_peaks_1 =  finetune_peak_freq[finetune_peak_freq>finetune_peak_freq_th].index.to_list()
 
     chosen_feats = list(set(chosen_peaks_0) & set(chosen_peaks_1))
     input_size = len(chosen_feats)
+    print('input size:', input_size)
     if input_size < 5:
         raise ValueError('Not enough peaks to train the model')
     
