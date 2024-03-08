@@ -27,6 +27,14 @@ def get_model(model_kind, input_size, **kwargs):
     return model
 
 
+def _reset_params(layer):
+    if hasattr(layer, 'reset_parameters'):
+        layer.reset_parameters()
+    else:
+        if hasattr(layer, 'children'):
+            for child in layer.children():
+                _reset_params(child)
+
 # create a dummy model
 class DummyModel(nn.Module):
     def __init__(self):
@@ -180,9 +188,7 @@ class VAE(nn.Module):
     #     self.decoder.apply(self._reset_weights)
 
     def reset_params(self):
-        for layer in self.children():
-            if hasattr(layer, 'reset_parameters'):
-                layer.reset_parameters()
+        _reset_params(self)
 
     def get_hyperparameters(self):
         return {'input_size': self.input_size,
@@ -245,9 +251,7 @@ class AE(nn.Module):
         return self.decoder(z)
 
     def reset_params(self):
-        for layer in self.children():
-            if hasattr(layer, 'reset_parameters'):
-                layer.reset_parameters()
+        _reset_params(self)
 
     def get_hyperparameters(self):
         return {'input_size': self.input_size,
@@ -325,9 +329,7 @@ class BinaryClassifier(nn.Module):
             #                                 weight= class_weight)
 
     def reset_params(self):
-        for layer in self.children():
-            if hasattr(layer, 'reset_parameters'):
-                layer.reset_parameters()
+        _reset_params(self)
 
     def get_hyperparameters(self):
         return {'input_size': self.input_size,
@@ -398,9 +400,7 @@ class MultiClassClassifier(nn.Module):
         return self.loss(self.forward(x), y_true)
 
     def reset_params(self):
-        for layer in self.children():
-            if hasattr(layer, 'reset_parameters'):
-                layer.reset_parameters()
+        _reset_params(self)
 
     def get_hyperparameters(self):
         return {'input_size': self.input_size,
@@ -449,9 +449,7 @@ class RegressionNN(nn.Module):
             # return F.mse_loss(y_pred, y_true, reduction='mean')
         
     def reset_params(self):
-        for layer in self.children():
-            if hasattr(layer, 'reset_parameters'):
-                layer.reset_parameters()
+        _reset_params(self)
 
     def get_hyperparameters(self):
         return {'input_size': self.input_size,
@@ -498,6 +496,9 @@ class CoxNN(nn.Module):
         # return F.sigmoid(self.network(x))
         return torch.exp(self.network(x))
     
+    def reset_params(self):
+        _reset_params(self)
+
     def get_hyperparameters(self):
         return {'input_size': self.input_size,
                 'hidden_size': self.hidden_size,

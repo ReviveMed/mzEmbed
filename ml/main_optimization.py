@@ -10,6 +10,7 @@ from utils_gcp import upload_file_to_bucket, download_file_from_bucket, check_fi
 import optuna
 import logging
 import sys
+import shutil
 
 ####################################################################################
 # Main functions
@@ -27,8 +28,8 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 goal_col = 'Nivo Benefit BINARY'
 # goal_col = 'MSKCC BINARY'
-study_name = goal_col + '_study_march08_2'
-
+study_name = goal_col + '_study_march08_3'
+TRIAL_DIR = f'{BASE_DIR}/trials/{study_name}'
 
 def objective(trial):
 
@@ -462,14 +463,15 @@ def objective(trial):
         if finetune_val_frac> 0:
             dataloaders['val'] = val_loader
 
-
+        # print(list(encoder.parameters())[0][:5])
         # Initialize the models
         finetune_head.reset_params()
         encoder.reset_params() 
         if finetune_adv is not None:
             finetune_adv.reset_params()
          
-
+        # print('reset') 
+        # print(list(encoder.parameters())[0][:5])
         # Run the train and evaluation
         _, _, _, rand_output = train_compound_model(dataloaders, encoder, finetune_head, finetune_adv, **randtune_kwargs)
 
@@ -585,7 +587,7 @@ if __name__ == '__main__':
     data_url = 'https://www.dropbox.com/scl/fo/d1yqlmyafvu8tzujlg4nk/h?rlkey=zrxfapacmgb6yxsmonw4yt986&dl=1'
     data_dir = DATA_DIR
     result_dir = RESULT_DIR
-    trials_dir = os.path.join(TRIAL_DIR, study_name)
+    trials_dir = TRIAL_DIR
     gcp_save_loc = 'March_6_Data'
 
 
@@ -657,7 +659,7 @@ if __name__ == '__main__':
                                 pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=20, interval_steps=5))
     
     try:
-        study.optimize(objective, n_trials=8)
+        study.optimize(objective, n_trials=1)
     except Exception as e:
         print(e)
     # finally:
@@ -670,6 +672,7 @@ if __name__ == '__main__':
     if SAVE_TRIALS:
         upload_path_to_bucket(trials_dir, gcp_save_loc, verbose=True)
         # delete the data in the trials dir
-        os.system(f'rm -r {trials_dir}/*')
+        # os.system(f'rm -r {trials_dir}/*')
+        shutil.rmtree(trials_dir)
 
     # optuna-dashboard sqlite:///study_3.db

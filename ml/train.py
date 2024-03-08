@@ -169,6 +169,7 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
 
     # start the training loop
     for epoch in range(num_epochs):
+        run_status = True
         if patience_counter > early_stopping_patience:
             print('Early stopping at epoch', epoch)
             encoder.load_state_dict(best_wts['encoder'])
@@ -257,7 +258,9 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
                     # new addition, if join loss is 0, then only nans are present
                     # we don't want to backpropagate
                     if (encoder_loss.item() == 0) and (head_loss.item() == 0):
-                        print('skipping backprop')
+                        if run_status:
+                            print('skipping backprop')
+                            run_status = False
                         continue
 
                     running_losses['raw_encoder'] += encoder_loss.item()
