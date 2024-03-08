@@ -5,7 +5,7 @@ import os
 import json
 from models import get_model
 from train import CompoundDataset, train_compound_model, get_end_state_eval_funcs
-from misc import get_dropbox_dir, download_data_dir, download_data_file, round_to_even, encode_df_col
+from misc import get_dropbox_dir, download_data_dir, download_data_file, round_to_even, encode_df_col, save_json
 from utils_gcp import upload_file_to_bucket, download_file_from_bucket, check_file_exists_in_bucket, upload_path_to_bucket
 import optuna
 import logging
@@ -25,8 +25,10 @@ USE_WEBAPP_DB = True
 SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
-# goal_col = 'Nivo Benefit BINARY'
-goal_col = 'MSKCC BINARY'
+goal_col = 'Nivo Benefit BINARY'
+# goal_col = 'MSKCC BINARY'
+study_name = goal_col + '_study_march08_0'
+
 
 def objective(trial):
 
@@ -66,6 +68,7 @@ def objective(trial):
         'y_finetune_cols': [goal_col, 'Sex BINARY'],    
         'num_folds': 50,
         # 'num_folds': 5,
+        'hold_out_str': 'Validation',
 
         ################
         ## Pretrain ##
@@ -73,8 +76,16 @@ def objective(trial):
         'pretrain_val_frac': 0.1,
         'pretrain_batch_size': 32,
         'pretrain_head_kind': 'NA',
-        'pretrain_head_kwargs' : {
-            },
+        'pretrain_head_kwargs' : {},
+        # 'pretrain_head_kind': 'MultiClassClassifier',
+        # 'pretrain_head_kwargs' : {
+        #     'hidden_size': 4,
+        #     'num_hidden_layers': 1,
+        #     'dropout_rate': 0,
+        #     'activation': activation,
+        #     'use_batch_norm': False,
+        #     'num_classes': 4,
+        #     },
         'pretrain_adv_kind': 'NA',
         'pretrain_adv_kwargs' : {
             },
@@ -95,7 +106,7 @@ def objective(trial):
         ################
         ## Finetune ##
 
-        'finetune_val_frac': 0.1,
+        'finetune_val_frac': 0,
         'finetune_batch_size': 32,
         'finetune_head_kind': 'BinaryClassifier',
         'finetune_head_kwargs' : {
@@ -117,18 +128,15 @@ def objective(trial):
             'head_weight': 1,
             'adversary_weight': 0,
             'noise_factor': 0,
-            'early_stopping_patience': 10,
+            'early_stopping_patience': -1,
             'loss_avg_beta': -1,
             'end_state_eval_funcs': get_end_state_eval_funcs(),
             'adversarial_mini_epochs': 20
         },
     }
   
-
-
-    ############################
-    # load the kwargs
-
+    ########################################################
+    # Set Up
 
     save_dir = kwargs.get('save_dir', None)
     encoder_kind = kwargs.get('encoder_kind', 'AE')
@@ -138,6 +146,7 @@ def objective(trial):
     y_pretrain_cols = kwargs.get('y_pretrain_cols', None)
     y_finetune_cols = kwargs.get('y_finetune_cols', None)
     num_folds = kwargs.get('num_folds', None)
+    hold_out_str = kwargs.get('hold_out_str', None)
 
     if num_folds is None:
         num_folds = splits.shape[1]
@@ -146,8 +155,14 @@ def objective(trial):
         raise ValueError('save_dir must be defined')
     os.makedirs(save_dir, exist_ok=True)
 
+    # save the kwargs to json
+    save_json(kwargs, os.path.join(save_dir, 'kwargs.json'))
+    # with open(os.path.join(save_dir, 'kwargs.json'), 'w') as f:
+    #     json.dump(kwargs, f, indent=4)
+
     ############################
     # Filter, preprocess Data
+
     X_pretrain = X_data
     y_pretrain = y_data[y_pretrain_cols].astype(float)
 
@@ -156,8 +171,10 @@ def objective(trial):
 
     input_size = X_pretrain.shape[1]
 
-    ############################
+    ########################################################
     # Pretrain
+    ########################################################
+
     pretrain_batch_size = kwargs.get('pretrain_batch_size', 32)
     pretrain_val_frac = kwargs.get('pretrain_val_frac', 0)
     pretrain_head_kind = kwargs.get('pretrain_head_kind', 'NA')
@@ -214,8 +231,11 @@ def objective(trial):
     #TODO: Add user attributes related to the pretraining
     trial.set_user_attr('reconstruction loss', pretrain_result) 
 
-    ############################
-    # Finetune
+
+    ########################################################
+    # Finetune Set Up
+    ########################################################
+
     finetune_batch_size = kwargs.get('finetune_batch_size', 32)
     finetune_val_frac = kwargs.get('finetune_val_frac', 0)
     finetune_head_kind = kwargs.get('finetune_head_kind', 'MultiClassClassifier')
@@ -224,17 +244,24 @@ def objective(trial):
     finetune_adv_kwargs = kwargs.get('finetune_adv_kwargs', {})
     finetune_kwargs = kwargs.get('finetune_kwargs', {})
 
-    finetune_dir = os.path.join(save_dir, 'finetune')
-    finetune_kwargs['save_dir'] = finetune_dir
-    os.makedirs(finetune_dir, exist_ok=True)
-
     head_col = y_finetune_cols[0]
     adv_col = y_finetune_cols[1]
 
     finetune_head = get_model(finetune_head_kind, latent_size+other_size, **finetune_head_kwargs)
     finetune_adv = get_model(finetune_adv_kind, latent_size, **finetune_adv_kwargs)
 
-    #### Start the CV loop
+
+    ########################################################
+    # Finetune from Pretrained Encoder
+    ########################################################
+
+    finetune_dir = os.path.join(save_dir, 'finetune')
+    finetune_kwargs['save_dir'] = finetune_dir
+    os.makedirs(finetune_dir, exist_ok=True)
+
+    ############################
+    # Start the CV loop
+    ############################
     finetune_results = []
     for n_fold in range(num_folds):
         print('fold:', n_fold)
@@ -297,15 +324,84 @@ def objective(trial):
             raise optuna.TrialPruned()
 
 
+    trial.set_user_attr('finetune AUC std', np.std(finetune_results))
+    trial.set_user_attr('finetune AUC avg', np.mean(finetune_results))
+
     ############################
+    # Train on the full dataset, and evaluate on an independent test set,
+    ############################
+    if (hold_out_str) and (hold_out_str in y_data['Set'].unique()):
+        X_train, y_train = X_finetune, y_finetune
+        hold_out_files = y_data[y_data['Set'] == hold_out_str].index.to_list()
+        X_test = X_data.loc[hold_out_files]
+        y_test = y_data.loc[hold_out_files][y_finetune_cols].astype(float)
+
+
+        train_dataset = CompoundDataset(X_train, y_train[head_col], y_train[adv_col])
+        test_dataset = CompoundDataset(X_test, y_test[head_col], y_test[adv_col])
+        
+        if finetune_head_kind != 'NA':
+            num_classes_finetune_head = train_dataset.get_num_classes_head()
+            weights_finetune_head = train_dataset.get_class_weights_head()
+            finetune_head.define_loss(class_weight=weights_finetune_head)
+
+        if finetune_adv_kind != 'NA':    
+            num_classes_finetune_adv = train_dataset.get_num_classes_adv()
+            weights_finetune_adv = train_dataset.get_class_weights_adv()
+            finetune_adv.define_loss(class_weight=weights_finetune_adv)
+
+
+        # Split the training dataset into training and validation sets
+        if finetune_val_frac>0:
+            train_size = int((1-finetune_val_frac) * len(train_dataset))
+            val_size = len(train_dataset) - train_size
+
+            train_dataset, val_dataset = torch.utils.data.random_split(train_dataset, [train_size, val_size])
+            val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=finetune_batch_size, shuffle=False)
+
+
+        dataloaders = {
+            'train': torch.utils.data.DataLoader(train_dataset, batch_size=finetune_batch_size, shuffle=True),
+            'test': torch.utils.data.DataLoader(test_dataset, batch_size=finetune_batch_size, shuffle=False)
+        }
+        
+        if finetune_val_frac> 0:
+            dataloaders['val'] = val_loader
+
+        
+        # Initialize the models
+        finetune_head.reset_params()
+        if finetune_adv is not None:
+            finetune_adv.reset_params()
+        encoder.reset_params()
+
+        encoder.load_state_dict(torch.load(os.path.join(pretrain_dir, 'encoder.pth')))
+
+
+        # Run the train and evaluation
+        _, _, _, finetune_output = train_compound_model(dataloaders, encoder, finetune_head, finetune_adv, **finetune_kwargs)
+
+        hold_out_finetune_result = finetune_output['end_state_eval']['test']['head_auc']
+    else:
+        hold_out_finetune_result = 0
+
+    trial.set_user_attr('Hold Out Finetune AUC', hold_out_finetune_result)
+
+
+    ########################################################
     # Finetune from Random
+    ########################################################
+
     randtune_dir = os.path.join(save_dir, 'randtune')
     os.makedirs(randtune_dir, exist_ok=True)
     randtune_kwargs = finetune_kwargs
     randtune_kwargs['save_dir'] = randtune_dir
     
     rand_results = []
-    #### Start the CV loop
+
+    ############################
+    # Start the CV loop
+    ############################
     for n_fold in range(num_folds):
         X_train, y_train = X_finetune.loc[~splits.iloc[:,n_fold]], y_finetune.loc[~splits.iloc[:,n_fold]]
         X_test, y_test = X_finetune.loc[splits.iloc[:,n_fold]], y_finetune.loc[splits.iloc[:,n_fold]]
@@ -341,27 +437,13 @@ def objective(trial):
         if finetune_val_frac> 0:
             dataloaders['val'] = val_loader
 
-        
-        # Print the first 3 parameter values of the model
-        # params = list(encoder.parameters())
-        # print(params[0].data)
-        # print(params[1].data)
-        # print(params[2].data)
 
         # Initialize the models
         finetune_head.reset_params()
         encoder.reset_params() 
         if finetune_adv is not None:
             finetune_adv.reset_params()
-        
-        # Print the first 3 parameter values of the model
-        # params = list(encoder.parameters())
-        # print(params[0].data)
-        # print(params[1].data)
-        # print(params[2].data)
-
-        encoder.load_state_dict(torch.load(os.path.join(pretrain_dir, 'encoder.pth')))
- 
+         
 
         # Run the train and evaluation
         _, _, _, rand_output = train_compound_model(dataloaders, encoder, finetune_head, finetune_adv, **randtune_kwargs)
@@ -369,13 +451,78 @@ def objective(trial):
         rand_result = rand_output['end_state_eval']['test']['head_auc']
         rand_results.append(rand_result)
 
+    trial.set_user_attr('rand AUC std', np.std(rand_results))
+    trial.set_user_attr('rand AUC avg', np.mean(rand_results))
+
+    ############################
+    # Train on the full dataset, and evaluate on an independent test set,
+    ############################
+    if (hold_out_str) and (hold_out_str in y_data['Set'].unique()):
+        X_train, y_train = X_finetune, y_finetune
+        hold_out_files = y_data[y_data['Set'] == hold_out_str].index.to_list()
+        X_test = X_data.loc[hold_out_files]
+        y_test = y_data.loc[hold_out_files][y_finetune_cols].astype(float)
+
+
+        train_dataset = CompoundDataset(X_train, y_train[head_col], y_train[adv_col])
+        test_dataset = CompoundDataset(X_test, y_test[head_col], y_test[adv_col])
+        
+        if finetune_head_kind != 'NA':
+            num_classes_finetune_head = train_dataset.get_num_classes_head()
+            weights_finetune_head = train_dataset.get_class_weights_head()
+            finetune_head.define_loss(class_weight=weights_finetune_head)
+
+        if finetune_adv_kind != 'NA':    
+            num_classes_finetune_adv = train_dataset.get_num_classes_adv()
+            weights_finetune_adv = train_dataset.get_class_weights_adv()
+            finetune_adv.define_loss(class_weight=weights_finetune_adv)
+
+        # Split the training dataset into training and validation sets
+        if finetune_val_frac>0:
+            train_size = int((1-finetune_val_frac) * len(train_dataset))
+            val_size = len(train_dataset) - train_size
+
+            train_dataset, val_dataset = torch.utils.data.random_split(train_dataset, [train_size, val_size])
+            val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=finetune_batch_size, shuffle=False)
+
+
+        dataloaders = {
+            'train': torch.utils.data.DataLoader(train_dataset, batch_size=finetune_batch_size, shuffle=True),
+            'test': torch.utils.data.DataLoader(test_dataset, batch_size=finetune_batch_size, shuffle=False)
+        }
+        
+        if finetune_val_frac> 0:
+            dataloaders['val'] = val_loader
+
+
+        # Initialize the models
+        finetune_head.reset_params()
+        encoder.reset_params() 
+        if finetune_adv is not None:
+            finetune_adv.reset_params()
+         
+
+        # Run the train and evaluation
+        _, _, _, rand_output = train_compound_model(dataloaders, encoder, finetune_head, finetune_adv, **randtune_kwargs)
+
+        hold_out_rand_result = rand_output['end_state_eval']['test']['head_auc']
+        trial.set_user_attr('Hold Out Rand AUC', hold_out_rand_result)
+    else:
+        hold_out_rand_result = 0
+        trial.set_user_attr('Hold Out Rand AUC', 0)
+
+
+
 
     ############################
     # create a summary of the results
+    ############################
     result_dct = {
         'pretrain': pretrain_result,
         'finetune': finetune_results,
         'randtune': rand_results,
+        'hold_out_finetune': hold_out_finetune_result,
+        'hold_out_rand': hold_out_rand_result,
         # 'kwargs': kwargs
     }
     result_save_file = os.path.join(save_dir, 'result.json')
@@ -386,8 +533,8 @@ def objective(trial):
     print('randtune:', rand_results)
 
     obj_0 = np.mean(finetune_results)
+    
     obj_1 = obj_0 - np.mean(rand_results)
-    trial.set_user_attr('rand AUC', np.mean(rand_results))
 
     return obj_0
 
@@ -413,13 +560,12 @@ if __name__ == '__main__':
     data_url = 'https://www.dropbox.com/scl/fo/d1yqlmyafvu8tzujlg4nk/h?rlkey=zrxfapacmgb6yxsmonw4yt986&dl=1'
     data_dir = DATA_DIR
     result_dir = RESULT_DIR
-    trails_dir = TRIAL_DIR
+    trials_dir = os.path.join(TRIAL_DIR, study_name)
     gcp_save_loc = 'March_6_Data'
-    study_name = goal_col + '_study_march07'
 
 
     os.makedirs(result_dir, exist_ok=True)
-    os.makedirs(trails_dir, exist_ok=True)
+    os.makedirs(trials_dir, exist_ok=True)
     os.makedirs(data_dir, exist_ok=True)
     if not os.path.exists(f'{data_dir}/X.csv'):
         print('downloading data from dropbox')
@@ -497,8 +643,8 @@ if __name__ == '__main__':
         upload_file_to_bucket(storage_loc, gcp_save_loc, verbose=True)
 
     if SAVE_TRIALS:
-        upload_path_to_bucket(trails_dir, gcp_save_loc, verbose=True)
+        upload_path_to_bucket(trials_dir, gcp_save_loc, verbose=True)
         # delete the data in the trials dir
-        os.system(f'rm -r {trails_dir}/*')
+        os.system(f'rm -r {trials_dir}/*')
 
     # optuna-dashboard sqlite:///study_3.db

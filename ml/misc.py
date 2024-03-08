@@ -4,6 +4,37 @@ import pandas as pd
 import torch
 import requests
 import zipfile
+import json
+
+###################
+## Basic File I/O Functions
+###################
+def load_json(file_path):
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+    return data
+
+def clean_for_json(data):
+    if isinstance(data, list):
+        data = [clean_for_json(d) for d in data]
+
+    if isinstance(data, dict):
+        data = {k: clean_for_json(v) for k, v in data.items()}
+
+    if isinstance(data, np.int64):
+        data = int(data)
+
+    if callable(data):
+        # convert function to string
+        data = str(data)
+    
+    return data
+
+def save_json(data, file_path):
+    data = clean_for_json(data)
+    with open(file_path, 'w') as f:
+        json.dump(data, f, indent=4)
+
 
 ####################################################################################
 # Download data
