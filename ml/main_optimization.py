@@ -26,8 +26,8 @@ USE_WEBAPP_DB = True
 SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
-# goal_col = 'Nivo Benefit BINARY'
-goal_col = 'MSKCC BINARY'
+goal_col = 'Nivo Benefit BINARY'
+# goal_col = 'MSKCC BINARY'
 study_name = goal_col + '_study_march08_3'
 TRIAL_DIR = f'{BASE_DIR}/trials/{study_name}'
 
