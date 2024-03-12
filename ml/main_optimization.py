@@ -34,7 +34,7 @@ TRIAL_DIR = f'{BASE_DIR}/trials/{study_name}'
 
 def objective(trial):
 
-    ############################
+    ########################################################
     # load the data
     splits_subdir = f"{goal_col} finetune_folds" 
     trail_dir = TRIAL_DIR
@@ -44,31 +44,53 @@ def objective(trial):
 
     X_data = pd.read_csv(f'{data_dir}/X.csv', index_col=0)
     y_data = pd.read_csv(f'{data_dir}/y.csv', index_col=0)
-    splits = pd.read_csv(f'{data_dir}/{splits_subdir}/splits.csv', index_col=0)
+    
+    # Get the pretrain, finetune cols
+    pretrain_files = y_data[y_data['Set'] == 'Pretrain'].index.to_list()
+    finetune_files = y_data[y_data['Set'] == 'Finetune'].index.to_list() # should be the same as splits
+
+    splits_file_path = f'{data_dir}/{splits_subdir}/splits.csv'
+    if os.path.exists(splits_file_path):
+        splits = pd.read_csv(f'{data_dir}/{splits_subdir}/splits.csv', index_col=0)
+    else:
+        print('WARNING: Missing splits file')
+        splits= None
+
     nan_data = pd.read_csv(f'{data_dir}/nans.csv', index_col=0)
 
 
-    # latent_size = trial.suggest_int('latent_size', 4, 100, log=True)
-    latent_size = -1
+    ########################################################
+    # Specify the model arcitecture and hyperparameters
 
     activation = trial.suggest_categorical('activation', ['tanh', 'leakyrelu','sigmoid'])
+    encoder_kind = 'TGEM_Encoder'
+    # encoder_kind = trial.suggest_categorical('encoder_kind', ['AE', 'VAE'])
+
+    if encoder_kind == 'AE' or encoder_kind == 'VAE':
+        latent_size = trial.suggest_int('latent_size', 4, 100, log=True)
+        encoder_kwargs = {
+            'activation': activation,
+            'latent_size': latent_size,
+            'num_hidden_layers': trial.suggest_int('num_hidden_layers', 1, 5),
+            'dropout_rate': trial.suggest_float('dropout_rate', 0, 0.4, step=0.1),
+            'use_batch_norm': False, #trial.suggest_categorical('use_batch_norm', [True, False]),
+            'hidden_size': round(1.5*latent_size), #trial.suggest_float('hidden_size_mult',1,2, step=0.1)*latent_size,
+            # 'hidden_sizes': [trial.suggest_int('hidden_size', 2, 100, log=True) for _ in range(trial.suggest_int('num_layers', 1, 5))],
+            }
+    else:
+        latent_size = -1
+        encoder_kwargs = {
+            'dropout_rate': trial.suggest_float('dropout_rate', 0, 0.4, step=0.1),
+            'n_head': trial.suggest_int('num_hidden_layers', 1, 5),
+        }
+
     kwargs = {
         ################
         ## General ##
 
         'save_dir': os.path.join(trail_dir, f'trial_{trial.datetime_start}__{trial.number}'),
-        # 'encoder_kind': trial.suggest_categorical('encoder_kind', ['AE', 'VAE']),
-        'encoder_kind': 'TGEM_Encoder',
-        'encoder_kwargs': {},
-        # 'encoder_kwargs': {
-        #     'activation': activation,
-        #     'latent_size': latent_size,
-        #     'num_hidden_layers': trial.suggest_int('num_hidden_layers', 1, 5),
-        #     'dropout_rate': trial.suggest_float('dropout_rate', 0, 0.4, step=0.1),
-        #     'use_batch_norm': False, #trial.suggest_categorical('use_batch_norm', [True, False]),
-        #     'hidden_size': round(1.5*latent_size), #trial.suggest_float('hidden_size_mult',1,2, step=0.1)*latent_size,
-        #     # 'hidden_sizes': [trial.suggest_int('hidden_size', 2, 100, log=True) for _ in range(trial.suggest_int('num_layers', 1, 5))],
-        #     },
+        'encoder_kind': encoder_kind,
+        'encoder_kwargs': encoder_kwargs,
         'other_size': 1,
         # 'y_pretrain_cols': ['Cohort Label_encoded', 'Study ID_encoded'],
         # 'y_finetune_cols': ['Benefit_encoded', 'Sex_encoded'], 
@@ -81,6 +103,9 @@ def objective(trial):
         # 'overall_peak_freq_th': trial.suggest_float('overall_peak_freq_th', 0, 0.5, step=0.1),
         'finetune_peak_freq_th': 0.1,
         'overall_peak_freq_th': 0.4,
+        'pretrain_peak_freq_th': 0.1,
+        'finetune_var_q_th': 0.1,
+        'finetune_var_th': None,
 
         ################
         ## Pretrain ##
@@ -174,24 +199,59 @@ def objective(trial):
     hold_out_str_list = kwargs.get('hold_out_str_list', [])
 
     if num_folds is None:
-        num_folds = splits.shape[1]
+        num_folds = 5 #splits.shape[1]
 
     if save_dir is None:
         raise ValueError('save_dir must be defined')
     os.makedirs(save_dir, exist_ok=True)
 
 
-    # filter the features?
-    finetune_peak_freq_th = kwargs.get('finetune_peak_freq_th', 0)
-    overall_peak_freq_th = kwargs.get('overall_peak_freq_th', 0)
-    
-    peak_freq = 1- nan_data.sum(axis=0)/nan_data.shape[0]
-    chosen_peaks_0 = peak_freq[peak_freq>overall_peak_freq_th].index.to_list()
-    
-    finetune_peak_freq = 1- nan_data.loc[splits.index].sum(axis=0)/len(splits.index)
-    chosen_peaks_1 =  finetune_peak_freq[finetune_peak_freq>finetune_peak_freq_th].index.to_list()
+    if splits is None:
+        print('Generate Splits on the fly')
+        splits = pd.DataFrame(index=finetune_files, columns=range(num_folds), dtype=int)
+        splits = splits.fillna(0)
+        for i in range(num_folds):
+            splits[splits.sample(frac=0.2), i] = 1
 
-    chosen_feats = list(set(chosen_peaks_0) & set(chosen_peaks_1))
+    ############################
+    # Filter the Peaks
+            
+    finetune_peak_freq_th = kwargs.get('finetune_peak_freq_th', 0)
+    pretrain_peak_freq_th = kwargs.get('pretrain_peak_freq_th', 0)
+    overall_peak_freq_th = kwargs.get('overall_peak_freq_th', 0)
+    finetune_var_q_th = kwargs.get('finetune_var_q_th', 0)
+    finetune_var_th = kwargs.get('finetune_var_th', None)
+
+    finetune_peak_freq = 1- nan_data.loc[finetune_files].sum(axis=0)/len(finetune_files)
+    pretrain_peak_freq = 1- nan_data.loc[pretrain_files].sum(axis=0)/len(pretrain_files)
+    overall_peak_freq = 1- nan_data.sum(axis=0)/nan_data.shape[0]
+    finetune_var = X_data.loc[finetune_files].var(axis=0)
+
+    if (finetune_var_th is None) and (finetune_var_q_th > 0):
+        finetune_var_th = finetune_var.quantile(finetune_var_q_th)
+        print('finetune_var_th:', finetune_var_th)
+    elif finetune_var_th is None:
+        finetune_var_th = 0
+     
+
+    peak_filt_df = pd.DataFrame({
+            'finetune_peak_freq': finetune_peak_freq,
+            'pretrain_peak_freq': pretrain_peak_freq,
+            'overall_peak_freq': overall_peak_freq,
+            'finetune_var': finetune_var,
+        }, index=X_data.columns)
+    
+    
+    chosen_feats = peak_filt_df[  (peak_filt_df['finetune_peak_freq'] >= finetune_peak_freq_th)
+                                & (peak_filt_df['pretrain_peak_freq'] >= pretrain_peak_freq_th)
+                                & (peak_filt_df['overall_peak_freq'] >= overall_peak_freq_th)
+                                & (peak_filt_df['finetune_var'] >= finetune_var_th)
+                            ].index.to_list() 
+    peak_filt_df['chosen'] = False
+    peak_filt_df.loc[chosen_feats, 'chosen'] = True
+    peak_filt_df.to_csv(os.path.join(save_dir, 'peak_filt_df.csv'))
+
+
     input_size = len(chosen_feats)
     if latent_size < 0:
         latent_size = input_size
@@ -199,14 +259,11 @@ def objective(trial):
     if input_size < 5:
         raise ValueError('Not enough peaks to train the model')
     
-    X_data = X_data[chosen_feats]
+    X_data = X_data[chosen_feats].copy()
     trial.set_user_attr('number of input peaks', input_size)
-
 
     # save the kwargs to json
     save_json(kwargs, os.path.join(save_dir, 'kwargs.json'))
-    # with open(os.path.join(save_dir, 'kwargs.json'), 'w') as f:
-    #     json.dump(kwargs, f, indent=4)
 
     result_dct  = {}
     result_dct['kwargs'] = kwargs
@@ -214,8 +271,8 @@ def objective(trial):
     ############################
     # Filter, preprocess Data
 
-    X_pretrain = X_data
-    y_pretrain = y_data[y_pretrain_cols].astype(float)
+    X_pretrain = X_data.loc[pretrain_files]
+    y_pretrain = y_data.loc[pretrain_files][y_pretrain_cols].astype(float)
 
     X_finetune = X_data.loc[splits.index]
     y_finetune = y_data.loc[splits.index][y_finetune_cols].astype(float)

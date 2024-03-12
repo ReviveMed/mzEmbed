@@ -624,7 +624,7 @@ class res_connect(nn.Module):
 
 
 class TGEM_Encoder(torch.nn.Module):
-    def __init__(self, input_size,  n_head=5, dropout_rate=0.3, act_fun='linear', 
+    def __init__(self, input_size,  n_head=5, dropout_rate=0.3, activation='linear', 
                  query_gene=64, d_ff=1024, mode=0, n_layers=3):
         super(TGEM_Encoder, self).__init__()
         self.goal = 'encode'
@@ -633,23 +633,33 @@ class TGEM_Encoder(torch.nn.Module):
         self.input_size = input_size
         self.d_ff = d_ff
         self.dropout_rate = dropout_rate
-        self.act_fun = act_fun
+        self.activation = activation
         self.n_layers = n_layers
+        ##########   ##########
         # mode 1 is not working right now.
         self.mode = mode
         self.query_gene = query_gene #in original version, this was not a object parameter 
+        # query gene is NOT used when mode=0. It is used when mode=1. 
+        # But according to the code, mode 1 isn't even working
+        if mode == 1:
+            raise NotImplementedError('mode 1 is not working right now.')
+        ##########   ##########
 
-        if n_layers != 3:
-            raise NotImplementedError('n_layers must be 3 for TGEM_Encoder')
+        if n_layers > 3:
+            raise NotImplementedError('n_layers must be 3 or less for TGEM_Encoder')
 
-        if self.act_fun == 'relu':
+        if self.activation == 'relu':
             self.activation_func = torch.nn.ReLU()
-        elif self.act_fun == 'leakyrelu':
+        elif self.activation == 'leakyrelu':
             self.activation_func = torch.nn.LeakyReLU(0.1)
-        elif self.act_fun == 'gelu':
+        elif self.activation == 'gelu':
             self.activation_func = torch.nn.GELU()
-        elif self.act_fun == 'linear':
+        elif self.activation == 'linear':
             self.activation_func = torch.nn.Identity()
+        elif self.activation == 'tanh':
+            self.activation_func = torch.nn.Tanh()
+        elif self.activation == 'sigmoid':
+            self.activation_func = torch.nn.Sigmoid()
         else:
             raise ValueError('{} is not a valid activation function'.format(self.act_fun))
 
@@ -678,14 +688,22 @@ class TGEM_Encoder(torch.nn.Module):
 
         out_attn = self.mulitiattention1(x)
         out_attn_1 = self.sublayer(x, out_attn)
+        
+        if self.n_layers < 2:
+            return self.activation_func(out_attn_1)
+        
         out_attn_2 = self.mulitiattention2(out_attn_1)
         out_attn_2 = self.sublayer(out_attn_1, out_attn_2)
+        
+        if self.n_layers < 3:
+            return self.activation_func(out_attn_2)
+        
         out_attn_3 = self.mulitiattention3(out_attn_2)
         out_attn_3 = self.sublayer(out_attn_2, out_attn_3)
-        y_output = self.activation_func(out_attn_3)
-        # y_output = F.log_softmax(y_output, dim=1) # not as numerically stable as using CrossEntropyLoss
-
-        return y_output
+        if self.n_layers < 4:
+            return self.activation_func(out_attn_3)
+        
+        return self.activation_func(out_attn_3)
     
     def transform(self, x):
         return self.forward(x)
@@ -710,7 +728,7 @@ class TGEM_Encoder(torch.nn.Module):
                 'query_gene': self.query_gene,
                 'd_ff': self.d_ff,
                 'dropout_rate': self.dropout_rate,
-                'act_fun': self.act_fun}        
+                'activation': self.activation}        
 
 
 

@@ -206,7 +206,7 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
             for batch_idx, data in enumerate(dataloaders[phase]):
                 if encoder_type == 'TGEM_Encoder':
                     print('Batch', batch_idx, '/', num_batches)
-                    if batch_idx> 5:
+                    if batch_idx> 3:
                         continue
 
                 X, y_head, y_adversary, clin_vars = data

@@ -16,7 +16,10 @@ import torch
 
 
 
-def generate_latent_space(X_data, encoder, batch_size=32):
+def generate_latent_space(X_data, encoder, batch_size=128):
+    if isinstance(X_data, pd.DataFrame):
+        x_index = X_data.index
+        X_data = torch.tensor(X_data.to_numpy(), dtype=torch.float32)
     Z = torch.tensor([])
     with torch.inference_mode():
         for i in range(0, len(X_data), batch_size):
@@ -24,7 +27,7 @@ def generate_latent_space(X_data, encoder, batch_size=32):
             Z_batch = encoder.transform(X_data[i:i+batch_size])
             Z = torch.cat((Z, Z_batch), dim=0)
         Z = Z.detach().numpy()
-        Z = pd.DataFrame(Z, index=X_data.index)
+        Z = pd.DataFrame(Z, index=x_index)
     return Z
 
 
