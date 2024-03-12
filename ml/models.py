@@ -16,6 +16,8 @@ def get_model(model_kind, input_size, **kwargs):
         model = VAE(input_size = input_size, **kwargs)
     elif model_kind == 'AE':
         model = AE(input_size = input_size, **kwargs)
+    elif model_kind == 'TGEM_Encoder':
+        model = TGEM_Encoder(input_size = input_size, **kwargs)
     elif model_kind == 'TGEM':
         model = TGEM(input_size = input_size, **kwargs)
     elif model_kind == 'BinaryClassifier':
@@ -131,6 +133,7 @@ class VAE(nn.Module):
                  activation='leakyrelu', use_batch_norm=False, act_on_latent_layer=False):
         super(VAE, self).__init__()
         self.goal = 'encode'
+        self.kind = 'VAE'
         self.latent_size = latent_size
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -209,6 +212,7 @@ class AE(nn.Module):
                  activation='leakyrelu', use_batch_norm=False, act_on_latent_layer=False):
         super(AE, self).__init__()
         self.goal = 'encode'
+        self.kind = 'AE'
         self.latent_size = latent_size
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -620,18 +624,23 @@ class res_connect(nn.Module):
 
 
 class TGEM_Encoder(torch.nn.Module):
-    def __init__(self, input_size,  n_head, dropout_rate=0.3, act_fun='linear', 
-                 query_gene=64, d_ff=1024, mode=0):
+    def __init__(self, input_size,  n_head=5, dropout_rate=0.3, act_fun='linear', 
+                 query_gene=64, d_ff=1024, mode=0, n_layers=3):
         super(TGEM_Encoder, self).__init__()
         self.goal = 'encode'
+        self.kind = 'TGEM_Encoder'
         self.n_head = n_head
         self.input_size = input_size
         self.d_ff = d_ff
         self.dropout_rate = dropout_rate
         self.act_fun = act_fun
+        self.n_layers = n_layers
         # mode 1 is not working right now.
         self.mode = mode
         self.query_gene = query_gene #in original version, this was not a object parameter 
+
+        if n_layers != 3:
+            raise NotImplementedError('n_layers must be 3 for TGEM_Encoder')
 
         if self.act_fun == 'relu':
             self.activation_func = torch.nn.ReLU()
@@ -657,6 +666,8 @@ class TGEM_Encoder(torch.nn.Module):
         self.dropout = nn.Dropout(dropout_rate)
         self.sublayer = res_connect(input_size, dropout_rate)
     
+    def reset_params(self):
+        _reset_params(self)
 
     def feedforward(self, x):
         out = F.relu(self.ffn1(x))
@@ -676,6 +687,22 @@ class TGEM_Encoder(torch.nn.Module):
 
         return y_output
     
+    def transform(self, x):
+        return self.forward(x)
+    
+    def generate(self, x):
+        # return a zero tensor the same size as x
+        return torch.zeros_like(x)
+    
+    def loss(self, x, x_recon):
+        return torch.tensor(0, dtype=torch.float32)
+    
+    def forward_to_loss(self, x):
+        return torch.tensor(0, dtype=torch.float32)
+
+    def transform_with_loss(self, x):
+        return self.forward(x), torch.tensor(0, dtype=torch.float32)
+
     def get_hyperparameters(self):
         return {
                 'n_head': self.n_head,

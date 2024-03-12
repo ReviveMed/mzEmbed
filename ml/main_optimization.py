@@ -11,6 +11,7 @@ import optuna
 import logging
 import sys
 import shutil
+from viz import generate_latent_space, generate_umap_embedding, generate_pca_embedding
 
 ####################################################################################
 # Main functions
@@ -28,7 +29,7 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 goal_col = 'Nivo Benefit BINARY'
 # goal_col = 'MSKCC BINARY'
-study_name = goal_col + '_study_march08_3'
+study_name = goal_col + '_study_march12_0'
 TRIAL_DIR = f'{BASE_DIR}/trials/{study_name}'
 
 def objective(trial):
@@ -47,65 +48,84 @@ def objective(trial):
     nan_data = pd.read_csv(f'{data_dir}/nans.csv', index_col=0)
 
 
-    latent_size = trial.suggest_int('latent_size', 4, 100, log=True)
+    # latent_size = trial.suggest_int('latent_size', 4, 100, log=True)
+    latent_size = -1
+
     activation = trial.suggest_categorical('activation', ['tanh', 'leakyrelu','sigmoid'])
     kwargs = {
         ################
         ## General ##
 
         'save_dir': os.path.join(trail_dir, f'trial_{trial.datetime_start}__{trial.number}'),
-        'encoder_kind': trial.suggest_categorical('encoder_kind', ['AE', 'VAE']),
-        'encoder_kwargs': {
-            'activation': activation,
-            'latent_size': latent_size,
-            'num_hidden_layers': trial.suggest_int('num_hidden_layers', 1, 5),
-            'dropout_rate': trial.suggest_float('dropout_rate', 0, 0.4, step=0.1),
-            'use_batch_norm': False, #trial.suggest_categorical('use_batch_norm', [True, False]),
-            'hidden_size': round(1.5*latent_size), #trial.suggest_float('hidden_size_mult',1,2, step=0.1)*latent_size,
-            # 'hidden_sizes': [trial.suggest_int('hidden_size', 2, 100, log=True) for _ in range(trial.suggest_int('num_layers', 1, 5))],
-            },
+        # 'encoder_kind': trial.suggest_categorical('encoder_kind', ['AE', 'VAE']),
+        'encoder_kind': 'TGEM_Encoder',
+        'encoder_kwargs': {},
+        # 'encoder_kwargs': {
+        #     'activation': activation,
+        #     'latent_size': latent_size,
+        #     'num_hidden_layers': trial.suggest_int('num_hidden_layers', 1, 5),
+        #     'dropout_rate': trial.suggest_float('dropout_rate', 0, 0.4, step=0.1),
+        #     'use_batch_norm': False, #trial.suggest_categorical('use_batch_norm', [True, False]),
+        #     'hidden_size': round(1.5*latent_size), #trial.suggest_float('hidden_size_mult',1,2, step=0.1)*latent_size,
+        #     # 'hidden_sizes': [trial.suggest_int('hidden_size', 2, 100, log=True) for _ in range(trial.suggest_int('num_layers', 1, 5))],
+        #     },
         'other_size': 1,
         # 'y_pretrain_cols': ['Cohort Label_encoded', 'Study ID_encoded'],
         # 'y_finetune_cols': ['Benefit_encoded', 'Sex_encoded'], 
         'y_pretrain_cols': ['Cohort Label_encoded', 'Study ID_encoded'],
         'y_finetune_cols': [goal_col, 'Sex BINARY'],    
-        'num_folds': 50,
-        # 'num_folds': 5,
-        'hold_out_str': 'Validation',
-        'finetune_peak_freq_th': trial.suggest_float('finetune_peak_freq_th', 0, 0.9, step=0.1),
-        'overall_peak_freq_th': trial.suggest_float('overall_peak_freq_th', 0, 0.5, step=0.1),
+        # 'num_folds': 50,
+        'num_folds': 5,
+        'hold_out_str_list': ['Validation', 'Test'],
+        # 'finetune_peak_freq_th': trial.suggest_float('finetune_peak_freq_th', 0, 0.9, step=0.1),
+        # 'overall_peak_freq_th': trial.suggest_float('overall_peak_freq_th', 0, 0.5, step=0.1),
+        'finetune_peak_freq_th': 0.1,
+        'overall_peak_freq_th': 0.4,
 
         ################
         ## Pretrain ##
 
-        'pretrain_val_frac': 0.1,
+        'pretrain_val_frac': 0.2, # each trial the train/val samples will be different, also not stratified?
         'pretrain_batch_size': 32,
-        'pretrain_head_kind': 'NA',
-        'pretrain_head_kwargs' : {},
-        # 'pretrain_head_kind': 'MultiClassClassifier',
-        # 'pretrain_head_kwargs' : {
+        # 'pretrain_head_kind': 'NA',
+        # 'pretrain_head_kwargs' : {},
+        'pretrain_head_kind': 'MultiClassClassifier',
+        'pretrain_head_kwargs' : {
+            'hidden_size': 4,
+            'num_hidden_layers': 1,
+            'dropout_rate': 0,
+            'activation': activation,
+            'use_batch_norm': False,
+            'num_classes': 4,
+            },
+        
+        'pretrain_adv_kind': 'NA',
+        'pretrain_adv_kwargs' : {
+            },
+        # 'pretrain_adv_kind': 'MultiClassClassifier',
+        # 'pretrain_adv_kwargs' : {
         #     'hidden_size': 4,
         #     'num_hidden_layers': 1,
         #     'dropout_rate': 0,
         #     'activation': activation,
         #     'use_batch_norm': False,
-        #     'num_classes': 4,
+        #     'num_classes': 18,
         #     },
-        'pretrain_adv_kind': 'NA',
-        'pretrain_adv_kwargs' : {
-            },
+
         'pretrain_kwargs': {
-            # 'num_epochs': 1,
-            'num_epochs': trial.suggest_int('pretrain_epochs', 50, 500,log=True),
+            'num_epochs': 10,
+            # 'num_epochs': trial.suggest_int('pretrain_epochs', 50, 500,log=True),
             'lr': trial.suggest_float('pretrain_lr', 0.0001, 0.01, log=True),
-            'encoder_weight': 1,
-            'head_weight': 0,
+            'encoder_weight': 0,
+            'head_weight': 1,
             'adversary_weight': 0,
             'noise_factor': 0,
             'early_stopping_patience': 25,
             'loss_avg_beta': -1,
-            'end_state_eval_funcs': {},
-            'adversarial_mini_epochs': 20
+            # 'loss_avg_beta': 0,
+            # 'end_state_eval_funcs': {},
+            'end_state_eval_funcs': get_end_state_eval_funcs(),
+            'adversarial_mini_epochs': 5,
         },
 
         ################
@@ -126,8 +146,8 @@ def objective(trial):
         'finetune_adv_kwargs' : {
             },
         'finetune_kwargs': {
-            # 'num_epochs': 2,
-            'num_epochs': trial.suggest_int('finetune_epochs', 25, 250,log=True),
+            'num_epochs': 2,
+            # 'num_epochs': trial.suggest_int('finetune_epochs', 25, 250,log=True),
             'lr': trial.suggest_float('finetune_lr', 0.0001, 0.01, log=True),
             'encoder_weight': 0,
             'head_weight': 1,
@@ -151,7 +171,7 @@ def objective(trial):
     y_pretrain_cols = kwargs.get('y_pretrain_cols', None)
     y_finetune_cols = kwargs.get('y_finetune_cols', None)
     num_folds = kwargs.get('num_folds', None)
-    hold_out_str = kwargs.get('hold_out_str', None)
+    hold_out_str_list = kwargs.get('hold_out_str_list', [])
 
     if num_folds is None:
         num_folds = splits.shape[1]
@@ -173,6 +193,8 @@ def objective(trial):
 
     chosen_feats = list(set(chosen_peaks_0) & set(chosen_peaks_1))
     input_size = len(chosen_feats)
+    if latent_size < 0:
+        latent_size = input_size
     print('input size:', input_size)
     if input_size < 5:
         raise ValueError('Not enough peaks to train the model')
@@ -185,6 +207,9 @@ def objective(trial):
     save_json(kwargs, os.path.join(save_dir, 'kwargs.json'))
     # with open(os.path.join(save_dir, 'kwargs.json'), 'w') as f:
     #     json.dump(kwargs, f, indent=4)
+
+    result_dct  = {}
+    result_dct['kwargs'] = kwargs
 
     ############################
     # Filter, preprocess Data
@@ -220,6 +245,18 @@ def objective(trial):
     head_col = y_pretrain_cols[0]
     adv_col = y_pretrain_cols[1]
     pretrain_dataset = CompoundDataset(X_pretrain, y_pretrain[head_col], y_pretrain[adv_col])
+
+    if pretrain_head_kind != 'NA':
+        num_classes_pretrain_head = pretrain_dataset.get_num_classes_head()
+        weights_pretrain_head = pretrain_dataset.get_class_weights_head()
+        pretrain_head.define_loss(class_weight=weights_pretrain_head)
+
+
+    if pretrain_adv_kind != 'NA':      
+        num_classes_pretrain_adv = pretrain_dataset.get_num_classes_adv()
+        weights_pretrain_adv = pretrain_dataset.get_class_weights_adv()
+        pretrain_adv.define_loss(class_weight=weights_pretrain_adv)
+
     if pretrain_val_frac>0:
         train_size = int((1-pretrain_val_frac) * len(pretrain_dataset))
         val_size = len(pretrain_dataset) - train_size
@@ -234,17 +271,6 @@ def objective(trial):
         dataloaders['val'] = val_loader
 
 
-    if pretrain_head_kind != 'NA':
-        num_classes_pretrain_head = pretrain_dataset.get_num_classes_head()
-        weights_pretrain_head = pretrain_dataset.get_class_weights_head()
-        pretrain_head.define_loss(class_weight=weights_pretrain_head)
-
-
-    if pretrain_adv_kind != 'NA':      
-        num_classes_pretrain_adv = pretrain_dataset.get_num_classes_adv()
-        weights_pretrain_adv = pretrain_dataset.get_class_weights_adv()
-        pretrain_adv.define_loss(class_weight=weights_pretrain_adv)
-
     # pretrain the model
     _, _, _, pretrain_output = train_compound_model(dataloaders, encoder, pretrain_head, pretrain_adv, **pretrain_kwargs)
 
@@ -256,7 +282,26 @@ def objective(trial):
 
     #TODO: Add user attributes related to the pretraining
     trial.set_user_attr('reconstruction loss', pretrain_result) 
+    trial.set_user_attr('pretrain Head AUC', pretrain_output['end_state_eval']['val']['head_auc'])
+    # trial.set_user_attr('pretrain Adv AUC', pretrain_output['end_state_eval']['val']['adv_auc'])
+    if 'val LogisticRegression_auc' in pretrain_output['sklearn_adversary_eval']:
+        trial.set_user_attr('pretrain Adv AUC', pretrain_output['sklearn_adversary_eval']['val LogisticRegression_auc'])
 
+    result_dct['pretrain'] = pretrain_result
+
+
+    try:
+        Z = generate_latent_space(X_data, encoder)
+        Z.to_csv(os.path.join(pretrain_dir, 'Z.csv'))
+
+        Z_pca = generate_pca_embedding(Z)
+        Z_pca.to_csv(os.path.join(pretrain_dir, 'Z_pca.csv'))
+
+        Z_umap = generate_umap_embedding(Z)
+        Z_umap.to_csv(os.path.join(pretrain_dir, 'Z_umap.csv'))
+    except ValueError as e:
+        print(e)
+        print('Error when generating the embeddings')
 
     ########################################################
     # Finetune Set Up
@@ -352,19 +397,16 @@ def objective(trial):
 
     trial.set_user_attr('finetune AUC std', np.std(finetune_results))
     trial.set_user_attr('finetune AUC avg', np.mean(finetune_results))
+    result_dct['finetune'] = finetune_results
+
 
     ############################
     # Train on the full dataset, and evaluate on an independent test set,
     ############################
-    if (hold_out_str) and (hold_out_str in y_data['Set'].unique()):
+    if len(hold_out_str_list)> 0:
         X_train, y_train = X_finetune, y_finetune
-        hold_out_files = y_data[y_data['Set'] == hold_out_str].index.to_list()
-        X_test = X_data.loc[hold_out_files]
-        y_test = y_data.loc[hold_out_files][y_finetune_cols].astype(float)
-
 
         train_dataset = CompoundDataset(X_train, y_train[head_col], y_train[adv_col])
-        test_dataset = CompoundDataset(X_test, y_test[head_col], y_test[adv_col])
         
         if finetune_head_kind != 'NA':
             num_classes_finetune_head = train_dataset.get_num_classes_head()
@@ -388,11 +430,23 @@ def objective(trial):
 
         dataloaders = {
             'train': torch.utils.data.DataLoader(train_dataset, batch_size=finetune_batch_size, shuffle=True),
-            'test': torch.utils.data.DataLoader(test_dataset, batch_size=finetune_batch_size, shuffle=False)
         }
         
         if finetune_val_frac> 0:
             dataloaders['val'] = val_loader
+
+        for hold_out_str in hold_out_str_list:
+            if hold_out_str == 'val':
+                continue
+            if hold_out_str not in y_data['Set'].unique():
+                continue
+
+            hold_out_files = y_data[y_data['Set'] == hold_out_str].index.to_list()
+            X_test = X_data.loc[hold_out_files]
+            y_test = y_data.loc[hold_out_files][y_finetune_cols].astype(float)
+            test_dataset = CompoundDataset(X_test, y_test[head_col], y_test[adv_col])
+            dataloaders[hold_out_str] = torch.utils.data.DataLoader(test_dataset, batch_size=finetune_batch_size, shuffle=False)
+
 
         
         # Initialize the models
@@ -407,11 +461,14 @@ def objective(trial):
         # Run the train and evaluation
         _, _, _, finetune_output = train_compound_model(dataloaders, encoder, finetune_head, finetune_adv, **finetune_kwargs)
 
-        hold_out_finetune_result = finetune_output['end_state_eval']['test']['head_auc']
-    else:
-        hold_out_finetune_result = 0
+        for hold_out_str in hold_out_str_list:
+            if hold_out_str == 'val':
+                continue
+            if hold_out_str not in y_data['Set'].unique():
+                continue
+            trial.set_user_attr(f'Hold Out {hold_out_str} Finetune AUC', finetune_output['end_state_eval'][hold_out_str]['head_auc'])
+            result_dct[f'{hold_out_str} Finetune AUC'] = finetune_output['end_state_eval'][hold_out_str]['head_auc']
 
-    trial.set_user_attr('Hold Out Finetune AUC', hold_out_finetune_result)
 
 
     ########################################################
@@ -480,19 +537,16 @@ def objective(trial):
 
     trial.set_user_attr('rand AUC std', np.std(rand_results))
     trial.set_user_attr('rand AUC avg', np.mean(rand_results))
+    result_dct['randtune'] = rand_results
 
     ############################
     # Train on the full dataset, and evaluate on an independent test set,
     ############################
-    if (hold_out_str) and (hold_out_str in y_data['Set'].unique()):
+    # if (hold_out_str) and (hold_out_str in y_data['Set'].unique()):
+    if len(hold_out_str_list)> 0:
         X_train, y_train = X_finetune, y_finetune
-        hold_out_files = y_data[y_data['Set'] == hold_out_str].index.to_list()
-        X_test = X_data.loc[hold_out_files]
-        y_test = y_data.loc[hold_out_files][y_finetune_cols].astype(float)
-
 
         train_dataset = CompoundDataset(X_train, y_train[head_col], y_train[adv_col])
-        test_dataset = CompoundDataset(X_test, y_test[head_col], y_test[adv_col])
         
         if finetune_head_kind != 'NA':
             num_classes_finetune_head = train_dataset.get_num_classes_head()
@@ -515,11 +569,24 @@ def objective(trial):
 
         dataloaders = {
             'train': torch.utils.data.DataLoader(train_dataset, batch_size=finetune_batch_size, shuffle=True),
-            'test': torch.utils.data.DataLoader(test_dataset, batch_size=finetune_batch_size, shuffle=False)
         }
         
         if finetune_val_frac> 0:
             dataloaders['val'] = val_loader
+
+
+        for hold_out_str in hold_out_str_list:
+            if hold_out_str == 'val':
+                continue
+            if hold_out_str not in y_data['Set'].unique():
+                continue
+
+            hold_out_files = y_data[y_data['Set'] == hold_out_str].index.to_list()
+            X_test = X_data.loc[hold_out_files]
+            y_test = y_data.loc[hold_out_files][y_finetune_cols].astype(float)
+            test_dataset = CompoundDataset(X_test, y_test[head_col], y_test[adv_col])
+            dataloaders[hold_out_str] = torch.utils.data.DataLoader(test_dataset, batch_size=finetune_batch_size, shuffle=False)
+
 
 
         # Initialize the models
@@ -532,11 +599,13 @@ def objective(trial):
         # Run the train and evaluation
         _, _, _, rand_output = train_compound_model(dataloaders, encoder, finetune_head, finetune_adv, **randtune_kwargs)
 
-        hold_out_rand_result = rand_output['end_state_eval']['test']['head_auc']
-        trial.set_user_attr('Hold Out Rand AUC', hold_out_rand_result)
-    else:
-        hold_out_rand_result = 0
-        trial.set_user_attr('Hold Out Rand AUC', 0)
+        for hold_out_str in hold_out_str_list:
+            if hold_out_str == 'val':
+                continue
+            if hold_out_str not in y_data['Set'].unique():
+                continue
+            trial.set_user_attr(f'Hold Out {hold_out_str} Rand AUC', rand_output['end_state_eval'][hold_out_str]['head_auc'])
+            result_dct[f'{hold_out_str} Rand AUC'] = finetune_output['end_state_eval'][hold_out_str]['head_auc']
 
 
 
@@ -544,17 +613,9 @@ def objective(trial):
     ############################
     # create a summary of the results
     ############################
-    result_dct = {
-        'pretrain': pretrain_result,
-        'finetune': finetune_results,
-        'randtune': rand_results,
-        'hold_out_finetune': hold_out_finetune_result,
-        'hold_out_rand': hold_out_rand_result,
-        # 'kwargs': kwargs
-    }
+
     result_save_file = os.path.join(save_dir, 'result.json')
-    with open(result_save_file, 'w') as f:
-        json.dump(result_dct, f, indent=4)
+    save_json(result_dct, result_save_file)
 
     print('finetune:', finetune_results)
     print('randtune:', rand_results)
