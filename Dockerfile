@@ -1,5 +1,6 @@
 # Use an official Python runtime as a parent image
-FROM python:3.9-slim
+FROM python:3.9-bookworm 
+# FROM python:3.9-slim
 
 LABEL Description="ReviveMed Linux environment for mz_embed_engine analysis using Python (R to be added later)"
 LABEL tags="revivemed-mz_embed_engine"
@@ -21,6 +22,7 @@ RUN apt-get install -y screen htop
 RUN apt-get install -y build-essential
 RUN apt-get install -y pkg-config
 RUN apt-get install -y libmariadb-dev-compat
+RUN apt-get update && apt-get install -y vim
 
 RUN pip install --upgrade pip
 RUN pip install mysqlclient

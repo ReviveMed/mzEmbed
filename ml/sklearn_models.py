@@ -87,6 +87,11 @@ def run_train_sklearn_model(data_dict, save_dir, **kwargs):
     phase_list = kwargs.get('phase_list',None)
     num_classes = kwargs.get('num_classes',None)
     feat_subset = kwargs.get('feat_subset',None)
+    n_iter = kwargs.get('n_iter',100)
+    cv = kwargs.get('cv',5)
+    verbose = kwargs.get('verbose',0)
+    random_state = kwargs.get('random_state',42)
+    scoring = kwargs.get('scoring','roc_auc')
 
     if base_model is None:
         if model_kind == 'logistic_regression':
@@ -135,7 +140,7 @@ def run_train_sklearn_model(data_dict, save_dir, **kwargs):
     # create the model
     if (param_grid is not None) and (len(param_grid) > 0):
         model = RandomizedSearchCV(base_model, param_distributions=param_grid, 
-                                n_iter=100, cv=5, verbose=0, random_state=42, n_jobs=-1, scoring='roc_auc')
+                                n_iter=n_iter, cv=cv, verbose=verbose, random_state=random_state, n_jobs=-1, scoring=scoring)
     
     
         model.fit(X_train, y_train)

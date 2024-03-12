@@ -20,27 +20,25 @@ from viz import generate_latent_space, generate_umap_embedding, generate_pca_emb
 # temp_dir = '/Users/jonaheaton/Desktop/temp'
 BASE_DIR = '/DATA'
 DATA_DIR = f'{BASE_DIR}/data'
-RESULT_DIR = f'{BASE_DIR}/results'
 TRIAL_DIR = f'{BASE_DIR}/trials'
 storage_name = 'optuna'
 USE_WEBAPP_DB = True
 SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
-goal_col = 'Nivo Benefit BINARY'
-# goal_col = 'MSKCC BINARY'
-study_name = goal_col + '_study_march12_0'
-TRIAL_DIR = f'{BASE_DIR}/trials/{study_name}'
+# goal_col = 'Nivo Benefit BINARY'
+goal_col = 'MSKCC BINARY'
+study_name = goal_col + '_study_march12_TGEM'
+RESULT_DIR = f'{BASE_DIR}/trials/{study_name}'
 
 def objective(trial):
 
     ########################################################
     # load the data
     splits_subdir = f"{goal_col} finetune_folds" 
-    trail_dir = TRIAL_DIR
     data_dir = DATA_DIR
     result_dir = RESULT_DIR
-
+    os.makedirs(result_dir, exist_ok=True)
 
     X_data = pd.read_csv(f'{data_dir}/X.csv', index_col=0)
     y_data = pd.read_csv(f'{data_dir}/y.csv', index_col=0)
@@ -88,7 +86,7 @@ def objective(trial):
         ################
         ## General ##
 
-        'save_dir': os.path.join(trail_dir, f'trial_{trial.datetime_start}__{trial.number}'),
+        'save_dir': os.path.join(result_dir, f'trial_{trial.datetime_start}__{trial.number}'),
         'encoder_kind': encoder_kind,
         'encoder_kwargs': encoder_kwargs,
         'other_size': 1,
@@ -101,9 +99,9 @@ def objective(trial):
         'hold_out_str_list': ['Validation', 'Test'],
         # 'finetune_peak_freq_th': trial.suggest_float('finetune_peak_freq_th', 0, 0.9, step=0.1),
         # 'overall_peak_freq_th': trial.suggest_float('overall_peak_freq_th', 0, 0.5, step=0.1),
-        'finetune_peak_freq_th': 0.1,
-        'overall_peak_freq_th': 0.4,
-        'pretrain_peak_freq_th': 0.1,
+        'finetune_peak_freq_th': 0.9,
+        'overall_peak_freq_th': 0,
+        'pretrain_peak_freq_th': 0.3,
         'finetune_var_q_th': 0.1,
         'finetune_var_th': None,
 
@@ -111,7 +109,7 @@ def objective(trial):
         ## Pretrain ##
 
         'pretrain_val_frac': 0.2, # each trial the train/val samples will be different, also not stratified?
-        'pretrain_batch_size': 32,
+        'pretrain_batch_size': 64,
         # 'pretrain_head_kind': 'NA',
         # 'pretrain_head_kwargs' : {},
         'pretrain_head_kind': 'MultiClassClassifier',
@@ -138,14 +136,14 @@ def objective(trial):
         #     },
 
         'pretrain_kwargs': {
-            'num_epochs': 10,
-            # 'num_epochs': trial.suggest_int('pretrain_epochs', 50, 500,log=True),
+            # 'num_epochs': trial.suggest_int('pretrain_epochs', 10, 100,log=True),
+            'num_epochs': trial.suggest_int('pretrain_epochs', 50, 500,log=True),
             'lr': trial.suggest_float('pretrain_lr', 0.0001, 0.01, log=True),
             'encoder_weight': 0,
             'head_weight': 1,
             'adversary_weight': 0,
             'noise_factor': 0,
-            'early_stopping_patience': 25,
+            'early_stopping_patience': 5,
             'loss_avg_beta': -1,
             # 'loss_avg_beta': 0,
             # 'end_state_eval_funcs': {},
@@ -171,8 +169,9 @@ def objective(trial):
         'finetune_adv_kwargs' : {
             },
         'finetune_kwargs': {
-            'num_epochs': 2,
-            # 'num_epochs': trial.suggest_int('finetune_epochs', 25, 250,log=True),
+            # 'num_epochs': 2,
+            # 'num_epochs': trial.suggest_int('finetune_epochs', 5, 50,log=True),
+            'num_epochs': trial.suggest_int('finetune_epochs', 25, 250,log=True),
             'lr': trial.suggest_float('finetune_lr', 0.0001, 0.01, log=True),
             'encoder_weight': 0,
             'head_weight': 1,
@@ -702,14 +701,13 @@ if __name__ == '__main__':
 
     # download the data
     # data_url = 'https://www.dropbox.com/scl/fo/fa3n7sw8fgktnz6q91ffo/h?rlkey=edbdekkhuju5r88kkdo1garmn&dl=1'
-    data_url = 'https://www.dropbox.com/scl/fo/d1yqlmyafvu8tzujlg4nk/h?rlkey=zrxfapacmgb6yxsmonw4yt986&dl=1'
+    # data_url = 'https://www.dropbox.com/scl/fo/d1yqlmyafvu8tzujlg4nk/h?rlkey=zrxfapacmgb6yxsmonw4yt986&dl=1' # March 6 data
+    data_url = 'https://www.dropbox.com/scl/fo/y4h9nyxccldu0bpc2be2f/h?rlkey=itkulmqraytn7gl86b2f1kxq6&dl=1' #March 12 data
     data_dir = DATA_DIR
-    result_dir = RESULT_DIR
     trials_dir = TRIAL_DIR
-    gcp_save_loc = 'March_6_Data'
+    gcp_save_loc = 'March_12_Data'
 
 
-    os.makedirs(result_dir, exist_ok=True)
     os.makedirs(trials_dir, exist_ok=True)
     os.makedirs(data_dir, exist_ok=True)
     if not os.path.exists(f'{data_dir}/X.csv'):
@@ -756,12 +754,12 @@ if __name__ == '__main__':
     else:
         print('use local sqlite database downloaded from GCP bucket')
         # save the study in a sqlite database located in result_dir
-        storage_loc = f'{result_dir}/{storage_name}.db'
+        storage_loc = f'{data_dir}/{storage_name}.db'
         if not os.path.exists(storage_loc):
             print("checking if study exists on GCP")
             if check_file_exists_in_bucket(gcp_save_loc, f'{storage_name}.db'):
                 print("downloading study from GCP")
-                download_file_from_bucket(gcp_save_loc, f'{storage_name}.db', local_path=result_dir)
+                download_file_from_bucket(gcp_save_loc, f'{storage_name}.db', local_path=data_dir)
 
         storage_name = f'sqlite:///{storage_loc}'
 
