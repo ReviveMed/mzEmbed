@@ -28,7 +28,7 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 # goal_col = 'Nivo Benefit BINARY'
 goal_col = 'MSKCC BINARY'
-study_name = goal_col + '_study_march13_L_Reg'
+study_name = goal_col + '_study_march13_S_Clas'
 RESULT_DIR = f'{BASE_DIR}/trials/{study_name}'
 
 def objective(trial):
@@ -100,14 +100,14 @@ def objective(trial):
         'hold_out_str_list': ['Test'],
         # 'finetune_peak_freq_th': trial.suggest_float('finetune_peak_freq_th', 0, 0.9, step=0.1),
         # 'overall_peak_freq_th': trial.suggest_float('overall_peak_freq_th', 0, 0.5, step=0.1),
-        'finetune_peak_freq_th': 0,
-        'overall_peak_freq_th': 0,
-        'pretrain_peak_freq_th': 0,
-        'finetune_var_q_th': 0,
-        # 'finetune_peak_freq_th': 0.9,
+        # 'finetune_peak_freq_th': 0,
         # 'overall_peak_freq_th': 0,
-        # 'pretrain_peak_freq_th': 0.3,
-        # 'finetune_var_q_th': 0.1,
+        # 'pretrain_peak_freq_th': 0,
+        # 'finetune_var_q_th': 0,
+        'finetune_peak_freq_th': 0.9,
+        'overall_peak_freq_th': 0,
+        'pretrain_peak_freq_th': 0.3,
+        'finetune_var_q_th': 0.05,
         'finetune_var_th': None,
 
         ################
@@ -115,17 +115,17 @@ def objective(trial):
 
         'pretrain_val_frac': 0.2, # each trial the train/val samples will be different, also not stratified?
         'pretrain_batch_size': 64,
-        'pretrain_head_kind': 'NA',
-        'pretrain_head_kwargs' : {},
-        # 'pretrain_head_kind': 'MultiClassClassifier',
-        # 'pretrain_head_kwargs' : {
-        #     'hidden_size': 4,
-        #     'num_hidden_layers': 1,
-        #     'dropout_rate': 0,
-        #     'activation': activation,
-        #     'use_batch_norm': False,
-        #     'num_classes': 4,
-        #     },
+        # 'pretrain_head_kind': 'NA',
+        # 'pretrain_head_kwargs' : {},
+        'pretrain_head_kind': 'MultiClassClassifier',
+        'pretrain_head_kwargs' : {
+            'hidden_size': 4,
+            'num_hidden_layers': 1,
+            'dropout_rate': 0,
+            'activation': activation,
+            'use_batch_norm': False,
+            'num_classes': 4,
+            },
         
         'pretrain_adv_kind': 'NA',
         'pretrain_adv_kwargs' : {},
@@ -144,11 +144,11 @@ def objective(trial):
             'num_epochs': trial.suggest_int('pretrain_epochs', 10, 500,log=True),
             'lr': trial.suggest_float('pretrain_lr', 0.0001, 0.01, log=True),
             'encoder_weight': 1,
-            'head_weight': 0,
+            'head_weight': trial.suggest_float('pretrain_head_weight',0.1, 10, log=True),
             'adversary_weight': 0,
             'noise_factor': 0,
             'early_stopping_patience': 5,
-            'loss_avg_beta': -1,
+            'loss_avg_beta': 0,
             # 'loss_avg_beta': 0,
             # 'end_state_eval_funcs': {},
             'end_state_eval_funcs': get_end_state_eval_funcs(),

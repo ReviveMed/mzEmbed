@@ -96,7 +96,7 @@ def objective(trial):
         'y_pretrain_cols': ['Cohort Label_encoded', 'Study ID_encoded'],
         'y_finetune_cols': [goal_col, 'Sex BINARY'],    
         # 'num_folds': 50,
-        'num_folds': 5,
+        'num_folds': 30,
         'hold_out_str_list': ['Test'],
         # 'finetune_peak_freq_th': trial.suggest_float('finetune_peak_freq_th', 0, 0.9, step=0.1),
         # 'overall_peak_freq_th': trial.suggest_float('overall_peak_freq_th', 0, 0.5, step=0.1),
