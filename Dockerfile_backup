@@ -14,7 +14,6 @@ WORKDIR /app
 # less secure
 # ENV BITBUCKET_ACCESS_KEY=your_access_key
 
-
 # Copy the current directory contents into the container at /app
 # COPY . /app
 # only copy the requirements_4.txt file
@@ -39,6 +38,8 @@ RUN apt-get update && apt-get install -y vim
 RUN pip install --upgrade pip
 RUN pip install mysqlclient
 
+# RUN git clone https://$BITBUCKET_ACCESS_KEY@bitbucket.org/revivemed/mz_embed_engine.git
+# RUN git checkout dev_jonah
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements_4.txt
@@ -49,11 +50,8 @@ EXPOSE 8080
 # Define environment variable
 ENV NAME World
 
-# Copy the current directory contents into the container at /app
-# COPY . /app
-
-# RUN git clone https://$BITBUCKET_ACCESS_KEY@bitbucket.org/revivemed/mz_embed_engine.git
-# RUN git checkout dev_jonah
+# To build give the access BITBUCKET_ACCESS_KEY
+# docker build --build-arg BITBUCKET_ACCESS_KEY=your_access_key -t your_image_name .
 
 
 # Run commands when the container launches

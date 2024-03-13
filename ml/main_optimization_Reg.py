@@ -28,7 +28,7 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 # goal_col = 'Nivo Benefit BINARY'
 goal_col = 'MSKCC BINARY'
-study_name = goal_col + '_study_march12_S_Reg'
+study_name = goal_col + '_study_march12_L_Reg'
 RESULT_DIR = f'{BASE_DIR}/trials/{study_name}'
 
 def objective(trial):
@@ -100,10 +100,14 @@ def objective(trial):
         'hold_out_str_list': ['Validation', 'Test'],
         # 'finetune_peak_freq_th': trial.suggest_float('finetune_peak_freq_th', 0, 0.9, step=0.1),
         # 'overall_peak_freq_th': trial.suggest_float('overall_peak_freq_th', 0, 0.5, step=0.1),
-        'finetune_peak_freq_th': 0.9,
+        'finetune_peak_freq_th': 0,
         'overall_peak_freq_th': 0,
-        'pretrain_peak_freq_th': 0.3,
-        'finetune_var_q_th': 0.1,
+        'pretrain_peak_freq_th': 0,
+        'finetune_var_q_th': 0,
+        # 'finetune_peak_freq_th': 0.9,
+        # 'overall_peak_freq_th': 0,
+        # 'pretrain_peak_freq_th': 0.3,
+        # 'finetune_var_q_th': 0.1,
         'finetune_var_th': None,
 
         ################
