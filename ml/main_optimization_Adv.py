@@ -28,14 +28,14 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 # goal_col = 'Nivo Benefit BINARY'
 goal_col = 'MSKCC BINARY'
-study_name = goal_col + '_study_march12_L_Adv'
+study_name = goal_col + '_study_march13_L_Adv'
 RESULT_DIR = f'{BASE_DIR}/trials/{study_name}'
 
 def objective(trial):
 
     ########################################################
     # load the data
-    splits_subdir = f"{goal_col} finetune_folds" 
+    splits_subdir = f"{goal_col} predefined_val" 
     data_dir = DATA_DIR
     result_dir = RESULT_DIR
     os.makedirs(result_dir, exist_ok=True)
@@ -97,7 +97,7 @@ def objective(trial):
         'y_finetune_cols': [goal_col, 'Sex BINARY'],    
         # 'num_folds': 50,
         'num_folds': 5,
-        'hold_out_str_list': ['Validation', 'Test'],
+        'hold_out_str_list': ['Test'],
         # 'finetune_peak_freq_th': trial.suggest_float('finetune_peak_freq_th', 0, 0.9, step=0.1),
         # 'overall_peak_freq_th': trial.suggest_float('overall_peak_freq_th', 0, 0.5, step=0.1),
         'finetune_peak_freq_th': 0,
@@ -149,7 +149,7 @@ def objective(trial):
             'adversary_weight': trial.suggest_float('pretrain_adv_weight', 0.1, 10, log=True),
             'noise_factor': 0,
             'early_stopping_patience': 5,
-            'loss_avg_beta': -1,
+            'loss_avg_beta': 0,
             # 'loss_avg_beta': 0,
             # 'end_state_eval_funcs': {},
             'end_state_eval_funcs': get_end_state_eval_funcs(),

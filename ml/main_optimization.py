@@ -792,3 +792,8 @@ if __name__ == '__main__':
         shutil.rmtree(trials_dir)
 
     # optuna-dashboard sqlite:///study_3.db
+
+
+    # Create a table of the study in csv format
+    study_table = study.trials_dataframe()
+    study_table.to_csv('study_table.csv', index=False)
