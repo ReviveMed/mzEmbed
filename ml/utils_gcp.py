@@ -231,5 +231,5 @@ def upload_file_to_bucket(local_path, project_subdir, save_subdir=None, verbose=
 
 
 ### main function
-if __name__ == '__main__':
-    upload_file_to_bucket('main.py', 'test', verbose=True)
+# if __name__ == '__main__':
+    # upload_file_to_bucket('main.py', 'test', verbose=True)
