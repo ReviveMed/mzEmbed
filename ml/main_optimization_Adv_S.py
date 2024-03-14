@@ -28,14 +28,14 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 # goal_col = 'Nivo Benefit BINARY'
 goal_col = 'MSKCC BINARY'
-study_name = goal_col + '_study_march12_TGEM'
+study_name = goal_col + '_study_march13_S_Adv'
 RESULT_DIR = f'{BASE_DIR}/trials/{study_name}'
 
 def objective(trial):
 
     ########################################################
     # load the data
-    splits_subdir = f"{goal_col} finetune_folds" 
+    splits_subdir = f"{goal_col} predefined_val" 
     data_dir = DATA_DIR
     result_dir = RESULT_DIR
     os.makedirs(result_dir, exist_ok=True)
@@ -61,8 +61,9 @@ def objective(trial):
     # Specify the model arcitecture and hyperparameters
 
     activation = trial.suggest_categorical('activation', ['tanh', 'leakyrelu','sigmoid'])
-    encoder_kind = 'TGEM_Encoder'
+    # encoder_kind = 'TGEM_Encoder'
     # encoder_kind = trial.suggest_categorical('encoder_kind', ['AE', 'VAE'])
+    encoder_kind = 'AE'
 
     if encoder_kind == 'AE' or encoder_kind == 'VAE':
         latent_size = trial.suggest_int('latent_size', 4, 100, log=True)
@@ -95,14 +96,18 @@ def objective(trial):
         'y_pretrain_cols': ['Cohort Label_encoded', 'Study ID_encoded'],
         'y_finetune_cols': [goal_col, 'Sex BINARY'],    
         # 'num_folds': 50,
-        'num_folds': 5,
-        'hold_out_str_list': ['Validation', 'Test'],
+        'num_folds': 30,
+        'hold_out_str_list': ['Test'],
         # 'finetune_peak_freq_th': trial.suggest_float('finetune_peak_freq_th', 0, 0.9, step=0.1),
         # 'overall_peak_freq_th': trial.suggest_float('overall_peak_freq_th', 0, 0.5, step=0.1),
+        # 'finetune_peak_freq_th': 0,
+        # 'overall_peak_freq_th': 0,
+        # 'pretrain_peak_freq_th': 0,
+        # 'finetune_var_q_th': 0,
         'finetune_peak_freq_th': 0.9,
         'overall_peak_freq_th': 0,
         'pretrain_peak_freq_th': 0.3,
-        'finetune_var_q_th': 0.1,
+        'finetune_var_q_th': 0.05,
         'finetune_var_th': None,
 
         ################
@@ -110,41 +115,41 @@ def objective(trial):
 
         'pretrain_val_frac': 0.2, # each trial the train/val samples will be different, also not stratified?
         'pretrain_batch_size': 64,
-        # 'pretrain_head_kind': 'NA',
-        # 'pretrain_head_kwargs' : {},
-        'pretrain_head_kind': 'MultiClassClassifier',
-        'pretrain_head_kwargs' : {
-            'hidden_size': 4,
-            'num_hidden_layers': 1,
-            'dropout_rate': 0,
-            'activation': activation,
-            'use_batch_norm': False,
-            'num_classes': 4,
-            },
-        
-        'pretrain_adv_kind': 'NA',
-        'pretrain_adv_kwargs' : {
-            },
-        # 'pretrain_adv_kind': 'MultiClassClassifier',
-        # 'pretrain_adv_kwargs' : {
+        'pretrain_head_kind': 'NA',
+        'pretrain_head_kwargs' : {},
+        # 'pretrain_head_kind': 'MultiClassClassifier',
+        # 'pretrain_head_kwargs' : {
         #     'hidden_size': 4,
         #     'num_hidden_layers': 1,
         #     'dropout_rate': 0,
         #     'activation': activation,
         #     'use_batch_norm': False,
-        #     'num_classes': 18,
+        #     'num_classes': 4,
         #     },
+        
+        # 'pretrain_adv_kind': 'NA',
+        # 'pretrain_adv_kwargs' : {
+        #     },
+        'pretrain_adv_kind': 'MultiClassClassifier',
+        'pretrain_adv_kwargs' : {
+            'hidden_size': 4,
+            'num_hidden_layers': 1,
+            'dropout_rate': 0,
+            'activation': activation,
+            'use_batch_norm': False,
+            'num_classes': 18,
+            },
 
         'pretrain_kwargs': {
             # 'num_epochs': trial.suggest_int('pretrain_epochs', 10, 100,log=True),
-            'num_epochs': trial.suggest_int('pretrain_epochs', 50, 500,log=True),
+            'num_epochs': trial.suggest_int('pretrain_epochs', 10, 500,log=True),
             'lr': trial.suggest_float('pretrain_lr', 0.0001, 0.01, log=True),
-            'encoder_weight': 0,
-            'head_weight': 1,
-            'adversary_weight': 0,
+            'encoder_weight': 1,
+            'head_weight': 0,
+            'adversary_weight': trial.suggest_float('pretrain_adv_weight', 0.1, 10, log=True),
             'noise_factor': 0,
             'early_stopping_patience': 5,
-            'loss_avg_beta': -1,
+            'loss_avg_beta': 0,
             # 'loss_avg_beta': 0,
             # 'end_state_eval_funcs': {},
             'end_state_eval_funcs': get_end_state_eval_funcs(),
@@ -171,7 +176,7 @@ def objective(trial):
         'finetune_kwargs': {
             # 'num_epochs': 2,
             # 'num_epochs': trial.suggest_int('finetune_epochs', 5, 50,log=True),
-            'num_epochs': trial.suggest_int('finetune_epochs', 25, 250,log=True),
+            'num_epochs': trial.suggest_int('finetune_epochs', 5, 250,log=True),
             'lr': trial.suggest_float('finetune_lr', 0.0001, 0.01, log=True),
             'encoder_weight': 0,
             'head_weight': 1,
@@ -775,7 +780,7 @@ if __name__ == '__main__':
                                 pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=20, interval_steps=5))
     
     try:
-        study.optimize(objective, n_trials=100)#, show_progress_bar=True, timeout=3600*24*7, gc_after_trial=True)
+        study.optimize(objective, n_trials=200)#, show_progress_bar=True, timeout=3600*24*7, gc_after_trial=True)
     except Exception as e:
         print(e)
     # finally:
@@ -792,12 +797,11 @@ if __name__ == '__main__':
         shutil.rmtree(trials_dir)
 
     # optuna-dashboard sqlite:///study_3.db
+        
 
-
-    # Create a table of the study in csv format
     study_table_path = f'{trials_dir}/{study_name}_table.csv'
     study_table = study.trials_dataframe()
     # study_table.to_csv('study_table.csv', index=False)
     study_table.to_csv(study_table_path, index=False)
 
-    upload_file_to_bucket(study_table_path, gcp_save_loc)
+    upload_file_to_bucket(study_table_path, gcp_save_loc)        
