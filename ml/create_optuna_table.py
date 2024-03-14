@@ -46,6 +46,8 @@ def summarize_user_attrs_columns(df):
     result = {}
     for col in df.columns:
         if col.startswith('user_attrs_'):
+            if col == 'user_attrs_DEBUG':
+                continue
             if pd.api.types.is_numeric_dtype(df[col]):
                 result[col] = df[col].mean()
                 result[col + ' std'] = df[col].std()
@@ -62,8 +64,15 @@ def process_top_trials(df, top_trial_perc=0.05, direction='maximize'):
     else:
         df.sort_values(by='value', ascending=True, inplace=True)
 
+    # only look at the completed runs
+    df = df[df['state'] == 'COMPLETE'].copy()
+
+    if 'user_attrs_DEBUG' in df.columns:
+        df.fillna({'user_attrs_DEBUG': False}, inplace=True)
+        df = df[df['user_attrs_DEBUG'] == False].copy()
+    print('After removing failed, pruned and debug trials,', df.shape[0], ' remain')
+
     num_trials = df.shape[0]
-    
     top_trials = int(np.floor(num_trials*top_trial_perc))
     if top_trials < 3:
         top_trials = 3
@@ -151,7 +160,7 @@ if __name__ == '__main__':
     
     # Create a table of the study in csv format
     study_table = study.trials_dataframe()
-    study_table.to_csv('study_table.csv', index=False)
+    # study_table.to_csv('study_table.csv', index=False)
 
     study_table.to_csv(study_table_path, index=False)
 
@@ -168,4 +177,4 @@ if __name__ == '__main__':
     all_study_summary = compile_top_trials_from_all_studies(gcp_save_loc, data_dir)
     all_study_summary.to_csv(f'{data_dir}/all_study_summary.csv')
     upload_file_to_bucket(f'{data_dir}/all_study_summary.csv', gcp_save_loc)
-    all_study_summary.to_csv('all_study_summary.csv')
+    # all_study_summary.to_csv('all_study_summary.csv')

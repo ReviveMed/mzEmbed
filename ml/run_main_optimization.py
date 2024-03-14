@@ -30,7 +30,7 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 GOAL_COL= None
 STUDY_KIND = None
-DEBUG = True
+DEBUG = False
 
 def objective(trial):
 
@@ -93,6 +93,7 @@ def objective(trial):
     encoder_kind = kwargs.get('encoder_kind', 'AE')
     encoder_kwargs = kwargs.get('encoder_kwargs', {})
     other_size = kwargs.get('other_size', 1)
+    latent_size = encoder_kwargs.get('latent_size', -1)
 
     y_pretrain_cols = kwargs.get('y_pretrain_cols', None)
     y_finetune_cols = kwargs.get('y_finetune_cols', None)
@@ -150,11 +151,12 @@ def objective(trial):
                             ].index.to_list() 
     peak_filt_df['chosen'] = False
     peak_filt_df.loc[chosen_feats, 'chosen'] = True
-    peak_filt_df.to_csv(os.path.join(save_dir, 'peak_filt_df.csv'))
+    # peak_filt_df.to_csv(os.path.join(save_dir, 'peak_filt_df.csv'))
 
 
     input_size = len(chosen_feats)
     if latent_size < 0:
+        print('WARNING: latent size not defined, setting to input size')
         latent_size = input_size
     print('input size:', input_size)
     if input_size < 5:
@@ -248,18 +250,19 @@ def objective(trial):
     result_dct['pretrain'] = pretrain_result
 
 
-    try:
-        Z = generate_latent_space(X_data, encoder)
-        Z.to_csv(os.path.join(pretrain_dir, 'Z.csv'))
+    if not DEBUG:
+        try:
+            Z = generate_latent_space(X_data, encoder)
+            Z.to_csv(os.path.join(pretrain_dir, 'Z.csv'))
 
-        Z_pca = generate_pca_embedding(Z)
-        Z_pca.to_csv(os.path.join(pretrain_dir, 'Z_pca.csv'))
+            Z_pca = generate_pca_embedding(Z)
+            Z_pca.to_csv(os.path.join(pretrain_dir, 'Z_pca.csv'))
 
-        Z_umap = generate_umap_embedding(Z)
-        Z_umap.to_csv(os.path.join(pretrain_dir, 'Z_umap.csv'))
-    except ValueError as e:
-        print(e)
-        print('Error when generating the embeddings')
+            Z_umap = generate_umap_embedding(Z)
+            Z_umap.to_csv(os.path.join(pretrain_dir, 'Z_umap.csv'))
+        except ValueError as e:
+            print(e)
+            print('Error when generating the embeddings')
 
     ########################################################
     # Finetune Set Up
@@ -506,7 +509,7 @@ def objective(trial):
     trial.set_user_attr('rand Val AUC std', np.std(rand_results['Val AUC']))
     trial.set_user_attr('rand Train AUC avg', np.mean(rand_results['Train AUC']))
     trial.set_user_attr('rand Train AUC std', np.std(rand_results['Train AUC']))
-    result_dct['randtune'] = rand_results
+    result_dct['randtune'] = rand_results.to_dict()
 
     ############################
     # Train on the full dataset, and evaluate on an independent test set,
@@ -614,11 +617,15 @@ if __name__ == '__main__':
     # get arguments from the command line
     if len(sys.argv) > 1:
         GOAL_COL = sys.argv[1]
+    elif DEBUG:
+        GOAL_COL = 'MSKCC BINARY'
     else:
         raise ValueError('GOAL_COL must be defined')
 
     if len(sys.argv) > 2:
         STUDY_KIND = sys.argv[2]
+    elif DEBUG:
+        STUDY_KIND = '_study_march13_S_Clas'
     else:
         raise ValueError('STUDY_KIND must be defined')
 

@@ -23,7 +23,7 @@ def generate_latent_space(X_data, encoder, batch_size=128):
     Z = torch.tensor([])
     with torch.inference_mode():
         for i in range(0, len(X_data), batch_size):
-            print(i, len(X_data))
+            # print(i, len(X_data))
             Z_batch = encoder.transform(X_data[i:i+batch_size])
             Z = torch.cat((Z, Z_batch), dim=0)
         Z = Z.detach().numpy()
