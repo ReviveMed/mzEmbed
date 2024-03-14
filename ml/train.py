@@ -287,17 +287,17 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
 
                     if phase == 'train':
 
-                        if encoder_weight > 0:
-                            encoder_loss, encoder_loss_avg = normalize_loss(
-                                encoder_loss, encoder_loss_avg, loss_avg_beta, curr_batch)
+                        # if encoder_weight > 0:
+                        #     encoder_loss, encoder_loss_avg = normalize_loss(
+                        #         encoder_loss, encoder_loss_avg, loss_avg_beta, curr_batch)
 
-                        if head_weight > 0:
-                            head_loss, head_loss_avg = normalize_loss(
-                                head_loss, head_loss_avg, loss_avg_beta, curr_batch)
+                        # if head_weight > 0:
+                        #     head_loss, head_loss_avg = normalize_loss(
+                        #         head_loss, head_loss_avg, loss_avg_beta, curr_batch)
 
-                        if adversary_weight > 0:
-                            adversary_loss, adversary_loss_avg = normalize_loss(
-                                adversary_loss, adversary_loss_avg, loss_avg_beta, curr_batch)
+                        # if adversary_weight > 0:
+                        #     adversary_loss, adversary_loss_avg = normalize_loss(
+                        #         adversary_loss, adversary_loss_avg, loss_avg_beta, curr_batch)
 
                         joint_loss = (encoder_weight*encoder_loss + \
                             head_weight*head_loss - \
@@ -320,17 +320,17 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
 
                     elif phase == 'val':
 
-                        if encoder_weight > 0:
-                            encoder_loss, _ = normalize_loss(
-                                encoder_loss, encoder_loss_avg, loss_avg_beta, -1)
+                        # if encoder_weight > 0:
+                        #     encoder_loss, _ = normalize_loss(
+                        #         encoder_loss, encoder_loss_avg, loss_avg_beta, -1)
                         
-                        if head_weight > 0:
-                            head_loss, _ = normalize_loss(
-                                head_loss, head_loss_avg, loss_avg_beta, -1)
+                        # if head_weight > 0:
+                        #     head_loss, _ = normalize_loss(
+                        #         head_loss, head_loss_avg, loss_avg_beta, -1)
                         
-                        if adversary_weight > 0:
-                            adversary_loss, _ = normalize_loss(
-                                adversary_loss, adversary_loss_avg, loss_avg_beta, -1)
+                        # if adversary_weight > 0:
+                        #     adversary_loss, _ = normalize_loss(
+                        #         adversary_loss, adversary_loss_avg, loss_avg_beta, -1)
                         
                         joint_loss = (encoder_weight*encoder_loss + \
                             head_weight*head_loss - \

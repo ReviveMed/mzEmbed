@@ -625,14 +625,16 @@ if __name__ == '__main__':
     if len(sys.argv) > 2:
         STUDY_KIND = sys.argv[2]
     elif DEBUG:
-        STUDY_KIND = '_study_march13_S_Clas'
+        STUDY_KIND = '_study_march13_S_Clas'  #'_study_march13_S_TGEM'
     else:
         raise ValueError('STUDY_KIND must be defined')
 
     if len(sys.argv) > 3:
         num_trials = int(sys.argv[3])
-    else:
+    elif DEBUG:
         num_trials = 1
+    else:
+        num_trials = 20
 
     # study_kind = '_study_march13_L_Clas'
     # goal_col = 'MSKCC BINARY'
