@@ -30,7 +30,7 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 GOAL_COL= None
 STUDY_KIND = None
-DEBUG = True
+DEBUG = False
 
 def objective(trial):
 
@@ -670,7 +670,7 @@ if __name__ == '__main__':
     elif DEBUG:
         num_trials = 1
     else:
-        num_trials = 20
+        num_trials = 100
 
     # study_kind = '_study_march13_L_Clas'
     # goal_col = 'MSKCC BINARY'
