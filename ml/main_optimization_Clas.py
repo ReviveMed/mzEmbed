@@ -395,6 +395,7 @@ def objective(trial):
     ############################
     finetune_results = []
     for n_fold in range(num_folds):
+        finetune_result = {}
         print('fold:', n_fold)
         X_train, y_train = X_finetune.loc[~splits.iloc[:,n_fold]], y_finetune.loc[~splits.iloc[:,n_fold]]
         X_test, y_test = X_finetune.loc[splits.iloc[:,n_fold]], y_finetune.loc[splits.iloc[:,n_fold]]
@@ -444,20 +445,23 @@ def objective(trial):
         _, _, _, finetune_output = train_compound_model(dataloaders, encoder, finetune_head, finetune_adv, **finetune_kwargs)
 
 
-        finetune_result = finetune_output['end_state_eval']['test']['head_auc']
+        finetune_result['Val AUC'] = finetune_output['end_state_eval']['test']['head_auc']
+        finetune_result['Train AUC'] = finetune_output['end_state_eval']['train']['head_auc']
         finetune_results.append(finetune_result)
 
         # Report intermediate objective value.
-        trial.report(finetune_result, step=n_fold)
+        trial.report(finetune_result['Val AUC'], step=n_fold)
 
         # Handle pruning based on the intermediate value.
         if trial.should_prune():
             raise optuna.TrialPruned()
 
-
-    trial.set_user_attr('finetune AUC std', np.std(finetune_results))
-    trial.set_user_attr('finetune AUC avg', np.mean(finetune_results))
-    result_dct['finetune'] = finetune_results
+    finetune_results = pd.DataFrame(finetune_results)
+    trial.set_user_attr('finetune Val AUC avg', np.mean(finetune_results['Val AUC']))
+    trial.set_user_attr('finetune Val AUC std', np.std(finetune_results['Val AUC']))
+    trial.set_user_attr('finetune Train AUC avg', np.mean(finetune_results['Train AUC']))
+    trial.set_user_attr('finetune Train AUC std', np.std(finetune_results['Train AUC']))
+    result_dct['finetune'] = finetune_results.to_dict()
 
 
     ############################
@@ -520,7 +524,7 @@ def objective(trial):
 
         # Run the train and evaluation
         _, _, _, finetune_output = train_compound_model(dataloaders, encoder, finetune_head, finetune_adv, **finetune_kwargs)
-
+        trial.set_user_attr('fit Train+Val Finetune AUC', finetune_output['end_state_eval']['train']['head_auc'])
         for hold_out_str in hold_out_str_list:
             if hold_out_str == 'val':
                 continue
@@ -546,6 +550,7 @@ def objective(trial):
     # Start the CV loop
     ############################
     for n_fold in range(num_folds):
+        rand_result = {}
         X_train, y_train = X_finetune.loc[~splits.iloc[:,n_fold]], y_finetune.loc[~splits.iloc[:,n_fold]]
         X_test, y_test = X_finetune.loc[splits.iloc[:,n_fold]], y_finetune.loc[splits.iloc[:,n_fold]]
 
@@ -592,11 +597,17 @@ def objective(trial):
         # Run the train and evaluation
         _, _, _, rand_output = train_compound_model(dataloaders, encoder, finetune_head, finetune_adv, **randtune_kwargs)
 
-        rand_result = rand_output['end_state_eval']['test']['head_auc']
+        rand_result['Val AUC'] = rand_output['end_state_eval']['test']['head_auc']
+        rand_result['Train AUC'] = rand_output['end_state_eval']['train']['head_auc']
         rand_results.append(rand_result)
 
-    trial.set_user_attr('rand AUC std', np.std(rand_results))
-    trial.set_user_attr('rand AUC avg', np.mean(rand_results))
+    
+    rand_results = pd.DataFrame(rand_results)
+    
+    trial.set_user_attr('rand Val AUC avg', np.mean(rand_results['Val AUC']))
+    trial.set_user_attr('rand Val AUC std', np.std(rand_results['Val AUC']))
+    trial.set_user_attr('rand Train AUC avg', np.mean(rand_results['Train AUC']))
+    trial.set_user_attr('rand Train AUC std', np.std(rand_results['Train AUC']))
     result_dct['randtune'] = rand_results
 
     ############################
@@ -658,6 +669,7 @@ def objective(trial):
 
         # Run the train and evaluation
         _, _, _, rand_output = train_compound_model(dataloaders, encoder, finetune_head, finetune_adv, **randtune_kwargs)
+        trial.set_user_attr('fit Train+Val Rand AUC', rand_output['end_state_eval']['train']['head_auc'])
 
         for hold_out_str in hold_out_str_list:
             if hold_out_str == 'val':
@@ -798,7 +810,7 @@ if __name__ == '__main__':
     # optuna-dashboard sqlite:///study_3.db
         
 
-    study_table_path = f'{trials_dir}/{study_name}_table.csv'
+    study_table_path = f'{data_dir}/{study_name}_table.csv'
     study_table = study.trials_dataframe()
     # study_table.to_csv('study_table.csv', index=False)
     study_table.to_csv(study_table_path, index=False)

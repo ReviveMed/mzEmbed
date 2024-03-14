@@ -1,6 +1,6 @@
 # Use an official Python runtime as a parent image
-FROM python:3.9-bookworm 
-# FROM python:3.9-slim
+# FROM python:3.9-bookworm 
+FROM python:3.9-slim
 
 LABEL Description="ReviveMed Linux environment for mz_embed_engine analysis using Python (R to be added later)"
 LABEL tags="revivemed-mz_embed_engine"
@@ -75,3 +75,7 @@ ENV NAME World
 # Add user to the docker group so you don't need sudo and can use vscode to develop:
 # https://docs.docker.com/engine/install/linux-postinstall/
 
+
+
+# git remote set-url origin git@bitbucket.org:jonaheaton/revivemed/mz_embed_engine.git
+# git remote set-url origin jonaheaton@bitbucket.org:revivemed/mz_embed_engine.git

@@ -12,6 +12,8 @@ import logging
 import sys
 import shutil
 from viz import generate_latent_space, generate_umap_embedding, generate_pca_embedding
+from utils_study_kwargs import get_kwargs
+from create_optuna_table import process_top_trials
 
 ####################################################################################
 # Main functions
@@ -26,18 +28,24 @@ USE_WEBAPP_DB = True
 SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
-# goal_col = 'Nivo Benefit BINARY'
-goal_col = 'MSKCC BINARY'
-study_name = goal_col + '_study_march13_L_Adv'
-RESULT_DIR = f'{BASE_DIR}/trials/{study_name}'
+GOAL_COL= None
+STUDY_KIND = None
+DEBUG = True
 
 def objective(trial):
 
+
+    if GOAL_COL is None:
+        raise ValueError('GOAL_COL must be defined')
+    if STUDY_KIND is None:
+        raise ValueError('STUDY_KIND must be defined')
+
     ########################################################
     # load the data
-    splits_subdir = f"{goal_col} predefined_val" 
+    splits_subdir = f"{GOAL_COL} predefined_val" 
     data_dir = DATA_DIR
-    result_dir = RESULT_DIR
+    study_name = trial.study.study_name
+    result_dir = f'{BASE_DIR}/trials/{study_name}'
     os.makedirs(result_dir, exist_ok=True)
 
     X_data = pd.read_csv(f'{data_dir}/X.csv', index_col=0)
@@ -56,139 +64,28 @@ def objective(trial):
 
     nan_data = pd.read_csv(f'{data_dir}/nans.csv', index_col=0)
 
+    assert GOAL_COL in y_data.columns, f'{GOAL_COL} not in y_data.columns'
+
 
     ########################################################
     # Specify the model arcitecture and hyperparameters
 
-    activation = trial.suggest_categorical('activation', ['tanh', 'leakyrelu','sigmoid'])
-    # encoder_kind = 'TGEM_Encoder'
-    # encoder_kind = trial.suggest_categorical('encoder_kind', ['AE', 'VAE'])
-    encoder_kind = 'AE'
-
-    if encoder_kind == 'AE' or encoder_kind == 'VAE':
-        latent_size = trial.suggest_int('latent_size', 4, 100, log=True)
-        encoder_kwargs = {
-            'activation': activation,
-            'latent_size': latent_size,
-            'num_hidden_layers': trial.suggest_int('num_hidden_layers', 1, 5),
-            'dropout_rate': trial.suggest_float('dropout_rate', 0, 0.4, step=0.1),
-            'use_batch_norm': False, #trial.suggest_categorical('use_batch_norm', [True, False]),
-            'hidden_size': round(1.5*latent_size), #trial.suggest_float('hidden_size_mult',1,2, step=0.1)*latent_size,
-            # 'hidden_sizes': [trial.suggest_int('hidden_size', 2, 100, log=True) for _ in range(trial.suggest_int('num_layers', 1, 5))],
-            }
-    else:
-        latent_size = -1
-        encoder_kwargs = {
-            'dropout_rate': trial.suggest_float('dropout_rate', 0, 0.4, step=0.1),
-            'n_head': trial.suggest_int('num_hidden_layers', 1, 5),
-        }
-
-    kwargs = {
-        ################
-        ## General ##
-
-        'save_dir': os.path.join(result_dir, f'trial_{trial.datetime_start}__{trial.number}'),
-        'encoder_kind': encoder_kind,
-        'encoder_kwargs': encoder_kwargs,
-        'other_size': 1,
-        # 'y_pretrain_cols': ['Cohort Label_encoded', 'Study ID_encoded'],
-        # 'y_finetune_cols': ['Benefit_encoded', 'Sex_encoded'], 
-        'y_pretrain_cols': ['Cohort Label_encoded', 'Study ID_encoded'],
-        'y_finetune_cols': [goal_col, 'Sex BINARY'],    
-        # 'num_folds': 50,
-        'num_folds': 30,
-        'hold_out_str_list': ['Test'],
-        # 'finetune_peak_freq_th': trial.suggest_float('finetune_peak_freq_th', 0, 0.9, step=0.1),
-        # 'overall_peak_freq_th': trial.suggest_float('overall_peak_freq_th', 0, 0.5, step=0.1),
-        'finetune_peak_freq_th': 0,
-        'overall_peak_freq_th': 0,
-        'pretrain_peak_freq_th': 0,
-        'finetune_var_q_th': 0,
-        # 'finetune_peak_freq_th': 0.9,
-        # 'overall_peak_freq_th': 0,
-        # 'pretrain_peak_freq_th': 0.3,
-        # 'finetune_var_q_th': 0.1,
-        'finetune_var_th': None,
-
-        ################
-        ## Pretrain ##
-
-        'pretrain_val_frac': 0.2, # each trial the train/val samples will be different, also not stratified?
-        'pretrain_batch_size': 64,
-        'pretrain_head_kind': 'NA',
-        'pretrain_head_kwargs' : {},
-        # 'pretrain_head_kind': 'MultiClassClassifier',
-        # 'pretrain_head_kwargs' : {
-        #     'hidden_size': 4,
-        #     'num_hidden_layers': 1,
-        #     'dropout_rate': 0,
-        #     'activation': activation,
-        #     'use_batch_norm': False,
-        #     'num_classes': 4,
-        #     },
-        
-        # 'pretrain_adv_kind': 'NA',
-        # 'pretrain_adv_kwargs' : {
-        #     },
-        'pretrain_adv_kind': 'MultiClassClassifier',
-        'pretrain_adv_kwargs' : {
-            'hidden_size': 4,
-            'num_hidden_layers': 1,
-            'dropout_rate': 0,
-            'activation': activation,
-            'use_batch_norm': False,
-            'num_classes': 18,
-            },
-
-        'pretrain_kwargs': {
-            # 'num_epochs': trial.suggest_int('pretrain_epochs', 10, 100,log=True),
-            'num_epochs': trial.suggest_int('pretrain_epochs', 10, 500,log=True),
-            'lr': trial.suggest_float('pretrain_lr', 0.0001, 0.01, log=True),
-            'encoder_weight': 1,
-            'head_weight': 0,
-            'adversary_weight': trial.suggest_float('pretrain_adv_weight', 0.1, 10, log=True),
-            'noise_factor': 0,
-            'early_stopping_patience': 5,
-            'loss_avg_beta': 0,
-            # 'loss_avg_beta': 0,
-            # 'end_state_eval_funcs': {},
-            'end_state_eval_funcs': get_end_state_eval_funcs(),
-            'adversarial_mini_epochs': 5,
-        },
-
-        ################
-        ## Finetune ##
-
-        'finetune_val_frac': 0,
-        'finetune_batch_size': 32,
-        'finetune_head_kind': 'BinaryClassifier',
-        'finetune_head_kwargs' : {
-            'hidden_size': 4, 
-            'num_hidden_layers': 0,
-            'dropout_rate': 0,
-            'activation': activation,
-            'use_batch_norm': False,
-            'num_classes': 2,
-            },
-        'finetune_adv_kind': 'NA',
-        'finetune_adv_kwargs' : {
-            },
-        'finetune_kwargs': {
-            # 'num_epochs': 2,
-            # 'num_epochs': trial.suggest_int('finetune_epochs', 5, 50,log=True),
-            'num_epochs': trial.suggest_int('finetune_epochs', 5, 250,log=True),
-            'lr': trial.suggest_float('finetune_lr', 0.0001, 0.01, log=True),
-            'encoder_weight': 0,
-            'head_weight': 1,
-            'adversary_weight': 0,
-            'noise_factor': 0,
-            'early_stopping_patience': -1,
-            'loss_avg_beta': -1,
-            'end_state_eval_funcs': get_end_state_eval_funcs(),
-            'adversarial_mini_epochs': 20
-        },
-    }
+    kwargs = get_kwargs(trial,
+                        study_kind=STUDY_KIND,
+                        goal_col=GOAL_COL,
+                        result_dir=result_dir)
   
+    if DEBUG:
+        print('##############################################')
+        print('DEBUG MODE')
+        print('##############################################')
+        print(kwargs)
+        kwargs['num_folds'] = 1
+        kwargs['pretrain_kwargs']['num_epochs'] = 1
+        kwargs['finetune_kwargs']['num_epochs'] = 1
+        trial.set_user_attr('DEBUG', True)
+
+
     ########################################################
     # Set Up
 
@@ -396,6 +293,7 @@ def objective(trial):
     ############################
     finetune_results = []
     for n_fold in range(num_folds):
+        finetune_result = {}
         print('fold:', n_fold)
         X_train, y_train = X_finetune.loc[~splits.iloc[:,n_fold]], y_finetune.loc[~splits.iloc[:,n_fold]]
         X_test, y_test = X_finetune.loc[splits.iloc[:,n_fold]], y_finetune.loc[splits.iloc[:,n_fold]]
@@ -445,20 +343,23 @@ def objective(trial):
         _, _, _, finetune_output = train_compound_model(dataloaders, encoder, finetune_head, finetune_adv, **finetune_kwargs)
 
 
-        finetune_result = finetune_output['end_state_eval']['test']['head_auc']
+        finetune_result['Val AUC'] = finetune_output['end_state_eval']['test']['head_auc']
+        finetune_result['Train AUC'] = finetune_output['end_state_eval']['train']['head_auc']
         finetune_results.append(finetune_result)
 
         # Report intermediate objective value.
-        trial.report(finetune_result, step=n_fold)
+        trial.report(finetune_result['Val AUC'], step=n_fold)
 
         # Handle pruning based on the intermediate value.
         if trial.should_prune():
             raise optuna.TrialPruned()
 
-
-    trial.set_user_attr('finetune AUC std', np.std(finetune_results))
-    trial.set_user_attr('finetune AUC avg', np.mean(finetune_results))
-    result_dct['finetune'] = finetune_results
+    finetune_results = pd.DataFrame(finetune_results)
+    trial.set_user_attr('finetune Val AUC avg', np.mean(finetune_results['Val AUC']))
+    trial.set_user_attr('finetune Val AUC std', np.std(finetune_results['Val AUC']))
+    trial.set_user_attr('finetune Train AUC avg', np.mean(finetune_results['Train AUC']))
+    trial.set_user_attr('finetune Train AUC std', np.std(finetune_results['Train AUC']))
+    result_dct['finetune'] = finetune_results.to_dict()
 
 
     ############################
@@ -521,7 +422,7 @@ def objective(trial):
 
         # Run the train and evaluation
         _, _, _, finetune_output = train_compound_model(dataloaders, encoder, finetune_head, finetune_adv, **finetune_kwargs)
-
+        trial.set_user_attr('fit Train+Val Finetune AUC', finetune_output['end_state_eval']['train']['head_auc'])
         for hold_out_str in hold_out_str_list:
             if hold_out_str == 'val':
                 continue
@@ -547,6 +448,7 @@ def objective(trial):
     # Start the CV loop
     ############################
     for n_fold in range(num_folds):
+        rand_result = {}
         X_train, y_train = X_finetune.loc[~splits.iloc[:,n_fold]], y_finetune.loc[~splits.iloc[:,n_fold]]
         X_test, y_test = X_finetune.loc[splits.iloc[:,n_fold]], y_finetune.loc[splits.iloc[:,n_fold]]
 
@@ -593,11 +495,17 @@ def objective(trial):
         # Run the train and evaluation
         _, _, _, rand_output = train_compound_model(dataloaders, encoder, finetune_head, finetune_adv, **randtune_kwargs)
 
-        rand_result = rand_output['end_state_eval']['test']['head_auc']
+        rand_result['Val AUC'] = rand_output['end_state_eval']['test']['head_auc']
+        rand_result['Train AUC'] = rand_output['end_state_eval']['train']['head_auc']
         rand_results.append(rand_result)
 
-    trial.set_user_attr('rand AUC std', np.std(rand_results))
-    trial.set_user_attr('rand AUC avg', np.mean(rand_results))
+    
+    rand_results = pd.DataFrame(rand_results)
+    
+    trial.set_user_attr('rand Val AUC avg', np.mean(rand_results['Val AUC']))
+    trial.set_user_attr('rand Val AUC std', np.std(rand_results['Val AUC']))
+    trial.set_user_attr('rand Train AUC avg', np.mean(rand_results['Train AUC']))
+    trial.set_user_attr('rand Train AUC std', np.std(rand_results['Train AUC']))
     result_dct['randtune'] = rand_results
 
     ############################
@@ -659,6 +567,7 @@ def objective(trial):
 
         # Run the train and evaluation
         _, _, _, rand_output = train_compound_model(dataloaders, encoder, finetune_head, finetune_adv, **randtune_kwargs)
+        trial.set_user_attr('fit Train+Val Rand AUC', rand_output['end_state_eval']['train']['head_auc'])
 
         for hold_out_str in hold_out_str_list:
             if hold_out_str == 'val':
@@ -702,7 +611,28 @@ def objective(trial):
 if __name__ == '__main__':
 
 
+    # get arguments from the command line
+    if len(sys.argv) > 1:
+        GOAL_COL = sys.argv[1]
+    else:
+        raise ValueError('GOAL_COL must be defined')
 
+    if len(sys.argv) > 2:
+        STUDY_KIND = sys.argv[2]
+    else:
+        raise ValueError('STUDY_KIND must be defined')
+
+    if len(sys.argv) > 3:
+        num_trials = int(sys.argv[3])
+    else:
+        num_trials = 1
+
+    # study_kind = '_study_march13_L_Clas'
+    # goal_col = 'MSKCC BINARY'
+    study_name = f'{GOAL_COL}{STUDY_KIND}'
+    print('goal_col:', GOAL_COL)
+    print('study_kind:', STUDY_KIND)
+    print('study_name:', study_name)
 
     # download the data
     # data_url = 'https://www.dropbox.com/scl/fo/fa3n7sw8fgktnz6q91ffo/h?rlkey=edbdekkhuju5r88kkdo1garmn&dl=1'
@@ -711,6 +641,7 @@ if __name__ == '__main__':
     data_dir = DATA_DIR
     trials_dir = TRIAL_DIR
     gcp_save_loc = 'March_12_Data'
+
 
 
     os.makedirs(trials_dir, exist_ok=True)
@@ -780,7 +711,7 @@ if __name__ == '__main__':
                                 pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=20, interval_steps=5))
     
     try:
-        study.optimize(objective, n_trials=200)#, show_progress_bar=True, timeout=3600*24*7, gc_after_trial=True)
+        study.optimize(objective, n_trials=num_trials)#, show_progress_bar=True, timeout=3600*24*7, gc_after_trial=True)
     except Exception as e:
         print(e)
     # finally:
@@ -798,10 +729,16 @@ if __name__ == '__main__':
 
     # optuna-dashboard sqlite:///study_3.db
         
-    
+
     study_table_path = f'{data_dir}/{study_name}_table.csv'
     study_table = study.trials_dataframe()
     # study_table.to_csv('study_table.csv', index=False)
     study_table.to_csv(study_table_path, index=False)
 
-    upload_file_to_bucket(study_table_path, gcp_save_loc)
+    upload_file_to_bucket(study_table_path, gcp_save_loc)        
+
+
+    # Create a summary of the top trials
+    summary = process_top_trials(study_table, top_trial_perc=0.05, direction='maximize')
+    save_json(summary, f'{data_dir}/{study_name}_toptrials_summary.json')
+    upload_file_to_bucket(f'{data_dir}/{study_name}_toptrials_summary.json', gcp_save_loc)

@@ -45,8 +45,9 @@ def get_list_of_files_in_bucket(project_subdir):
 
     """
     gcp_project_dir = os.path.join(gcp_root_path, project_subdir)
+    # print(gcp_project_dir)
 
-    blobs = client.list_blobs(client_id, prefix=project_subdir)
+    blobs = client.list_blobs(client_id, prefix=gcp_project_dir)
     file_list = []
     for blob in blobs:
         file_list.append(blob.name.replace(gcp_project_dir, ''))

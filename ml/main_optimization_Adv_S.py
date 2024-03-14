@@ -799,7 +799,7 @@ if __name__ == '__main__':
     # optuna-dashboard sqlite:///study_3.db
         
 
-    study_table_path = f'{trials_dir}/{study_name}_table.csv'
+    study_table_path = f'{data_dir}/{study_name}_table.csv'
     study_table = study.trials_dataframe()
     # study_table.to_csv('study_table.csv', index=False)
     study_table.to_csv(study_table_path, index=False)
