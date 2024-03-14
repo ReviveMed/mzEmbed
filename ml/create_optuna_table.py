@@ -149,29 +149,49 @@ if __name__ == '__main__':
         storage_name = f'sqlite:///{storage_loc}'
 
 
+    if study_name == 'all':
 
-    study = optuna.create_study(direction="maximize",
-                                study_name=study_name, 
-                                storage=storage_name, 
-                                load_if_exists=True)
-    
-
-    study_table_path = f'{data_dir}/{study_name}_table.csv'
-    
-    # Create a table of the study in csv format
-    study_table = study.trials_dataframe()
-    # study_table.to_csv('study_table.csv', index=False)
-
-    study_table.to_csv(study_table_path, index=False)
+        study_name_list = ['MSKCC BINARY_study_march13_S_Clas','MSKCC BINARY_study_march13_L_Clas',\
+                           'MSKCC BINARY_study_march13_S_Adv','MSKCC BINARY_study_march13_L_Adv',\
+                            'MSKCC BINARY_study_march13_S_Reg','MSKCC BINARY_study_march13_L_Reg',\
+                            'BINARY_study_march12_S_TGEM',
+                            'MSKCC BINARY_study_march12_S_Clas','MSKCC BINARY_study_march12_L_Clas',\
+                           'MSKCC BINARY_study_march12_S_Adv','MSKCC BINARY_study_march12_L_Adv',\
+                            'MSKCC BINARY_study_march12_S_Reg','MSKCC BINARY_study_march12_L_Reg',
+        ]
+    else:
+        study_name_list = [study_name]
 
 
-    # Create a summary of the top trials
-    summary = process_top_trials(study_table, top_trial_perc=0.05, direction='maximize')
-    save_json(summary, f'{data_dir}/{study_name}_toptrials_summary.json')
+    for study_name in study_name_list:
+        study = optuna.create_study(direction="maximize",
+                                    study_name=study_name, 
+                                    storage=storage_name, 
+                                    load_if_exists=True)
+        
+
+        study_table_path = f'{data_dir}/{study_name}_table.csv'
+        
+        # Create a table of the study in csv format
+        study_table = study.trials_dataframe()
+        # study_table.to_csv('study_table.csv', index=False)
+
+        study_table.to_csv(study_table_path, index=False)
 
 
-    upload_file_to_bucket(study_table_path, gcp_save_loc)
-    upload_file_to_bucket(f'{data_dir}/{study_name}_toptrials_summary.json', gcp_save_loc)
+        # Create a summary of the top trials
+        try:
+            summary = process_top_trials(study_table, top_trial_perc=0.05, direction='maximize')
+            save_json(summary, f'{data_dir}/{study_name}_toptrials_summary.json')
+
+
+            upload_file_to_bucket(study_table_path, gcp_save_loc)
+            upload_file_to_bucket(f'{data_dir}/{study_name}_toptrials_summary.json', gcp_save_loc)
+        # except KeyError 
+        except KeyError as e:
+            print(e)
+            continue
+        
 
 
     all_study_summary = compile_top_trials_from_all_studies(gcp_save_loc, data_dir)
