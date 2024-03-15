@@ -125,6 +125,34 @@ def _get_study_march15(trial, goal_col, result_dir):
     else:
         finetune_val_frac = trial.suggest_float('finetune_val_frac', 0.15, 0.25, step=0.05)
 
+    use_pretrain_weight_decay = trial.suggest_categorical('use_pretrain_weight_decay', [True, False])
+    use_finetune_weight_decay = trial.suggest_categorical('use_finetune_weight_decay', [True, False])
+    use_pretrain_elasticnet_reg = trial.suggest_categorical('use_elasticnet_reg', [True, False])
+    use_finetune_elasticnet_reg = trial.suggest_categorical('use_elasticnet_reg', [True, False])
+    if use_pretrain_weight_decay:
+        pretrain_weight_decay = trial.suggest_float('pretrain_weight_decay', 0.0001, 0.1, log=True)
+    else:
+        pretrain_weight_decay = 0
+
+    if use_finetune_weight_decay:
+        finetune_weight_decay = trial.suggest_float('finetune_weight_decay', 0.0001, 0.1, log=True)
+    else:
+        finetune_weight_decay = 0
+
+    if use_pretrain_elasticnet_reg:
+        pretrain_l1_reg_weight = trial.suggest_float('pretrain_l1_reg_weight', 0.0001, 0.1, log=True)
+        pretrain_l2_reg_weight = trial.suggest_float('pretrain_l2_reg_weight', 0.0001, 0.1, log=True)
+    else:
+        pretrain_l1_reg_weight = 0
+        pretrain_l2_reg_weight = 0
+
+    if use_finetune_elasticnet_reg:
+        finetune_l1_reg_weight = trial.suggest_float('finetune_l1_reg_weight', 0.0001, 0.1, log=True)
+        finetune_l2_reg_weight = trial.suggest_float('finetune_l2_reg_weight', 0.0001, 0.1, log=True)
+    else:
+        finetune_l1_reg_weight = 0
+        finetune_l2_reg_weight = 0
+
     kwargs = {
         ################
         ## General ##
@@ -160,9 +188,9 @@ def _get_study_march15(trial, goal_col, result_dir):
             # 'num_epochs': trial.suggest_int('pretrain_epochs', 10, 100,log=True),
             'num_epochs': trial.suggest_int('pretrain_epochs', 10, 500,log=True),
             'lr': trial.suggest_float('pretrain_lr', 0.0001, 0.01, log=True),
-            'weight_decay': trial.suggest_float('pretrain_weight_decay', 0, 0.01, log=True),
-            'l1_reg_weight': trial.suggest_float('pretrain_l1_reg_weight', 0, 0.01, log=True),
-            'l2_reg_weight': trial.suggest_float('pretrain_l2_reg_weight', 0, 0.01, log=True),
+            'weight_decay': pretrain_weight_decay,
+            'l1_reg_weight': pretrain_l1_reg_weight,
+            'l2_reg_weight': pretrain_l2_reg_weight,
             'encoder_weight': 1,
             'head_weight': 0,
             'adversary_weight': 0,
@@ -196,9 +224,9 @@ def _get_study_march15(trial, goal_col, result_dir):
             # 'num_epochs': trial.suggest_int('finetune_epochs', 5, 50,log=True),
             'num_epochs': trial.suggest_int('finetune_epochs', 10, 250,log=True),
             'lr': trial.suggest_float('finetune_lr', 0.0001, 0.01, log=True),
-            'weight_decay': trial.suggest_float('finetune_weight_decay', 0, 0.01, log=True),
-            'l1_reg_weight': trial.suggest_float('finetune_l1_reg_weight', 0, 0.01, log=True),
-            'l2_reg_weight': trial.suggest_float('finetune_l2_reg_weight', 0, 0.01, log=True),
+            'weight_decay': finetune_weight_decay,
+            'l1_reg_weight': finetune_l1_reg_weight,
+            'l2_reg_weight': finetune_l2_reg_weight,
             'encoder_weight': 0,
             'head_weight': 1,
             'adversary_weight': 0,
