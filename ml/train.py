@@ -5,7 +5,7 @@ from misc import normalize_loss
 import json
 import os
 import torch.nn.functional as F
-from models import AE, MultiClassClassifier, BinaryClassifier, VAE
+from models import AE, MultiClassClassifier, BinaryClassifier, VAE, get_reg_penalty
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import numpy as np
@@ -63,13 +63,15 @@ class CompoundDataset(Dataset):
 def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
 
     learning_rate = kwargs.get('learning_rate', kwargs.get('lr', 0.001))
-    
+    weight_decay = kwargs.get('weight_decay', 0)
     num_epochs = kwargs.get('num_epochs', 10)
     encoder_weight = kwargs.get('encoder_weight', 1)
     head_weight = kwargs.get('head_weight', 1)
     adversary_weight = kwargs.get('adversary_weight', 1)
     early_stopping_patience = kwargs.get('early_stopping_patience', -1)
     noise_factor = kwargs.get('noise_factor', 0)
+    l1_reg_weight = kwargs.get('l1_reg_weight', 0)
+    l2_reg_weight = kwargs.get('l2_reg_weight', 0)
     phase_list = kwargs.get('phase_list', None)
     loss_avg_beta = kwargs.get('loss_avg_beta', 0)
     scheduler_kind = kwargs.get('scheduler_kind', None)
@@ -114,6 +116,7 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
 
     learning_parameters = {
         'learning_rate': learning_rate,
+        'weight_decay': weight_decay,
         'num_epochs': num_epochs,
         'early_stopping_patience': early_stopping_patience,
         'noise_factor': noise_factor,
@@ -141,14 +144,14 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
     adversary.to(device)
 
     # define the optimizers
-    encoder_optimizer = torch.optim.Adam(encoder.parameters(), lr=learning_rate)
+    encoder_optimizer = torch.optim.Adam(encoder.parameters(), lr=learning_rate, weight_decay=weight_decay)
     if head_weight > 0:
-        head_optimizer = torch.optim.Adam(head.parameters(), lr=learning_rate)
+        head_optimizer = torch.optim.Adam(head.parameters(), lr=learning_rate, weight_decay=weight_decay)
     else:
         head_optimizer = None
     
     if adversary_weight > 0:
-        adversary_optimizer = torch.optim.Adam(adversary.parameters(), lr=learning_rate)
+        adversary_optimizer = torch.optim.Adam(adversary.parameters(), lr=learning_rate, weight_decay=weight_decay)
     else:
         adversary_optimizer = None
 
@@ -285,25 +288,26 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
                     
                     curr_batch = num_batches*epoch + batch_idx
 
+                    joint_loss = (encoder_weight*encoder_loss + \
+                        head_weight*head_loss - \
+                        adversary_weight*adversary_loss)
+
                     if phase == 'train':
-
-                        # if encoder_weight > 0:
-                        #     encoder_loss, encoder_loss_avg = normalize_loss(
-                        #         encoder_loss, encoder_loss_avg, loss_avg_beta, curr_batch)
-
-                        # if head_weight > 0:
-                        #     head_loss, head_loss_avg = normalize_loss(
-                        #         head_loss, head_loss_avg, loss_avg_beta, curr_batch)
-
-                        # if adversary_weight > 0:
-                        #     adversary_loss, adversary_loss_avg = normalize_loss(
-                        #         adversary_loss, adversary_loss_avg, loss_avg_beta, curr_batch)
 
                         joint_loss = (encoder_weight*encoder_loss + \
                             head_weight*head_loss - \
                             adversary_weight*adversary_loss)
                         
-                        joint_loss.backward(retain_graph=True)
+                        joint_loss_w_penalty = joint_loss
+                        # right now we are also penalizing the weights in the decoder, do we want to do that?
+                        joint_loss_w_penalty += get_reg_penalty(encoder, l1_reg_weight, l2_reg_weight)
+                        # joint_loss += get_reg_penalty(encoder.encoder, l1_reg_weight, l2_reg_weight)
+                        joint_loss_w_penalty += get_reg_penalty(head, l1_reg_weight, l2_reg_weight)
+
+                        # we probably don't care about the adversary weights
+                        # joint_loss += get_reg_penalty(adversary, l1_reg_weight, l2_reg_weight)
+
+                        joint_loss_w_penalty.backward(retain_graph=True)
                         
 
                         encoder_optimizer.step()
@@ -317,24 +321,6 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
                             # Backward pass and optimize the adversarial classifiers
                             adversary_loss.backward()
                             adversary_optimizer.step()
-
-                    elif phase == 'val':
-
-                        # if encoder_weight > 0:
-                        #     encoder_loss, _ = normalize_loss(
-                        #         encoder_loss, encoder_loss_avg, loss_avg_beta, -1)
-                        
-                        # if head_weight > 0:
-                        #     head_loss, _ = normalize_loss(
-                        #         head_loss, head_loss_avg, loss_avg_beta, -1)
-                        
-                        # if adversary_weight > 0:
-                        #     adversary_loss, _ = normalize_loss(
-                        #         adversary_loss, adversary_loss_avg, loss_avg_beta, -1)
-                        
-                        joint_loss = (encoder_weight*encoder_loss + \
-                            head_weight*head_loss - \
-                            adversary_weight*adversary_loss)
                     
 
                     running_losses['encoder'] += encoder_loss.item()

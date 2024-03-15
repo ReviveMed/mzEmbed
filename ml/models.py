@@ -37,6 +37,25 @@ def _reset_params(layer):
             for child in layer.children():
                 _reset_params(child)
 
+def get_reg_penalty_slow(model,l1_lambda,l2_lambda):
+    #this is probably slower, but more memory efficient 
+    reg_loss = torch.tensor(0, dtype=torch.float32)
+    for param in model.parameters():
+        reg_loss += l1_lambda * torch.sum(torch.abs(param)) + l2_lambda * torch.sum(param**2)
+    return reg_loss
+
+def get_reg_penalty(model,l1_lambda,l2_lambda):
+    if (l1_lambda == 0) and (l2_lambda == 0):
+        return torch.tensor(0, dtype=torch.float32)
+    all_params = torch.cat([x.view(-1) for x in model.parameters()])
+    if l1_lambda == 0:
+        return l2_lambda * torch.sum(all_params.pow(2))
+    elif l2_lambda == 0:
+        return l1_lambda * torch.sum(all_params.abs())
+    return l1_lambda * torch.sum(all_params.abs()) + l2_lambda * torch.sum(all_params.pow(2))
+
+
+
 # create a dummy model
 class DummyModel(nn.Module):
     def __init__(self):
@@ -72,6 +91,8 @@ class Dense_Layers(nn.Module):
             activation_func = nn.Tanh()
         elif activation == 'sigmoid':
             activation_func = nn.Sigmoid()
+        elif activation == 'elu':
+            activation_func = nn.ELU()
         else:
             raise ValueError('activation must be one of "leakyrelu", "relu", "tanh", or "sigmoid"')
 
@@ -671,18 +692,18 @@ class TGEM_Encoder(torch.nn.Module):
                                                 mode)
         self.mulitiattention3 = mulitiattention( self.n_head, self.input_size, query_gene,
                                                 mode)
-        self.ffn1 = nn.Linear(self.input_size, self.d_ff)
-        self.ffn2 = nn.Linear(self.d_ff, self.input_size)
+        # self.ffn1 = nn.Linear(self.input_size, self.d_ff)
+        # self.ffn2 = nn.Linear(self.d_ff, self.input_size)
         self.dropout = nn.Dropout(dropout_rate)
         self.sublayer = res_connect(input_size, dropout_rate)
     
     def reset_params(self):
         _reset_params(self)
 
-    def feedforward(self, x):
-        out = F.relu(self.ffn1(x))
-        out = self.ffn2(self.dropout(out))
-        return out
+    # def feedforward(self, x):
+    #     out = F.relu(self.ffn1(x))
+    #     out = self.ffn2(self.dropout(out))
+    #     return out
 
     def forward(self, x):
 
