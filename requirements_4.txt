@@ -26,3 +26,4 @@ jupyterlab-widgets==3.0.9
 jupyterlab_server==2.25.0
 optuna-dashboard
 mysqlclient
+paretoset

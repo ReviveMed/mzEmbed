@@ -241,7 +241,7 @@ def objective(trial):
         pretrain_result = output['end_state_losses']['train']['reconstruction']
 
     #TODO: Add user attributes related to the pretraining
-    trial.set_user_attr('reconstruction loss', output) 
+    trial.set_user_attr('reconstruction loss', output['end_state_losses']['val']['reconstruction'])
     trial.set_user_attr('pretrain Head AUC', output['end_state_eval']['val']['head_auc'])
     # trial.set_user_attr('pretrain Adv AUC', pretrain_output['end_state_eval']['val']['adv_auc'])
     if 'val LogisticRegression_auc' in output['sklearn_adversary_eval']:
@@ -782,6 +782,12 @@ if __name__ == '__main__':
 
 
     # Create a summary of the top trials
-    summary = process_top_trials(study_table, top_trial_perc=0.05, direction='maximize')
+    directions =  [study.directions[0].name for _ in range(len(study.directions))]
+    min_cutoffs = {'values_0', 0.8}
+    max_cutoffs = {}
+    summary = process_top_trials(study_table, top_trial_perc=0.1, directions=directions,
+                                    min_cutoffs=min_cutoffs,max_cutoffs=max_cutoffs)
+
+
     save_json(summary, f'{data_dir}/{study_name}_toptrials_summary.json')
     upload_file_to_bucket(f'{data_dir}/{study_name}_toptrials_summary.json', gcp_save_loc)
