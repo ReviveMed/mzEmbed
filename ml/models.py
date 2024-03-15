@@ -62,6 +62,7 @@ class DummyModel(nn.Module):
         super(DummyModel, self).__init__()
         self.fc = nn.Identity()
         self.goal = 'NA'
+        self.dummy = nn.Linear(1, 1)
 
     def forward(self, x):
         return self.fc(x)
