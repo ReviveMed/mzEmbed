@@ -118,7 +118,7 @@ def _get_study_march15(trial, goal_col, result_dir):
         }
 
 
-    finetune_early_stopping_patience = trial.suggest_int('finetune_early_stopping_patience', 0, 20, step=10),
+    finetune_early_stopping_patience = trial.suggest_int('finetune_early_stopping_patience', 0, 20, step=10)
 
     if finetune_early_stopping_patience == 0:
         finetune_val_frac = 0
