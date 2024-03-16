@@ -384,7 +384,7 @@ def objective(trial):
     
     # https://github.com/optuna/optuna/issues/2237
     obj_finetune_robust = obj_finetune_val / (obj_finetune_train / obj_finetune_val)
-    obj_finetune_robust2 =  res['Val*2 / Train AUC'].mean()
+    # obj_finetune_robust2 =  results['Val*2 / Train AUC'].mean()
 
     ############################
     # Train on the full dataset, and evaluate on an independent test set,
