@@ -30,7 +30,7 @@ storage_name = 'optuna'
 USE_WEBAPP_DB = True
 SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
-
+y_filename = 'y_pretrain'
 GOAL_COL= None
 STUDY_KIND = None
 DEBUG = False
@@ -54,7 +54,7 @@ def objective(trial):
     os.makedirs(result_dir, exist_ok=True)
 
     X_data = pd.read_csv(f'{data_dir}/X.csv', index_col=0)
-    y_data = pd.read_csv(f'{data_dir}/y_pretrain.csv', index_col=0)
+    y_data = pd.read_csv(f'{data_dir}/{y_filename}.csv', index_col=0)
     
     # Get the pretrain, finetune cols
     pretrain_files = y_data[y_data['Set'] == 'Pretrain'].index.to_list()
@@ -184,10 +184,12 @@ def objective(trial):
     X_pretrain_train = X_data.loc[pretrain_train_files]
     X_pretrain_val = X_data.loc[pretrain_val_files]
     X_pretrain_test = X_data.loc[pretrain_test_files]
+    X_pretrain_trainval = X_data.loc[pretrain_train_files + pretrain_val_files]
 
     y_pretrain_train = y_data.loc[pretrain_train_files][y_pretrain_cols].astype(float)
     y_pretrain_val = y_data.loc[pretrain_val_files][y_pretrain_cols].astype(float)
     y_pretrain_test = y_data.loc[pretrain_test_files][y_pretrain_cols].astype(float)
+    y_pretrain_trainval = y_data.loc[pretrain_train_files + pretrain_val_files][y_pretrain_cols].astype(float)
 
     X_finetune = X_data.loc[splits.index]
     y_finetune = y_data.loc[splits.index][y_finetune_cols].astype(float)
@@ -266,7 +268,7 @@ def objective(trial):
 
     # trial.set_user_attr('pretrain Adv AUC', pretrain_output['end_state_eval']['val']['adv_auc'])
     if 'test LogisticRegression_auc' in output['sklearn_adversary_eval']:
-        trial.set_user_attr('Pretrain Adv Train AUC', output['sklearn_adversary_eval']['train LogisticRegression_auc'])
+        # trial.set_user_attr('Pretrain Adv Train AUC', output['sklearn_adversary_eval']['train LogisticRegression_auc'])
         trial.set_user_attr('Pretrain Adv Val AUC', output['sklearn_adversary_eval']['test LogisticRegression_auc'])
         obj_2 = output['sklearn_adversary_eval']['test LogisticRegression_auc']
     else:
@@ -287,10 +289,7 @@ def objective(trial):
     pretrain_head = get_model(pretrain_head_kind, latent_size+other_size, **pretrain_head_kwargs)
     pretrain_adv = get_model(pretrain_adv_kind, latent_size, **pretrain_adv_kwargs)
 
-    pretrain_trainval_dataset = CompoundDataset(X_pretrain_train.append(X_pretrain_val), 
-                                                y_pretrain_train.append(y_pretrain_val)[pretrain_head_col], 
-                                                y_pretrain_train.append(y_pretrain_val)[pretrain_adv_col])
-    
+    pretrain_trainval_dataset = CompoundDataset(X_pretrain_trainval, y_pretrain_trainval[pretrain_head_col], y_pretrain_trainval[pretrain_adv_col])
     pretrain_test_dataset = CompoundDataset(X_pretrain_test, y_pretrain_test[pretrain_head_col], y_pretrain_test[pretrain_adv_col])
 
 
@@ -336,7 +335,7 @@ def objective(trial):
     trial.set_user_attr('pretrain Head Test AUC', output['end_state_eval']['test']['head_auc'])
     # trial.set_user_attr('pretrain Adv AUC', pretrain_output['end_state_eval']['val']['adv_auc'])
     if 'test LogisticRegression_auc' in output['sklearn_adversary_eval']:
-        trial.set_user_attr('Pretrain Adv Train+Val AUC', output['sklearn_adversary_eval']['train LogisticRegression_auc'])
+        # trial.set_user_attr('Pretrain Adv Train+Val AUC', output['sklearn_adversary_eval']['train LogisticRegression_auc'])
         trial.set_user_attr('Pretrain Adv Test AUC', output['sklearn_adversary_eval']['test LogisticRegression_auc'])
 
 
@@ -808,7 +807,7 @@ if __name__ == '__main__':
         print('downloading data from dropbox')
         download_data_dir(data_url, data_dir)
 
-    if not os.path.exists(f'{data_dir}/y_pretrain.csv'):
+    if not os.path.exists(f'{data_dir}/{y_filename}.csv'):
         print('downloading data pretrain data from dropbox')
         data_url2 = 'https://www.dropbox.com/scl/fi/fnlsik6o1x5f5u7wo42y7/y_pretrain.csv?rlkey=gxnzw7eqwkyp3oswbyc0gczn4&dl=1'
         download_data_file(data_url2, data_dir)
@@ -821,7 +820,7 @@ if __name__ == '__main__':
             mapper_dict = json.load(f)
 
     # if not os.path.exists('data/y_encoded.csv'):
-    y = pd.read_csv(f'{data_dir}/y.csv', index_col=0)
+    y = pd.read_csv(f'{data_dir}/{y_filename}.csv', index_col=0)
     
     if 'Sex BINARY' not in y.columns:
         y, mapper = encode_df_col(y, 'Sex', suffix=' BINARY')
@@ -832,14 +831,16 @@ if __name__ == '__main__':
         mapper_dict['Cohort Label'] = mapper
 
     if 'Study ID_encoded' not in y.columns:
-        y, mapper = encode_df_col(y, 'Study ID')
+        # y, mapper = encode_df_col(y, 'Study ID')
+        y, mapper = encode_df_col(y, 'Study ID Expanded')
+        y['Study ID_encoded'] = y['Study ID Expanded_encoded']
         mapper_dict['Study ID'] = mapper
 
 
     with open(f'{data_dir}/mappers.json', 'w') as f:
         json.dump(mapper_dict, f, indent=4)
 
-    y.to_csv(f'{data_dir}/y.csv')
+    y.to_csv(f'{data_dir}/{y_filename}.csv')
 
 
     # Set up logging

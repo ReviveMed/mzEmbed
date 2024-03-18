@@ -66,7 +66,7 @@ def _get_adv_kwargs(kwargs,trial):
         'dropout_rate': 0,
         'activation': 'leakyrelu',
         'use_batch_norm': False,
-        'num_classes': 18,
+        'num_classes': 19,
         }
     kwargs['pretrain_kwargs']['adversary_weight'] = trial.suggest_float('pretrain_adv_weight', 0.01, 100, log=True)
     return kwargs
