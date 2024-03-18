@@ -261,10 +261,10 @@ if __name__ == '__main__':
     # Choose optional cutoffs
     min_cutoffs = {}
     max_cutoffs = {}
-    min_cutoffs['value'] = 0.80
-    min_cutoffs['values_0'] = 0.80
-    max_cutoffs['values_1'] = 0.99
-    top_trial_perc = 0.05
+    # min_cutoffs['value'] = 0.80
+    # min_cutoffs['values_0'] = 0.80
+    # max_cutoffs['values_1'] = 0.99
+    top_trial_perc = 0.1
 
 
     # print out a list of the available studies in the database
