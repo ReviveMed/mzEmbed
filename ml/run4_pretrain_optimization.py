@@ -34,8 +34,8 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 GOAL_COL= None
 STUDY_KIND = None
 DEBUG = False
-NUM_OBJECTIVES = 2
-MIN_ACCEPTABLE_AUC = 0.75
+NUM_OBJECTIVES = 1
+MIN_ACCEPTABLE_AUC = 0
 
 def objective(trial):
 
@@ -276,7 +276,7 @@ def objective(trial):
 
 
     objective_val = -1*obj_0 + 1*obj_1 - 1*obj_2
-    
+
     ########################################################
     # Pretrain, Eval on the Test data
     ########################################################
@@ -773,7 +773,8 @@ if __name__ == '__main__':
     if len(sys.argv) > 2:
         STUDY_KIND = sys.argv[2]
     elif DEBUG:
-        STUDY_KIND = '_march15_S_Clas'  #'_study_march13_S_TGEM'
+        STUDY_KIND = '_pretrain_1_S_Clas_Adv'  #'_study_march13_S_TGEM
+        # STUDY_KIND = '_march15_S_Clas'  #'_study_march13_S_TGEM'
     else:
         raise ValueError('STUDY_KIND must be defined')
 
@@ -807,6 +808,10 @@ if __name__ == '__main__':
         print('downloading data from dropbox')
         download_data_dir(data_url, data_dir)
 
+    if not os.path.exists(f'{data_dir}/y_pretrain.csv'):
+        print('downloading data pretrain data from dropbox')
+        data_url2 = 'https://www.dropbox.com/scl/fi/fnlsik6o1x5f5u7wo42y7/y_pretrain.csv?rlkey=gxnzw7eqwkyp3oswbyc0gczn4&dl=1'
+        download_data_file(data_url2, data_dir)
 
     mapper_file = f'{data_dir}/mappers.json'
     if not os.path.exists(mapper_file):

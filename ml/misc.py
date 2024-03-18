@@ -41,6 +41,8 @@ def save_json(data, file_path):
 def download_data_file(dropbox_url, save_dir='data'):
     # Parse the file name from the URL
     file_name = dropbox_url.split("/")[-1]
+    if '?' in file_name:
+        file_name = file_name.split('?')[0]
 
     # Create the directory if it doesn't exist
     os.makedirs(save_dir, exist_ok=True)

@@ -27,6 +27,9 @@ def get_kwargs(trial,study_kind,goal_col,result_dir=None):
     elif 'march15' in study_kind:
         kwargs = _get_study_march15(trial,goal_col,result_dir=result_dir)        
 
+    elif 'pretrain_1' in study_kind:
+        kwargs = _get_study_march15(trial,goal_col,result_dir=result_dir)    
+
     else:
         raise ValueError(f'Unrecognized study_kind: {study_kind}')
 
