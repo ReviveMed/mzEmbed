@@ -296,7 +296,7 @@ if __name__ == '__main__':
         study_table = study.trials_dataframe()
         study_table.to_csv('study_table.csv', index=False)
 
-        study_table.to_csv(study_table_path, index=False)
+        # study_table.to_csv(study_table_path, index=False)
 
 
         # Create a summary of the top trials
