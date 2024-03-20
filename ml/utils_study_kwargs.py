@@ -243,6 +243,26 @@ def _get_study_finetune1(trial, goal_col, result_dir):
             'adversarial_mini_epochs': 20
         },
     }
+
+    kwargs['pretrain_adv_kind'] = 'MultiClassClassifier'
+    kwargs['pretrain_adv_kwargs'] = {
+        'hidden_size': 4,
+        'num_hidden_layers': 1,
+        'dropout_rate': 0,
+        'activation': 'leakyrelu',
+        'use_batch_norm': False,
+        'num_classes': 19,
+        }
+    
+    kwargs['pretrain_head_kind'] = 'MultiClassClassifier'
+    kwargs['pretrain_head_kwargs'] = {
+        'hidden_size': 4,
+        'num_hidden_layers': 1,
+        'dropout_rate': 0,
+        'activation': 'leakyrelu',
+        'use_batch_norm': False,
+        'num_classes': 4,
+        }
     return kwargs
 
 
