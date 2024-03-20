@@ -37,9 +37,9 @@ DEBUG = False
 NUM_OBJECTIVES = 1
 MIN_ACCEPTABLE_AUC = 0
 
-WEIGHT_PRETRAIN_RECON = 1
-WEIGHT_PRETRAIN_CLF = 1
-WEIGHT_PRETRAIN_ADV = 1
+WEIGHT_PRETRAIN_RECON = 0
+WEIGHT_PRETRAIN_CLF = 0
+WEIGHT_PRETRAIN_ADV = 0
 WEIGHT_FINETUNE_VAL = 1
 WEIGHT_FINETUNE_TRAINDIFF = 0
 WEIGHT_RANDINIT_VAL = 0
@@ -824,6 +824,9 @@ if __name__ == '__main__':
     print('goal_col:', GOAL_COL)
     print('study_kind:', STUDY_KIND)
     print('study_name:', study_name)
+
+    # print the weights 
+    print('WEIGHTS_DCT:', WEIGHTS_DCT)
 
     # download the data
     # data_url = 'https://www.dropbox.com/scl/fo/fa3n7sw8fgktnz6q91ffo/h?rlkey=edbdekkhuju5r88kkdo1garmn&dl=1'
