@@ -256,12 +256,12 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
 
                     # check if the losses are nan
                     if torch.isnan(encoder_loss):
-                        if batch_idx == 0:
+                        if run_status:
                             print('Encoder loss is nan!')
                         encoder_loss = torch.tensor(0)
 
                     if torch.isnan(head_loss):
-                        if batch_idx == 0:
+                        if run_status:
                             print('Head loss is nan!')
                         # print('Head loss is nan!')
                         head_loss = torch.tensor(0)
@@ -272,6 +272,8 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
                     if (encoder_loss.item() == 0) and (head_loss.item() == 0):
                         if run_status:
                             print('skipping backprop')
+                            print('y head output:', y_head_output)
+                            print('y_head:', y_head.view(-1))
                             run_status = False
                         continue
 

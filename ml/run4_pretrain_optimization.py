@@ -279,6 +279,12 @@ def objective(trial):
 
     objective_val = -1*obj_0 + 1*obj_1 - 1*obj_2
 
+    # prune?
+    if NUM_OBJECTIVES==1:
+        trial.report(objective_val, 0)
+        if trial.should_prune(0):
+            raise optuna.TrialPruned()
+
     ########################################################
     # Pretrain, Eval on the Test data
     ########################################################
