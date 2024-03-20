@@ -814,14 +814,14 @@ if __name__ == '__main__':
 
     # get arguments from the command line
     if len(sys.argv) > 1:
-        STUDY_KIND = sys.argv[2]
+        STUDY_KIND = sys.argv[1]
     elif DEBUG:
         STUDY_KIND = 'march20'
     else:
         raise ValueError('STUDY_KIND must be defined')
 
     if len(sys.argv) > 2:
-        num_trials = int(sys.argv[3])
+        num_trials = int(sys.argv[2])
     elif DEBUG:
         num_trials = 1
     else:
