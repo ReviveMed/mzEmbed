@@ -31,16 +31,16 @@ USE_WEBAPP_DB = True
 SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 y_filename = 'y_pretrain'
-GOAL_COL= None
+FINETUNE_GOAL_COL= None
 STUDY_KIND = None
 DEBUG = False
 NUM_OBJECTIVES = 1
 MIN_ACCEPTABLE_AUC = 0
 
-WEIGHT_PRETRAIN_RECON = 0
+WEIGHT_PRETRAIN_RECON = 1
 WEIGHT_PRETRAIN_CLF = 0
 WEIGHT_PRETRAIN_ADV = 0
-WEIGHT_FINETUNE_VAL = 1
+WEIGHT_FINETUNE_VAL = 0
 WEIGHT_FINETUNE_TRAINDIFF = 0
 WEIGHT_RANDINIT_VAL = 0
 
@@ -58,14 +58,14 @@ WEIGHTS_DCT = {
 def objective(trial):
 
 
-    if GOAL_COL is None:
-        raise ValueError('GOAL_COL must be defined')
+    if FINETUNE_GOAL_COL is None:
+        if (WEIGHT_FINETUNE_VAL > 0) and (WEIGHT_FINETUNE_TRAINDIFF > 0):
+            raise ValueError('FINETUNE_GOAL_COL must be defined')
     if STUDY_KIND is None:
         raise ValueError('STUDY_KIND must be defined')
 
     ########################################################
     # load the data
-    splits_subdir = f"{GOAL_COL} predefined_val" 
     data_dir = DATA_DIR
     study_name = trial.study.study_name
     result_dir = f'{BASE_DIR}/trials/{study_name}'
@@ -81,16 +81,21 @@ def objective(trial):
     pretrain_test_files = y_data[y_data['Pretrain']=='Test'].index.to_list()
     finetune_files = y_data[y_data['Set'] == 'Finetune'].index.to_list() # should be the same as splits
 
-    splits_file_path = f'{data_dir}/{splits_subdir}/splits.csv'
-    if os.path.exists(splits_file_path):
-        splits = pd.read_csv(f'{data_dir}/{splits_subdir}/splits.csv', index_col=0)
+    if FINETUNE_GOAL_COL is not None:
+        splits_subdir = f"{FINETUNE_GOAL_COL} predefined_val" 
+        splits_file_path = f'{data_dir}/{splits_subdir}/splits.csv'
+        if os.path.exists(splits_file_path):
+            splits = pd.read_csv(f'{data_dir}/{splits_subdir}/splits.csv', index_col=0)
+        else:
+            print('WARNING: Missing splits file')
+            splits= None
     else:
-        print('WARNING: Missing splits file')
-        splits= None
+        splits = None
 
     nan_data = pd.read_csv(f'{data_dir}/nans.csv', index_col=0)
 
-    assert GOAL_COL in y_data.columns, f'{GOAL_COL} not in y_data.columns'
+    if FINETUNE_GOAL_COL is not None:
+        assert FINETUNE_GOAL_COL in y_data.columns, f'{FINETUNE_GOAL_COL} not in y_data.columns'
 
 
     ########################################################
@@ -98,7 +103,8 @@ def objective(trial):
 
     kwargs = get_kwargs(trial,
                         study_kind=STUDY_KIND,
-                        goal_col=GOAL_COL,
+                        study_name=study_name,
+                        goal_col=FINETUNE_GOAL_COL,
                         result_dir=result_dir)
   
     if DEBUG:
@@ -132,13 +138,6 @@ def objective(trial):
         raise ValueError('save_dir must be defined')
     os.makedirs(save_dir, exist_ok=True)
 
-
-    if splits is None:
-        print('Generate Splits on the fly')
-        splits = pd.DataFrame(index=finetune_files, columns=range(num_folds), dtype=int)
-        splits = splits.fillna(0)
-        for i in range(num_folds):
-            splits[splits.sample(frac=0.2), i] = 1
 
     ############################
     # Filter the Peaks
@@ -208,9 +207,6 @@ def objective(trial):
     y_pretrain_val = y_data.loc[pretrain_val_files][y_pretrain_cols].astype(float)
     y_pretrain_test = y_data.loc[pretrain_test_files][y_pretrain_cols].astype(float)
     y_pretrain_trainval = y_data.loc[pretrain_train_files + pretrain_val_files][y_pretrain_cols].astype(float)
-
-    X_finetune = X_data.loc[splits.index]
-    y_finetune = y_data.loc[splits.index][y_finetune_cols].astype(float)
 
     input_size = X_pretrain_train.shape[1]
 
@@ -295,6 +291,16 @@ def objective(trial):
     result_dct['pretrain'] = pretrain_result
 
 
+    # finetune_weights = [v for k,v in WEIGHTS_DCT.items() if 'finetune' in k]
+    if FINETUNE_GOAL_COL is None:
+        objective_val = WEIGHT_PRETRAIN_RECON*obj_pretrain_recon + WEIGHT_PRETRAIN_CLF*obj_pretrain_clf + WEIGHT_PRETRAIN_ADV*obj_pretrain_adv
+
+        # prune?
+        if NUM_OBJECTIVES==1:
+            trial.report(objective_val, 0)
+            if trial.should_prune(0):
+                raise optuna.TrialPruned()
+
     ########################################################
     # Pretrain, Eval on the Test data
     ########################################################
@@ -374,8 +380,9 @@ def objective(trial):
 
     ########################################################
     # Combine the Pretrain Objectives into a single objective and return if no finetune
-    finetune_weights = [v for k,v in WEIGHTS_DCT.items() if 'finetune' in k]
-    if np.sum(np.abs(finetune_weights)) == 0:
+    # finetune_weights = [v for k,v in WEIGHTS_DCT.items() if 'finetune' in k]
+    # if np.sum(np.abs(finetune_weights)) == 0:
+    if FINETUNE_GOAL_COL is None:
         return WEIGHT_PRETRAIN_RECON*obj_pretrain_recon + WEIGHT_PRETRAIN_CLF*obj_pretrain_clf + WEIGHT_PRETRAIN_ADV*obj_pretrain_adv
 
 
@@ -399,6 +406,16 @@ def objective(trial):
     finetune_head = get_model(finetune_head_kind, latent_size+other_size, **finetune_head_kwargs)
     finetune_adv = get_model(finetune_adv_kind, latent_size, **finetune_adv_kwargs)
 
+
+    if splits is None:
+        print('Generate Splits on the fly')
+        splits = pd.DataFrame(index=finetune_files, columns=range(num_folds), dtype=int)
+        splits = splits.fillna(0)
+        for i in range(num_folds):
+            splits[splits.sample(frac=0.2), i] = 1
+
+    X_finetune = X_data.loc[splits.index]
+    y_finetune = y_data.loc[splits.index][y_finetune_cols].astype(float)
 
     ########################################################
     # Finetune from Pretrained Encoder
@@ -797,36 +814,42 @@ if __name__ == '__main__':
 
     # get arguments from the command line
     if len(sys.argv) > 1:
-        GOAL_COL = sys.argv[1]
-    elif DEBUG:
-        GOAL_COL = 'MSKCC BINARY'
-    else:
-        raise ValueError('GOAL_COL must be defined')
-
-    if len(sys.argv) > 2:
         STUDY_KIND = sys.argv[2]
     elif DEBUG:
-        STUDY_KIND = '_pretrain_1_S_Clas_Adv'  #'_study_march13_S_TGEM
-        # STUDY_KIND = '_march15_S_Clas'  #'_study_march13_S_TGEM'
+        STUDY_KIND = 'march20'
     else:
         raise ValueError('STUDY_KIND must be defined')
 
-    if len(sys.argv) > 3:
+    if len(sys.argv) > 2:
         num_trials = int(sys.argv[3])
     elif DEBUG:
         num_trials = 1
     else:
         num_trials = 100
 
+    
+    # FINETUNE_GOAL_COL = input("Enter FINETUNE_GOAL_COL", FINETUNE_GOAL_COL)
+    WEIGHT_PRETRAIN_RECON = input("Enter WEIGHT_PRETRAIN_RECON", WEIGHT_PRETRAIN_RECON)
+    WEIGHT_PRETRAIN_CLF = input("Enter WEIGHT_PRETRAIN_CLF", WEIGHT_PRETRAIN_CLF)
+    WEIGHT_PRETRAIN_ADV = input("Enter WEIGHT_PRETRAIN_ADV", WEIGHT_PRETRAIN_ADV)
+
+    # WEIGHT_FINETUNE_VAL = input("Enter WEIGHT_FINETUNE_VAL", WEIGHT_FINETUNE_VAL)
+    # WEIGHT_FINETUNE_TRAINDIFF = input("Enter WEIGHT_FINETUNE_TRAINDIFF", WEIGHT_FINETUNE_TRAINDIFF)
+    # WEIGHT_RANDINIT_VAL = input("Enter WEIGHT_RANDINIT_VAL", WEIGHT_RANDINIT_VAL)
+
     # study_kind = '_study_march13_L_Clas'
-    # goal_col = 'MSKCC BINARY'
-    study_name = f'{GOAL_COL}{STUDY_KIND}'
-    print('goal_col:', GOAL_COL)
+    # FINETUNE_goal_col = 'MSKCC BINARY'
+    if FINETUNE_GOAL_COL is None:
+        study_name = f'PRETRAIN {WEIGHT_PRETRAIN_RECON}_{WEIGHT_PRETRAIN_CLF}_{WEIGHT_PRETRAIN_ADV}_{STUDY_KIND}'
+    else:
+        study_name = f'{FINETUNE_GOAL_COL}{STUDY_KIND}'
+        print('FINETUNE_goal_col:', FINETUNE_GOAL_COL)
+    
     print('study_kind:', STUDY_KIND)
     print('study_name:', study_name)
 
     # print the weights 
-    print('WEIGHTS_DCT:', WEIGHTS_DCT)
+    # print('WEIGHTS_DCT:', WEIGHTS_DCT)
 
     # download the data
     # data_url = 'https://www.dropbox.com/scl/fo/fa3n7sw8fgktnz6q91ffo/h?rlkey=edbdekkhuju5r88kkdo1garmn&dl=1'
@@ -944,7 +967,8 @@ if __name__ == '__main__':
 
     # Create a summary of the top trials
     directions =  [study.directions[0].name for _ in range(len(study.directions))]
-    min_cutoffs = {'values_0', 0.8}
+    # min_cutoffs = {'values_0', 0.8}
+    min_cutoffs = {}
     max_cutoffs = {}
     summary = process_top_trials(study_table, top_trial_perc=0.1, directions=directions,
                                     min_cutoffs=min_cutoffs,max_cutoffs=max_cutoffs)
