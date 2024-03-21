@@ -31,3 +31,6 @@ learn2learn # testing for meta-learning, needed to update torch to 2.2.1?
 neptune # neptune AI for model tracking (paid)
 mlflow # mlflow for model tracking (free)
 neptune-optuna
+neptune-mlflow
+torchviz
+neptune-pytorch

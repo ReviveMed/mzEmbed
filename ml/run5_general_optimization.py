@@ -15,9 +15,17 @@ from viz import generate_latent_space, generate_umap_embedding, generate_pca_emb
 from utils_study_kwargs import get_kwargs
 from create_optuna_table import process_top_trials
 import neptune
-# import neptune.integrations.optuna as npt_utils
+import neptune.integrations.optuna as npt_utils
+from neptune_pytorch import NeptuneLogger
+from neptune.utils import stringify_unsupported
 import uuid
+import matplotlib.pyplot as plt
+import seaborn as sns
 
+
+# the key to staged training will be to resume a run
+# https://docs.neptune.ai/usage/resume_run/
+# or maybe using a model registery
 
 ####################################################################################
 # Main functions
@@ -38,7 +46,7 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 y_filename = 'y_pretrain'
 FINETUNE_GOAL_COL= None
 STUDY_KIND = None
-DEBUG = True
+DEBUG = False
 NUM_OBJECTIVES = 1
 MIN_ACCEPTABLE_AUC = 0
 
@@ -75,6 +83,9 @@ def objective(trial):
     study_name = trial.study.study_name
     result_dir = f'{BASE_DIR}/trials/{study_name}'
     os.makedirs(result_dir, exist_ok=True)
+
+    # Ideally we want to log the data as artifacts into neptune, connected to GCP bucket
+    # https://docs.neptune.ai/logging/artifacts/#google-cloud-storage
 
     X_data = pd.read_csv(f'{data_dir}/X.csv', index_col=0)
     y_data = pd.read_csv(f'{data_dir}/{y_filename}.csv', index_col=0)
@@ -118,13 +129,14 @@ def objective(trial):
         print('##############################################')
         print(kwargs)
         kwargs['num_folds'] = 1
-        kwargs['pretrain_kwargs']['num_epochs'] = 3
+        kwargs['pretrain_kwargs']['num_epochs'] = 1
         kwargs['finetune_kwargs']['num_epochs'] = 1
         trial.set_user_attr('DEBUG', True)
 
     run = neptune.init_run(project='revivemed/RCC',
                             api_token=NEPTUNE_API_TOKEN)
 
+    run['kwargs'] = stringify_unsupported(kwargs)
     ########################################################
     # Set Up
 
@@ -183,6 +195,9 @@ def objective(trial):
     peak_filt_df['chosen'] = False
     peak_filt_df.loc[chosen_feats, 'chosen'] = True
     # peak_filt_df.to_csv(os.path.join(save_dir, 'peak_filt_df.csv'))
+    
+    # record the chosen features? that is probably redundent
+    # run['chosen_feats'] = chosen_feats
 
 
     input_size = len(chosen_feats)
@@ -269,18 +284,37 @@ def objective(trial):
 
     dataloaders['test'] = torch.utils.data.DataLoader(pretrain_val_dataset, batch_size=pretrain_batch_size, shuffle=False)
 
+
+    npt_logger = NeptuneLogger(
+        run=run,
+        model=encoder,
+        log_model_diagram=True,
+        log_gradients=True,
+        log_parameters=True,
+        log_freq=1,
+    )
+
     # pretrain the model
-    _, _, _, output = train_compound_model(dataloaders, encoder, pretrain_head, pretrain_adv, **pretrain_kwargs, run=run)
+    encoder, head, adversary, output = train_compound_model(dataloaders, encoder, pretrain_head, pretrain_adv, **pretrain_kwargs, run=run)
+
+    # log the models
+    run['encoder pth'].upload(os.path.join(pretrain_dir, 'encoder.pth'))
+    run['head pth'].upload(os.path.join(pretrain_dir, 'head.pth'))
+    run['adversary pth'].upload(os.path.join(pretrain_dir, 'adversary.pth'))
 
     # extract the pretraining objective
     if 'test' in output['end_state_losses']:
         pretrain_result = output['end_state_losses']['test']['reconstruction']
+
+    run['end_state_losses'] = stringify_unsupported(output['end_state_losses'])
+    run['end_state_eval'] = stringify_unsupported(output['end_state_eval'])
 
     #TODO: Add user attributes related to the pretraining
     trial.set_user_attr('Pretrain Recon Train loss', output['end_state_losses']['train']['reconstruction'])
     trial.set_user_attr('Pretrain Recon Val loss', output['end_state_losses']['test']['reconstruction'])
     
     obj_pretrain_recon = output['end_state_losses']['test']['reconstruction']
+
     
     trial.set_user_attr('Pretrain Head Train AUC', output['end_state_eval']['train']['head_auc'])
     trial.set_user_attr('pretrain Head Val AUC', output['end_state_eval']['test']['head_auc'])
@@ -297,6 +331,55 @@ def objective(trial):
 
     result_dct['pretrain'] = pretrain_result
 
+    if True: #not DEBUG:
+        try:
+            Z = generate_latent_space(X_data, encoder)
+            Z.to_csv(os.path.join(pretrain_dir, 'Z.csv'))
+
+            Z_pca = generate_pca_embedding(Z)
+            Z_pca.to_csv(os.path.join(pretrain_dir, 'Z_pca.csv'))
+
+            Z_pca.columns = [f'PC{i+1}' for i in range(Z_pca.shape[1])]
+            pretrain_head_col = 'Cohort Label'
+            pretrain_adv_col = 'Study ID Expanded'
+            Z_pca[pretrain_head_col] = y_data.loc[Z_pca.index,pretrain_head_col]
+            Z_pca[pretrain_adv_col] = y_data.loc[Z_pca.index,pretrain_adv_col]
+            Z_pca['Set'] = y_data.loc[Z_pca.index,'Set']
+
+            for set_id in ['Train', 'Val', 'Test']:
+                fig = sns.scatterplot(data=Z_pca[Z_pca['Set']==set_id], x='PC1', y='PC2', hue=pretrain_head_col)
+                # this should work (we are on neptune version 1.9.1), but for some reason it doesnt
+                # https://docs.neptune.ai/integrations/seaborn/
+                # run[f'visuals/{set_id}/pca_head'].upload(neptune.types.File.as_image(fig))
+                run[f'visuals/{set_id}/pca_head'].upload(fig.figure)
+                # run[f'visuals/{set_id}/pca_head'] = fig
+                plt.close()
+                fig = sns.scatterplot(data=Z_pca[Z_pca['Set']==set_id], x='PC1', y='PC2', hue=pretrain_adv_col)
+                # run[f'visuals/{set_id}/pca_adv'] = fig
+                run[f'visuals/{set_id}/pca_adv'].upload(fig.figure)
+                plt.close()
+                
+            Z_umap = generate_umap_embedding(Z)
+            Z_umap.to_csv(os.path.join(pretrain_dir, 'Z_umap.csv'))
+
+            Z_umap.columns = [f'UMAP{i+1}' for i in range(Z_umap.shape[1])]
+            Z_umap[pretrain_head_col] = y_data.loc[Z_umap.index,pretrain_head_col]
+            Z_umap[pretrain_adv_col] = y_data.loc[Z_umap.index,pretrain_adv_col]
+            Z_umap['Set'] = y_data.loc[Z_umap.index,'Set']
+
+            for set_id in ['Train', 'Val', 'Test']:
+                fig = sns.scatterplot(data=Z_umap[Z_umap['Set']==set_id], x='UMAP1', y='UMAP2', hue=pretrain_head_col)
+                # run[f'visuals/{set_id}/umap_head'] = fig
+                run[f'visuals/{set_id}/umap_head'].upload(fig.figure)
+                plt.close()
+                fig = sns.scatterplot(data=Z_umap[Z_umap['Set']==set_id], x='UMAP1', y='UMAP2', hue=pretrain_adv_col)
+                # run[f'visuals/{set_id}/umap_adv'] = fig
+                run[f'visuals/{set_id}/umap_adv'].upload(fig.figure)
+                plt.close()
+                
+        except ValueError as e:
+            print(e)
+            print('Error when generating the embeddings') 
 
     # finetune_weights = [v for k,v in WEIGHTS_DCT.items() if 'finetune' in k]
     if FINETUNE_GOAL_COL is None:
@@ -828,14 +911,15 @@ if __name__ == '__main__':
     elif DEBUG:
         STUDY_KIND = 'march20'
     else:
-        raise ValueError('STUDY_KIND must be defined')
+        STUDY_KIND = 'march20'
+        # raise ValueError('STUDY_KIND must be defined')
 
     if len(sys.argv) > 2:
         num_trials = int(sys.argv[2])
     elif DEBUG:
         num_trials = 1
     else:
-        num_trials = 100
+        num_trials = 50
 
     
     # FINETUNE_GOAL_COL = input("Enter FINETUNE_GOAL_COL", FINETUNE_GOAL_COL)

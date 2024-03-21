@@ -18,6 +18,8 @@ from sklearn.ensemble import RandomForestClassifier
 
 
 import neptune
+from neptune.utils import stringify_unsupported
+
 
 ##################################################################################
 ##################################################################################
@@ -133,7 +135,8 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
         'adversarial_mini_epochs': adversarial_mini_epochs,
         'loss_avg_beta': loss_avg_beta,
     }
-    run['learning_parameters'] = learning_parameters
+    #TODO add a run prefix to all the keys
+    run['learning_parameters'] = stringify_unsupported(learning_parameters)
 
     if early_stopping_patience < 0:
         early_stopping_patience = num_epochs
