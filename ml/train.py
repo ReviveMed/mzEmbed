@@ -16,6 +16,9 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 
+
+import neptune
+
 ##################################################################################
 ##################################################################################
 ######### for training the compound model
@@ -83,6 +86,7 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
     end_state_eval_funcs = kwargs.get('end_state_eval_funcs', {})
     adversarial_mini_epochs = kwargs.get('adversarial_mini_epochs', 20)
     yes_plot = kwargs.get('yes_plot', False)
+    run = kwargs.get('run', {}) # should be a neptune run object
 
     if save_dir is not None:
         save_trained_model = True
@@ -129,6 +133,7 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
         'adversarial_mini_epochs': adversarial_mini_epochs,
         'loss_avg_beta': loss_avg_beta,
     }
+    run['learning_parameters'] = learning_parameters
 
     if early_stopping_patience < 0:
         early_stopping_patience = num_epochs
@@ -253,6 +258,11 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
                     else:
                         y_adversary_output = torch.tensor([])
                         adversary_loss = torch.tensor(0)
+
+                    run['train/encoder_loss'].append(encoder_loss.item())
+                    run['train/head_loss'].append(head_loss.item())
+                    run['train/adversary_loss'].append(adversary_loss.item())
+
 
                     # check if the losses are nan
                     if torch.isnan(encoder_loss):

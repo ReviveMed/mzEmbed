@@ -14,6 +14,9 @@ import shutil
 from viz import generate_latent_space, generate_umap_embedding, generate_pca_embedding
 from utils_study_kwargs import get_kwargs
 from create_optuna_table import process_top_trials
+import neptune
+
+
 
 ####################################################################################
 # Main functions
@@ -21,6 +24,9 @@ from create_optuna_table import process_top_trials
 
 #TODO: https://github.com/christianversloot/machine-learning-articles/blob/main/how-to-use-l1-l2-and-elastic-net-regularization-with-pytorch.md
 #TODO: prune using information from the RandomInit results, if those are really really bad, then we know its not worth it
+
+
+run = neptune.init_run(project='revivemed/RCC')
 
 # temp_dir = '/Users/jonaheaton/Desktop/temp'
 BASE_DIR = '/DATA'
@@ -117,6 +123,8 @@ def objective(trial):
         kwargs['finetune_kwargs']['num_epochs'] = 1
         trial.set_user_attr('DEBUG', True)
 
+    model_key = trial.study.study_name + '_' + str(trial.number)
+    run = neptune.init_model(key=model_key)
 
     ########################################################
     # Set Up
@@ -263,7 +271,7 @@ def objective(trial):
     dataloaders['test'] = torch.utils.data.DataLoader(pretrain_val_dataset, batch_size=pretrain_batch_size, shuffle=False)
 
     # pretrain the model
-    _, _, _, output = train_compound_model(dataloaders, encoder, pretrain_head, pretrain_adv, **pretrain_kwargs)
+    _, _, _, output = train_compound_model(dataloaders, encoder, pretrain_head, pretrain_adv, **pretrain_kwargs, run=run)
 
     # extract the pretraining objective
     if 'test' in output['end_state_losses']:
@@ -298,7 +306,7 @@ def objective(trial):
         # prune?
         if NUM_OBJECTIVES==1:
             trial.report(objective_val, 0)
-            if trial.should_prune(0):
+            if trial.should_prune():
                 raise optuna.TrialPruned()
 
     ########################################################

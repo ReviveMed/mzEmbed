@@ -8,11 +8,18 @@ LABEL tags="revivemed-mz_embed_engine"
 # Set the working directory in the container
 WORKDIR /app
 
+
 # the more secure method
 # ARG BITBUCKET_ACCESS_KEY
 
 # less secure
 # ENV BITBUCKET_ACCESS_KEY=your_access_key
+
+
+# not a super secure way to save the API token
+ENV NEPTUNE_API_TOKEN=="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=="
+# more secure way would be pass it at runtime:
+# docker run -e API_TOKEN=your_api_token your_image_name
 
 
 # Copy the current directory contents into the container at /app

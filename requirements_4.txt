@@ -26,5 +26,7 @@ jupyterlab-widgets==3.0.9
 jupyterlab_server==2.25.0
 optuna-dashboard
 mysqlclient
-paretoset
+paretoset #find the pareto frontier of a set of points
 learn2learn # testing for meta-learning, needed to update torch to 2.2.1?
+neptune # neptune AI for model tracking (paid)
+mlflow # mlflow for model tracking (free)
