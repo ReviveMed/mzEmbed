@@ -115,7 +115,7 @@ def _get_study_march20(trial, goal_col, result_dir):
     
     activation = 'leakyrelu'
     # encoder_kind = 'AE'
-    encoder_kind = trial.suggest_categorical('encoder_kind', ['AE', 'VAE']),
+    encoder_kind = trial.suggest_categorical('encoder_kind', ['AE', 'VAE'])
 
     if encoder_kind == 'AE' or encoder_kind == 'VAE':
         latent_size = trial.suggest_int('latent_size', 4, 50, log=True)

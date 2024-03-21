@@ -259,11 +259,6 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
                         y_adversary_output = torch.tensor([])
                         adversary_loss = torch.tensor(0)
 
-                    run['train/encoder_loss'].append(encoder_loss.item())
-                    run['train/head_loss'].append(head_loss.item())
-                    run['train/adversary_loss'].append(adversary_loss.item())
-
-
                     # check if the losses are nan
                     if torch.isnan(encoder_loss):
                         if run_status:
@@ -275,6 +270,10 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
                             print('Head loss is nan!')
                         # print('Head loss is nan!')
                         head_loss = torch.tensor(0)
+
+                    run['train/encoder_loss'].append(encoder_loss)
+                    run['train/head_loss'].append(head_loss)
+                    run['train/adversary_loss'].append(adversary_loss)
 
 
                     # new addition, if join loss is 0, then only nans are present
@@ -393,6 +392,10 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
                                                     adversary_targets = epoch_adversary_targets,
                                                     head = head,
                                                     adversary = adversary))
+                
+                for eval_name, eval_list in eval_history[phase].items():
+                    run[f'{phase} {eval_name}'].append(eval_list[-1])
+
 
             if (verbose) and (epoch % 10 == 0):
                 print(f'Epoch [{epoch+1}/{num_epochs}], {phase} Loss: {loss_history["joint"][phase][-1]:.4f}')

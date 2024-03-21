@@ -15,7 +15,8 @@ from viz import generate_latent_space, generate_umap_embedding, generate_pca_emb
 from utils_study_kwargs import get_kwargs
 from create_optuna_table import process_top_trials
 import neptune
-
+# import neptune.integrations.optuna as npt_utils
+import uuid
 
 
 ####################################################################################
@@ -25,10 +26,8 @@ import neptune
 #TODO: https://github.com/christianversloot/machine-learning-articles/blob/main/how-to-use-l1-l2-and-elastic-net-regularization-with-pytorch.md
 #TODO: prune using information from the RandomInit results, if those are really really bad, then we know its not worth it
 
-
-run = neptune.init_run(project='revivemed/RCC')
-
 # temp_dir = '/Users/jonaheaton/Desktop/temp'
+NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 BASE_DIR = '/DATA'
 DATA_DIR = f'{BASE_DIR}/data'
 TRIAL_DIR = f'{BASE_DIR}/trials'
@@ -39,13 +38,13 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 y_filename = 'y_pretrain'
 FINETUNE_GOAL_COL= None
 STUDY_KIND = None
-DEBUG = False
+DEBUG = True
 NUM_OBJECTIVES = 1
 MIN_ACCEPTABLE_AUC = 0
 
 WEIGHT_PRETRAIN_RECON = 1
-WEIGHT_PRETRAIN_CLF = 0
-WEIGHT_PRETRAIN_ADV = 0
+WEIGHT_PRETRAIN_CLF = 1
+WEIGHT_PRETRAIN_ADV = 1
 WEIGHT_FINETUNE_VAL = 0
 WEIGHT_FINETUNE_TRAINDIFF = 0
 WEIGHT_RANDINIT_VAL = 0
@@ -119,12 +118,12 @@ def objective(trial):
         print('##############################################')
         print(kwargs)
         kwargs['num_folds'] = 1
-        kwargs['pretrain_kwargs']['num_epochs'] = 1
+        kwargs['pretrain_kwargs']['num_epochs'] = 3
         kwargs['finetune_kwargs']['num_epochs'] = 1
         trial.set_user_attr('DEBUG', True)
 
-    model_key = trial.study.study_name + '_' + str(trial.number)
-    run = neptune.init_model(key=model_key)
+    run = neptune.init_run(project='revivemed/RCC',
+                            api_token=NEPTUNE_API_TOKEN)
 
     ########################################################
     # Set Up
@@ -302,6 +301,9 @@ def objective(trial):
     # finetune_weights = [v for k,v in WEIGHTS_DCT.items() if 'finetune' in k]
     if FINETUNE_GOAL_COL is None:
         objective_val = WEIGHT_PRETRAIN_RECON*obj_pretrain_recon + WEIGHT_PRETRAIN_CLF*obj_pretrain_clf + WEIGHT_PRETRAIN_ADV*obj_pretrain_adv
+        run.stop()
+        return objective_val
+
 
         # prune?
         if NUM_OBJECTIVES==1:
@@ -837,9 +839,9 @@ if __name__ == '__main__':
 
     
     # FINETUNE_GOAL_COL = input("Enter FINETUNE_GOAL_COL", FINETUNE_GOAL_COL)
-    WEIGHT_PRETRAIN_RECON = input("Enter WEIGHT_PRETRAIN_RECON")#, WEIGHT_PRETRAIN_RECON)
-    WEIGHT_PRETRAIN_CLF = input("Enter WEIGHT_PRETRAIN_CLF")#, WEIGHT_PRETRAIN_CLF)
-    WEIGHT_PRETRAIN_ADV = input("Enter WEIGHT_PRETRAIN_ADV")#, WEIGHT_PRETRAIN_ADV)
+    # WEIGHT_PRETRAIN_RECON = input("Enter WEIGHT_PRETRAIN_RECON")#, WEIGHT_PRETRAIN_RECON)
+    # WEIGHT_PRETRAIN_CLF = input("Enter WEIGHT_PRETRAIN_CLF")#, WEIGHT_PRETRAIN_CLF)
+    # WEIGHT_PRETRAIN_ADV = input("Enter WEIGHT_PRETRAIN_ADV")#, WEIGHT_PRETRAIN_ADV)
 
     # WEIGHT_FINETUNE_VAL = input("Enter WEIGHT_FINETUNE_VAL", WEIGHT_FINETUNE_VAL)
     # WEIGHT_FINETUNE_TRAINDIFF = input("Enter WEIGHT_FINETUNE_TRAINDIFF", WEIGHT_FINETUNE_TRAINDIFF)
