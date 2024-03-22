@@ -443,32 +443,33 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
         latent_space = latent_space.detach().numpy()
         y_adv_train = y_adv_train.detach().numpy()
 
-        knn = KNeighborsClassifier(n_neighbors=adversary.num_classes, weights='distance')
-        knn.fit(latent_space, y_adv_train)
+        try:
 
-        logreg = LogisticRegression(max_iter=1000, class_weight='balanced')
-        logreg.fit(latent_space, y_adv_train)
+            knn = KNeighborsClassifier(n_neighbors=adversary.num_classes, weights='distance')
+            knn.fit(latent_space, y_adv_train)
 
-        # rdf = RandomForestClassifier(n_estimators=100, class_weight='balanced')
-        # rdf.fit(latent_space, y_adv_train)
+            logreg = LogisticRegression(max_iter=1000, class_weight='balanced')
+            logreg.fit(latent_space, y_adv_train)
 
-        for phase in phase_list:
-            if phase == 'train':
-                continue
+            # rdf = RandomForestClassifier(n_estimators=100, class_weight='balanced')
+            # rdf.fit(latent_space, y_adv_train)
 
-            test_latent_space = torch.tensor([])
-            y_adv_test = torch.tensor([])
-            for data in dataloaders[phase]:
-                X, y_head, y_adversary, clin_vars = data
-                X = X.to(device)
-                z = encoder.transform(X)
-                test_latent_space = torch.cat((test_latent_space, z), 0)
-                y_adv_test = torch.cat((y_adv_test, y_adversary), 0)
+            for phase in phase_list:
+                if phase == 'train':
+                    continue
 
-            test_latent_space = test_latent_space.detach().numpy()
-            y_adv_test = y_adv_test.detach().numpy()
+                test_latent_space = torch.tensor([])
+                y_adv_test = torch.tensor([])
+                for data in dataloaders[phase]:
+                    X, y_head, y_adversary, clin_vars = data
+                    X = X.to(device)
+                    z = encoder.transform(X)
+                    test_latent_space = torch.cat((test_latent_space, z), 0)
+                    y_adv_test = torch.cat((y_adv_test, y_adversary), 0)
 
-            try:
+                test_latent_space = test_latent_space.detach().numpy()
+                y_adv_test = y_adv_test.detach().numpy()
+
                 adversary_auc = evaluate_auc(torch.tensor(knn.predict_proba(test_latent_space)), torch.tensor(y_adv_test), adversary)
                 print(f'KNN Adversary AUC: {adversary_auc:.4f}')
                     # sklearn_adversary_eval['KNN_accuracy'] = adversary_acc
@@ -483,13 +484,13 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
                 # adversary_auc = evaluate_auc(torch.tensor(rdf.predict_proba(test_latent_space)), torch.tensor(y_adv_test), adversary)
                 # print(f'Random Forest Adversary AUC: {adversary_auc:.4f}')
                 # sklearn_adversary_eval['RandomForest_accuracy'] = adversary_acc
-                # sklearn_adversary_eval[f'{phase} RandomForest_auc'] = adversary_auc
-            except ValueError as e:
-                print(e)
-                print('ValueError encountered in sklearn adversary evaluation')
-                sklearn_adversary_eval[f'{phase} KNN_auc'] = np.nan
-                sklearn_adversary_eval[f'{phase} LogisticRegression_auc'] = np.nan
-                # sklearn_adversary_eval[f'{phase} RandomForest_auc'] = np.nan
+                # sklearn_adversary_eval[f'{phase} RandomForest_auc'] = adversary_uc
+        except ValueError as e:
+            print(e)
+            print('ValueError encountered in sklearn adversary evaluation')
+            sklearn_adversary_eval[f'{phase} KNN_auc'] = np.nan
+            sklearn_adversary_eval[f'{phase} LogisticRegression_auc'] = np.nan
+            # sklearn_adversary_eval[f'{phase} RandomForest_auc'] = np.nan
     else:
         sklearn_adversary_eval = {}
 
