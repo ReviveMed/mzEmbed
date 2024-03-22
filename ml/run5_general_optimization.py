@@ -143,7 +143,7 @@ def objective(trial):
     save_dir = kwargs.get('save_dir', None)
     encoder_kind = kwargs.get('encoder_kind', 'AE')
     encoder_kwargs = kwargs.get('encoder_kwargs', {})
-    other_size = kwargs.get('other_size', 1)
+    other_input_size = kwargs.get('other_input_size', 1)
     latent_size = encoder_kwargs.get('latent_size', -1)
 
     y_pretrain_cols = kwargs.get('y_pretrain_cols', None)
@@ -250,7 +250,7 @@ def objective(trial):
     pretrain_kwargs['save_dir'] = pretrain_dir
     encoder = get_model(encoder_kind, input_size, **encoder_kwargs)
     
-    pretrain_head = get_model(pretrain_head_kind, latent_size+other_size, **pretrain_head_kwargs)
+    pretrain_head = get_model(pretrain_head_kind, latent_size+other_input_size, **pretrain_head_kwargs)
     pretrain_adv = get_model(pretrain_adv_kind, latent_size, **pretrain_adv_kwargs)
 
     pretrain_head_col = y_pretrain_cols[0]
@@ -331,7 +331,7 @@ def objective(trial):
 
     result_dct['pretrain'] = pretrain_result
 
-    if True: #not DEBUG:
+    if False: #not DEBUG:
         try:
             Z = generate_latent_space(X_data, encoder)
             Z.to_csv(os.path.join(pretrain_dir, 'Z.csv'))
@@ -411,7 +411,7 @@ def objective(trial):
 
     encoder = get_model(encoder_kind, input_size, **encoder_kwargs)
     
-    pretrain_head = get_model(pretrain_head_kind, latent_size+other_size, **pretrain_head_kwargs)
+    pretrain_head = get_model(pretrain_head_kind, latent_size+other_input_size, **pretrain_head_kwargs)
     pretrain_adv = get_model(pretrain_adv_kind, latent_size, **pretrain_adv_kwargs)
 
     pretrain_trainval_dataset = CompoundDataset(X_pretrain_trainval, y_pretrain_trainval[pretrain_head_col], y_pretrain_trainval[pretrain_adv_col])
@@ -506,7 +506,7 @@ def objective(trial):
     finetune_head_col = y_finetune_cols[0]
     finetune_adv_col = y_finetune_cols[1]
 
-    finetune_head = get_model(finetune_head_kind, latent_size+other_size, **finetune_head_kwargs)
+    finetune_head = get_model(finetune_head_kind, latent_size+other_input_size, **finetune_head_kwargs)
     finetune_adv = get_model(finetune_adv_kind, latent_size, **finetune_adv_kwargs)
 
 

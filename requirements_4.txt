@@ -34,3 +34,4 @@ neptune-optuna
 neptune-mlflow
 torchviz
 neptune-pytorch
+plotly
