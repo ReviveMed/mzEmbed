@@ -467,23 +467,29 @@ def train_compound_model(dataloaders,encoder,head,adversary,**kwargs):
 
             test_latent_space = test_latent_space.detach().numpy()
             y_adv_test = y_adv_test.detach().numpy()
-            
 
-            adversary_auc = evaluate_auc(torch.tensor(knn.predict_proba(test_latent_space)), torch.tensor(y_adv_test), adversary)
-            print(f'KNN Adversary AUC: {adversary_auc:.4f}')
-                # sklearn_adversary_eval['KNN_accuracy'] = adversary_acc
-            sklearn_adversary_eval[f'{phase} KNN_auc'] = adversary_auc
-
-
-            adversary_auc = evaluate_auc(torch.tensor(logreg.predict_proba(test_latent_space)), torch.tensor(y_adv_test), adversary)
-            print(f'Logistic Regression Adversary AUC: {adversary_auc:.4f}')
-            sklearn_adversary_eval[f'{phase} LogisticRegression_auc'] = adversary_auc
+            try:
+                adversary_auc = evaluate_auc(torch.tensor(knn.predict_proba(test_latent_space)), torch.tensor(y_adv_test), adversary)
+                print(f'KNN Adversary AUC: {adversary_auc:.4f}')
+                    # sklearn_adversary_eval['KNN_accuracy'] = adversary_acc
+                sklearn_adversary_eval[f'{phase} KNN_auc'] = adversary_auc
 
 
-            # adversary_auc = evaluate_auc(torch.tensor(rdf.predict_proba(test_latent_space)), torch.tensor(y_adv_test), adversary)
-            # print(f'Random Forest Adversary AUC: {adversary_auc:.4f}')
-            # sklearn_adversary_eval['RandomForest_accuracy'] = adversary_acc
-            # sklearn_adversary_eval[f'{phase} RandomForest_auc'] = adversary_auc
+                adversary_auc = evaluate_auc(torch.tensor(logreg.predict_proba(test_latent_space)), torch.tensor(y_adv_test), adversary)
+                print(f'Logistic Regression Adversary AUC: {adversary_auc:.4f}')
+                sklearn_adversary_eval[f'{phase} LogisticRegression_auc'] = adversary_auc
+
+
+                # adversary_auc = evaluate_auc(torch.tensor(rdf.predict_proba(test_latent_space)), torch.tensor(y_adv_test), adversary)
+                # print(f'Random Forest Adversary AUC: {adversary_auc:.4f}')
+                # sklearn_adversary_eval['RandomForest_accuracy'] = adversary_acc
+                # sklearn_adversary_eval[f'{phase} RandomForest_auc'] = adversary_auc
+            except ValueError as e:
+                print(e)
+                print('ValueError encountered in sklearn adversary evaluation')
+                sklearn_adversary_eval[f'{phase} KNN_auc'] = np.nan
+                sklearn_adversary_eval[f'{phase} LogisticRegression_auc'] = np.nan
+                # sklearn_adversary_eval[f'{phase} RandomForest_auc'] = np.nan
     else:
         sklearn_adversary_eval = {}
 

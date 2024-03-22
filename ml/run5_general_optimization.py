@@ -346,19 +346,24 @@ def objective(trial):
             Z_pca[pretrain_adv_col] = y_data.loc[Z_pca.index,pretrain_adv_col]
             Z_pca['Set'] = y_data.loc[Z_pca.index,'Set']
 
+
+
             for set_id in ['Train', 'Val', 'Test']:
-                fig = sns.scatterplot(data=Z_pca[Z_pca['Set']==set_id], x='PC1', y='PC2', hue=pretrain_head_col)
-                # this should work (we are on neptune version 1.9.1), but for some reason it doesnt
-                # https://docs.neptune.ai/integrations/seaborn/
-                # run[f'visuals/{set_id}/pca_head'].upload(neptune.types.File.as_image(fig))
-                run[f'visuals/{set_id}/pca_head'].upload(fig.figure)
-                # run[f'visuals/{set_id}/pca_head'] = fig
-                plt.close()
-                fig = sns.scatterplot(data=Z_pca[Z_pca['Set']==set_id], x='PC1', y='PC2', hue=pretrain_adv_col)
-                # run[f'visuals/{set_id}/pca_adv'] = fig
-                run[f'visuals/{set_id}/pca_adv'].upload(fig.figure)
-                plt.close()
-                
+                for hue_col in [pretrain_head_col, pretrain_adv_col]:
+                    hue_order = Z_pca[hue_col].unique()
+                    hue_order.sort()
+                    palette = 'tab10'
+                    fig = sns.scatterplot(data=Z_pca[Z_pca['Pretrain']==set_id], x='PC1', y='PC2', hue=hue_col,hue_order=hue_order, palette=palette)
+                    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+                    plt.title(f'PCA of Latent Dimension ({set_id})')
+                    # this should work (we are on neptune version 1.9.1), but for some reason it doesnt
+                    # https://docs.neptune.ai/integrations/seaborn/
+                    # run[f'visuals/{set_id}/pca_head'].upload(neptune.types.File.as_image(fig))
+                    run[f'visuals/{set_id}/pca_{hue_col}'].upload(fig.figure)
+                    # run[f'visuals/{set_id}/pca_head'] = fig
+                    plt.close()
+
+
             Z_umap = generate_umap_embedding(Z)
             Z_umap.to_csv(os.path.join(pretrain_dir, 'Z_umap.csv'))
 
@@ -368,14 +373,19 @@ def objective(trial):
             Z_umap['Set'] = y_data.loc[Z_umap.index,'Set']
 
             for set_id in ['Train', 'Val', 'Test']:
-                fig = sns.scatterplot(data=Z_umap[Z_umap['Set']==set_id], x='UMAP1', y='UMAP2', hue=pretrain_head_col)
-                # run[f'visuals/{set_id}/umap_head'] = fig
-                run[f'visuals/{set_id}/umap_head'].upload(fig.figure)
-                plt.close()
-                fig = sns.scatterplot(data=Z_umap[Z_umap['Set']==set_id], x='UMAP1', y='UMAP2', hue=pretrain_adv_col)
-                # run[f'visuals/{set_id}/umap_adv'] = fig
-                run[f'visuals/{set_id}/umap_adv'].upload(fig.figure)
-                plt.close()
+                for hue_col in [pretrain_head_col, pretrain_adv_col]:
+                    hue_order = Z_umap[hue_col].unique()
+                    hue_order.sort()
+                    palette = 'tab10'
+                    fig = sns.scatterplot(data=Z_umap[Z_umap['Pretrain']==set_id], x='UMAP1', y='UMAP2', hue=hue_col,hue_order=hue_order, palette=palette)
+                    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+                    plt.title(f'UMAP of Latent Dimension ({set_id})')
+                    # this should work (we are on neptune version 1.9.1), but for some reason it doesnt
+                    # https://docs.neptune.ai/integrations/seaborn/
+                    # run[f'visuals/{set_id}/pca_head'].upload(neptune.types.File.as_image(fig))
+                    run[f'visuals/{set_id}/umap_{hue_col}'].upload(fig.figure)
+                    # run[f'visuals/{set_id}/pca_head'] = fig
+                    plt.close()
                 
         except ValueError as e:
             print(e)
