@@ -185,6 +185,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
     head = get_model(head_kind, latent_size+other_input_size, **head_kwargs)
     adv = get_model(adv_kind, latent_size, **adv_kwargs)
 
+    #TODO: need to assign the class weights
+
     if load_model_loc:
         run[f'{load_model_loc}/encoder_state_dict'].download(f'{save_dir}/{load_model_loc}_encoder_state_dict.pth')
         encoder_state_dict = torch.load(f'{save_dir}/{load_model_loc}_encoder_state_dict.pth')
