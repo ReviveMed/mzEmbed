@@ -95,7 +95,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
     scheduler_kind = kwargs.get('scheduler_kind', None)
     scheduler_kwargs = kwargs.get('scheduler_kwargs', {})
     verbose = kwargs.get('verbose', True)
-    end_state_eval_funcs = kwargs.get('end_state_eval_funcs', {})
+    eval_funcs = kwargs.get('eval_funcs', {})
     adversarial_mini_epochs = kwargs.get('adversarial_mini_epochs', 20)
     prefix = kwargs.get('prefix', 'train')
 
@@ -164,15 +164,15 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
 
     # define the loss history and best params with associated losses
     loss_history = {
-        'encoder': {'train': [], 'val': []},
-        'head': {'train': [], 'val': []},
-        'adversary': {'train': [], 'val': []},
-        'joint': {'train': [], 'val': []},
-        'epoch' : {'train': [], 'val': []},
+        'encoder': {'train': [], 'train_holdout': []},
+        'head': {'train': [], 'train_holdout': []},
+        'adversary': {'train': [], 'train_holdout': []},
+        'joint': {'train': [], 'train_holdout': []},
+        'epoch' : {'train': [], 'train_holdout': []},
     }
     best_loss = {'encoder': 1e10, 'head': 1e10, 'adversary': 1e10, 'joint': 1e10, 'epoch': 0}
     best_wts = {'encoder': encoder.state_dict(), 'head': head.state_dict(), 'adversary': adversary.state_dict()}
-    eval_history = {'train': {}, 'val': {}}
+    eval_history = {'train': {}, 'train_holdout': {}}
     patience_counter = 0
 
     # start the training loop
@@ -369,7 +369,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
             loss_history['joint'][phase].append(running_losses['joint'])
             loss_history['epoch'][phase].append(epoch)
 
-            for eval_name, eval_func in end_state_eval_funcs.items():
+            for eval_name, eval_func in eval_funcs.items():
                 if ('head' in eval_name) and (epoch_head_outputs.size(0) == 0):
                     continue
                 if ('adversary' in eval_name) and (epoch_adversary_outputs.size(0) == 0):
@@ -493,7 +493,7 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
             run[f'{prefix}/{phase}/head_loss'] = head_loss
             run[f'{prefix}/{phase}/adversary_loss'] = adversary_loss
             for eval_name, eval_val in end_state_eval[phase].items():
-                run[f'{prefix}/{phase}/{eval_name}'] = eval_val
+                run[f'{prefix}/{phase}/{eval_name}'] = stringify_unsupported(eval_val)
 
             if sklearn_models:
                 try:
@@ -513,9 +513,9 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
                             else:
                                 task = 'multiclass'
                             metric = AUROC(task=task,average='weighted',num_classes=adversary.num_classes)
-                            probs = model.predict_proba(latent_outputs[nan_mask].detach().numpy())
+                            probs = torch.tensor(model.predict_proba(latent_outputs[nan_mask].detach().numpy()))
                             metric(probs,adversary_targets[nan_mask].long())
-                            run[f'{prefix}/{phase}/{model_name}_auc'] = metric.compute().item()
+                            run[f'{prefix}/{phase}/{model_name}_auc'] = stringify_unsupported(metric.compute().item())
                 except Exception as e:
                     print('Error in sklearn model evaluation:', e)
                     run[f'{prefix}/{phase}/sklearn_error'] = str(e)
