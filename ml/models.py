@@ -7,7 +7,7 @@ from torch.utils.checkpoint import checkpoint as cp
 import os
 from misc import save_json
 
-from torchmetrics import AUROC, Accuracy, F1, Precision, Recall, ConfusionMatrix
+from torchmetrics import AUROC
 
 ####################################################################################
 # Helper functions
