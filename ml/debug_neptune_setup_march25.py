@@ -36,7 +36,7 @@ for latent_size in [4,8,16,32]:
                     'num_hidden_layers': num_hidden_layers,
                     'dropout_rate': 0.2,
                     'use_batch_norm': False,
-                    'hidden_size': 1.5*latent_size,
+                    'hidden_size': int(1.5*latent_size),
                     }
 
 
