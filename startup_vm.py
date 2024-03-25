@@ -291,6 +291,13 @@ if len(records) > 0:
         # append the sample_info_df to all_job_sample_info
         all_job_sample_info = pd.concat([all_job_sample_info, sample_info_df], sort=False,
                                         ignore_index=True)
+        # mzlearn-webapp.appspot.com/mzlearn/min/2023-10-20 13:55:12/targets_peaks/name_matched_targets.csv
+        # save this file to local storage if it exists
+        targets_path = f"mzlearn-webapp.appspot.com/{mzlearn_path}/targets_peaks/name_matched_targets.csv"
+        if fs.exists(targets_path):
+            with fs.open(targets_path) as f:
+                targets_df = pd.read_csv(f, sep=",")
+            targets_df.to_csv(f"{script_path}/{job_id}/targets.csv", index=False)
     print(all_job_sample_info)
 
     ####################################################################################################################
@@ -580,7 +587,93 @@ if len(records) > 0:
             print(f'Error in PCA and UMAP: {e}')
 
         ########################################################################################################
+        # look at the targed peak info from the combined study and plot bar plots based on alignment_df
+        ########################################################################################################
+        # based on the alignment_df, for each study build a dictionary of reference_study_peak_id2targets
+        # print(f"alignment_df is {alignment_df}")
+        # drop the rows that have nan in all columns
+        alignment_df_path = f"{align_save_dir_freq_th}/alignment_df.csv"
+        alignment_df = pd.read_csv(alignment_df_path)
+        alignment_df = alignment_df.dropna(how='all')
+        print(f"alignment_df is {alignment_df}")
+
+        # based on the column names of alignment_df, get the study_id
+        # loop through each column of alignment_df and find the corresponding study_id
+        study_id2list_of_peak_matches = {}
+        for column in alignment_df.columns:
+            # for each study_id, create a list of list of peak matched to a peak id
+            list_of_peak_target_matches = []
+            # loop through each row of this column
+            # get the study_id from the column name
+            study_id = column
+            # based on the study_id, get the targeted data info from mzlearn run that was saved before
+            # local target file path f"{script_path}/{job_id}/targets.csv"
+            target_file_path = f"{script_path}/{study_id}/targets.csv"
+            if os.path.exists(target_file_path):
+                targets_df = pd.read_csv(target_file_path)
+                # loop through each row of this column
+                for row in alignment_df[column]:
+                    peak_id = row
+                    # print(f"peak_id is {peak_id}")
+                    # find the HMDB_match value in the targets_df from the row with feats == peak_id
+                    # if found, then add the HMDB_match value to list_of_peak_target_matches
+                    matched_target = "NA"
+                    if not pd.isna(peak_id):
+                        target_row = targets_df[targets_df['feats'] == peak_id]
+                        if not target_row.empty:
+                            matched_target = target_row['HMDB_match'].values[0]
+                    list_of_peak_target_matches.append(matched_target)
+
+            # read the target file if it exists
+            study_id2list_of_peak_matches[study_id] = list_of_peak_target_matches
+
+        # how long each key of study_id2list_of_peak_matches is
+        for key, value in study_id2list_of_peak_matches.items():
+            print(f"study_id: {key} has {len(value)} peaks matched")
+
+        # start comparison between the studies, each other_job_ids compared to reference_job_id once
+        # get the study_id2list_of_peak_matches for the reference_job_id
+        reference_study_id_list_of_peak_matches = study_id2list_of_peak_matches[str(reference_job_id)]
+        # loop through each study_id in other_job_ids
+        alignment_targets_tracking_results = pd.DataFrame()
+        for study_id in other_job_ids:
+            print(f"other study_id: {study_id}")
+            other_study_id_list_of_peak_matches = study_id2list_of_peak_matches[str(study_id)]
+
+            if len(other_study_id_list_of_peak_matches) > 0:
+                print(f"this study has targeted peaks")
+
+                # combine reference_study_id_list_of_peak_matches and other_study_id_list_of_peak_matches
+                all_peak_matches = reference_study_id_list_of_peak_matches + other_study_id_list_of_peak_matches
+                # drop all "NA" and None from all_peak_matches
+                all_peak_matches = [i for i in all_peak_matches if i != "NA"]
+                # count the number of unique peaks in all_peak_matches
+                unique_peaks = len(set(all_peak_matches))
+
+                # compare the reference_study_id_list_of_peak_matches and other_study_id_list_of_peak_matches
+                # to see how many peaks are common
+                correct_alignment_peaks = 0
+                for ref_peak_matches, other_peak_matches in zip(reference_study_id_list_of_peak_matches,
+                                                                other_study_id_list_of_peak_matches):
+                    # if both ref_peak_matches and other_peak_matches are not "NA" and not None
+                    if ref_peak_matches != "NA" and other_peak_matches != "NA":
+                        if ref_peak_matches == other_peak_matches:
+                            correct_alignment_peaks += 1
+
+                # build a row to add to alignment_targets_tracking_results
+                row = {'reference_study_id': str(int(reference_job_id)),
+                       'other_study_id': str(int(study_id)),
+                       'total_possible_aligned_targets': unique_peaks,
+                       'correct_alignment_targets': correct_alignment_peaks,
+                       'correct_alignment_percentage': correct_alignment_peaks / unique_peaks * 100}
+                alignment_targets_tracking_results = alignment_targets_tracking_results.append(row, ignore_index=True)
+
+        # save the alignment_targets_tracking_results to the freq_grid_search_dir_name folder
+        alignment_targets_tracking_results.to_csv(os.path.join(align_save_dir_freq_th, f'alignment_targets_tracking_results.csv'))
+
+        ########################################################################################################
         # save the combined peak intensity to gcp bucket
+        ########################################################################################################
         # gcp_file_path = f"mzlearn-webapp.appspot.com/mzlearn_pretraining/peak_combine_results/{peak_combine_job_id}/{freq_grid_search_dir_name}
         # save all results to gcp as well
         gcp_file_path = f"mzlearn_pretraining/peak_combine_results/{peak_combine_job_id}/{freq_grid_search_dir_name}"
