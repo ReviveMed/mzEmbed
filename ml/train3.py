@@ -31,12 +31,12 @@ class CompoundDataset(Dataset):
         if (y_head is None) or (y_head.size == 0):
             self.y_head = torch.tensor(np.zeros((len(X), 1)), dtype=torch.float32)
         else:
-            self.y_head = torch.tensor(y_head.to_numpy(), dtype=torch.float32)
+            self.y_head = torch.tensor(y_head.astype(float).to_numpy(), dtype=torch.float32)
         
         if (y_adv is None) or (y_adv.size == 0):
             self.y_adv = torch.tensor(np.zeros((len(X), 1)), dtype=torch.float32)
         else:
-            self.y_adv = torch.tensor(y_adv.to_numpy(), dtype=torch.float32)
+            self.y_adv = torch.tensor(y_adv.astype(float).to_numpy(), dtype=torch.float32)
 
         if (other is None) or (other.size == 0):
             self.other = torch.tensor(np.zeros((len(X), 1)), dtype=torch.float32)
