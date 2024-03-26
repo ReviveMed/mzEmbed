@@ -32,6 +32,27 @@ def get_model(model_kind, input_size, **kwargs):
     return model
 
 
+# def get_model2(model_kind, **kwargs):
+
+#     if model_kind == 'NA':
+#         model = Dummy_Head()
+#     elif model_kind == 'VAE':
+#         model = VAE(input_size = input_size, **kwargs)
+#     elif model_kind == 'AE':
+#         model = AE(input_size = input_size, **kwargs)
+#     elif model_kind == 'TGEM_Encoder':
+#         model = TGEM_Encoder(input_size = input_size, **kwargs)
+#     elif model_kind == 'TGEM':
+#         model = TGEM(input_size = input_size, **kwargs)
+#     elif model_kind == 'Binary_Head':
+#         model = Binary_Head(input_size = input_size, **kwargs)
+#     elif model_kind == 'MultiClass_Head':
+#         model = MultiClass_Head(input_size = input_size, **kwargs)
+#     else:
+#         raise ValueError('model_kind not recognized')
+#     return model
+
+
 def _reset_params(layer):
     if hasattr(layer, 'reset_parameters'):
         layer.reset_parameters()
@@ -58,6 +79,15 @@ def get_reg_penalty(model,l1_lambda,l2_lambda):
     return l1_lambda * torch.sum(all_params.abs()) + l2_lambda * torch.sum(all_params.pow(2))
 
 
+def _nan_cleaner(y_output, y_true, ignore_nan=True):
+        if ignore_nan:
+            mask = ~torch.isnan(y_true)
+            if mask.sum().item() == 0:
+                return None, None
+            return y_output[mask], y_true[mask]
+        else:
+            return y_output, y_true
+
 
 # create a dummy model
 class DummyModel(nn.Module):
@@ -82,10 +112,25 @@ class DummyModel(nn.Module):
 #########################################################
 ### Basic Multi-layer Perceptron
 class Dense_Layers(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, 
-        num_hidden_layers=1, dropout_rate=0.2, activation='leakyrelu',
-        use_batch_norm=False, act_on_output_layer=False):
+    def __init__(self,**kwargs):
+    # def __init__(self, input_size, hidden_size, output_size, 
+    #     num_hidden_layers=1, dropout_rate=0.2, activation='leakyrelu',
+    #     use_batch_norm=False, act_on_output_layer=False):
         super(Dense_Layers, self).__init__()
+
+        input_size = kwargs.get('input_size', 1)
+        hidden_size = kwargs.get('hidden_size', 1)
+        output_size = kwargs.get('output_size', 1)
+        num_hidden_layers = kwargs.get('num_hidden_layers', 1)
+        dropout_rate = kwargs.get('dropout_rate', 0.2)
+        activation = kwargs.get('activation', 'leakyrelu')
+        use_batch_norm = kwargs.get('use_batch_norm', False)
+        act_on_output_layer = kwargs.get('act_on_output_layer', False)
+        
+        # print the unusued kwargs
+        for key, value in kwargs.items():
+            if key not in ['input_size', 'hidden_size', 'output_size', 'num_hidden_layers', 'dropout_rate', 'activation', 'use_batch_norm', 'act_on_output_layer']:
+                print(f'Warning: {key} is not a valid argument for Dense_Layers')
 
         if activation == 'leakyrelu':
             activation_func = nn.LeakyReLU()
@@ -246,13 +291,22 @@ class AE(nn.Module):
         self.activation = activation
         self.use_batch_norm = use_batch_norm
         self.act_on_latent_layer = act_on_latent_layer
-        self.encoder = Dense_Layers(input_size, hidden_size, latent_size, 
-                                    num_hidden_layers, dropout_rate, activation,
-                                    use_batch_norm, act_on_output_layer=act_on_latent_layer)
+        self.encoder = Dense_Layers(input_size=input_size, 
+                                    hidden_size=hidden_size, 
+                                    output_size=latent_size, 
+                                    num_hidden_layers=num_hidden_layers,
+                                    dropout_rate = dropout_rate,
+                                    activation = activation,
+                                    use_batch_norm=use_batch_norm, 
+                                    act_on_output_layer=act_on_latent_layer)
         
-        self.decoder = Dense_Layers(latent_size, hidden_size, input_size,
-                                    num_hidden_layers, dropout_rate, activation,
-                                    use_batch_norm)
+        self.decoder = Dense_Layers(input_size=latent_size, 
+                                    hidden_size = hidden_size, 
+                                    output_size = input_size,
+                                    num_hidden_layers = num_hidden_layers, 
+                                    dropout_rate = dropout_rate,
+                                    activation = activation,
+                                    use_batch_norm = use_batch_norm)
         
     def forward(self, x):
         z = self.encoder(x)
@@ -301,48 +355,54 @@ class AE(nn.Module):
 class MultiHead(nn.Module):
     def __init__(self, heads):
         super().__init__()
-        self.heads = nn.ModuleList(heads)
-        self.heads_names = [head.name for head in heads]
+        self.heads = nn.ModuleList([h for h in heads if h.weight > 0])
+        self.heads_names = [head.name for head in self.heads]
 
         # check that all heads have unique names
         if len(set(self.heads_names)) != len(self.heads_names):
             raise ValueError('All heads must have unique names')
         
         # check that all heads have the same input size
-        input_sizes = [head.input_size for head in heads]
-        if len(set(input_sizes)) != 1:
+        input_sizes = [head.input_size for head in self.heads]
+        if len(set(input_sizes)) > 1:
             raise ValueError('All heads must have the same input size')
 
     def forward(self, x):
         outputs = {f'{head.kind}_{head.name}': head(x) for head in self.heads}
         return outputs
 
+    def update_class_weights(self, y_data):
+        for head in self.heads:
+            if head.goal == 'classify':
+                head.update_class_weights(y_data)
+        pass
+
     # def multi_loss(self, outputs, y_true):
-    def loss(self, outputs, y_true):
-        losses = {f'{head.kind}_{head.name}': head.loss(outputs[f'head_{head.name}'], y_true) for head in self.heads}
+    def multi_loss(self, outputs, y_true):
+        losses = {f'{head.kind}_{head.name}': head.loss(outputs[f'{head.kind}_{head.name}'], y_true) for head in self.heads}
         return losses
     
     def score(self, outputs, y_true):
-        scores = {f'{head.kind}_{head.name}': head.score(outputs[f'head_{head.name}'], y_true) for head in self.heads}
+        scores = {f'{head.kind}_{head.name}': head.score(outputs[f'{head.kind}_{head.name}'], y_true) for head in self.heads}
         return scores
 
     def reset_params(self):
         for head in self.heads:
             head.reset_params()
 
-    def joint_loss(self, outputs, y_true):
-        losses = self.loss(outputs, y_true)
+    def loss(self, outputs, y_true):
+        losses = self.multi_loss(outputs, y_true)
         joint_loss = sum([head.weight * losses[f'{head.kind}_{head.name}'] for head in self.heads])
         return joint_loss
     
-    def save_state(self, save_path):
+    def save_state_to_path(self, save_path):
         for head in self.heads:
-            head.save_state(save_path)
+            head.save_state_to_path(save_path)
         pass
 
-    def load_state(self, load_path):
+    def load_state_from_path(self, load_path):
         for head in self.heads:
-            head.load_state(load_path)
+            head.load_state_from_path(load_path)
         pass
 
     def save_info(self, save_path):
@@ -350,9 +410,12 @@ class MultiHead(nn.Module):
             head.save_info(save_path)
         pass
 
+    def get_file_ids(self):
+        return [head.file_id for head in self.heads]
+
 
 class Head(nn.Module):
-    def __init__(self):
+    def __init__(self,**kwargs):
         super(Head, self).__init__()
         self.goal = 'NA'
         self.kind = 'Head'
@@ -362,8 +425,19 @@ class Head(nn.Module):
         self.loss_func = lambda x, y: torch.tensor(0, dtype=torch.float32)
         self.eval_func = lambda x, y: torch.tensor(0, dtype=torch.float32)
         self.weight = 1.0
+        self.input_size = kwargs.get('input_size', 1)
+        self.output_size = kwargs.get('output_size', 1)
+        self.architecture = {}
+        self.score_func_dict = {}
+        self.file_id = self.kind + '_' + self.name
 
-    def define_architecture(self):
+    def define_architecture(self,**kwargs):
+        self.input_size = kwargs.get('input_size', 1)
+        self.output_size = kwargs.get('output_size', 1)
+        pass
+
+    def assign_weight(self, weight):
+        self.weight = weight
         pass
 
     def reset_params(self):
@@ -376,6 +450,8 @@ class Head(nn.Module):
     #     pass
 
     def loss(self, y_output, y_true):
+        if self.weight == 0:
+            return torch.tensor(0, dtype=torch.float32)
         return self.loss_func(y_output, y_true)
     
     # def define_score(self):
@@ -384,24 +460,24 @@ class Head(nn.Module):
     def score(self, y_output, y_true):
         return self.score_func(y_output, y_true)
 
-    def save_state(self, save_path, save_name=None):
+    def save_state_to_path(self, save_path, save_name=None):
         if save_name is None:
             if os.path.isfile(save_path):
                 save_name = os.path.basename(save_path)
                 save_path = os.path.dirname(save_path)
             else:
-                save_name = self.kind + '_' + self.name + '_state.pt'
+                save_name = self.file_id + '_state.pt'
         torch.save(self.state_dict(), os.path.join(save_path, save_name))
         pass
 
-    def load_state(self, load_path, load_name=None):
+    def load_state_from_path(self, load_path, load_name=None):
         if load_name is None:
             # check if the load_path is to a file
             if os.path.isfile(load_path):
                 load_name = os.path.basename(load_path)
                 load_path = os.path.dirname(load_path)
             else:
-                load_name = self.kind + '_' + self.name + '_state.pt'
+                load_name = self.file_id + '_state.pt'
         self.load_state_dict(torch.load(os.path.join(load_path, load_name)))
         pass
 
@@ -409,11 +485,24 @@ class Head(nn.Module):
         # cycle through all the attributes of the class and save them
         hyperparameters = {}
         for key, value in self.__dict__.items():
+            # skip if it is a private attribute
+            if key[0] == '_':
+                continue
+            
             # skip if it is a method
             if callable(value):
                 continue
             hyperparameters[key] = value
-        pass
+        return hyperparameters
+
+    def get_info(self):
+        return self.get_hyperparameters()
+
+    def get_architecture(self):
+        return self.architecture
+    
+    def get_kwargs(self):
+        return self.architecture
 
     def save_info(self, save_path, save_name=None):
         if save_name is None:
@@ -421,34 +510,54 @@ class Head(nn.Module):
                 save_name = os.path.basename(save_path)
                 save_path = os.path.dirname(save_path)
             else:
-                save_name = self.kind + '_' + self.name + '_info.json'
-        save_json(self.get_hyperparameters(), os.path.join(save_path, save_name))                
+                save_name = self.file_id + '_info.json'
+        save_json(self.get_info(), os.path.join(save_path, save_name))                
         pass
+
+
+
+#########################################################
+class Dummy_Head(Head):
+    def __init__(self, name='Dummy', y_idx=0, **kwargs):
+        super(Dummy_Head, self).__init__()
+        self.goal = 'NA'
+        self.kind = 'Dummy'
+        self.name = name
+        self.y_idx = y_idx
+        self.weight = 0.0
+        self.network = nn.Identity()
 
 
 #########################################################
     
-class BinaryHead(Head):
-    def __init__(self, name='BinaryHead', y_idx=0):
-        super(BinaryHead, self).__init__()
+class Binary_Head(Head):
+    def __init__(self, name='Binary', y_idx=0, weight=1.0, kind='Binary', **kwargs):
+        super(Binary_Head, self).__init__()
         self.goal = 'classify'
-        self.kind = 'BinaryHead'
+        self.kind = 'Binary'
+        assert self.kind == kind
         self.name = name
         self.y_idx = y_idx
-        self.network = nn.Identity()
-        self.weight = 1.0
-        self.class_weight = [1,1]
-        self.pos_class_weight = 1
-        self.architecture = {}
+        self.weight = weight
+        self.class_weight = None
+        self.pos_class_weight = None
+        self.architecture = kwargs
         self.loss_reduction = 'mean'
+        # self.network = nn.Identity()
+        self.network = Dense_Layers(**kwargs)
+        self.input_size = kwargs.get('input_size', 1)
+        self.output_size = kwargs.get('output_size', 1)
+        self.file_id = self.kind + '_' + self.name
 
         self.loss_func = nn.BCEWithLogitsLoss(reduction=self.loss_reduction,
-                                                    pos_weight=self.pos_weight)
-        self.score_func = AUROC(task='binary', average='weighted')
-
+                                                    pos_weight=self.pos_class_weight)
+        self.score_func_dict = {'AUROC': AUROC(task='binary', average='weighted')}
+        #TODO: is the score function aggregrationg results?
 
     def define_architecture(self, **kwargs):
         self.architecture = kwargs
+        self.input_size = kwargs.get('input_size', 1)
+        self.output_size = kwargs.get('output_size', 1)
         self.network = Dense_Layers(**kwargs)
         pass
 
@@ -464,20 +573,19 @@ class BinaryHead(Head):
         y_true = y_true[~torch.isnan(y_true)]
         y_int = y_true.int()
         self.class_weight= 1/torch.bincount(y_int)
-        self.pos_weight = self.class_weight[1]/self.class_weight[0]
+        self.pos_class_weight = self.class_weight[1]/self.class_weight[0]
         pass
 
 
     def loss(self, y_logits, y_data, ignore_nan=True):
+        if self.weight == 0:
+            return torch.tensor(0, dtype=torch.float32)
         y_true = y_data[:,self.y_idx]
-        if ignore_nan:
-            mask = ~torch.isnan(y_true)
-            if mask.sum().item() == 0:
-                return torch.tensor(0, dtype=torch.float32)
-            return self.loss_func(y_logits[mask].squeeze(), y_true[mask].squeeze())
-        else:
-            return self.loss_func(y_logits.squeeze(), y_true.squeeze())
-
+        
+        y0, y1 = _nan_cleaner(y_logits, y_true, ignore_nan)
+        if y0 is None:
+            return torch.tensor(0, dtype=torch.float32)
+        return self.loss_func(y0.squeeze(), y1.squeeze())
 
     def logits_to_proba(self, y_logits):
         return F.sigmoid(y_logits)
@@ -489,42 +597,78 @@ class BinaryHead(Head):
         return (self.predict_proba(x) > threshold).float()
 
 
+    def auroc_score(self, y_logits, y_data,ignore_nan=True):
+        y_true = y_data[:,self.y_idx]
+        y0, y1 = _nan_cleaner(y_logits, y_true, ignore_nan)
+        if y0 is None:
+            return torch.tensor(0, dtype=torch.float32)
+        return self.score_func_dict['AUROC'](y0.squeeze(), y1.squeeze())
+    
+        # if ignore_nan:
+        #     mask = ~torch.isnan(y_true)
+        #     if mask.sum().item() == 0:
+        #         return torch.tensor(0, dtype=torch.float32)
+        #     return self.score_func(y_logits[mask].squeeze(), y_true[mask].squeeze())
+        #     # return {'AUROC' : self.score_func(y_logits[mask].squeeze(), y_true[mask].squeeze())}
+        # else:
+        #     return self.score_func(y_logits.squeeze(), y_true.squeeze())
+
     def score(self, y_logits, y_data,ignore_nan=True):
         y_true = y_data[:,self.y_idx]
-        if ignore_nan:
-            mask = ~torch.isnan(y_true)
-            if mask.sum().item() == 0:
-                return torch.tensor(0, dtype=torch.float32)
-            return self.score_func(y_logits[mask].squeeze(), y_true[mask].squeeze())
-        else:
-            return self.score_func(y_logits.squeeze(), y_true.squeeze())
-
+        y0, y1 = _nan_cleaner(y_logits, y_true, ignore_nan)
+        if y0 is None:
+            return torch.tensor(0, dtype=torch.float32)
+        return {k: v(y0.squeeze(), y1.squeeze()) for k, v in self.score_func_dict.items()}
+        # return {k: v(y0.squeeze(), y1.squeeze()).compute().item() for k, v in self.score_func_dict.items()}
 
 #########################################################
 
-class MultiClassHead(Head):
-    def __init__(self, name='MultiClassHead', y_idx=0, num_classes=3):
-        super(MultiClassHead, self).__init__()
+class MultiClass_Head(Head):
+    def __init__(self, name='MultiClass', y_idx=0, weight=1.0, num_classes=3, kind='MultiClass', **kwargs):
+        super(MultiClass_Head, self).__init__()
         self.goal = 'classify'
-        self.kind = 'MultiClassHead'
+        self.kind = 'MultiClass'
+        assert self.kind == kind
         self.name = name
         self.y_idx = y_idx
-        self.network = nn.Identity()
-        self.weight = 1.0
+        self.weight = weight
         self.num_classes = num_classes
-        self.class_weight = [1]*num_classes
-        self.architecture = {}
+        
+        if 'output_size' in kwargs:
+            if kwargs['output_size'] != self.num_classes:
+                raise ValueError(f'Output layer has {kwargs["output_size"]} features, but should have {self.num_classes} features')
+        else:
+            kwargs['output_size'] = num_classes
+        
+        self.file_id = self.kind + '_' + self.name
+        self.input_size = kwargs.get('input_size', 1)
+        self.output_size = kwargs.get('output_size', self.num_classes)
+        self.class_weight = None
+        self.architecture = kwargs
         self.loss_reduction = 'mean'
         self.label_smoothing = 0
+        # self.network = nn.Identity()
+        self.network = Dense_Layers(**kwargs)
+        
 
         self.loss_func = nn.CrossEntropyLoss(reduction=self.loss_reduction, 
                                              weight=self.class_weight, 
                                              label_smoothing=self.label_smoothing)
-        self.score_func = AUROC(task='multiclass', average='weighted')
+        self.score_func_dict = {'AUROC':
+            AUROC(task='multiclass', average='weighted', num_classes=num_classes)}
 
     def define_architecture(self, **kwargs):
+        if 'output_size' in kwargs:
+            if kwargs['output_size'] != self.num_classes:
+                raise ValueError(f'Output layer has {kwargs["output_size"]} features, but should have {self.num_classes} features')
+        else:
+            kwargs['output_size'] = self.num_classes
+        
+        self.input_size = kwargs.get('input_size', 1)
+        self.output_size = kwargs.get('output_size', self.num_classes)
         self.architecture = kwargs
         self.network = Dense_Layers(**kwargs)
+        # check that the output layer has the correct number of classes
         pass
 
     def update_class_weights(self, y_data):
@@ -539,14 +683,20 @@ class MultiClassHead(Head):
         pass
 
     def loss(self, y_logits, y_data, ignore_nan=True):
+        if self.weight == 0:
+            return torch.tensor(0, dtype=torch.float32)
         y_true = y_data[:,self.y_idx]
-        if ignore_nan:
-            mask = ~torch.isnan(y_true)
-            if mask.sum().item() == 0:
-                return torch.tensor(0, dtype=torch.float32)
-            return self.loss_func(y_logits[mask], y_true[mask].long())
-        else:
-            return self.loss_func(y_logits, y_true.long())
+        y0, y1 = _nan_cleaner(y_logits, y_true, ignore_nan)
+        if y0 is None:
+            return torch.tensor(0, dtype=torch.float32)
+        return self.loss_func(y0, y1.long())
+        # if ignore_nan:
+        #     mask = ~torch.isnan(y_true)
+        #     if mask.sum().item() == 0:
+        #         return torch.tensor(0, dtype=torch.float32)
+        #     return self.loss_func(y_logits[mask], y_true[mask].long())
+        # else:
+        #     return self.loss_func(y_logits, y_true.long())
 
     def logits_to_proba(self, y_logits):
         return F.softmax(y_logits, dim=1)
@@ -559,13 +709,19 @@ class MultiClassHead(Head):
     
     def score(self, y_logits, y_data, ignore_nan=True):
         y_true = y_data[:,self.y_idx]
-        if ignore_nan:
-            mask = ~torch.isnan(y_true)
-            if mask.sum().item() == 0:
-                return torch.tensor(0, dtype=torch.float32)
-            return self.score_func(y_logits[mask], y_true[mask].long())
-        else:
-            return self.score_func(y_logits, y_true.long())
+        y0, y1 = _nan_cleaner(y_logits, y_true, ignore_nan)
+        if y0 is None:
+            return {k: torch.tensor(0, dtype=torch.float32) for k in self.score_func_dict.keys()}
+        return {k: v(y0, y1.long()) for k, v in self.score_func_dict.items()}
+        # return {k: v(y0, y1.long()).compute().item() for k, v in self.score_func_dict.items()}
+    
+        # if ignore_nan:
+        #     mask = ~torch.isnan(y_true)
+        #     if mask.sum().item() == 0:
+        #         return torch.tensor(0, dtype=torch.float32)
+        #     return self.score_func(y_logits[mask], y_true[mask].long())
+        # else:
+        #     return self.score_func(y_logits, y_true.long())
 
 
 #########################################################

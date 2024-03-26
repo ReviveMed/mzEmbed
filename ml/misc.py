@@ -19,7 +19,7 @@ def clean_for_json(data):
         data = [clean_for_json(d) for d in data]
 
     if isinstance(data, dict):
-        data = {k: clean_for_json(v) for k, v in data.items()}
+        data = {k: clean_for_json(v) for k, v in data.items() if k[0] != '_'}
 
     if isinstance(data, np.int64):
         data = int(data)
@@ -28,6 +28,10 @@ def clean_for_json(data):
         # convert function to string
         data = str(data)
     
+    # check if data is a tensor
+    if isinstance(data, torch.Tensor):
+        data = data.tolist()
+
     return data
 
 def save_json(data, file_path):
