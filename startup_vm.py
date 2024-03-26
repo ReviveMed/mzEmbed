@@ -295,6 +295,8 @@ if len(records) > 0:
         # save this file to local storage if it exists
         targets_path = f"mzlearn-webapp.appspot.com/{mzlearn_path}/targets_peaks/name_matched_targets.csv"
         if fs.exists(targets_path):
+            if not os.path.exists(f"{script_path}/{job_id}"):
+                os.makedirs(f"{script_path}/{job_id}")
             with fs.open(targets_path) as f:
                 targets_df = pd.read_csv(f, sep=",")
             targets_df.to_csv(f"{script_path}/{job_id}/targets.csv", index=False)
@@ -653,18 +655,22 @@ if len(records) > 0:
                 # compare the reference_study_id_list_of_peak_matches and other_study_id_list_of_peak_matches
                 # to see how many peaks are common
                 correct_alignment_peaks = 0
+                miss_aligned_peaks = 0
                 for ref_peak_matches, other_peak_matches in zip(reference_study_id_list_of_peak_matches,
                                                                 other_study_id_list_of_peak_matches):
                     # if both ref_peak_matches and other_peak_matches are not "NA" and not None
                     if ref_peak_matches != "NA" and other_peak_matches != "NA":
                         if ref_peak_matches == other_peak_matches:
                             correct_alignment_peaks += 1
+                        else:
+                            miss_aligned_peaks += 1
 
                 # build a row to add to alignment_targets_tracking_results
                 row = {'reference_study_id': str(int(reference_job_id)),
                        'other_study_id': str(int(study_id)),
                        'total_possible_aligned_targets': unique_peaks,
                        'correct_alignment_targets': correct_alignment_peaks,
+                       'miss_aligned_peaks': miss_aligned_peaks,
                        'correct_alignment_percentage': correct_alignment_peaks / unique_peaks * 100}
                 alignment_targets_tracking_results = alignment_targets_tracking_results.append(row, ignore_index=True)
 
