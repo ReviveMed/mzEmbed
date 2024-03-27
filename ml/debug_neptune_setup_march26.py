@@ -174,4 +174,4 @@ for latent_size in [4,8,16,32]:
 
 
 
-                run_id = setup_neptune_run(data_dir,setup_id='finetune',with_run_id=run_id,**kwargs)
+                # run_id = setup_neptune_run(data_dir,setup_id='finetune_mkscc',with_run_id=run_id,**kwargs)
