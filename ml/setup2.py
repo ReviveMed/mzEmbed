@@ -28,10 +28,11 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 
 def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
+    tags = ['v3.1']
     if with_run_id is None:
         run = neptune.init_run(project='revivemed/RCC',
             api_token=NEPTUNE_API_TOKEN,
-            tags=['v3'])
+            tags=tags)
     else:
         try:
             run = neptune.init_run(project='revivemed/RCC',
@@ -39,13 +40,19 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
                                    with_id=with_run_id)
             print('Continuing run:', with_run_id)
             # add tags to the run
-            run["sys/tags"].add('v3')
+            run["sys/tags"].add(tags[0])
+
+            #check if 'setup_id' exists in the run, current code doesnt work
+            # if f'{setup_id}/kwargs' in run:
+                # print(f'{setup_id} already exists in run:', with_run_id)
+                # return with_run_id
+
         except NeptuneException:
             print('RunNotFound')
             run = neptune.init_run(project='revivemed/RCC',
                 api_token=NEPTUNE_API_TOKEN,
                 # custom_run_id=with_run_id,
-                tags=['v3'])
+                tags=tags)
             print('Starting new run:', run['sys/id'].fetch())
 
         overwrite_existing_kwargs = kwargs.get('overwrite_existing_kwargs', False)
@@ -79,13 +86,15 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
     if load_head_loc:
         print('loading pretrained heads, overwriting head_kwargs_list')
         load_kwargs = run[f'{load_head_loc}/kwargs'].fetch()
-        kwargs['head_kwargs_list'] = eval(load_kwargs['head_kwargs_list'])
+        kwargs['head_kwargs_dict'] = load_kwargs.get('head_kwargs_dict', {})
+        kwargs['head_kwargs_list'] = eval(load_kwargs.get('head_kwargs_list', '[]'))
         # assert len(kwargs['head_kwargs_list']) <= len(y_head_cols)
 
     if load_adv_loc:
         print('loading pretrained advs, overwriting adv_kwargs_list')
         load_kwargs = run[f'{load_adv_loc}/kwargs'].fetch()
-        kwargs['adv_kwargs_list'] = eval(load_kwargs['adv_kwargs_list'])
+        kwargs['adv_kwargs_dict'] = load_kwargs.get('adv_kwargs_dict', {})
+        kwargs['adv_kwargs_list'] = eval(load_kwargs.get('adv_kwargs_list', '[]'))
         # assert len(kwargs['adv_kwargs_list']) <= len(y_adv_cols)
 
 
@@ -137,6 +146,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
     input_size = kwargs.get('input_size', X_data_train.shape[1])
     assert input_size == X_data_train.shape[1]
 
+    if 'hidden_size_mult' in encoder_kwargs:
+        encoder_kwargs['hidden_size'] = int(encoder_kwargs['hidden_size_mult']*latent_size)
 
     encoder = get_model(encoder_kind, input_size, **encoder_kwargs)
 
@@ -151,7 +162,11 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
     ####################################
     ###### Create the Head Models ######
 
-    head_kwargs_list = kwargs.get('head_kwargs_list', [{}])
+    head_kwargs_dict = kwargs.get('head_kwargs_dict', {})
+    if head_kwargs_dict:
+        head_kwargs_list = [head_kwargs_dict[k] for k in head_kwargs_dict.keys()]
+    else:
+        head_kwargs_list = kwargs.get('head_kwargs_list', [{}])
 
     head_list = []
     for head_kwargs in head_kwargs_list:
@@ -203,7 +218,12 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
     ####################################
     ###### Create the Adversarial Models ######
 
-    adv_kwargs_list = kwargs.get('adv_kwargs_list', [{}])
+    adv_kwargs_dict = kwargs.get('adv_kwargs_dict', {})
+    if adv_kwargs_dict:
+        adv_kwargs_list = [adv_kwargs_dict[k] for k in adv_kwargs_dict.keys()]
+    else:
+        adv_kwargs_list = kwargs.get('adv_kwargs_list', [{}])
+
     adv_list = []
     for adv_kwargs in adv_kwargs_list:
         adv_kind = adv_kwargs.get('kind', 'NA')
