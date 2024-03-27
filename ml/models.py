@@ -7,7 +7,8 @@ from torch.utils.checkpoint import checkpoint as cp
 import os
 from misc import save_json
 
-from torchmetrics import AUROC
+# from torchmetrics import AUROC
+from sklearn.metrics import roc_auc_score
 
 ####################################################################################
 # Helper functions
@@ -539,6 +540,7 @@ class Binary_Head(Head):
         self.name = name
         self.y_idx = y_idx
         self.weight = weight
+        self.num_examples_per_class = None
         self.class_weight = None
         self.pos_class_weight = None
         self.architecture = kwargs
@@ -551,7 +553,9 @@ class Binary_Head(Head):
 
         self.loss_func = nn.BCEWithLogitsLoss(reduction=self.loss_reduction,
                                                     pos_weight=self.pos_class_weight)
-        self.score_func_dict = {'AUROC': AUROC(task='binary', average='weighted')}
+        self.score_func_dict = {'AUROC (micro)': lambda y_score, y_true:
+                                roc_auc_score(y_true.numpy(), y_score.numpy(), average='micro')}
+                                # AUROC(task='binary', average='weighted')}
         #TODO: is the score function aggregrationg results?
 
     def define_architecture(self, **kwargs):
@@ -565,15 +569,17 @@ class Binary_Head(Head):
     def update_class_weights(self, y_data):
         # self.loss_func = nn.BCEWithLogitsLoss(weight=class_weight,
                                                 # reduction=reduction)
-        # pos weight = # of negative samples / # of positive samples
+        # pos weight = # of negative samples / # of positive samples <- this is wrong, we want the reverse
         # class_weight = [1/(# of negative samples), 1/(# of positive samples)]
         # so pos_weight = (1/neg_weight)/(1/pos_weight) = pos_weight/neg_weight
         y_true = y_data[:,self.y_idx]
         # remove nans 
         y_true = y_true[~torch.isnan(y_true)]
         y_int = y_true.int()
+        self.num_sample_per_class = torch.bincount(y_int)
         self.class_weight= 1/torch.bincount(y_int)
-        self.pos_class_weight = self.class_weight[1]/self.class_weight[0]
+        self.pos_class_weight = self.num_sample_per_class[1]/self.num_sample_per_class[0]
+        # self.pos_class_weight = self.class_weight[1]/self.class_weight[0]
         pass
 
 
@@ -597,28 +603,13 @@ class Binary_Head(Head):
         return (self.predict_proba(x) > threshold).float()
 
 
-    def auroc_score(self, y_logits, y_data,ignore_nan=True):
-        y_true = y_data[:,self.y_idx]
-        y0, y1 = _nan_cleaner(y_logits, y_true, ignore_nan)
-        if y0 is None:
-            return torch.tensor(0, dtype=torch.float32)
-        return self.score_func_dict['AUROC'](y0.squeeze(), y1.squeeze())
-    
-        # if ignore_nan:
-        #     mask = ~torch.isnan(y_true)
-        #     if mask.sum().item() == 0:
-        #         return torch.tensor(0, dtype=torch.float32)
-        #     return self.score_func(y_logits[mask].squeeze(), y_true[mask].squeeze())
-        #     # return {'AUROC' : self.score_func(y_logits[mask].squeeze(), y_true[mask].squeeze())}
-        # else:
-        #     return self.score_func(y_logits.squeeze(), y_true.squeeze())
-
     def score(self, y_logits, y_data,ignore_nan=True):
         y_true = y_data[:,self.y_idx]
-        y0, y1 = _nan_cleaner(y_logits, y_true, ignore_nan)
-        if y0 is None:
+        logits, targets = _nan_cleaner(y_logits.detach(), y_true.detach(), ignore_nan)
+        if logits is None:
             return torch.tensor(0, dtype=torch.float32)
-        return {k: v(y0.squeeze(), y1.squeeze()) for k, v in self.score_func_dict.items()}
+        probs = self.logits_to_proba(logits)
+        return {k: v(probs.squeeze(), targets.squeeze()) for k, v in self.score_func_dict.items()}
         # return {k: v(y0.squeeze(), y1.squeeze()).compute().item() for k, v in self.score_func_dict.items()}
 
 #########################################################
@@ -654,8 +645,12 @@ class MultiClass_Head(Head):
         self.loss_func = nn.CrossEntropyLoss(reduction=self.loss_reduction, 
                                              weight=self.class_weight, 
                                              label_smoothing=self.label_smoothing)
-        self.score_func_dict = {'AUROC':
-            AUROC(task='multiclass', average='weighted', num_classes=num_classes)}
+        self.score_func_dict = {'AUROC (ovo, macro)': lambda y_score, y_true:
+                                roc_auc_score(y_true.numpy(), y_score.numpy(), average='macro', multi_class='ovo')}
+        # larger classes are given MORE weight when average="weighted"
+
+        #     AUROC(task='multiclass', average='weighted', num_classes=num_classes)}
+
 
     def define_architecture(self, **kwargs):
         if 'output_size' in kwargs:
@@ -707,12 +702,20 @@ class MultiClass_Head(Head):
     def predict(self, x):
         return torch.argmax(self.predict_proba(x), dim=1)
     
-    def score(self, y_logits, y_data, ignore_nan=True):
+    def score(self, y_logits, y_data,ignore_nan=True):
         y_true = y_data[:,self.y_idx]
-        y0, y1 = _nan_cleaner(y_logits, y_true, ignore_nan)
-        if y0 is None:
-            return {k: torch.tensor(0, dtype=torch.float32) for k in self.score_func_dict.keys()}
-        return {k: v(y0, y1.long()) for k, v in self.score_func_dict.items()}
+        logits, targets = _nan_cleaner(y_logits.detach(), y_true.detach(), ignore_nan)
+        if logits is None:
+            return torch.tensor(0, dtype=torch.float32)
+        probs = self.logits_to_proba(logits)
+        return {k: v(probs, targets.long()) for k, v in self.score_func_dict.items()}
+
+    # def score(self, y_logits, y_data, ignore_nan=True):
+    #     y_true = y_data[:,self.y_idx]
+    #     y0, y1 = _nan_cleaner(y_logits, y_true, ignore_nan)
+    #     if y0 is None:
+    #         return {k: torch.tensor(0, dtype=torch.float32) for k in self.score_func_dict.keys()}
+    #     return {k: v(y0, y1.long()) for k, v in self.score_func_dict.items()}
         # return {k: v(y0, y1.long()).compute().item() for k, v in self.score_func_dict.items()}
     
         # if ignore_nan:

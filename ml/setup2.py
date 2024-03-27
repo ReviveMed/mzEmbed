@@ -70,17 +70,20 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         y_adv_cols = [y_adv_cols]
     
     if load_encoder_loc:
+        print('loading pretrained encoders, overwriting encoder_kwargs')
         load_kwargs = run[f'{load_encoder_loc}/kwargs'].fetch()
         kwargs['encoder_kwargs'].update(load_kwargs['encoder_kwargs'])
         if kwargs['encoder_kind'] != load_kwargs['encoder_kind']:
             raise ValueError(f'Encoder kind mismatch: {kwargs["encoder_kind"]} vs {load_kwargs["encoder_kind"]}')
         
     if load_head_loc:
+        print('loading pretrained heads, overwriting head_kwargs_list')
         load_kwargs = run[f'{load_head_loc}/kwargs'].fetch()
         kwargs['head_kwargs_list'] = eval(load_kwargs['head_kwargs_list'])
         # assert len(kwargs['head_kwargs_list']) <= len(y_head_cols)
 
     if load_adv_loc:
+        print('loading pretrained advs, overwriting adv_kwargs_list')
         load_kwargs = run[f'{load_adv_loc}/kwargs'].fetch()
         kwargs['adv_kwargs_list'] = eval(load_kwargs['adv_kwargs_list'])
         # assert len(kwargs['adv_kwargs_list']) <= len(y_adv_cols)
@@ -272,12 +275,12 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
         # alternative way to log models
         torch.save(encoder.state_dict(), f'{save_dir}/{setup_id}_encoder_state_dict.pth')
-        torch.save(head.state_dict(), f'{save_dir}/{setup_id}_head_state_dict.pth')
-        torch.save(adv.state_dict(), f'{save_dir}/{setup_id}_adv_state_dict.pth')
+        # torch.save(head.state_dict(), f'{save_dir}/{setup_id}_head_state_dict.pth')
+        # torch.save(adv.state_dict(), f'{save_dir}/{setup_id}_adv_state_dict.pth')
 
         run[f'{setup_id}/models/encoder_state_dict'].upload(f'{save_dir}/{setup_id}_encoder_state_dict.pth')
-        run[f'{setup_id}/models/head_state_dict'].upload(f'{save_dir}/{setup_id}_head_state_dict.pth')
-        run[f'{setup_id}/models/adv_state_dict'].upload(f'{save_dir}/{setup_id}_adv_state_dict.pth')
+        # run[f'{setup_id}/models/head_state_dict'].upload(f'{save_dir}/{setup_id}_head_state_dict.pth')
+        # run[f'{setup_id}/models/adv_state_dict'].upload(f'{save_dir}/{setup_id}_adv_state_dict.pth')
 
         os.makedirs(os.path.join(save_dir,setup_id), exist_ok=True)
         head.save_state_to_path(f'{save_dir}/{setup_id}')

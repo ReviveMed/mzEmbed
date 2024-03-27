@@ -358,41 +358,44 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                                 adversary_optimizer.step()
             
             ############ end of training adversary on fixed latent space
+            #turn on inference mode
+            with torch.inference_mode():
+                
+                running_losses['encoder'] /= len(dataloaders[phase])
+                running_losses['head'] /= len(dataloaders[phase])
+                running_losses['adversary'] /= len(dataloaders[phase])
+                running_losses['joint'] /= len(dataloaders[phase])
 
-            running_losses['encoder'] /= len(dataloaders[phase])
-            running_losses['head'] /= len(dataloaders[phase])
-            running_losses['adversary'] /= len(dataloaders[phase])
-            running_losses['joint'] /= len(dataloaders[phase])
+                run[f'{prefix}/{phase}/epoch/encoder_loss'].append(running_losses['encoder'])
+                run[f'{prefix}/{phase}/epoch/head_loss'].append(running_losses['head'])
+                run[f'{prefix}/{phase}/epoch/adversary_loss'].append(running_losses['adversary'])
+                run[f'{prefix}/{phase}/epoch/joint_loss'].append(running_losses['joint'])
 
-            run[f'{prefix}/{phase}/epoch/encoder_loss'].append(running_losses['encoder'])
-            run[f'{prefix}/{phase}/epoch/head_loss'].append(running_losses['head'])
-            run[f'{prefix}/{phase}/epoch/adversary_loss'].append(running_losses['adversary'])
-            run[f'{prefix}/{phase}/epoch/joint_loss'].append(running_losses['joint'])
+                loss_history['encoder'][phase].append(running_losses['encoder'])
+                loss_history['head'][phase].append(running_losses['head'])
+                loss_history['adversary'][phase].append(running_losses['adversary'])
+                loss_history['joint'][phase].append(running_losses['joint'])
+                loss_history['epoch'][phase].append(epoch)
 
-            loss_history['encoder'][phase].append(running_losses['encoder'])
-            loss_history['head'][phase].append(running_losses['head'])
-            loss_history['adversary'][phase].append(running_losses['adversary'])
-            loss_history['joint'][phase].append(running_losses['joint'])
-            loss_history['epoch'][phase].append(epoch)
-
-            eval_scores = {}
-            #TODO more efficient to aggregate the scores in the batch loop, see documentation for torchmetrics
-            # but unclear how this will work with other metrics
-            eval_scores = head.score(epoch_head_outputs, epoch_head_targets)
-            eval_scores.update(adversary.score(epoch_adversary_outputs, epoch_adversary_targets))
-            
-            for eval_name, eval_val in eval_scores.items():
-                if isinstance(eval_val, dict):
-                    for k, v in eval_val.items():
-                        run[f'{prefix}/{phase}/epoch/{eval_name}/{k}'].append(v)
-                else:
-                    run[f'{prefix}/{phase}/epoch/{eval_name}'].append(eval_val)
+                eval_scores = {}
+                #TODO more efficient to aggregate the scores in the batch loop, see documentation for torchmetrics
+                # but unclear how this will work with other metrics
+                
+                eval_scores = head.score(epoch_head_outputs, epoch_head_targets)
+                eval_scores.update(adversary.score(epoch_adversary_outputs, epoch_adversary_targets))
+                
+                for eval_name, eval_val in eval_scores.items():
+                    if isinstance(eval_val, dict):
+                        for k, v in eval_val.items():
+                            run[f'{prefix}/{phase}/epoch/{eval_name}/{k}'].append(v)
+                    else:
+                        run[f'{prefix}/{phase}/epoch/{eval_name}'].append(eval_val)
 
 
-            if (verbose) and (epoch % 10 == 0):
-                print(f'Epoch [{epoch+1}/{num_epochs}], {phase} Loss: {loss_history["joint"][phase][-1]:.4f}')
-                if encoder_weight > 0:
-                    print(f'{phase} Encoder Loss: {loss_history["encoder"][phase][-1]:.4f}')
+                if (verbose) and (epoch % 10 == 0):
+                    print(f'Epoch [{epoch+1}/{num_epochs}], {phase} Loss: {loss_history["joint"][phase][-1]:.4f}')
+                    if encoder_weight > 0:
+                        print(f'{phase} Encoder Loss: {loss_history["encoder"][phase][-1]:.4f}')
 
             if phase == 'train_holdout':
                 if loss_history['joint'][phase][-1] < best_loss['joint']:
@@ -555,7 +558,7 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
                                 probs = torch.tensor(model.predict_proba(latent_outputs[nan_mask].detach().numpy()))
                             
                             metric(probs,adv0_targets[nan_mask].long())
-                            run[f'{prefix}/{phase}/{adv0.kind}_{adv0_name}/{model_name} AUROC'] = stringify_unsupported(metric.compute().item())
+                            run[f'{prefix}/{phase}/{adv0.kind}_{adv0_name}/{model_name} AUROC (weighted)'] = stringify_unsupported(metric.compute().item())
             
         except Exception as e:
             print('Error in sklearn model evaluation:', e)
