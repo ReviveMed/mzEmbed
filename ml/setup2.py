@@ -44,7 +44,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             print('RunNotFound')
             run = neptune.init_run(project='revivemed/RCC',
                 api_token=NEPTUNE_API_TOKEN,
-                custom_run_id=with_run_id,
+                # custom_run_id=with_run_id,
                 tags=['v3'])
             print('Starting new run:', run['sys/id'].fetch())
 

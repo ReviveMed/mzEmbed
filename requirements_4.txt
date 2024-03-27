@@ -2,7 +2,7 @@ numpy==1.26.1
 pandas==2.1.2
 matplotlib==3.8.1
 torch==2.2.1
-torchmetrics#==1.3.0.post0
+torchmetrics
 umap-learn==0.5.4
 scikit-learn==1.3.2
 scipy==1.11.3
