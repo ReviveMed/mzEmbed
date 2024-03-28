@@ -123,8 +123,8 @@ study = optuna.create_study(direction="maximize",
                 load_if_exists=True)
 
 
-if len(study.trials) > 20:
+if len(study.trials) < 20:
     add_runs_to_study(study,objective_func=compute_objective)
 
 
-study.optimize(objective, n_trials=1)
+study.optimize(objective, n_trials=100)
