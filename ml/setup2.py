@@ -29,10 +29,12 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
     tags = ['v3.1']
+    is_run_new = False
     if with_run_id is None:
         run = neptune.init_run(project='revivemed/RCC',
             api_token=NEPTUNE_API_TOKEN,
             tags=tags)
+        is_run_new = True
     else:
         try:
             run = neptune.init_run(project='revivemed/RCC',
@@ -54,6 +56,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
                 # custom_run_id=with_run_id,
                 tags=tags)
             print('Starting new run:', run['sys/id'].fetch())
+            is_run_new = True
 
         overwrite_existing_kwargs = kwargs.get('overwrite_existing_kwargs', False)
         if overwrite_existing_kwargs:   
@@ -97,7 +100,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         kwargs['adv_kwargs_list'] = eval(load_kwargs.get('adv_kwargs_list', '[]'))
         # assert len(kwargs['adv_kwargs_list']) <= len(y_adv_cols)
 
-
+    if is_run_new:
+        run[f'{setup_id}/original_kwargs'] = stringify_unsupported(kwargs)
+    
     run[f'{setup_id}/kwargs'] = stringify_unsupported(kwargs)
     
     run_id = run["sys/id"].fetch()

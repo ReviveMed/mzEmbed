@@ -71,7 +71,7 @@ def objective(trial):
     run_id = setup_neptune_run(data_dir,setup_id='finetune_mkscc',with_run_id=run_id,**kwargs)
 
 
-    return objective_func1(run_id)
+    return objective_func1(run_id,data_dir=data_dir)
 
 
 

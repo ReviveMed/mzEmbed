@@ -4,7 +4,7 @@ import neptune
 
 import optuna
 import json
-
+from setup2 import setup_neptune_run
 from optuna.distributions import FloatDistribution, IntDistribution, CategoricalDistribution
 # from optuna.distributions import json_to_distribution, check_distribution_compatibility, distribution_to_json
 
@@ -96,7 +96,7 @@ def reuse_run(run_id,study_kwargs=None,objective_func=None):
 ########################################################################################
 
 
-def objective_func1(run_id,recompute_eval=False):
+def objective_func1(run_id,data_dir,recompute_eval=False):
 
     obj_val = None
     recon_weight = 1
@@ -109,11 +109,19 @@ def objective_func1(run_id,recompute_eval=False):
     run = neptune.init_run(project='revivemed/RCC',
                     api_token=NEPTUNE_API_TOKEN,
                     with_id=run_id)
-    
-    if recompute_eval:
-        raise NotImplementedError("Need to recompute")
 
     pretrain_output = run['pretrain'].fetch()
+
+    if recompute_eval:
+        kwargs = convert_neptune_kwargs(pretrain_output['kwargs'])
+        kwargs['load_model_loc'] = 'pretrain'
+        kwargs['run_training'] = False
+        kwargs['run_evaluation'] = True
+        kwargs['save_latent_space'] = False
+        kwargs['plot_latent_space'] = False
+        setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+        #raise NotImplementedError("Need to recompute")
+
     
     if 'eval' in pretrain_output:
         eval_res = pretrain_output['eval']['val']
@@ -143,7 +151,7 @@ def objective_func1(run_id,recompute_eval=False):
 
         run.stop()
     else:
-        # run the evaluation!
+        # run the evaluation!?
         run.stop()
         raise ValueError("No eval results")
         
