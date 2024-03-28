@@ -30,9 +30,9 @@ def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=No
     for run_id in run_id_list:
         #TODO test this code
         #check if the trial is already in the study by looking at the user attributes
-        # if run_id in [t.user_attrs['run_id'] for t in study.trials]:
-        #     print(f"Run {run_id} is already in the study")
-        #     continue
+        if run_id in [t.user_attrs['run_id'] for t in study.trials if 'run_id' in t.user_attrs]:
+            print(f"Run {run_id} is already in the study")
+            continue
 
         print('adding {} to study'.format(run_id))
         # try:
