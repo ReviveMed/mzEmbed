@@ -1,10 +1,11 @@
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
 import neptune
-
+import numpy as np
 import optuna
 import json
 from setup2 import setup_neptune_run
+from misc import round_to_sig
 from optuna.distributions import FloatDistribution, IntDistribution, CategoricalDistribution
 # from optuna.distributions import json_to_distribution, check_distribution_compatibility, distribution_to_json
 
@@ -62,6 +63,10 @@ def reuse_run(run_id,study_kwargs=None,objective_func=None):
     pretrain_kwargs = convert_neptune_kwargs(pretrain_kwargs)
     # print(pretrain_kwargs['head_kwargs_list'][1]['weight'])
     
+    #TODO test this
+    # pretrain_kwargs = convert_model_kwargs_list_to_dict(pretrain_kwargs)
+    # study_kwargs = convert_model_kwargs_list_to_dict(study_kwargs)
+
     diff = dict_diff(flatten_dict(study_kwargs), flatten_dict(pretrain_kwargs))
     diff_clean = dict_diff_cleanup(diff)
 
@@ -103,7 +108,7 @@ def objective_func1(run_id,data_dir,recompute_eval=False):
     isPediatric_weight = 1
     cohortLabel_weight = 1
     advStudyID_weight = 1
-    objective_name = 'OBJECTIVE equal weights'
+    objective_name = 'OBJ4 equal weights (v0)'
 
 
     run = neptune.init_run(project='revivemed/RCC',
@@ -160,19 +165,19 @@ def objective_func1(run_id,data_dir,recompute_eval=False):
 
 ########################################################################################
 
-def make_kwargs():
+def make_kwargs(sig_figs=2):
     activation = 'leakyrelu'
-    latent_size = IntDistribution(4, 100, log=True)
+    latent_size = IntDistribution(4, 64, step=1)
     num_hidden_layers = IntDistribution(1, 5)
-    cohort_label_weight = FloatDistribution(0,10)
-    head_weight = FloatDistribution(0,10)
+    cohort_label_weight = FloatDistribution(0,10,step=0.1)
+    head_weight = FloatDistribution(0,10,step=0.1)
     # head_weight = FloatDistribution(0.1, 10, log=True)
-    adv_weight = FloatDistribution(0,10)
+    adv_weight = FloatDistribution(0,10,step=0.1)
     encoder_kwargs = {
                 'activation': activation,
                 'latent_size': latent_size,
                 'num_hidden_layers': num_hidden_layers,
-                'dropout_rate': 0.2,
+                'dropout_rate': FloatDistribution(0, 0.5, step=0.1),
                 'use_batch_norm': False,
                 # 'hidden_size': int(1.5*latent_size),
                 'hidden_size_mult' : 1.5
@@ -237,22 +242,72 @@ def make_kwargs():
 
                     'train_kwargs': {
                         # 'num_epochs': trial.suggest_int('pretrain_epochs', 10, 100,log=True),
-                        'num_epochs': 100,
-                        'lr': 0.01,
+                        'num_epochs': IntDistribution(50, 200, step=10),
+                        'lr': FloatDistribution(0.0001, 0.05, log=True),
+                        # 'lr': 0.01,
                         'weight_decay': 0,
                         'l1_reg_weight': 0,
-                        'l2_reg_weight': 0.001,
+                        # 'l2_reg_weight': 0.001,
+                        'l2_reg_weight': FloatDistribution(0, 0.01, step=0.0001),
                         'encoder_weight': 1,
                         'head_weight': head_weight,
                         'adversary_weight': adv_weight,
                         'noise_factor': 0.1,
-                        'early_stopping_patience': 20,
+                        'early_stopping_patience': IntDistribution(0, 50, step=10),
                         'adversarial_mini_epochs': 5,
                     },
 
         }
+    
+    kwargs = round_kwargs_to_sig(kwargs,sig_figs=sig_figs)
     return kwargs
 
+
+def round_kwargs_to_sig(val,sig_figs=2,key=None):
+    if sig_figs is None:
+        return val
+
+    # for key, val in kwargs.items():
+    if isinstance(val, dict):
+        for k, v in val.items():
+            val[k] = round_kwargs_to_sig(v, sig_figs=sig_figs, key=k)
+        return val
+    
+    elif isinstance(val, list):
+        return [round_kwargs_to_sig(v, sig_figs=sig_figs) for v in val]
+    
+    elif isinstance(val, float):
+        new_val = round_to_sig(val, sig_figs=sig_figs)
+        if np.abs(new_val - val) > 1e-6:
+            print(f"Rounded {key} from {val} to {new_val}")
+        return new_val
+    else:
+        return val
+
+
+def convert_model_kwargs_list_to_dict(kwargs,style=0):
+
+    if 'head_kwargs_dict' not in kwargs:
+        kwargs['head_kwargs_dict'] = {}
+    if 'adv_kwargs_dict' not in kwargs:
+        kwargs['adv_kwargs_dict'] = {}
+
+    for key in ['head_kwargs_list','adv_kwargs_list']:
+        if key not in kwargs:
+            # print(f"Key {key} not in kwargs")
+            continue
+        val = kwargs[key]
+        new_key = key.replace('kwargs_list','kwargs_dict')
+        if style == 0:
+            kwargs[new_key].update({f'{i}': v for i, v in enumerate(val)})
+        elif style == 1:
+            kwargs[new_key].update({f'{v["name"]}': v for i, v in enumerate(val)})
+        elif style == 2:                
+            kwargs[new_key].update({f'{v["kind"]}_{v["name"]}': v for i, v in enumerate(val)})
+
+        del kwargs[key]
+
+    return kwargs
 
 ########################################################################################
 ########################################################################################

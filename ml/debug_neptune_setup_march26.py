@@ -102,7 +102,6 @@ for latent_size in [4,8,16]:
 
                             'train_kwargs': {
                                 # 'num_epochs': trial.suggest_int('pretrain_epochs', 10, 100,log=True),
-                                'num_epochs': 100,
                                 'lr': 0.01,
                                 'weight_decay': 0,
                                 'l1_reg_weight': 0,

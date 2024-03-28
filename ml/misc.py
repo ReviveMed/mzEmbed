@@ -136,6 +136,10 @@ def normalize_loss(current_loss, loss_avg=1, beta=0, current_epoch=1):
     return new_loss, loss_avg
 
 
+# round to significant digits
+def round_to_sig(x, sig_figs=2):
+    return round(x, sig_figs-int(np.floor(np.log10(abs(x))))-1)
+
 def round_to_even(n):
     if n % 2 == 0:
         return n

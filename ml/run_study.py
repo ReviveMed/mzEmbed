@@ -7,7 +7,7 @@ import os
 import optuna
 import json
 from prep_study import add_runs_to_study, get_run_id_list, reuse_run, \
-    objective_func1, make_kwargs, convert_distributions_to_suggestion
+    objective_func1, make_kwargs, convert_distributions_to_suggestion, convert_model_kwargs_list_to_dict
 from setup2 import setup_neptune_run
 from misc import download_data_dir
 
@@ -33,6 +33,7 @@ if not os.path.exists(data_dir+'/X_pretrain_train.csv'):
 def objective(trial):
 
     kwargs = make_kwargs()
+    # kwargs = convert_model_kwargs_list_to_dict(kwargs)
     kwargs = convert_distributions_to_suggestion(kwargs, trial)
 
     run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
@@ -47,6 +48,8 @@ def objective(trial):
     kwargs['y_head_col'] = ['MSKCC BINARY']
     kwargs['y_adv_col'] = []
 
+    kwargs['head_kwargs_dict'] = {}
+    kwargs['adv_kwargs_list'] = {}
     kwargs['head_kwargs_list'] = [{
         'kind': 'Binary',
         'name': 'MSKCC',
@@ -67,7 +70,7 @@ def objective(trial):
     kwargs['train_kwargs']['adversary_weight'] = 0
     kwargs['eval_kwargs']['sklearn_models'] = {}
 
-
+    # kwargs = convert_model_kwargs_list_to_dict(kwargs)
     run_id = setup_neptune_run(data_dir,setup_id='finetune_mkscc',with_run_id=run_id,**kwargs)
 
 
