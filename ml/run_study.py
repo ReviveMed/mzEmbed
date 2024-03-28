@@ -20,6 +20,29 @@ SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 
+STUDY_INFO_DICT = {
+    'study_name': 'OBJ1_March27',
+    'objective_name': 'OBJ4 equal weights (v0)',
+    'recon_weight': 1,
+    'isPediatric_weight': 1,
+    'cohortLabel_weight': 1,
+    'advStudyID_weight': 1,
+}
+
+
+# STUDY_INFO_DICT = {
+#     'study_name': 'OBJ1_March27',
+#     'objective_name': 'OBJ no Adv (v0)',
+#     'recon_weight': 1,
+#     'isPediatric_weight': 1,
+#     'cohortLabel_weight': 1,
+#     'advStudyID_weight': 0,
+# }
+
+
+#TODO save the study info dict to neptune metadata
+
+
 data_dir = '/DATA2'
 os.makedirs(data_dir, exist_ok=True)
 
@@ -28,6 +51,10 @@ if not os.path.exists(data_dir+'/X_pretrain_train.csv'):
     download_data_dir(data_url, save_dir=data_dir)
 
 
+def compute_objective(run_id):
+    return objective_func1(run_id,
+                           data_dir=data_dir,
+                           objective_info_dict=STUDY_INFO_DICT)
 
 
 def objective(trial):
@@ -36,9 +63,10 @@ def objective(trial):
     # kwargs = convert_model_kwargs_list_to_dict(kwargs)
     kwargs = convert_distributions_to_suggestion(kwargs, trial)
 
-    run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+    setup_id = 'pretrain'
+    run_id = setup_neptune_run(data_dir,setup_id=setup_id,**kwargs)
 
-    kwargs['load_encoder_loc'] = 'pretrain'
+    kwargs['load_encoder_loc'] = setup_id
     # kwargs['load_model_loc'] = 'finetune'
     kwargs['run_training'] = True
     kwargs['run_evaluation'] = True
@@ -68,13 +96,17 @@ def objective(trial):
     kwargs['train_kwargs']['head_weight'] = 1
     kwargs['train_kwargs']['encoder_weight'] = 1
     kwargs['train_kwargs']['adversary_weight'] = 0
+    
+    kwargs['eval_kwargs'] = {}
     kwargs['eval_kwargs']['sklearn_models'] = {}
 
     # kwargs = convert_model_kwargs_list_to_dict(kwargs)
     run_id = setup_neptune_run(data_dir,setup_id='finetune_mkscc',with_run_id=run_id,**kwargs)
 
+    trial.set_user_attr('run_id',run_id)
+    trial.set_user_attr('setup_id',setup_id)
 
-    return objective_func1(run_id,data_dir=data_dir)
+    return compute_objective(run_id)
 
 
 
@@ -83,7 +115,7 @@ if USE_WEBAPP_DB:
     storage_name = WEBAPP_DB_LOC
 
 
-study_name = 'OBJ1_March27'
+study_name = STUDY_INFO_DICT['study_name']
 
 study = optuna.create_study(direction="maximize",
                 study_name=study_name, 
@@ -91,7 +123,8 @@ study = optuna.create_study(direction="maximize",
                 load_if_exists=True)
 
 
-add_runs_to_study(study)
+if len(study.trials) > 20:
+    add_runs_to_study(study,objective_func=compute_objective)
 
 
-study.optimize(objective, n_trials=2)
+study.optimize(objective, n_trials=1)

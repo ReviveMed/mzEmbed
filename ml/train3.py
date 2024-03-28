@@ -130,7 +130,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
     #TODO add a run prefix to all the keys
     run[f'{prefix}/learning_parameters'] = stringify_unsupported(learning_parameters)
 
-    if early_stopping_patience < 0:
+    if early_stopping_patience < 1:
         early_stopping_patience = num_epochs
 
 

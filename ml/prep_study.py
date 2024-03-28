@@ -1,5 +1,3 @@
-NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
-
 import neptune
 import numpy as np
 import optuna
@@ -9,6 +7,9 @@ from misc import round_to_sig
 from optuna.distributions import FloatDistribution, IntDistribution, CategoricalDistribution
 # from optuna.distributions import json_to_distribution, check_distribution_compatibility, distribution_to_json
 
+NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
+
+
 #########################################################################################
 
 
@@ -17,15 +18,27 @@ def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=No
     if run_id_list is None:
         run_id_list = get_run_id_list()
 
+    print('number of runs: ', len(run_id_list))
+
     if study_kwargs is None:
         study_kwargs = make_kwargs()
 
     if objective_func is None:
-        objective_func = objective_func1
+        objective_func = lambda x: objective_func1(x,data_dir='/DATA2')
 
-
+    
     for run_id in run_id_list:
+        #TODO test this code
+        #check if the trial is already in the study by looking at the user attributes
+        # if run_id in [t.user_attrs['run_id'] for t in study.trials]:
+        #     print(f"Run {run_id} is already in the study")
+        #     continue
+
+        print('adding {} to study'.format(run_id))
+        # try:
         trial = reuse_run(run_id, study_kwargs=study_kwargs, objective_func=objective_func)
+        
+
         study.add_trial(trial)
 
     return
@@ -39,9 +52,14 @@ def get_run_id_list():
     project = neptune.init_project(
         project='revivemed/RCC',
         mode="read-only",
+        api_token=NEPTUNE_API_TOKEN
     )
 
     runs_table_df = project.fetch_runs_table(tag=['v3.1'],state='inactive').to_pandas()
+
+    #drop the failed runs
+    runs_table_df = runs_table_df[~runs_table_df['sys/failed']].copy()
+
     run_id_list = runs_table_df['sys/id'].tolist()
     return run_id_list
 
@@ -56,8 +74,9 @@ def reuse_run(run_id,study_kwargs=None,objective_func=None):
                         api_token=NEPTUNE_API_TOKEN,
                         with_id=run_id,
                         mode='read-only')
+    setup_id = 'pretrain'
     print(run_id)
-    pretrain_kwargs = run['pretrain/kwargs'].fetch()
+    pretrain_kwargs = run[f'{setup_id}/kwargs'].fetch()
     run.stop()
 
     pretrain_kwargs = convert_neptune_kwargs(pretrain_kwargs)
@@ -93,7 +112,8 @@ def reuse_run(run_id,study_kwargs=None,objective_func=None):
     trial = optuna.create_trial(
         params=params, 
         distributions=distributions, 
-        value=objective_val)
+        value=objective_val,
+        user_attrs={'run_id': run_id, 'setup_id': setup_id})
     
     return trial
 
@@ -101,14 +121,21 @@ def reuse_run(run_id,study_kwargs=None,objective_func=None):
 ########################################################################################
 
 
-def objective_func1(run_id,data_dir,recompute_eval=False):
+def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=None):
 
     obj_val = None
-    recon_weight = 1
-    isPediatric_weight = 1
-    cohortLabel_weight = 1
-    advStudyID_weight = 1
-    objective_name = 'OBJ4 equal weights (v0)'
+    if objective_info_dict is None:
+        recon_weight = 1
+        isPediatric_weight = 1
+        cohortLabel_weight = 1
+        advStudyID_weight = 1
+        objective_name = 'OBJ4 equal weights (v0)'
+
+    recon_weight = objective_info_dict.get('recon_weight',1)
+    isPediatric_weight = objective_info_dict.get('isPediatric_weight',1)
+    cohortLabel_weight = objective_info_dict.get('cohortLabel_weight',1)
+    advStudyID_weight = objective_info_dict.get('advStudyID_weight',1)
+    objective_name = objective_info_dict.get('objective_name','OBJ4 equal weights (v0)')
 
 
     run = neptune.init_run(project='revivemed/RCC',
@@ -343,13 +370,13 @@ def convert_json_to_distributions(obj):
 
 def convert_distributions_to_suggestion(obj,trial,name=None):
     if isinstance(obj, optuna.distributions.BaseDistribution):
-        print('base')
+        # print('base')
         return trial._suggest(name, obj)
     elif isinstance(obj, dict):
-        print('dict')
+        # print('dict')
         return {k: convert_distributions_to_suggestion(v,trial,name=k) for k, v in obj.items()}
     elif isinstance(obj, list):
-        print('list')
+        # print('list')
         return [convert_distributions_to_suggestion(v,trial) for v in obj]
     else:
         return obj    

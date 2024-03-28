@@ -153,7 +153,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
     if 'hidden_size_mult' in encoder_kwargs:
         encoder_kwargs['hidden_size'] = int(encoder_kwargs['hidden_size_mult']*latent_size)
-
+        # remove the hidden_size_mult key
+        encoder_kwargs.pop('hidden_size_mult')
+   
     encoder = get_model(encoder_kind, input_size, **encoder_kwargs)
 
 
