@@ -20,24 +20,24 @@ SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 
-STUDY_INFO_DICT = {
-    'study_name': 'OBJ1_March27',
-    'objective_name': 'OBJ4 equal weights (v0)',
-    'recon_weight': 1,
-    'isPediatric_weight': 1,
-    'cohortLabel_weight': 1,
-    'advStudyID_weight': 1,
-}
-
-
 # STUDY_INFO_DICT = {
 #     'study_name': 'OBJ1_March27',
-#     'objective_name': 'OBJ no Adv (v0)',
+#     'objective_name': 'OBJ4 equal weights (v0)',
 #     'recon_weight': 1,
 #     'isPediatric_weight': 1,
 #     'cohortLabel_weight': 1,
-#     'advStudyID_weight': 0,
+#     'advStudyID_weight': 1,
 # }
+
+
+STUDY_INFO_DICT = {
+    'study_name': 'OBJ no Adv (v0)',
+    'objective_name': 'OBJ no Adv (v0)',
+    'recon_weight': 1,
+    'isPediatric_weight': 1,
+    'cohortLabel_weight': 1,
+    'advStudyID_weight': 0,
+}
 
 
 #TODO save the study info dict to neptune metadata
