@@ -734,7 +734,14 @@ class MultiClass_Head(Head):
         return torch.argmax(self.predict_proba(x), dim=1)
     
     def score(self, y_logits, y_data,ignore_nan=True):
-        y_true = y_data[:,self.y_idx]
+        #TODO: make sure the fix for this issue is more correct
+        # if y_data.shape[1] < self.y_idx:
+            # return {k: 0 for k, v in self.score_func_dict.items()}
+        try:
+            y_true = y_data[:,self.y_idx]
+        except IndexError as e:
+            print(f'when calculate score get IndexError: {e}')
+            return {k: 0 for k, v in self.score_func_dict.items()}
         logits, targets = _nan_cleaner(y_logits.detach(), y_true.detach(), ignore_nan)
         if logits is None:
             return torch.tensor(0, dtype=torch.float32)

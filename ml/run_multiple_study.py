@@ -130,7 +130,7 @@ def main(STUDY_INFO_DICT):
     def objective(trial):
 
         kwargs = make_kwargs(encoder_kind=encoder_kind)
-        # kwargs = convert_model_kwargs_list_to_dict(kwargs)
+        kwargs = convert_model_kwargs_list_to_dict(kwargs)
         kwargs = convert_distributions_to_suggestion(kwargs, trial)
         kwargs = round_kwargs_to_sig(kwargs,sig_figs=2)
 
