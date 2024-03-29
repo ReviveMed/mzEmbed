@@ -6,7 +6,7 @@ from setup2 import setup_neptune_run
 from misc import round_to_sig
 from optuna.distributions import FloatDistribution, IntDistribution, CategoricalDistribution
 # from optuna.distributions import json_to_distribution, check_distribution_compatibility, distribution_to_json
-
+from sklearn.linear_model import LogisticRegression
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
 
@@ -144,13 +144,20 @@ def objective_func1(run_id,data_dir,recompute_eval=True,objective_info_dict=None
 
     pretrain_output = run['pretrain'].fetch()
 
-    if recompute_eval:
+    if (recompute_eval): #or ('eval' not in pretrain_output):
+        
         kwargs = convert_neptune_kwargs(pretrain_output['kwargs'])
         kwargs['load_model_loc'] = 'pretrain'
         kwargs['run_training'] = False
         kwargs['run_evaluation'] = True
         kwargs['save_latent_space'] = False
         kwargs['plot_latent_space'] = False
+        kwargs['eval_kwargs'] = {
+            'sklearn_models': {
+                'Adversary Logistic Regression': LogisticRegression(max_iter=10000, C=1.0, solver='lbfgs')
+            }
+        }
+
         setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
         #raise NotImplementedError("Need to recompute")
 

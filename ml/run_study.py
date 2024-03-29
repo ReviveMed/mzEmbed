@@ -10,6 +10,7 @@ from prep_study import add_runs_to_study, get_run_id_list, reuse_run, \
     objective_func1, make_kwargs, convert_distributions_to_suggestion, convert_model_kwargs_list_to_dict
 from setup2 import setup_neptune_run
 from misc import download_data_dir
+from sklearn.linear_model import LogisticRegression
 
 # BASE_DIR = '/DATA2'
 # DATA_DIR = f'{BASE_DIR}/data'
@@ -62,7 +63,12 @@ def objective(trial):
     kwargs = make_kwargs()
     # kwargs = convert_model_kwargs_list_to_dict(kwargs)
     kwargs = convert_distributions_to_suggestion(kwargs, trial)
-
+    kwargs['run_evaluation'] = True
+    kwargs['eval_kwargs'] = {
+        'sklearn_models': {
+            'Adversary Logistic Regression': LogisticRegression(max_iter=10000, C=1.0, solver='lbfgs')
+        }
+    }
     setup_id = 'pretrain'
     run_id = setup_neptune_run(data_dir,setup_id=setup_id,**kwargs)
 
@@ -123,8 +129,8 @@ study = optuna.create_study(direction="maximize",
                 load_if_exists=True)
 
 
-if len(study.trials) < 20:
-    add_runs_to_study(study,objective_func=compute_objective)
+# if len(study.trials) < 20:
+#     add_runs_to_study(study,objective_func=compute_objective)
 
 
-study.optimize(objective, n_trials=100)
+study.optimize(objective, n_trials=1)
