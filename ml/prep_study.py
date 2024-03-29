@@ -172,26 +172,30 @@ def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=Non
                     capture_stdout=False,
                     capture_stderr=False,
                     capture_hardware_metrics=False)
+    try:
+        pretrain_output = run['pretrain'].fetch()
 
-    pretrain_output = run['pretrain'].fetch()
-
-    if (recompute_eval) or ('eval' not in pretrain_output):
-        
-        kwargs = convert_neptune_kwargs(pretrain_output['kwargs'])
-        kwargs['overwrite_existing_kwargs'] = True
-        kwargs['load_model_loc'] = 'pretrain'
-        kwargs['run_training'] = False
-        kwargs['run_evaluation'] = True
-        kwargs['save_latent_space'] = True
-        kwargs['plot_latent_space'] = 'seaborn'
-        kwargs['eval_kwargs'] = {
-            'sklearn_models': {
-                'Adversary Logistic Regression': LogisticRegression(max_iter=10000, C=1.0, solver='lbfgs')
+        if (recompute_eval) or ('eval' not in pretrain_output):
+            
+            kwargs = convert_neptune_kwargs(pretrain_output['kwargs'])
+            kwargs['overwrite_existing_kwargs'] = True
+            kwargs['load_model_loc'] = 'pretrain'
+            kwargs['run_training'] = False
+            kwargs['run_evaluation'] = True
+            kwargs['save_latent_space'] = True
+            kwargs['plot_latent_space'] = 'seaborn'
+            kwargs['eval_kwargs'] = {
+                'sklearn_models': {
+                    'Adversary Logistic Regression': LogisticRegression(max_iter=10000, C=1.0, solver='lbfgs')
+                }
             }
-        }
 
-        setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
-        #raise NotImplementedError("Need to recompute")
+            setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+            #raise NotImplementedError("Need to recompute")
+    except NeptuneException as e:
+        print(f"Error with run {run_id}: {e}")
+        run.stop()
+        raise ValueError(f"Error with run {run_id}: {e}")
 
     
     if 'eval' in pretrain_output:
@@ -258,7 +262,11 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
         adversarial_mini_epochs = 5
         early_stopping_patience_step = 10
         early_stopping_patience_max = 50
-        l2_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
+        if encoder_kind == 'AE':
+            l2_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
+        else:
+            l2_reg_weight = 0
+        
 
     elif encoder_kind == 'TGEM_Encoder':
         encoder_kwargs = {
