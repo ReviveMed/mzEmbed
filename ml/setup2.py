@@ -159,6 +159,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         input_size = kwargs.get('input_size', X_data_train.shape[1])
         assert input_size == X_data_train.shape[1]
 
+        if encoder_kind == 'TGEM_Encoder':
+            latent_size = input_size
+
         if 'hidden_size_mult' in encoder_kwargs:
             encoder_kwargs['hidden_size'] = int(encoder_kwargs['hidden_size_mult']*latent_size)
             # remove the hidden_size_mult key

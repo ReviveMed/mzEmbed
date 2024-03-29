@@ -21,7 +21,12 @@ USE_WEBAPP_DB = True
 SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
-encoder_kind = 'VAE'
+# get user input
+encoder_kind = input('Enter encoder kind (AE, VAE, TGEM_Encoder): ')
+num_trials = int(input('Enter number of trials: '))
+
+# encoder_kind = 'VAE'
+# encoder_kind = 'TGEM_Encoder'
 
 STUDY_INFO_DICT1 = {
     'objective_name': 'OBJ 1-1-1-1 (v0)',
@@ -213,23 +218,29 @@ def main(STUDY_INFO_DICT):
                       run_id_list=get_run_id_list(encoder_kind=encoder_kind))
 
 
-    study.optimize(objective, n_trials=1)
+    study.optimize(objective, n_trials=num_trials)
 
 
 if __name__ == '__main__':
 
-    OBJ_list = [
-        STUDY_INFO_DICT1,
-        # STUDY_INFO_DICT2,
-        # STUDY_INFO_DICT3,
-        # STUDY_INFO_DICT4,
-        # STUDY_INFO_DICT5,
-        # STUDY_INFO_DICT6,
-        # STUDY_INFO_DICT7,
-        # STUDY_INFO_DICT8,
-        # STUDY_INFO_DICT9,
-        # STUDY_INFO_DICT0,
-    ]
+    if (encoder_kind == 'AE') or (encoder_kind == 'VAE'):
+        OBJ_list = [
+            STUDY_INFO_DICT1,
+            STUDY_INFO_DICT2,
+            STUDY_INFO_DICT3,
+            STUDY_INFO_DICT4,
+            STUDY_INFO_DICT5,
+            STUDY_INFO_DICT6,
+            STUDY_INFO_DICT7,
+            STUDY_INFO_DICT8,
+            STUDY_INFO_DICT9,
+            STUDY_INFO_DICT0,
+        ]
+
+    elif encoder_kind == 'TGEM_Encoder':
+        OBJ_list = [
+            STUDY_INFO_DICT7, #no encoder
+        ]
 
     for study_info_dict in OBJ_list:
         main(study_info_dict)
