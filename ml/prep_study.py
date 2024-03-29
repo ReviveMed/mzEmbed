@@ -490,7 +490,8 @@ def dict_diff(d1, d2):
 def dict_diff_cleanup(diff,ignore_keys_list=None):
     if ignore_keys_list is None:
         ignore_keys_list = ['run_evaluation','save_latent_space','plot_latent_space_cols','plot_latent_space',\
-                    'eval_kwargs','train_kwargs__eval_funcs','run_training','encoder_kwargs__hidden_size']
+                    'eval_kwargs','train_kwargs__eval_funcs','run_training','encoder_kwargs__hidden_size','overwrite_existing_kwargs',\
+                    'load_model_loc']
 
     diff_clean = {}
     for key, val in diff.items():
