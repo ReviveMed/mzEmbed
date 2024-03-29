@@ -2,17 +2,50 @@ import neptune
 import numpy as np
 import optuna
 import json
+from utils_neptune import get_run_id_list, check_neptune_existance
 from setup2 import setup_neptune_run
 from misc import round_to_sig
 from optuna.distributions import FloatDistribution, IntDistribution, CategoricalDistribution
 # from optuna.distributions import json_to_distribution, check_distribution_compatibility, distribution_to_json
 from sklearn.linear_model import LogisticRegression
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
+from neptune.utils import stringify_unsupported
 
 # import neptune exceptions
 from neptune.exceptions import NeptuneException #, NeptuneServerError
 
 #########################################################################################
+
+
+def cleanup_runs(run_id_list=None):
+    if run_id_list is None:
+        run_id_list = get_run_id_list()
+
+    for run_id in run_id_list:
+        print('cleanup run: ', run_id)
+        run = neptune.init_run(project='revivemed/RCC',
+                        api_token=NEPTUNE_API_TOKEN,
+                        with_id=run_id,
+                        capture_stdout=False,
+                        capture_stderr=False,
+                        capture_hardware_metrics=False)
+        
+        if check_neptune_existance(run,'pretrain/original_kwargs'):
+            existing_kwargs = run['pretrain/original_kwargs'].fetch()
+            existing_kwargs = convert_neptune_kwargs(existing_kwargs)
+        else:
+            existing_kwargs = run['pretrain/kwargs'].fetch()
+            existing_kwargs = convert_neptune_kwargs(existing_kwargs)
+            run['pretrain/original_kwargs'] = stringify_unsupported(existing_kwargs)
+
+        kwargs = convert_model_kwargs_list_to_dict(existing_kwargs,style=2)
+        del run['pretrain/kwargs']
+        run['pretrain/kwargs'] = stringify_unsupported(kwargs)
+
+        # run['sys/failed'] = False
+        run.stop()
+
+    return
 
 
 
@@ -55,22 +88,6 @@ def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=No
 
 ########################################################################################
 ########################################################################################
-
-def get_run_id_list():
-
-    project = neptune.init_project(
-        project='revivemed/RCC',
-        mode="read-only",
-        api_token=NEPTUNE_API_TOKEN
-    )
-
-    runs_table_df = project.fetch_runs_table(tag=['v3.1'],state='inactive').to_pandas()
-
-    #drop the failed runs
-    runs_table_df = runs_table_df[~runs_table_df['sys/failed']].copy()
-
-    run_id_list = runs_table_df['sys/id'].tolist()
-    return run_id_list
 
 
 ########################################################################################
@@ -149,11 +166,14 @@ def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=Non
 
     run = neptune.init_run(project='revivemed/RCC',
                     api_token=NEPTUNE_API_TOKEN,
-                    with_id=run_id)
+                    with_id=run_id,
+                    capture_stdout=False,
+                    capture_stderr=False,
+                    capture_hardware_metrics=False)
 
     pretrain_output = run['pretrain'].fetch()
 
-    if (recompute_eval): #or ('eval' not in pretrain_output):
+    if (recompute_eval) or ('eval' not in pretrain_output):
         
         kwargs = convert_neptune_kwargs(pretrain_output['kwargs'])
         kwargs['load_model_loc'] = 'pretrain'
@@ -478,3 +498,16 @@ def dict_diff_cleanup(diff,ignore_keys_list=None):
             diff_clean[key] = val
 
     return diff_clean
+
+
+
+########################################################################################
+########################################################################################
+
+if __name__ == '__main__':
+    cleanup_runs()
+    # run_id_list = get_run_id_list()
+    # print(run_id_list)
+    # for run_id in run_id_list:
+    #     reuse_run(run_id)
+    #
