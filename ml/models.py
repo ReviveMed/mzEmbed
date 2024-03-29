@@ -213,13 +213,32 @@ class VAE(nn.Module):
         self.activation = activation
         self.use_batch_norm = use_batch_norm
         self.act_on_latent_layer = act_on_latent_layer
-        self.encoder = Dense_Layers(input_size, hidden_size, 2*latent_size, 
-                                    num_hidden_layers, dropout_rate, activation,
-                                    use_batch_norm,act_on_output_layer=act_on_latent_layer)
+
+        self.encoder = Dense_Layers(input_size=input_size, 
+                                    hidden_size=hidden_size, 
+                                    output_size=2*latent_size, 
+                                    num_hidden_layers=num_hidden_layers,
+                                    dropout_rate = dropout_rate,
+                                    activation = activation,
+                                    use_batch_norm=use_batch_norm, 
+                                    act_on_output_layer=act_on_latent_layer)
         
-        self.decoder = Dense_Layers(latent_size, hidden_size, input_size,
-                                    num_hidden_layers, dropout_rate, activation,
-                                    use_batch_norm)
+        self.decoder = Dense_Layers(input_size=latent_size, 
+                                    hidden_size = hidden_size, 
+                                    output_size = input_size,
+                                    num_hidden_layers = num_hidden_layers, 
+                                    dropout_rate = dropout_rate,
+                                    activation = activation,
+                                    use_batch_norm = use_batch_norm)
+
+
+        # self.encoder = Dense_Layers(input_size, hidden_size, 2*latent_size, 
+        #                             num_hidden_layers, dropout_rate, activation,
+        #                             use_batch_norm,act_on_output_layer=act_on_latent_layer)
+        
+        # self.decoder = Dense_Layers(latent_size, hidden_size, input_size,
+        #                             num_hidden_layers, dropout_rate, activation,
+        #                             use_batch_norm)
         
     def reparameterize(self, mu, log_var):
         std = torch.exp(0.5*log_var)
@@ -384,7 +403,10 @@ class MultiHead(nn.Module):
         return losses
     
     def score(self, outputs, y_true):
-        scores = {f'{head.kind}_{head.name}': head.score(outputs[f'{head.kind}_{head.name}'], y_true) for head in self.heads}
+        if isinstance(outputs, dict):
+            scores = {f'{head.kind}_{head.name}': head.score(outputs[f'{head.kind}_{head.name}'], y_true) for head in self.heads}
+        else:
+            scores = {f'{head.kind}_{head.name}': head.score(outputs, y_true) for head in self.heads}
         return scores
 
     def reset_params(self):
@@ -577,6 +599,7 @@ class Binary_Head(Head):
         y_true = y_true[~torch.isnan(y_true)]
         y_int = y_true.int()
         self.num_sample_per_class = torch.bincount(y_int)
+        # print(self.num_sample_per_class)
         self.class_weight= 1/torch.bincount(y_int)
         self.pos_class_weight = self.num_sample_per_class[1]/self.num_sample_per_class[0]
         # self.pos_class_weight = self.class_weight[1]/self.class_weight[0]
@@ -604,6 +627,9 @@ class Binary_Head(Head):
 
 
     def score(self, y_logits, y_data,ignore_nan=True):
+        #TODO: make sure the fix for this issue is more correct
+        if y_data.shape[1] < self.y_idx:
+            return {k: 0 for k, v in self.score_func_dict.items()}
         y_true = y_data[:,self.y_idx]
         logits, targets = _nan_cleaner(y_logits.detach(), y_true.detach(), ignore_nan)
         if logits is None:

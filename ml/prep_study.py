@@ -57,8 +57,8 @@ def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=No
 
     if study_kwargs is None:
         study_kwargs = make_kwargs()
-        study_kwargs = convert_model_kwargs_list_to_dict(study_kwargs,style=2)
-        study_kwargs = convert_model_kwargs_list_to_dict(study_kwargs,style=2)
+    study_kwargs = convert_model_kwargs_list_to_dict(study_kwargs,style=2)
+        # study_kwargs = convert_model_kwargs_list_to_dict(study_kwargs,style=2)
 
     if objective_func is None:
         objective_func = lambda x: objective_func1(x,data_dir='/DATA2')
@@ -111,8 +111,8 @@ def reuse_run(run_id,study_kwargs=None,objective_func=None):
     # print(pretrain_kwargs['head_kwargs_list'][1]['weight'])
     
     #TODO test this
-    # pretrain_kwargs = convert_model_kwargs_list_to_dict(pretrain_kwargs)
-    # study_kwargs = convert_model_kwargs_list_to_dict(study_kwargs)
+    pretrain_kwargs = convert_model_kwargs_list_to_dict(pretrain_kwargs)
+    study_kwargs = convert_model_kwargs_list_to_dict(study_kwargs)
 
     diff = dict_diff(flatten_dict(study_kwargs), flatten_dict(pretrain_kwargs))
     diff_clean = dict_diff_cleanup(diff)
@@ -233,7 +233,7 @@ def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=Non
 
 ########################################################################################
 
-def make_kwargs(sig_figs=2):
+def make_kwargs(sig_figs=2,encoder_kind='AE'):
     activation = 'leakyrelu'
     latent_size = IntDistribution(4, 64, step=1)
     num_hidden_layers = IntDistribution(1, 5)
@@ -241,20 +241,45 @@ def make_kwargs(sig_figs=2):
     head_weight = FloatDistribution(0,10,step=0.1)
     # head_weight = FloatDistribution(0.1, 10, log=True)
     adv_weight = FloatDistribution(0,10,step=0.1)
-    encoder_kwargs = {
-                'activation': activation,
-                'latent_size': latent_size,
-                'num_hidden_layers': num_hidden_layers,
-                'dropout_rate': FloatDistribution(0, 0.5, step=0.1),
-                'use_batch_norm': False,
-                # 'hidden_size': int(1.5*latent_size),
-                'hidden_size_mult' : 1.5
-                }
+    if encoder_kind in ['AE','VAE']:
+        encoder_kwargs = {
+                    'activation': activation,
+                    'latent_size': latent_size,
+                    'num_hidden_layers': num_hidden_layers,
+                    'dropout_rate': FloatDistribution(0, 0.5, step=0.1),
+                    'use_batch_norm': False,
+                    # 'hidden_size': int(1.5*latent_size),
+                    'hidden_size_mult' : 1.5
+                    }
+        encoder_weight = 1
+        num_epochs_min = 50
+        num_epochs_max = 200
+        num_epochs_step = 10
+        adversarial_mini_epochs = 5
+        early_stopping_patience_step = 10
+        early_stopping_patience_max = 50
+        l2_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
+
+    elif encoder_kind == 'TGEM_Encoder':
+        encoder_kwargs = {
+                    'activation': 'linear',
+                    'n_head': IntDistribution(1, 5, step=1),
+                    'n_layers': IntDistribution(1, 3, step=1),
+                    'dropout_rate': FloatDistribution(0, 0.5, step=0.1),
+                    }
+        encoder_weight = 0
+        num_epochs_min = 10
+        num_epochs_max = 50
+        num_epochs_step = 1
+        adversarial_mini_epochs = 1
+        early_stopping_patience_step = 5
+        early_stopping_patience_max = 20
+        l2_reg_weight = 0
 
     kwargs = {
                     ################
                     ## General ##
-                    'encoder_kind': 'AE',
+                    'encoder_kind': encoder_kind,
                     'encoder_kwargs': encoder_kwargs,
                     'other_size': 1,
                     'y_head_cols' : ['is Pediatric','Cohort Label ENC'],
@@ -310,19 +335,19 @@ def make_kwargs(sig_figs=2):
 
                     'train_kwargs': {
                         # 'num_epochs': trial.suggest_int('pretrain_epochs', 10, 100,log=True),
-                        'num_epochs': IntDistribution(50, 200, step=10),
+                        'num_epochs': IntDistribution(num_epochs_min, num_epochs_max, step=num_epochs_step),
                         'lr': FloatDistribution(0.0001, 0.05, log=True),
                         # 'lr': 0.01,
                         'weight_decay': 0,
                         'l1_reg_weight': 0,
                         # 'l2_reg_weight': 0.001,
-                        'l2_reg_weight': FloatDistribution(0, 0.01, step=0.0001),
-                        'encoder_weight': 1,
+                        'l2_reg_weight': l2_reg_weight,
+                        'encoder_weight': encoder_weight,
                         'head_weight': head_weight,
                         'adversary_weight': adv_weight,
                         'noise_factor': 0.1,
-                        'early_stopping_patience': IntDistribution(0, 50, step=10),
-                        'adversarial_mini_epochs': 5,
+                        'early_stopping_patience': IntDistribution(0, early_stopping_patience_max, step=early_stopping_patience_step),
+                        'adversarial_mini_epochs': adversarial_mini_epochs,
                     },
 
         }
@@ -353,7 +378,7 @@ def round_kwargs_to_sig(val,sig_figs=2,key=None):
         return val
 
 
-def convert_model_kwargs_list_to_dict(kwargs,style=0):
+def convert_model_kwargs_list_to_dict(kwargs,style=2):
 
     if 'head_kwargs_dict' not in kwargs:
         kwargs['head_kwargs_dict'] = {}

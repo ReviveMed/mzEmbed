@@ -266,8 +266,8 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                     if (encoder_loss.item() == 0) and (head_loss.item() == 0):
                         if run_status:
                             print('skipping backprop')
-                            print('y head output:', y_head_output)
-                            print('y_head:', y_head.view(-1))
+                            # print('y head output:', y_head_output)
+                            # print('y_head:', y_head.view(-1))
                             run_status = False
                         continue
 
@@ -304,7 +304,8 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         joint_loss_w_penalty = joint_loss
                         # right now we are also penalizing the weights in the decoder, do we want to do that?
                         joint_loss_w_penalty += get_reg_penalty(encoder, l1_reg_weight, l2_reg_weight)
-                        # joint_loss += get_reg_penalty(encoder.encoder, l1_reg_weight, l2_reg_weight)
+                        # if 'encoder' in encoder._modules:
+                            # joint_loss_w_penalty += get_reg_penalty(encoder.encoder, l1_reg_weight, l2_reg_weight)
                         joint_loss_w_penalty += get_reg_penalty(head, l1_reg_weight, l2_reg_weight)
 
                         # we probably don't care about the adversary weights

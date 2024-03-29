@@ -30,12 +30,17 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
     run, is_run_new = start_neptune_run(with_run_id=with_run_id)
+    if is_run_new:
+        setup_is_new = not check_neptune_existance(run,f'{setup_id}/kwargs')
+    else:
+        setup_is_new = False
 
-    if not is_run_new:
+    if (not is_run_new) and (not setup_is_new):
         overwrite_existing_kwargs = kwargs.get('overwrite_existing_kwargs', False)
         if overwrite_existing_kwargs:
             print(f'Overwriting existing {setup_id} in run {run["sys/id"].fetch()}')
             existing_kwargs = run[f'{setup_id}/kwargs'].fetch()
+            # run[f'{setup_id}/original_kwargs'] = stringify_unsupported(kwargs)
             #TODO: log the existing kwargs to a file
             new_kwargs = {**existing_kwargs}
             new_kwargs.update(kwargs)
@@ -79,9 +84,6 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             kwargs['adv_kwargs_list'] = eval(load_kwargs.get('adv_kwargs_list', '[]'))
             # assert len(kwargs['adv_kwargs_list']) <= len(y_adv_cols)
 
-        if is_run_new:
-            run[f'{setup_id}/original_kwargs'] = stringify_unsupported(kwargs)
-        
         if check_neptune_existance(run,f'{setup_id}/kwargs'):
             if not overwrite_existing_kwargs:
                 raise ValueError(f'{setup_id} already exists in run {run_id} and overwrite_existing_kwargs is False')
@@ -92,6 +94,12 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         else:
             run[f'{setup_id}/kwargs'] = stringify_unsupported(kwargs)
         
+        if is_run_new:
+            run[f'{setup_id}/original_kwargs'] = stringify_unsupported(kwargs)
+
+        if setup_is_new:
+            run[f'{setup_id}/original_kwargs'] = stringify_unsupported(kwargs)
+
         local_dir = kwargs.get('local_dir', f'~/output')
         local_dir = os.path.expanduser(local_dir)
         save_dir = f'{local_dir}/{run_id}'
@@ -173,7 +181,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         if head_kwargs_dict:
             head_kwargs_list = [head_kwargs_dict[k] for k in head_kwargs_dict.keys()]
         else:
-            head_kwargs_list = kwargs.get('head_kwargs_list', [{}])
+            head_kwargs_list = kwargs.get('head_kwargs_list', [])
 
         head_list = []
         for head_kwargs in head_kwargs_list:
@@ -222,7 +230,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         if adv_kwargs_dict:
             adv_kwargs_list = [adv_kwargs_dict[k] for k in adv_kwargs_dict.keys()]
         else:
-            adv_kwargs_list = kwargs.get('adv_kwargs_list', [{}])
+            adv_kwargs_list = kwargs.get('adv_kwargs_list', [])
 
         adv_list = []
         for adv_kwargs in adv_kwargs_list:
@@ -274,14 +282,22 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             print('training models')
         
             # for advanced model logging
-            # npt_logger = NeptuneLogger(
-            #     run=run,
-            #     model=encoder,
-            #     log_model_diagram=True,
-            #     log_gradients=True,
-            #     log_parameters=True,
-            #     log_freq=10,
-            # )
+            # if encoder_kind == 'AE' or encoder_kind == 'VAE':
+            #     log_freq = 5
+            # elif encoder_kind == 'TGEM_Encoder':
+            #     log_freq = 1
+            # else:
+            #     log_freq = 0
+
+            # if log_freq > 0:
+            #     npt_logger = NeptuneLogger(
+            #         run=run,
+            #         model=encoder,
+            #         log_model_diagram=False,
+            #         log_gradients=False,
+            #         log_parameters=False,
+            #         log_freq=log_freq,
+            #     )
 
 
             train_kwargs = kwargs.get('train_kwargs', {})

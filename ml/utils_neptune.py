@@ -5,7 +5,7 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 
 from neptune.exceptions import NeptuneException
 
-def get_run_id_list():
+def get_run_id_list(encoder_kind='AE'):
 
     project = neptune.init_project(
         project='revivemed/RCC',
@@ -17,6 +17,9 @@ def get_run_id_list():
 
     #drop the failed runs
     runs_table_df = runs_table_df[~runs_table_df['sys/failed']].copy()
+
+    #filter by encoder_kind
+    runs_table_df = runs_table_df[runs_table_df['pretrain/kwargs/encoder_kind'] == encoder_kind].copy()
 
     run_id_list = runs_table_df['sys/id'].tolist()
     return run_id_list

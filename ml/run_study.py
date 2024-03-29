@@ -22,28 +22,28 @@ SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 
-# STUDY_INFO_DICT = {
-#     'study_name': 'OBJ1_March28',
-#     'objective_name': 'OBJ4 equal weights (v0)',
-#     'recon_weight': 1,
-#     'isPediatric_weight': 1,
-#     'cohortLabel_weight': 1,
-#     'advStudyID_weight': 1,
-# }
+STUDY_INFO_DICT = {
+    'study_name': 'OBJ1_March28',
+    'objective_name': 'OBJ 1-1-1-1 (v0)',
+    'recon_weight': 1,
+    'isPediatric_weight': 1,
+    'cohortLabel_weight': 1,
+    'advStudyID_weight': 1,
+}
 
 
-# STUDY_INFO_DICT = {
-#     'study_name': 'OBJ no Adv (v0)',
-#     'objective_name': 'OBJ no Adv (v0)',
-#     'recon_weight': 1,
-#     'isPediatric_weight': 1,
-#     'cohortLabel_weight': 1,
-#     'advStudyID_weight': 0,
-# }
+STUDY_INFO_DICT = {
+    'study_name': 'OBJ no Adv (v0)',
+    'objective_name': 'OBJ 1-1-1-0 (v0)',
+    'recon_weight': 1,
+    'isPediatric_weight': 1,
+    'cohortLabel_weight': 1,
+    'advStudyID_weight': 0,
+}
 
 STUDY_INFO_DICT = {
     'study_name': 'OBJ only recon (v0)',
-    'objective_name': 'OBJ only recon (v0)',
+    'objective_name': 'OBJ 1-0-0-0 (v0)',
     'recon_weight': 1,
     'isPediatric_weight': 0,
     'cohortLabel_weight': 0,
@@ -52,13 +52,30 @@ STUDY_INFO_DICT = {
 
 STUDY_INFO_DICT = {
     'study_name': 'OBJ4 high Adv (v0)',
-    'objective_name': 'OBJ only recon (v0)',
+    'objective_name': 'OBJ 1-1-1-10 (v0)',
     'recon_weight': 1,
     'isPediatric_weight': 1,
     'cohortLabel_weight': 1,
     'advStudyID_weight': 10,
 }
 
+STUDY_INFO_DICT = {
+    'study_name': 'OBJ4 high Recon (v0)',
+    'objective_name': 'OBJ 10-1-1-1 (v0)',
+    'recon_weight': 10,
+    'isPediatric_weight': 1,
+    'cohortLabel_weight': 1,
+    'advStudyID_weight': 1,
+}
+
+STUDY_INFO_DICT = {
+    'study_name': 'OBJ4 no Recon (v0)',
+    'objective_name': 'OBJ 0-1-1-1 (v0)',
+    'recon_weight': 0,
+    'isPediatric_weight': 1,
+    'cohortLabel_weight': 1,
+    'advStudyID_weight': 1,
+}
 
 #TODO save the study info dict to neptune metadata
 
@@ -154,4 +171,4 @@ study = optuna.create_study(direction="maximize",
 add_runs_to_study(study,objective_func=compute_objective)
 
 
-study.optimize(objective, n_trials=50)
+# study.optimize(objective, n_trials=50)
