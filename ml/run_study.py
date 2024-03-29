@@ -32,13 +32,31 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 # }
 
 
+# STUDY_INFO_DICT = {
+#     'study_name': 'OBJ no Adv (v0)',
+#     'objective_name': 'OBJ no Adv (v0)',
+#     'recon_weight': 1,
+#     'isPediatric_weight': 1,
+#     'cohortLabel_weight': 1,
+#     'advStudyID_weight': 0,
+# }
+
 STUDY_INFO_DICT = {
-    'study_name': 'OBJ no Adv (v0)',
-    'objective_name': 'OBJ no Adv (v0)',
+    'study_name': 'OBJ only recon (v0)',
+    'objective_name': 'OBJ only recon (v0)',
+    'recon_weight': 1,
+    'isPediatric_weight': 0,
+    'cohortLabel_weight': 0,
+    'advStudyID_weight': 0,
+}
+
+STUDY_INFO_DICT = {
+    'study_name': 'OBJ4 high Adv (v0)',
+    'objective_name': 'OBJ only recon (v0)',
     'recon_weight': 1,
     'isPediatric_weight': 1,
     'cohortLabel_weight': 1,
-    'advStudyID_weight': 0,
+    'advStudyID_weight': 10,
 }
 
 
@@ -136,4 +154,4 @@ study = optuna.create_study(direction="maximize",
 add_runs_to_study(study,objective_func=compute_objective)
 
 
-study.optimize(objective, n_trials=1)
+study.optimize(objective, n_trials=50)
