@@ -249,13 +249,13 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                     if torch.isnan(encoder_loss):
                         if run_status:
                             print('Encoder loss is nan!')
-                        encoder_loss = torch.tensor(0)
+                        encoder_loss = torch.tensor(0.0)
 
                     if torch.isnan(head_loss):
                         if run_status:
                             print('Head loss is nan!')
                         # print('Head loss is nan!')
-                        head_loss = torch.tensor(0)
+                        head_loss = torch.tensor(0.0)
 
                     run[f'{prefix}/{phase}/batch/encoder_loss'].append(encoder_loss)
                     run[f'{prefix}/{phase}/batch/head_loss'].append(head_loss)
@@ -366,6 +366,11 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                 running_losses['head'] /= len(dataloaders[phase])
                 running_losses['adversary'] /= len(dataloaders[phase])
                 running_losses['joint'] /= len(dataloaders[phase])
+                # check for nans and infinities, replace with 0
+                for k in running_losses.keys():
+                    if not torch.isfinite(running_losses[k]):
+                        print(f'Warning: {k} loss is not finite')
+                        running_losses[k] = torch.tensor(0.0)
 
                 run[f'{prefix}/{phase}/epoch/encoder_loss'].append(running_losses['encoder'])
                 run[f'{prefix}/{phase}/epoch/head_loss'].append(running_losses['head'])
@@ -516,6 +521,16 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
                         run[f'{prefix}/{phase}/{eval_name}/{k}'] = stringify_unsupported(v)
                 else:
                     run[f'{prefix}/{phase}/{eval_name}'] = stringify_unsupported(eval_val)
+
+            if not torch.isfinite(recon_loss):
+                print(f'Warning: recon loss is not finite')
+                recon_loss = torch.tensor(0.0)
+            if not torch.isfinite(head_loss):
+                print(f'Warning: head loss is not finite')
+                head_loss = torch.tensor(0.0)
+            if not torch.isfinite(adversary_loss):
+                print(f'Warning: adversary loss is not finite')
+                adversary_loss = torch.tensor(0.0)
 
 
             run[f'{prefix}/{phase}/reconstruction_loss'] = recon_loss
