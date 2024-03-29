@@ -57,6 +57,8 @@ def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=No
 
     if study_kwargs is None:
         study_kwargs = make_kwargs()
+        study_kwargs = convert_model_kwargs_list_to_dict(study_kwargs,style=2)
+        study_kwargs = convert_model_kwargs_list_to_dict(study_kwargs,style=2)
 
     if objective_func is None:
         objective_func = lambda x: objective_func1(x,data_dir='/DATA2')
@@ -176,11 +178,12 @@ def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=Non
     if (recompute_eval) or ('eval' not in pretrain_output):
         
         kwargs = convert_neptune_kwargs(pretrain_output['kwargs'])
+        kwargs['overwrite_existing_kwargs'] = True
         kwargs['load_model_loc'] = 'pretrain'
         kwargs['run_training'] = False
         kwargs['run_evaluation'] = True
-        kwargs['save_latent_space'] = False
-        kwargs['plot_latent_space'] = False
+        kwargs['save_latent_space'] = True
+        kwargs['plot_latent_space'] = 'seaborn'
         kwargs['eval_kwargs'] = {
             'sklearn_models': {
                 'Adversary Logistic Regression': LogisticRegression(max_iter=10000, C=1.0, solver='lbfgs')

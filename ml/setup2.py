@@ -36,6 +36,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         if overwrite_existing_kwargs:
             print(f'Overwriting existing {setup_id} in run {run["sys/id"].fetch()}')
             existing_kwargs = run[f'{setup_id}/kwargs'].fetch()
+            #TODO: log the existing kwargs to a file
             new_kwargs = {**existing_kwargs}
             new_kwargs.update(kwargs)
             kwargs = new_kwargs
@@ -97,6 +98,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         os.makedirs(save_dir, exist_ok=True)
 
     except Exception as e:
+        run['sys/tag'].add('init failed')
         run.stop()
         raise e
 
@@ -134,6 +136,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         eval_loader_dct.update(train_loader_dct)
 
     except Exception as e:
+        run['sys/tag'].add('data-load failed')
         run.stop()
         raise e
 
@@ -258,6 +261,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             adv.load_state_from_path(f'{save_dir}/{load_adv_loc}')
             
     except Exception as e:
+        run['sys/tag'].add('model-creation failed')
         run.stop()
         raise e
 
@@ -316,6 +320,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
                 run[f'{setup_id}/models/{adv_file_id}_info'].upload(f'{save_dir}/{setup_id}/{adv_file_id}_info.json')
 
         except Exception as e:
+            run['sys/tag'].add('training failed')
             run.stop()
             raise e
 
@@ -333,6 +338,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
                                     encoder, head, adv, 
                                     run=run, **eval_kwargs)
         except Exception as e:
+            run['sys/tag'].add('evaluation failed')
             run.stop()
             raise e
 
@@ -340,7 +346,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
     
     ####################################
     ###### Generate the Latent Space ######
-    print('generating latent space')
+    print('generating latent space plots')
     try:
         save_latent_space = kwargs.get('save_latent_space', True)
         Z_embed_savepath = os.path.join(save_dir, f'Z_embed_{eval_name}.csv')
@@ -409,6 +415,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
                     plt.close()
 
     except Exception as e:
+        run['sys/tag'].add('plotting failed')
         run.stop()
         raise e
 
