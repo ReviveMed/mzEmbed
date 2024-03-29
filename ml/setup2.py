@@ -66,6 +66,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             kwargs = new_kwargs
 
 
+
     load_model_loc = kwargs.get('load_model_loc', False)
     load_encoder_loc = kwargs.get('load_encoder_loc', load_model_loc)
     load_head_loc = kwargs.get('load_head_loc', load_model_loc)

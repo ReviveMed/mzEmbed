@@ -7,7 +7,8 @@ import os
 import optuna
 import json
 from prep_study import add_runs_to_study, get_run_id_list, reuse_run, \
-    objective_func1, make_kwargs, convert_distributions_to_suggestion, convert_model_kwargs_list_to_dict
+    objective_func1, make_kwargs, convert_distributions_to_suggestion, convert_model_kwargs_list_to_dict,\
+    round_kwargs_to_sig
 from setup2 import setup_neptune_run
 from misc import download_data_dir
 from sklearn.linear_model import LogisticRegression
@@ -63,6 +64,8 @@ def objective(trial):
     kwargs = make_kwargs()
     # kwargs = convert_model_kwargs_list_to_dict(kwargs)
     kwargs = convert_distributions_to_suggestion(kwargs, trial)
+    kwargs = round_kwargs_to_sig(kwargs,sig_figs=2)
+
     kwargs['run_evaluation'] = True
     kwargs['eval_kwargs'] = {
         'sklearn_models': {
