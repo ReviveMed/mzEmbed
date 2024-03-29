@@ -121,7 +121,7 @@ def reuse_run(run_id,study_kwargs=None,objective_func=None):
 ########################################################################################
 
 
-def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=None):
+def objective_func1(run_id,data_dir,recompute_eval=True,objective_info_dict=None):
 
     obj_val = None
     if objective_info_dict is None:
