@@ -10,7 +10,7 @@ from sklearn.linear_model import LogisticRegression
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
 # import neptune exceptions
-from neptune.exceptions import NeptuneException, NeptuneUnAuthorized, NeptuneForbidden, NeptuneNotFound, NeptuneBadRequest, NeptuneServerError
+from neptune.exceptions import NeptuneException #, NeptuneServerError
 
 #########################################################################################
 
@@ -40,12 +40,15 @@ def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=No
         try:
             trial = reuse_run(run_id, study_kwargs=study_kwargs, objective_func=objective_func)
             study.add_trial(trial)
+        except ValueError as e:
+            print(f"Error with run {run_id}: {e}")
+            continue
         except NeptuneException as e:
             print(f"Error with run {run_id}: {e}")
             continue
-        except NeptuneServerError as e:
-            print(f"Error with run {run_id}: {e}")
-            continue
+        # except NeptuneServerError as e:
+        #     print(f"Error with run {run_id}: {e}")
+        #     continue
 
     return
 
