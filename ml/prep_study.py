@@ -9,6 +9,8 @@ from optuna.distributions import FloatDistribution, IntDistribution, Categorical
 from sklearn.linear_model import LogisticRegression
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
+# import neptune exceptions
+from neptune.exceptions import NeptuneException, NeptuneUnAuthorized, NeptuneForbidden, NeptuneNotFound, NeptuneBadRequest, NeptuneServerError
 
 #########################################################################################
 
@@ -35,11 +37,15 @@ def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=No
             continue
 
         print('adding {} to study'.format(run_id))
-        # try:
-        trial = reuse_run(run_id, study_kwargs=study_kwargs, objective_func=objective_func)
-        
-
-        study.add_trial(trial)
+        try:
+            trial = reuse_run(run_id, study_kwargs=study_kwargs, objective_func=objective_func)
+            study.add_trial(trial)
+        except NeptuneException as e:
+            print(f"Error with run {run_id}: {e}")
+            continue
+        except NeptuneServerError as e:
+            print(f"Error with run {run_id}: {e}")
+            continue
 
     return
 
@@ -121,7 +127,7 @@ def reuse_run(run_id,study_kwargs=None,objective_func=None):
 ########################################################################################
 
 
-def objective_func1(run_id,data_dir,recompute_eval=True,objective_info_dict=None):
+def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=None):
 
     obj_val = None
     if objective_info_dict is None:
@@ -191,6 +197,8 @@ def objective_func1(run_id,data_dir,recompute_eval=True,objective_info_dict=None
         run.stop()
     else:
         # run the evaluation!?
+        # add tags to the run
+        run["sys/tags"].add("no eval") 
         run.stop()
         raise ValueError("No eval results")
         

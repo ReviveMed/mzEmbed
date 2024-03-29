@@ -22,7 +22,7 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 
 STUDY_INFO_DICT = {
-    'study_name': 'OBJ1_March27',
+    'study_name': 'OBJ1_March28',
     'objective_name': 'OBJ4 equal weights (v0)',
     'recon_weight': 1,
     'isPediatric_weight': 1,
@@ -133,4 +133,4 @@ study = optuna.create_study(direction="maximize",
 add_runs_to_study(study,objective_func=compute_objective)
 
 
-study.optimize(objective, n_trials=1)
+# study.optimize(objective, n_trials=1)
