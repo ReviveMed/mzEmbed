@@ -368,9 +368,9 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                 running_losses['joint'] /= len(dataloaders[phase])
                 # check for nans and infinities, replace with 0
                 for k in running_losses.keys():
-                    if not torch.isfinite(running_losses[k]):
+                    if not torch.isfinite(torch.tensor(running_losses[k])):
                         print(f'Warning: {k} loss is not finite')
-                        running_losses[k] = torch.tensor(0.0)
+                        running_losses[k] = 0 #torch.tensor(0.0)
 
                 run[f'{prefix}/{phase}/epoch/encoder_loss'].append(running_losses['encoder'])
                 run[f'{prefix}/{phase}/epoch/head_loss'].append(running_losses['head'])
