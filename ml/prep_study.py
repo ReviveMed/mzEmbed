@@ -265,6 +265,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
         if encoder_kind == 'AE':
             l2_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
         else:
+            #TODO why does loss explode for VAE when l2_reg_weight is not 0?
             l2_reg_weight = 0
         
 

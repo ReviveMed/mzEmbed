@@ -9,6 +9,7 @@ from misc import save_json
 
 # from torchmetrics import AUROC
 from sklearn.metrics import roc_auc_score
+import traceback
 
 ####################################################################################
 # Helper functions
@@ -631,18 +632,17 @@ class Binary_Head(Head):
         # if y_data.shape[1] < self.y_idx:
             # return {k: 0 for k, v in self.score_func_dict.items()}
         try:
-            y_true = y_data[:,self.y_idx]
+            y_true = y_data[:,self.y_idx]        
+            logits, targets = _nan_cleaner(y_logits.detach(), y_true.detach(), ignore_nan)
+            if logits is None:
+                return torch.tensor(0, dtype=torch.float32)
+            probs = self.logits_to_proba(logits)
+            return {k: v(probs.squeeze(), targets.squeeze()) for k, v in self.score_func_dict.items()}
+            # return {k: v(y0.squeeze(), y1.squeeze()).compute().item() for k, v in self.score_func_dict.items()}
         except IndexError as e:
             print(f'when calculate score get IndexError: {e}')
+            traceback.print_exc()
             return {k: 0 for k, v in self.score_func_dict.items()}
-        
-        logits, targets = _nan_cleaner(y_logits.detach(), y_true.detach(), ignore_nan)
-        if logits is None:
-            return torch.tensor(0, dtype=torch.float32)
-        probs = self.logits_to_proba(logits)
-        return {k: v(probs.squeeze(), targets.squeeze()) for k, v in self.score_func_dict.items()}
-        # return {k: v(y0.squeeze(), y1.squeeze()).compute().item() for k, v in self.score_func_dict.items()}
-
 #########################################################
 
 class MultiClass_Head(Head):
@@ -739,14 +739,15 @@ class MultiClass_Head(Head):
             # return {k: 0 for k, v in self.score_func_dict.items()}
         try:
             y_true = y_data[:,self.y_idx]
+            logits, targets = _nan_cleaner(y_logits.detach(), y_true.detach(), ignore_nan)
+            if logits is None:
+                return torch.tensor(0, dtype=torch.float32)
+            probs = self.logits_to_proba(logits)
+            return {k: v(probs, targets.long()) for k, v in self.score_func_dict.items()}
         except IndexError as e:
             print(f'when calculate score get IndexError: {e}')
+            traceback.print_exc()
             return {k: 0 for k, v in self.score_func_dict.items()}
-        logits, targets = _nan_cleaner(y_logits.detach(), y_true.detach(), ignore_nan)
-        if logits is None:
-            return torch.tensor(0, dtype=torch.float32)
-        probs = self.logits_to_proba(logits)
-        return {k: v(probs, targets.long()) for k, v in self.score_func_dict.items()}
 
     # def score(self, y_logits, y_data, ignore_nan=True):
     #     y_true = y_data[:,self.y_idx]
