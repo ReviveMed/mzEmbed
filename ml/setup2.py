@@ -393,12 +393,14 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
         plot_latent_space = kwargs.get('plot_latent_space', '')
         plot_latent_space_cols = kwargs.get('plot_latent_space_cols', [y_head_cols, y_adv_cols])
+        print('plot_latent_space:', plot_latent_space)
+        print('plot_latent_space_cols:', plot_latent_space_cols)
         if plot_latent_space:
             if os.path.exists(Z_embed_savepath):
                 Z_embed = pd.read_csv(Z_embed_savepath, index_col=0)
             else:
                 # check if the Z_embed file is in neptune
-                if f'{setup_id}/Z_embed_{eval_name}' not in run:
+                if check_neptune_existance(run,f'{setup_id}/Z_embed_{eval_name}'):
                     raise ValueError(f'No Z_embed_{eval_name} file found in run {run_id}')
 
                 # download the Z_embed file from neptune
