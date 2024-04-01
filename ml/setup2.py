@@ -39,7 +39,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         overwrite_existing_kwargs = kwargs.get('overwrite_existing_kwargs', False)
         if overwrite_existing_kwargs:
             print(f'Overwriting existing {setup_id} in run {run["sys/id"].fetch()}')
-            existing_kwargs = run[f'{setup_id}/kwargs'].fetch()
+            existing_kwargs = run[f'{setup_id}/original_kwargs'].fetch()
             existing_kwargs = convert_neptune_kwargs(existing_kwargs)
             # run[f'{setup_id}/original_kwargs'] = stringify_unsupported(kwargs)
             #TODO: log the existing kwargs to a file
