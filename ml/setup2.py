@@ -10,7 +10,7 @@ from models import get_model, Binary_Head, Dummy_Head, MultiClass_Head, MultiHea
 from train3 import CompoundDataset, train_compound_model, get_end_state_eval_funcs, evaluate_compound_model, create_dataloaders
 import neptune
 from neptune.utils import stringify_unsupported
-from utils_neptune import check_neptune_existance, start_neptune_run
+from utils_neptune import check_neptune_existance, start_neptune_run, convert_neptune_kwargs
 from neptune_pytorch import NeptuneLogger
 from viz import generate_latent_space, generate_umap_embedding, generate_pca_embedding
 
@@ -40,6 +40,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         if overwrite_existing_kwargs:
             print(f'Overwriting existing {setup_id} in run {run["sys/id"].fetch()}')
             existing_kwargs = run[f'{setup_id}/kwargs'].fetch()
+            existing_kwargs = convert_neptune_kwargs(existing_kwargs)
             # run[f'{setup_id}/original_kwargs'] = stringify_unsupported(kwargs)
             #TODO: log the existing kwargs to a file
             new_kwargs = {**existing_kwargs}

@@ -5,6 +5,19 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 
 from neptune.exceptions import NeptuneException
 
+
+    
+def convert_neptune_kwargs(kwargs):
+    if isinstance(kwargs, dict):
+        return {k: convert_neptune_kwargs(v) for k, v in kwargs.items()}
+    elif isinstance(kwargs, str):
+        try:
+            return eval(kwargs)
+        except:
+            return kwargs
+    else:
+        return kwargs    
+
 def get_run_id_list(encoder_kind='AE'):
 
     project = neptune.init_project(
