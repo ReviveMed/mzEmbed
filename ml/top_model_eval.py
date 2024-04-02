@@ -30,8 +30,13 @@ if not os.path.exists(data_dir+'/X_pretrain_train.csv'):
 # run_id = 'RCC-1216' # this was TGEM Ecnoder!
 
 run_id = input('Enter Run id: ')
-if isinstance(run_id,int):
+
+try:
+    run_id = int(run_id)
     run_id = 'RCC-'+str(run_id)
+except:
+    pass
+
 kwargs = {}
 
 ###############################
