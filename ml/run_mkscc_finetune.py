@@ -57,6 +57,7 @@ def compute_mskcc_finetune(run_id):
         kwargs['load_model_loc'] = False
         kwargs['X_filename'] = 'X_finetune'
         kwargs['y_filename'] = 'y_finetune'
+        kwargs['eval_name'] = 'val'
         kwargs['run_training'] = True
         kwargs['run_evaluation'] = True
         kwargs['save_latent_space'] = True

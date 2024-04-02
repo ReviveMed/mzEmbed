@@ -31,10 +31,10 @@ kwargs['load_model_loc'] = 'pretrain'
 kwargs['run_evaluation'] = False
 kwargs['run_training'] = False
 kwargs['save_latent_space'] = False
-kwargs['plot_latent_space'] = 'both'
+kwargs['plot_latent_space'] = 'sns' #'both'
 kwargs['plot_latent_space_cols'] = ['Study ID','Cohort Label','is Pediatric']
 
-run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+# run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
 
 kwargs['eval_name'] = 'train'
 run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
@@ -42,6 +42,8 @@ run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwa
 kwargs['eval_name'] = 'test'
 run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
 
+kwargs['eval_name'] = 'val'
+run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
 
 ###############################
 ### Run the finetune with random init
