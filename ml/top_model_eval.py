@@ -74,6 +74,7 @@ kwargs['head_kwargs_list'] = [{
     }]
 
 kwargs['adv_kwargs_list'] = []
+kwargs['train_kwargs'] = {}
 kwargs['train_kwargs']['num_epochs'] = 50
 kwargs['train_kwargs']['early_stopping_patience'] = 10
 kwargs['train_kwargs']['head_weight'] = 1
