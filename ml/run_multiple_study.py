@@ -251,17 +251,17 @@ if __name__ == '__main__':
     if (encoder_kind == 'AE') or (encoder_kind == 'VAE'):
         OBJ_list = [
             STUDY_INFO_DICT5,
-            STUDY_INFO_DICT6,
-            STUDY_INFO_DICT7,
-            STUDY_INFO_DICT8,
-            STUDY_INFO_DICT9,
-            STUDY_INFO_DICT0,
-            STUDY_INFO_DICT10,
-            STUDY_INFO_DICT11,
-            STUDY_INFO_DICT1,
-            STUDY_INFO_DICT2,
-            STUDY_INFO_DICT3,
-            STUDY_INFO_DICT4,
+            # STUDY_INFO_DICT6,
+            # STUDY_INFO_DICT7,
+            # STUDY_INFO_DICT8,
+            # STUDY_INFO_DICT9,
+            # STUDY_INFO_DICT0,
+            # STUDY_INFO_DICT10,
+            # STUDY_INFO_DICT11,
+            # STUDY_INFO_DICT1,
+            # STUDY_INFO_DICT2,
+            # STUDY_INFO_DICT3,
+            # STUDY_INFO_DICT4,
         ]
 
     elif encoder_kind == 'TGEM_Encoder':

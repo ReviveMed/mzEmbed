@@ -240,7 +240,7 @@ def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=Non
 def make_kwargs(sig_figs=2,encoder_kind='AE'):
     activation = 'leakyrelu'
     latent_size = IntDistribution(4, 64, step=1)
-    num_hidden_layers = IntDistribution(1, 5)
+    num_hidden_layers = IntDistribution(1, 8)
     cohort_label_weight = FloatDistribution(0,5,step=0.1)
     head_weight = FloatDistribution(0,5,step=0.1)
     # head_weight = FloatDistribution(0.1, 10, log=True)
