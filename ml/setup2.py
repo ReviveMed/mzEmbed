@@ -433,7 +433,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
                 run[f'{setup_id}/Z_embed_{eval_name}'].download(Z_embed_savepath)
                 Z_embed = pd.read_csv(Z_embed_savepath, index_col=0)
 
-            marker_sz = 10/(1+np.log10(Z_embed.shape[0]))
+            marker_sz = 5/(1+np.log10(Z_embed.shape[0]))
             if (plot_latent_space=='seaborn') or (plot_latent_space=='both') or (plot_latent_space=='sns'):
 
                 for hue_col in plot_latent_space_cols:
