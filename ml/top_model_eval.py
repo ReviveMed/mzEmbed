@@ -49,7 +49,7 @@ def main(run_id=None):
     kwargs['save_latent_space'] = True
     # kwargs['save_latent_space'] = False
 
-    kwargs['plot_latent_space'] = 'plotly' #'sns' #'both'
+    kwargs['plot_latent_space'] = 'sns' #'both'
     kwargs['plot_latent_space_cols'] = ['Study ID','Cohort Label','is Pediatric']
 
     # run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
