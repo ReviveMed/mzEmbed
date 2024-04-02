@@ -36,7 +36,7 @@ kwargs['overwrite_existing_kwargs'] = True
 kwargs['load_model_loc'] = 'pretrain'
 kwargs['run_evaluation'] = False
 kwargs['run_training'] = False
-kwargs['save_latent_space'] = False
+kwargs['save_latent_space'] = True
 kwargs['plot_latent_space'] = 'sns' #'both'
 kwargs['plot_latent_space_cols'] = ['Study ID','Cohort Label','is Pediatric']
 
