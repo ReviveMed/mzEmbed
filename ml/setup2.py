@@ -431,7 +431,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
             
             if (plot_latent_space=='seaborn') or (plot_latent_space=='both') or (plot_latent_space=='sns'):
-                marker_sz = 25/(1+np.log10(Z_embed.shape[0]))
+                marker_sz = 10/(1+np.log10(Z_embed.shape[0]))
 
                 for hue_col in plot_latent_space_cols:
                     palette = get_color_map(Z_embed[hue_col].nunique())
