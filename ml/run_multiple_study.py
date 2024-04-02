@@ -137,7 +137,8 @@ def main(STUDY_INFO_DICT):
     os.makedirs(data_dir, exist_ok=True)
 
     if not os.path.exists(data_dir+'/X_pretrain_train.csv'):
-        data_url = 'https://www.dropbox.com/scl/fo/iy2emxpwa4rkr3ad7vhc2/h?rlkey=hvhfa3ny9dlavnooka3kwvu5v&dl=1'
+        # data_url = 'https://www.dropbox.com/scl/fo/iy2emxpwa4rkr3ad7vhc2/h?rlkey=hvhfa3ny9dlavnooka3kwvu5v&dl=1' #march 22
+        data_url = 'https://www.dropbox.com/scl/fo/2xr104jnz9qda7oemrwob/h?rlkey=wy7q95pj81qpgcn7zida2xjps&dl=1' #march 29
         download_data_dir(data_url, save_dir=data_dir)
 
 
