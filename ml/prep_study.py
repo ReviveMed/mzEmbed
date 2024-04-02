@@ -54,8 +54,8 @@ def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=No
         run_id_list = get_run_id_list()
 
     print('number of runs: ', len(run_id_list))
-    if len(run_id_list) > 20:
-        run_id_list = run_id_list[:20]
+    # if len(run_id_list) > 20:
+        # run_id_list = run_id_list[:20]
 
     if study_kwargs is None:
         study_kwargs = make_kwargs()
@@ -63,7 +63,8 @@ def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=No
         # study_kwargs = convert_model_kwargs_list_to_dict(study_kwargs,style=2)
 
     if objective_func is None:
-        objective_func = lambda x: objective_func1(x,data_dir='/DATA2')
+        # objective_func = lambda x: objective_func1(x,data_dir='/DATA2')
+        raise ValueError("Objective function is None")
 
     
     for run_id in run_id_list:
@@ -138,12 +139,18 @@ def reuse_run(run_id,study_kwargs=None,objective_func=None):
     if objective_val is None:
         raise ValueError("Objective function returned None")
     
-
-    trial = optuna.create_trial(
-        params=params, 
-        distributions=distributions, 
-        value=objective_val,
-        user_attrs={'run_id': run_id, 'setup_id': setup_id})
+    if len(objective_val) == 1:
+        trial = optuna.create_trial(
+            params=params, 
+            distributions=distributions, 
+            value=objective_val,
+            user_attrs={'run_id': run_id, 'setup_id': setup_id})
+    else:
+        trial = optuna.create_trial(
+            params=params, 
+            distributions=distributions, 
+            values=objective_val,
+            user_attrs={'run_id': run_id, 'setup_id': setup_id})
     
     return trial
 
@@ -329,6 +336,8 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
                 'other_size': 1,
                 'y_head_cols' : ['is Pediatric','Cohort Label ENC', 'is Female'],
                 'y_adv_cols' : ['Study ID ENC'],
+                'train_name': 'train',
+                'eval_name': 'val',
 
                 ################
                 ## Pretrain ##
@@ -573,7 +582,10 @@ def dict_diff_cleanup(diff,ignore_keys_list=None):
         ignore_keys_list = ['run_evaluation','save_latent_space','plot_latent_space_cols','plot_latent_space',\
                     'eval_kwargs','train_kwargs__eval_funcs','run_training','encoder_kwargs__hidden_size','overwrite_existing_kwargs',\
                     'load_model_loc']
-        new_ignore_keys_list = ['y_head_cols','head_kwargs_dict__Binary_isFemale']
+        new_ignore_keys_list = ['y_head_cols','head_kwargs_dict__Binary_isFemale','eval_name','train_name']
+                                # 'head_kwargs_dict__MultiClass_Cohort','head_kwargs_dict__Binary_isPediatric',\
+                                # 'head_kwargs_dict__MultiClass_Cohort'
+                                
         ignore_keys_list.extend(new_ignore_keys_list)
 
     diff_clean = {}
