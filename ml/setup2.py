@@ -144,10 +144,12 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         holdout_frac = kwargs.get('holdout_frac', 0)
         train_kwargs = kwargs.get('train_kwargs', {})
         early_stopping_patience = train_kwargs.get('early_stopping_patience', 0)
+        scheduler_kind = train_kwargs.get('scheduler_kind', None)
 
-        if (holdout_frac > 0) and (early_stopping_patience < 1):
+        if (holdout_frac > 0) and (early_stopping_patience < 1) and (scheduler_kind is None):
             # raise ValueError('holdout_frac > 0 and early_stopping_patience < 1 is not recommended')
             print('holdout_frac > 0 and early_stopping_patience < 1 is not recommended, set hold out frac to 0')
+            print('UNLESS you are using a scheduler, in which case the holdout_frac is used for the scheduler')
             holdout_frac = 0
 
         train_dataset = CompoundDataset(X_data_train,y_data_train[y_head_cols], y_data_train[y_adv_cols])

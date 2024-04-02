@@ -95,14 +95,17 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
         phase_list = list(dataloaders.keys())
     
     if scheduler_kind is not None:
+        # Right now, Scheduler only impacts the encoder optimizer
+        #TODO Do we want to combine the encoder and head optimizers so it impacts both?
+        assert scheduler_kind in ['ReduceLROnPlateau', 'StepLR', 'MultiStepLR', 'ExponentialLR', 'CosineAnnealingLR']
         raise NotImplementedError('Scheduler not yet implemented')
     # if scheduler_kind is not None:
-    #     'scheduler_kind': 'ReduceLROnPlateau',
-    #         'scheduler_kwargs': {
-    #             'factor': 0.1,
-    #             'patience': 5,
-    #             'min_lr': 1e-6
-    #         }
+        # 'scheduler_kind': 'ReduceLROnPlateau',
+        #     'scheduler_kwargs': {
+        #         'factor': 0.1,
+        #         'patience': 5,
+        #         'min_lr': 1e-6
+        #     }
 
     dataset_size_dct = {phase: len(dataloaders[phase].dataset) for phase in phase_list}
     batch_size_dct = {phase: dataloaders[phase].batch_size for phase in phase_list}
@@ -151,6 +154,21 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
         adversary_optimizer = torch.optim.Adam(adversary.parameters(), lr=learning_rate, weight_decay=weight_decay)
     else:
         adversary_optimizer = None
+
+    scheduler = None
+    if scheduler_kind is not None:
+        if scheduler_kind == 'ReduceLROnPlateau':
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(encoder_optimizer, **scheduler_kwargs)
+        elif scheduler_kind == 'StepLR':
+            scheduler = torch.optim.lr_scheduler.StepLR(encoder_optimizer, **scheduler_kwargs)
+        elif scheduler_kind == 'MultiStepLR':
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(encoder_optimizer, **scheduler_kwargs)
+        elif scheduler_kind == 'ExponentialLR':
+            scheduler = torch.optim.lr_scheduler.ExponentialLR(encoder_optimizer, **scheduler_kwargs)
+        elif scheduler_kind == 'CosineAnnealingLR':
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(encoder_optimizer, **scheduler_kwargs)
+        else:
+            raise NotImplementedError('Scheduler not yet implemented')
 
     # define the loss history and best params with associated losses
     loss_history = {
@@ -404,6 +422,9 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         print(f'{phase} Encoder Loss: {loss_history["encoder"][phase][-1]:.4f}')
 
             if phase == 'train_holdout':
+                if scheduler is not None:
+                    scheduler.step(loss_history['joint'][phase][-1])
+
                 if loss_history['joint'][phase][-1] < best_loss['joint']:
                     best_loss['joint'] = loss_history['joint'][phase][-1]
                     best_loss['encoder'] = loss_history['encoder'][phase][-1]
