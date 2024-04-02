@@ -26,7 +26,8 @@ if not os.path.exists(data_dir+'/X_pretrain_train.csv'):
     data_url = 'https://www.dropbox.com/scl/fo/2xr104jnz9qda7oemrwob/h?rlkey=wy7q95pj81qpgcn7zida2xjps&dl=1' #march 29
     download_data_dir(data_url, save_dir=data_dir)
 
-run_id = 'RCC-1296'
+# run_id = 'RCC-1296'
+run_id = 'RCC-1216'
 kwargs = {}
 
 ###############################
