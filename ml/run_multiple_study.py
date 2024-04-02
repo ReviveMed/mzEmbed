@@ -162,6 +162,8 @@ def main(STUDY_INFO_DICT):
         }
         setup_id = 'pretrain'
         run_id = setup_neptune_run(data_dir,setup_id=setup_id,**kwargs)
+        trial.set_user_attr('run_id',run_id)
+        trial.set_user_attr('setup_id',setup_id)
 
         kwargs['load_encoder_loc'] = 'pretrain'
         # kwargs['load_model_loc'] = 'finetune'
@@ -206,8 +208,10 @@ def main(STUDY_INFO_DICT):
         # kwargs = convert_model_kwargs_list_to_dict(kwargs)
         run_id = setup_neptune_run(data_dir,setup_id='finetune_mkscc',with_run_id=run_id,**kwargs)
 
-        trial.set_user_attr('run_id',run_id)
-        trial.set_user_attr('setup_id',setup_id)
+
+        kwargs['run_random_init'] = True
+        kwargs['load_model_weights'] = False
+        _ = setup_neptune_run(data_dir,setup_id='randinit_mkscc',with_run_id=run_id,**kwargs)
 
         return compute_objective(run_id)
 

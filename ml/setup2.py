@@ -13,7 +13,7 @@ from neptune.utils import stringify_unsupported
 from utils_neptune import check_neptune_existance, start_neptune_run, convert_neptune_kwargs
 from neptune_pytorch import NeptuneLogger
 from viz import generate_latent_space, generate_umap_embedding, generate_pca_embedding
-
+from misc import assign_color_map, get_color_map
 import uuid
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -67,10 +67,16 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         if load_encoder_loc:
             print('loading pretrained encoders, overwriting encoder_kwargs')
             load_kwargs = run[f'{load_encoder_loc}/kwargs'].fetch()
-            kwargs['encoder_kwargs'].update(load_kwargs['encoder_kwargs'])
+            load_kwargs = convert_neptune_kwargs(load_kwargs)
+            # kwargs['encoder_kwargs'].update(load_kwargs['encoder_kwargs'])
             if kwargs['encoder_kind'] != load_kwargs['encoder_kind']:
                 raise ValueError(f'Encoder kind mismatch: {kwargs["encoder_kind"]} vs {load_kwargs["encoder_kind"]}')
             
+            encoder_kwargs = load_kwargs.get('encoder_kwargs', {})
+            encoder_kwargs.update(kwargs.get('encoder_kwargs', {}))
+            kwargs['encoder_kwargs'] = encoder_kwargs
+            print('encoder_kwargs:', kwargs['encoder_kwargs'])
+
         if load_head_loc:
             print('loading pretrained heads, overwriting head_kwargs_list')
             load_kwargs = run[f'{load_head_loc}/kwargs'].fetch()
@@ -136,6 +142,13 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         ##### Create the DataLoaders ######
         batch_size = kwargs.get('batch_size', 32)
         holdout_frac = kwargs.get('holdout_frac', 0)
+        train_kwargs = kwargs.get('train_kwargs', {})
+        early_stopping_patience = train_kwargs.get('early_stopping_patience', 0)
+
+        if (holdout_frac > 0) and (early_stopping_patience < 1):
+            # raise ValueError('holdout_frac > 0 and early_stopping_patience < 1 is not recommended')
+            print('holdout_frac > 0 and early_stopping_patience < 1 is not recommended, set hold out frac to 0')
+            holdout_frac = 0
 
         train_dataset = CompoundDataset(X_data_train,y_data_train[y_head_cols], y_data_train[y_adv_cols])
         eval_dataset = CompoundDataset(X_data_eval,y_data_eval[y_head_cols], y_data_eval[y_adv_cols])
@@ -158,6 +171,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         other_input_size = kwargs.get('other_input_size', 1)
         latent_size = encoder_kwargs.get('latent_size', 8)
         input_size = kwargs.get('input_size', X_data_train.shape[1])
+        load_model_weights = kwargs.get('load_model_weights', True)
         assert input_size == X_data_train.shape[1]
 
         if encoder_kind == 'TGEM_Encoder':
@@ -171,7 +185,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         encoder = get_model(encoder_kind, input_size, **encoder_kwargs)
 
 
-        if load_encoder_loc:
+        if (load_encoder_loc) and (load_model_weights):
             os.makedirs(os.path.join(save_dir,load_encoder_loc), exist_ok=True)
 
             run[f'{load_encoder_loc}/models/encoder_state_dict'].download(f'{save_dir}/{load_encoder_loc}/encoder_state_dict.pth')
@@ -219,7 +233,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         head.update_class_weights(train_dataset.y_head)
 
 
-        if load_head_loc:
+        if load_head_loc and load_model_weights:
             head_file_ids = head.get_file_ids()
             for head_file_id in head_file_ids:
                 run[f'{load_head_loc}/models/{head_file_id}_state'].download(f'{save_dir}/{load_head_loc}/{head_file_id}_state.pt')
@@ -264,7 +278,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
         adv.update_class_weights(train_dataset.y_adv)
 
-        if load_adv_loc:
+        if load_adv_loc and load_model_weights:
             adv_file_ids = adv.get_file_ids()
             for adv_file_id in adv_file_ids:
                 run[f'{load_adv_loc}/models/{adv_file_id}_state'].download(f'{save_dir}/{load_adv_loc}/{adv_file_id}_state.pt')
@@ -280,6 +294,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
     ####################################
     ###### Train the Models ######
     run_training = kwargs.get('run_training', True)
+    run_random_init = kwargs.get('run_random_init', False) # this should be redundant with load_model_weights
 
     if run_training:
         try:
@@ -302,6 +317,11 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             #         log_parameters=False,
             #         log_freq=log_freq,
             #     )
+
+            if run_random_init:
+                encoder.reset_params()
+                head.reset_params()
+                adv.reset_params()
 
 
             train_kwargs = kwargs.get('train_kwargs', {})
@@ -409,9 +429,12 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
             
             if (plot_latent_space=='seaborn') or (plot_latent_space=='both') or (plot_latent_space=='sns'):
+                marker_sz = 10/np.log1p(Z_embed.shape[0])
+
                 for hue_col in plot_latent_space_cols:
-                    palette = 'tab10'
-                    fig = sns.scatterplot(data=Z_embed, x='PCA1', y='PCA2', hue=hue_col, palette=palette)
+                    palette = get_color_map(Z_embed[hue_col].nunique())
+
+                    fig = sns.scatterplot(data=Z_embed, x='PCA1', y='PCA2', hue=hue_col, palette=palette,s=marker_sz)
                     # place the legend outside the plot
                     plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
                     plt.savefig(os.path.join(save_dir, f'Z_pca_{hue_col}_{eval_name}.png'), bbox_inches='tight')
@@ -419,7 +442,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
                     plt.close()
 
-                    fig = sns.scatterplot(data=Z_embed, x='UMAP1', y='UMAP2', hue=hue_col, palette=palette)
+                    fig = sns.scatterplot(data=Z_embed, x='UMAP1', y='UMAP2', hue=hue_col, palette=palette,s=marker_sz)
                     # place the legend outside the plot
                     plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
                     plt.savefig(os.path.join(save_dir, f'Z_umap_{hue_col}_{eval_name}.png'), bbox_inches='tight')
@@ -428,11 +451,13 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
             if (plot_latent_space=='plotly') or (plot_latent_space=='both') or (plot_latent_space=='px'):
                 for hue_col in plot_latent_space_cols:
-                    plotly_fig = px.scatter(Z_embed, x='PCA1', y='PCA2', color=hue_col)
+                    plotly_fig = px.scatter(Z_embed, x='PCA1', y='PCA2', color=hue_col, title=f'PCA {hue_col}')
+                    plotly_fig.update_traces(marker=dict(size=marker_sz))
                     run[f'{setup_id}/px_Z_pca_{hue_col}_{eval_name}'].upload(plotly_fig)
                     plt.close()
 
                     plotly_fig = px.scatter(Z_embed, x='UMAP1', y='UMAP2', color=hue_col)
+                    plotly_fig.update_traces(marker=dict(size=marker_sz))
                     run[f'{setup_id}/px_Z_umap_{hue_col}_{eval_name}'].upload(plotly_fig)
                     plt.close()
 

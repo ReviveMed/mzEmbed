@@ -173,3 +173,8 @@ for latent_size in [4,8,16]:
 
 
                     run_id = setup_neptune_run(data_dir,setup_id='finetune_mkscc',with_run_id=run_id,**kwargs)
+                    
+
+                    kwargs['run_random_init'] = True
+                    kwargs['load_model_weights'] = False
+                    _ = setup_neptune_run(data_dir,setup_id='randinit_mkscc',with_run_id=run_id,**kwargs)

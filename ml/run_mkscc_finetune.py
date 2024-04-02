@@ -80,22 +80,42 @@ def compute_mskcc_finetune(run_id):
             'num_classes': 2,
             }]
         
+        kwargs['encoder_kwargs']['dropout_rate'] = 0.2
         kwargs['adv_kwargs_list'] = []
-        kwargs['train_kwargs']['num_epochs'] = 50
-        kwargs['train_kwargs']['early_stopping_patience'] = 10
+        kwargs['train_kwargs']['num_epochs'] = 20
+        kwargs['train_kwargs']['early_stopping_patience'] = 0
+        kwargs['holdout_frac'] = 0
         kwargs['train_kwargs']['head_weight'] = 1
         kwargs['train_kwargs']['encoder_weight'] = 0
         kwargs['train_kwargs']['adversary_weight'] = 0
+        kwargs['train_kwargs']['learning_rate'] = 0.001
+        kwargs['train_kwargs']['l2_reg_weight'] = 0.0005
+        kwargs['train_kwargs']['l1_reg_weight'] = 0.005
+        kwargs['train_kwargs']['noise_factor'] = 0.1
+        kwargs['train_kwargs']['weight_decay'] = 0
         kwargs['run_evaluation'] = True
         kwargs['eval_kwargs'] = {}
         kwargs['eval_kwargs']['sklearn_models'] = {}
+
 
         kwargs = convert_model_kwargs_list_to_dict(kwargs)
 
 
         # kwargs = convert_model_kwargs_list_to_dict(kwargs)
-        run_id = setup_neptune_run(data_dir,setup_id='finetune_mkscc',with_run_id=run_id,**kwargs)
-       
+        # run_id = setup_neptune_run(data_dir,setup_id='finetune_mkscc',with_run_id=run_id,**kwargs)
+        _ = setup_neptune_run(data_dir,setup_id='finetune_mkscc_0',with_run_id=run_id,**kwargs)
+        _ = setup_neptune_run(data_dir,setup_id='finetune_mkscc_1',with_run_id=run_id,**kwargs)
+        _ = setup_neptune_run(data_dir,setup_id='finetune_mkscc_2',with_run_id=run_id,**kwargs)
+
+        kwargs['run_random_init'] = True
+        _ = setup_neptune_run(data_dir,setup_id='randinit_mkscc_0',with_run_id=run_id,**kwargs)
+
+        kwargs['load_model_weights'] = False
+        _ = setup_neptune_run(data_dir,setup_id='randinit_mkscc_1',with_run_id=run_id,**kwargs)
+
+        kwargs['load_model_weights'] = False
+        kwargs['run_random_init'] = False
+        _ = setup_neptune_run(data_dir,setup_id='randinit_mkscc_2',with_run_id=run_id,**kwargs)
 
         return run_id
 
@@ -103,7 +123,7 @@ def compute_mskcc_finetune(run_id):
 
 if __name__ == '__main__':
 
-    already_run = ['RCC-926', 'RCC-927', 'RCC-928','RCC-929','RCC-1130','RCC-1131','RCC-1124','RCC-1125']
+    already_run = ['RCC-1296']
     run_id_list = get_run_id_list()
     for run_id in run_id_list:
         if run_id in already_run:

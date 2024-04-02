@@ -5,6 +5,7 @@ import torch
 import requests
 import zipfile
 import json
+import matplotlib.pyplot as plt
 
 ###################
 ## Basic File I/O Functions
@@ -175,3 +176,32 @@ def get_clean_batch_sz(len_dataset, org_batch_sz):
             print('Warning: Could not find a clean batch size')
         # print('old batch size:', org_batch_sz, 'new batch size:', batch_sz, 'remainder:', curr_remainder)
         return batch_sz
+    
+
+
+# join the following colormaps Accent, Dark2, Set2, Pastel2
+my_32_colors = plt.cm.Accent.colors + plt.cm.Dark2.colors + plt.cm.Set2.colors + plt.cm.Pastel2.colors
+my_10_colors = plt.cm.tab10.colors
+my_20_colors = plt.cm.tab20.colors 
+my_42_colors = my_10_colors + my_32_colors
+my_52_colors = my_20_colors + my_32_colors
+
+def get_color_map(n):
+    if n <= 10:
+        return my_10_colors
+    elif n <= 20:
+        return my_20_colors
+    elif n <= 32:
+        return my_32_colors
+    elif n <= 42:
+        return my_42_colors
+    elif n <= 52:
+        return my_52_colors
+    else:
+        # create a colormap from turbo
+        return plt.cm.turbo(np.linspace(0, 1, n))
+    
+def assign_color_map(unique_vals):
+    my_colors = get_color_map(len(unique_vals))
+    color_map = dict(zip(np.sort(unique_vals), my_colors))
+    return color_map    
