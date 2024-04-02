@@ -32,8 +32,12 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
     run, is_run_new = start_neptune_run(with_run_id=with_run_id)
     if is_run_new:
         setup_is_new = not check_neptune_existance(run,f'{setup_id}/kwargs')
+        if setup_is_new:
+            setup_is_new = not check_neptune_existance(run,f'{setup_id}/original_kwargs')
     else:
         setup_is_new = False
+    
+    print(f'is_run_new: {is_run_new}, setup_is_new: {setup_is_new}')
 
     if (not is_run_new) and (not setup_is_new):
         overwrite_existing_kwargs = kwargs.get('overwrite_existing_kwargs', False)
