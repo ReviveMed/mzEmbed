@@ -29,7 +29,7 @@ num_trials = int(input('Enter number of trials: '))
 # encoder_kind = 'TGEM_Encoder'
 
 STUDY_INFO_DICT1 = {
-    'objective_name': 'OBJ 1-1-1-1 (v0)',
+    'objective_name': 'OBJ 1-1-1-1 (v1)',
     'recon_weight': 1,
     'isPediatric_weight': 1,
     'cohortLabel_weight': 1,
@@ -38,7 +38,7 @@ STUDY_INFO_DICT1 = {
 
 
 STUDY_INFO_DICT2 = {
-    'objective_name': 'OBJ 1-1-1-0 (v0)',
+    'objective_name': 'OBJ 1-1-1-0 (v1)',
     'recon_weight': 1,
     'isPediatric_weight': 1,
     'cohortLabel_weight': 1,
@@ -46,7 +46,7 @@ STUDY_INFO_DICT2 = {
 }
 
 STUDY_INFO_DICT3 = {
-    'objective_name': 'OBJ 1-1-0-1 (v0)',
+    'objective_name': 'OBJ 1-1-0-1 (v1)',
     'recon_weight': 1,
     'isPediatric_weight': 1,
     'cohortLabel_weight':0,
@@ -55,7 +55,7 @@ STUDY_INFO_DICT3 = {
 
 
 STUDY_INFO_DICT4 = {
-    'objective_name': 'OBJ 1-0-0-0 (v0)',
+    'objective_name': 'OBJ 1-0-0-0 (v1)',
     'recon_weight': 1,
     'isPediatric_weight': 0,
     'cohortLabel_weight': 0,
@@ -64,7 +64,7 @@ STUDY_INFO_DICT4 = {
 
 #
 STUDY_INFO_DICT5 = {
-    'objective_name': 'OBJ 1-1-1-10 (v0)',
+    'objective_name': 'OBJ 1-1-1-10 (v1)',
     'recon_weight': 1,
     'isPediatric_weight': 1,
     'cohortLabel_weight': 1,
@@ -249,10 +249,6 @@ if __name__ == '__main__':
 
     if (encoder_kind == 'AE') or (encoder_kind == 'VAE'):
         OBJ_list = [
-            # STUDY_INFO_DICT1,
-            # STUDY_INFO_DICT2,
-            # STUDY_INFO_DICT3,
-            # STUDY_INFO_DICT4,
             STUDY_INFO_DICT5,
             STUDY_INFO_DICT6,
             STUDY_INFO_DICT7,
@@ -260,7 +256,11 @@ if __name__ == '__main__':
             STUDY_INFO_DICT9,
             STUDY_INFO_DICT0,
             STUDY_INFO_DICT10,
-            STUDY_INFO_DICT11
+            STUDY_INFO_DICT11,
+            STUDY_INFO_DICT1,
+            STUDY_INFO_DICT2,
+            STUDY_INFO_DICT3,
+            STUDY_INFO_DICT4,
         ]
 
     elif encoder_kind == 'TGEM_Encoder':
