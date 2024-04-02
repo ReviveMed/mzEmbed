@@ -39,16 +39,17 @@ def compute_mskcc_finetune(run_id):
 
         kwargs = run['pretrain/kwargs'].fetch()
         kwargs = convert_neptune_kwargs(kwargs)
-        if check_neptune_existance(run,'finetune_mkscc'):
+        if check_neptune_existance(run,'finetune_mkscc_1'):
 
-            score = run['finetune_mkscc/eval/val/Binary_MSKCC/AUROC (micro)'].fetch()
-            if score > 0.9:
-                del run['finetune_mkscc/kwargs']
-                del run['finetune_mkscc']
+            score = run['finetune_mkscc_1/eval/val/Binary_MSKCC/AUROC (micro)'].fetch()
+            if score > 0.95:
+                del run['finetune_mkscc_1/kwargs']
+                del run['finetune_mkscc_1']
                 run.stop()
             else:
                 run.stop()
                 return run_id
+        
         # pause for 2 seconds
         # time.sleep(2)
 
@@ -123,8 +124,9 @@ def compute_mskcc_finetune(run_id):
 
 if __name__ == '__main__':
 
-    already_run = ['RCC-1296']
-    run_id_list = get_run_id_list()
+    already_run = []
+    run_id_list = ['RCC-1296']
+    # run_id_list = get_run_id_list()
     for run_id in run_id_list:
         if run_id in already_run:
             continue
