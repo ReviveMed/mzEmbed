@@ -62,6 +62,7 @@ STUDY_INFO_DICT4 = {
     'advStudyID_weight': 0,
 }
 
+#
 STUDY_INFO_DICT5 = {
     'objective_name': 'OBJ 1-1-1-10 (v0)',
     'recon_weight': 1,
@@ -109,6 +110,25 @@ STUDY_INFO_DICT0 = {
     'cohortLabel_weight':0,
     'advStudyID_weight': 1,
 }
+
+#
+STUDY_INFO_DICT10 = {
+    'objective_name': 'OBJ 1-0-0-10 (v0)',
+    'recon_weight': 1,
+    'isPediatric_weight': 0,
+    'cohortLabel_weight':0,
+    'advStudyID_weight': 10,
+}
+
+#
+STUDY_INFO_DICT11 = {
+    'objective_name': 'OBJ 10-0-0-1 (v0)',
+    'recon_weight': 1,
+    'isPediatric_weight': 2,
+    'cohortLabel_weight':2,
+    'advStudyID_weight': 10,
+}
+
 
 #TODO save the study info dict to neptune metadata
 
@@ -225,16 +245,18 @@ if __name__ == '__main__':
 
     if (encoder_kind == 'AE') or (encoder_kind == 'VAE'):
         OBJ_list = [
-            STUDY_INFO_DICT1,
-            STUDY_INFO_DICT2,
-            STUDY_INFO_DICT3,
-            STUDY_INFO_DICT4,
+            # STUDY_INFO_DICT1,
+            # STUDY_INFO_DICT2,
+            # STUDY_INFO_DICT3,
+            # STUDY_INFO_DICT4,
             STUDY_INFO_DICT5,
-            STUDY_INFO_DICT6,
-            STUDY_INFO_DICT7,
-            STUDY_INFO_DICT8,
-            STUDY_INFO_DICT9,
-            STUDY_INFO_DICT0,
+            # STUDY_INFO_DICT6,
+            # STUDY_INFO_DICT7,
+            # STUDY_INFO_DICT8,
+            # STUDY_INFO_DICT9,
+            # STUDY_INFO_DICT0,
+            STUDY_INFO_DICT10,
+            STUDY_INFO_DICT11
         ]
 
     elif encoder_kind == 'TGEM_Encoder':

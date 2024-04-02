@@ -241,10 +241,10 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
     activation = 'leakyrelu'
     latent_size = IntDistribution(4, 64, step=1)
     num_hidden_layers = IntDistribution(1, 5)
-    cohort_label_weight = FloatDistribution(0,10,step=0.1)
-    head_weight = FloatDistribution(0,10,step=0.1)
+    cohort_label_weight = FloatDistribution(0,5,step=0.1)
+    head_weight = FloatDistribution(0,5,step=0.1)
     # head_weight = FloatDistribution(0.1, 10, log=True)
-    adv_weight = FloatDistribution(0,10,step=0.1)
+    adv_weight = FloatDistribution(0,50,step=0.1)
     if encoder_kind in ['AE','VAE']:
         encoder_kwargs = {
                     'activation': activation,
@@ -255,7 +255,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
                     # 'hidden_size': int(1.5*latent_size),
                     'hidden_size_mult' : 1.5
                     }
-        encoder_weight = 1
+        encoder_weight = FloatDistribution(0,5,step=0.1)
         num_epochs_min = 50
         num_epochs_max = 200
         num_epochs_step = 10
