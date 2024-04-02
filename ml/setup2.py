@@ -123,6 +123,10 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
     ####################################
     ##### Load the Data ######
+    run_training = kwargs.get('run_training', True)
+    run_evaluation = kwargs.get('run_evaluation', True)
+    save_latent_space = kwargs.get('save_latent_space', True)
+    
     try:
         print('loading data')
         X_filename = kwargs.get('X_filename', 'X_pretrain')
@@ -130,15 +134,19 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         # nan_filename = kwargs.get('nan_filename', 'nans')
         train_name = kwargs.get('train_name', 'train')
         eval_name = kwargs.get('eval_name', 'val')
+        X_size = None
 
 
-
-        X_data_train = pd.read_csv(f'{data_dir}/{X_filename}_{train_name}.csv', index_col=0)
-        y_data_train = pd.read_csv(f'{data_dir}/{y_filename}_{train_name}.csv', index_col=0)
+        if run_training or run_evaluation:
+            X_data_train = pd.read_csv(f'{data_dir}/{X_filename}_{train_name}.csv', index_col=0)
+            y_data_train = pd.read_csv(f'{data_dir}/{y_filename}_{train_name}.csv', index_col=0)
+            X_size = X_data_train.shape[1]
         # nan_data = pd.read_csv(f'{data_dir}/{nan_filename}_{train_name}.csv', index_col=0)
 
-        X_data_eval = pd.read_csv(f'{data_dir}/{X_filename}_{eval_name}.csv', index_col=0)
-        y_data_eval = pd.read_csv(f'{data_dir}/{y_filename}_{eval_name}.csv', index_col=0)
+        if run_evaluation or save_latent_space:
+            X_data_eval = pd.read_csv(f'{data_dir}/{X_filename}_{eval_name}.csv', index_col=0)
+            y_data_eval = pd.read_csv(f'{data_dir}/{y_filename}_{eval_name}.csv', index_col=0)
+            X_size = X_data_eval.shape[1]
         # nan_data = pd.read_csv(f'{data_dir}/{nan_filename}_{eval_name}.csv', index_col=0)
 
 
@@ -156,12 +164,13 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             print('UNLESS you are using a scheduler, in which case the holdout_frac is used for the scheduler')
             holdout_frac = 0
 
-        train_dataset = CompoundDataset(X_data_train,y_data_train[y_head_cols], y_data_train[y_adv_cols])
-        eval_dataset = CompoundDataset(X_data_eval,y_data_eval[y_head_cols], y_data_eval[y_adv_cols])
+        if run_training or run_evaluation:
+            train_dataset = CompoundDataset(X_data_train,y_data_train[y_head_cols], y_data_train[y_adv_cols])
+            eval_dataset = CompoundDataset(X_data_eval,y_data_eval[y_head_cols], y_data_eval[y_adv_cols])
 
-        train_loader_dct = create_dataloaders(train_dataset, batch_size, holdout_frac, set_name=train_name)
-        eval_loader_dct = create_dataloaders(eval_dataset, batch_size, set_name = eval_name)
-        eval_loader_dct.update(train_loader_dct)
+            train_loader_dct = create_dataloaders(train_dataset, batch_size, holdout_frac, set_name=train_name)
+            eval_loader_dct = create_dataloaders(eval_dataset, batch_size, set_name = eval_name)
+            eval_loader_dct.update(train_loader_dct)
 
     except Exception as e:
         run['sys/tag'].add('data-load failed')
@@ -176,9 +185,19 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         encoder_kwargs = kwargs.get('encoder_kwargs', {})
         other_input_size = kwargs.get('other_input_size', 1)
         latent_size = encoder_kwargs.get('latent_size', 8)
-        input_size = kwargs.get('input_size', X_data_train.shape[1])
+        input_size = kwargs.get('input_size', None)
         load_model_weights = kwargs.get('load_model_weights', True)
-        assert input_size == X_data_train.shape[1]
+        
+        if input_size is None:
+            try:
+                input_size = run['input_size'].fetch()
+            except NeptuneException:
+                input_size = X_size
+                run['input_size'] = input_size
+        if X_size is not None:
+            assert input_size == X_size
+        # if input_size is None:
+
 
         if encoder_kind == 'TGEM_Encoder':
             latent_size = input_size
