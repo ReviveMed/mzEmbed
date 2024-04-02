@@ -54,6 +54,8 @@ def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=No
         run_id_list = get_run_id_list()
 
     print('number of runs: ', len(run_id_list))
+    if len(run_id_list) > 20:
+        run_id_list = run_id_list[:20]
 
     if study_kwargs is None:
         study_kwargs = make_kwargs()
@@ -149,6 +151,16 @@ def reuse_run(run_id,study_kwargs=None,objective_func=None):
 ########################################################################################
 
 
+def objective_func2(run_id,data_dir,recompute_eval=False,objective_info_dict_list=None):
+
+    obj_vals = []
+    for objective_info_dict in objective_info_dict_list:
+        obj_val = objective_func1(run_id,data_dir,recompute_eval=recompute_eval,objective_info_dict=objective_info_dict)
+        obj_vals.append(obj_val)
+    
+    return tuple(obj_vals)
+
+
 def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=None):
 
     obj_val = None
@@ -157,12 +169,14 @@ def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=Non
         isPediatric_weight = 1
         cohortLabel_weight = 1
         advStudyID_weight = 1
+        isFemale_weight = 0
         objective_name = 'OBJ4 equal weights (v0)'
 
     recon_weight = objective_info_dict.get('recon_weight',1)
     isPediatric_weight = objective_info_dict.get('isPediatric_weight',1)
     cohortLabel_weight = objective_info_dict.get('cohortLabel_weight',1)
     advStudyID_weight = objective_info_dict.get('advStudyID_weight',1)
+    isFemale_weight = objective_info_dict.get('isFemale_weight',0)
     objective_name = objective_info_dict.get('objective_name','OBJ4 equal weights (v0)')
 
 
@@ -217,10 +231,16 @@ def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=Non
         else:
             advStudyID_auc = 0.5
 
+        if 'Binary_isFemale' in eval_res:
+            isFemale_auc = eval_res['Binary_isFemale']['AUROC (micro)']
+        else:
+            isFemale_auc = 0.5
+
         obj_val = -1*(recon_weight)*recon_loss \
             + (isPediatric_weight)*isPediatric_auc \
             + (cohortLabel_weight)*cohortLabel_auc \
-            + -1*(advStudyID_weight)*advStudyID_auc
+            + -1*(advStudyID_weight)*advStudyID_auc \
+            + (isFemale_weight)*isFemale_auc
 
         run[f'objectives/{objective_name}'] = obj_val 
 
@@ -241,11 +261,11 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
     activation = 'leakyrelu'
     latent_size = IntDistribution(4, 64, step=1)
     num_hidden_layers = IntDistribution(1, 8)
-    cohort_label_weight = FloatDistribution(0,5,step=0.1)
+    cohort_label_weight = FloatDistribution(0,2,step=0.1)
+    isfemale_weight = FloatDistribution(0,10,step=0.1)
+    ispediatric_weight = FloatDistribution(0,5,step=0.1)
     head_weight = FloatDistribution(0,5,step=0.1)
-    # head_weight = FloatDistribution(0.1, 10, log=True)
     adv_weight = FloatDistribution(0,50,step=0.1)
-    isfemale_weight = 0
     
     if encoder_kind in ['AE']:
         encoder_kwargs = {
@@ -321,7 +341,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
                         'kind': 'Binary',
                         'name': 'isPediatric',
                         'y_idx': 0,
-                        'weight': 1.0,
+                        'weight': ispediatric_weight,
                         'hidden_size': 4,
                         'num_hidden_layers': 1,
                         'dropout_rate': 0,
@@ -371,7 +391,6 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
                 ],
 
                 'train_kwargs': {
-                    # 'num_epochs': trial.suggest_int('pretrain_epochs', 10, 100,log=True),
                     'num_epochs': IntDistribution(num_epochs_min, num_epochs_max, step=num_epochs_step),
                     'lr': FloatDistribution(0.0001, 0.05, log=True),
                     # 'lr': 0.01,
@@ -554,7 +573,7 @@ def dict_diff_cleanup(diff,ignore_keys_list=None):
         ignore_keys_list = ['run_evaluation','save_latent_space','plot_latent_space_cols','plot_latent_space',\
                     'eval_kwargs','train_kwargs__eval_funcs','run_training','encoder_kwargs__hidden_size','overwrite_existing_kwargs',\
                     'load_model_loc']
-        new_ignore_keys_list = ['y_head_cols']
+        new_ignore_keys_list = ['y_head_cols','head_kwargs_dict__Binary_isFemale']
         ignore_keys_list.extend(new_ignore_keys_list)
 
     diff_clean = {}

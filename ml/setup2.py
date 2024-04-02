@@ -464,6 +464,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             if (plot_latent_space=='seaborn') or (plot_latent_space=='both') or (plot_latent_space=='sns'):
 
                 for hue_col in plot_latent_space_cols:
+                    if hue_col not in Z_embed.columns:
+                        print(f'{hue_col} not in Z_embed columns')
+                        continue
                     palette = get_color_map(Z_embed[hue_col].nunique())
 
                     ## PCA ##
@@ -473,7 +476,14 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
                     
                     # edit the legend to include the number of samples in each cohort
                     handles, labels = fig.get_legend_handles_labels()
-                    labels = [f'{label} ({Z_embed[Z_embed[hue_col]==label].shape[0]})' for label in labels]
+                    if len(labels) > 2:
+                        labels = [f'{label} ({Z_embed[Z_embed[hue_col]==label].shape[0]})' for label in labels]
+                    else:
+                        new_labels = []
+                        Z_counts = Z_embed[Z_embed[hue_col]].value_counts()
+                        for label in labels:
+                            new_labels.append(f'{label} ({Z_counts[label]})')
+                    
                     # make the size of the markers in the handles larger
                     for handle in handles:
                         # print(dir(handle))
@@ -493,7 +503,13 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
                     # edit the legend to include the number of samples in each cohort
                     handles, labels = fig.get_legend_handles_labels()
-                    labels = [f'{label} ({Z_embed[Z_embed[hue_col]==label].shape[0]})' for label in labels]
+                    if len(labels) > 2:
+                        labels = [f'{label} ({Z_embed[Z_embed[hue_col]==label].shape[0]})' for label in labels]
+                    else:
+                        new_labels = []
+                        Z_counts = Z_embed[Z_embed[hue_col]].value_counts()
+                        for label in labels:
+                            new_labels.append(f'{label} ({Z_counts[label]})')
                     # make the size of the markers in the handles larger
                     for handle in handles:
                         # print(dir(handle))

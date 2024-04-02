@@ -7,7 +7,7 @@ import os
 import optuna
 import json
 from prep_study import add_runs_to_study, get_run_id_list, reuse_run, \
-    objective_func1, make_kwargs, convert_distributions_to_suggestion, convert_model_kwargs_list_to_dict,\
+    objective_func2, make_kwargs, convert_distributions_to_suggestion, convert_model_kwargs_list_to_dict,\
     round_kwargs_to_sig
 from setup2 import setup_neptune_run
 from misc import download_data_dir
@@ -28,120 +28,35 @@ num_trials = int(input('Enter number of trials: '))
 # encoder_kind = 'VAE'
 # encoder_kind = 'TGEM_Encoder'
 
-STUDY_INFO_DICT1 = {
-    'objective_name': 'OBJ 1-1-1-1 (v1)',
-    'recon_weight': 1,
-    'isPediatric_weight': 1,
-    'cohortLabel_weight': 1,
-    'advStudyID_weight': 1,
+STUDY_INFO_DICT = {
+    'study_name': 'Dual Obj 2',
+    'directions': ['maximize','minimize'],
+    'objective_info_list': [
+        {
+        'objective_name': 'OBJ Clasifiers (v1)',
+        'recon_weight': 1,
+        'isPediatric_weight': 1,
+        'cohortLabel_weight': 0.5,
+        'advStudyID_weight': 0,
+        'isFemale_weight': 2,
+        },
+        {
+        'objective_name': 'OBJ Adv StudyID (v1)',
+        'recon_weight': 0,
+        'isPediatric_weight': 0,
+        'cohortLabel_weight':0,
+        'advStudyID_weight': -1,
+        'isFemale_weight': 0,
+        },
+    ],
+    'encoder_kind': encoder_kind,
 }
 
-
-STUDY_INFO_DICT2 = {
-    'objective_name': 'OBJ 1-1-1-0 (v1)',
-    'recon_weight': 1,
-    'isPediatric_weight': 1,
-    'cohortLabel_weight': 1,
-    'advStudyID_weight': 0,
-}
-
-STUDY_INFO_DICT3 = {
-    'objective_name': 'OBJ 1-1-0-1 (v1)',
-    'recon_weight': 1,
-    'isPediatric_weight': 1,
-    'cohortLabel_weight':0,
-    'advStudyID_weight': 1,
-}
-
-
-STUDY_INFO_DICT4 = {
-    'objective_name': 'OBJ 1-0-0-0 (v1)',
-    'recon_weight': 1,
-    'isPediatric_weight': 0,
-    'cohortLabel_weight': 0,
-    'advStudyID_weight': 0,
-}
-
-#
-STUDY_INFO_DICT5 = {
-    'objective_name': 'OBJ 1-1-1-10 (v1)',
-    'recon_weight': 1,
-    'isPediatric_weight': 1,
-    'cohortLabel_weight': 1,
-    'advStudyID_weight': 10,
-}
-
-STUDY_INFO_DICT6 = {
-    'objective_name': 'OBJ 10-1-1-1 (v1)',
-    'recon_weight': 10,
-    'isPediatric_weight': 1,
-    'cohortLabel_weight': 1,
-    'advStudyID_weight': 1,
-}
-
-STUDY_INFO_DICT7 = {
-    'objective_name': 'OBJ 0-1-1-1 (v1)',
-    'recon_weight': 0,
-    'isPediatric_weight': 1,
-    'cohortLabel_weight': 1,
-    'advStudyID_weight': 1,
-}
-
-STUDY_INFO_DICT8 = {
-    'objective_name': 'OBJ 1-0-0-1 (v1)',
-    'recon_weight': 1,
-    'isPediatric_weight': 0,
-    'cohortLabel_weight':0,
-    'advStudyID_weight': 1,
-}
-
-STUDY_INFO_DICT9 = {
-    'objective_name': 'OBJ 1-1-0-10 (v1)',
-    'recon_weight': 1,
-    'isPediatric_weight': 1,
-    'cohortLabel_weight':0,
-    'advStudyID_weight': 10,
-}
-
-STUDY_INFO_DICT0 = {
-    'objective_name': 'OBJ 10-1-0-1 (v1)',
-    'recon_weight': 10,
-    'isPediatric_weight': 1,
-    'cohortLabel_weight':0,
-    'advStudyID_weight': 1,
-}
-
-#
-STUDY_INFO_DICT10 = {
-    'objective_name': 'OBJ 1-0-0-10 (v1)',
-    'recon_weight': 1,
-    'isPediatric_weight': 0,
-    'cohortLabel_weight':0,
-    'advStudyID_weight': 10,
-}
-
-#
-STUDY_INFO_DICT11 = {
-    'objective_name': 'OBJ 1-2-2-10 (v1)',
-    'recon_weight': 1,
-    'isPediatric_weight': 2,
-    'cohortLabel_weight':2,
-    'advStudyID_weight': 10,
-}
-
-STUDY_INFO_DICT12 = {
-    'objective_name': 'OBJ 1-1-1-10-1 (v0)',
-    'recon_weight': 1,
-    'isPediatric_weight': 1,
-    'cohortLabel_weight':1,
-    'advStudyID_weight': 10,
-    'isFemale_weight': 1,
-}
 
 
 #TODO save the study info dict to neptune metadata
 
-def main(STUDY_INFO_DICT):
+def main(STUDY_INFO_DICT_LIST):
     data_dir = '/DATA2'
     os.makedirs(data_dir, exist_ok=True)
 
@@ -152,9 +67,9 @@ def main(STUDY_INFO_DICT):
 
 
     def compute_objective(run_id):
-        return objective_func1(run_id,
+        return objective_func2(run_id,
                             data_dir=data_dir,
-                            objective_info_dict=STUDY_INFO_DICT)
+                            objective_info_dict_list=STUDY_INFO_DICT['objective_info_list'])
 
 
     def objective(trial):
@@ -204,8 +119,9 @@ def main(STUDY_INFO_DICT):
             }]
         
         kwargs['adv_kwargs_list'] = []
-        kwargs['train_kwargs']['num_epochs'] = 50
-        kwargs['train_kwargs']['early_stopping_patience'] = 10
+        kwargs['train_kwargs']['learning_rate'] = 0.0001
+        kwargs['train_kwargs']['num_epochs'] = 20
+        kwargs['train_kwargs']['early_stopping_patience'] = 0
         kwargs['train_kwargs']['head_weight'] = 1
         kwargs['train_kwargs']['encoder_weight'] = 0
         kwargs['train_kwargs']['adversary_weight'] = 0
@@ -234,22 +150,22 @@ def main(STUDY_INFO_DICT):
     if 'study_name' in STUDY_INFO_DICT:
         study_name = STUDY_INFO_DICT['study_name']
     else:
-        if encoder_kind == 'AE':
-            study_name = STUDY_INFO_DICT['objective_name']
-        else:
-            study_name = encoder_kind + ' ' + STUDY_INFO_DICT['objective_name']
+        study_name = [STUDY_INFO_DICT['objective_name'] for STUDY_INFO_DICT in STUDY_INFO_DICT_LIST]
+        study_name = '__'.join(study_name)
+        study_name = study_name + f' {encoder_kind}'
 
-    study = optuna.create_study(direction="maximize",
+
+    study = optuna.create_study(directions=STUDY_INFO_DICT['directions'],
                     study_name=study_name, 
                     storage=storage_name, 
                     load_if_exists=True)
 
 
     # if len(study.trials) < 20:
-    # add_runs_to_study(study,
-    #                   objective_func=compute_objective,
-    #                   study_kwargs=make_kwargs(encoder_kind=encoder_kind),
-    #                   run_id_list=get_run_id_list(encoder_kind=encoder_kind))
+    add_runs_to_study(study,
+                      objective_func=compute_objective,
+                      study_kwargs=make_kwargs(encoder_kind=encoder_kind),
+                      run_id_list=get_run_id_list(encoder_kind=encoder_kind))
 
 
     study.optimize(objective, n_trials=num_trials)
@@ -259,24 +175,12 @@ if __name__ == '__main__':
 
     if (encoder_kind == 'AE') or (encoder_kind == 'VAE'):
         OBJ_list = [
-            # STUDY_INFO_DICT5,
-            # STUDY_INFO_DICT6,
-            # STUDY_INFO_DICT7,
-            # STUDY_INFO_DICT8,
-            # STUDY_INFO_DICT9,
-            # STUDY_INFO_DICT0,
-            # STUDY_INFO_DICT10,
-            # STUDY_INFO_DICT11,
-            # STUDY_INFO_DICT1,
-            # STUDY_INFO_DICT2,
-            # STUDY_INFO_DICT3,
-            # STUDY_INFO_DICT4,
-            STUDY_INFO_DICT12
+            STUDY_INFO_DICT, #dual obj 1
         ]
 
     elif encoder_kind == 'TGEM_Encoder':
         OBJ_list = [
-            STUDY_INFO_DICT7, #no encoder
+            STUDY_INFO_DICT, #no encoder
         ]
 
     for study_info_dict in OBJ_list:
