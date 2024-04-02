@@ -125,4 +125,5 @@ run = neptune.init_run(project='revivemed/RCC',
                 capture_hardware_metrics=False)
 
 run['sys/failed'] = False
+run['sys/tags'].add('pretrain_plots')
 run.stop()
