@@ -72,7 +72,7 @@ STUDY_INFO_DICT5 = {
 }
 
 STUDY_INFO_DICT6 = {
-    'objective_name': 'OBJ 10-1-1-1 (v0)',
+    'objective_name': 'OBJ 10-1-1-1 (v1)',
     'recon_weight': 10,
     'isPediatric_weight': 1,
     'cohortLabel_weight': 1,
@@ -80,7 +80,7 @@ STUDY_INFO_DICT6 = {
 }
 
 STUDY_INFO_DICT7 = {
-    'objective_name': 'OBJ 0-1-1-1 (v0)',
+    'objective_name': 'OBJ 0-1-1-1 (v1)',
     'recon_weight': 0,
     'isPediatric_weight': 1,
     'cohortLabel_weight': 1,
@@ -88,24 +88,24 @@ STUDY_INFO_DICT7 = {
 }
 
 STUDY_INFO_DICT8 = {
-    'objective_name': 'OBJ 1-0-0-1 (v0)',
+    'objective_name': 'OBJ 1-0-0-1 (v1)',
     'recon_weight': 1,
-    'isPediatric_weight': 1,
+    'isPediatric_weight': 0,
     'cohortLabel_weight':0,
     'advStudyID_weight': 1,
 }
 
 STUDY_INFO_DICT9 = {
-    'objective_name': 'OBJ 1-0-0-10 (v0)',
+    'objective_name': 'OBJ 1-1-0-10 (v1)',
     'recon_weight': 1,
     'isPediatric_weight': 1,
     'cohortLabel_weight':0,
-    'advStudyID_weight': 1,
+    'advStudyID_weight': 10,
 }
 
 STUDY_INFO_DICT0 = {
-    'objective_name': 'OBJ 10-0-0-1 (v0)',
-    'recon_weight': 1,
+    'objective_name': 'OBJ 10-1-0-1 (v1)',
+    'recon_weight': 10,
     'isPediatric_weight': 1,
     'cohortLabel_weight':0,
     'advStudyID_weight': 1,
@@ -113,7 +113,7 @@ STUDY_INFO_DICT0 = {
 
 #
 STUDY_INFO_DICT10 = {
-    'objective_name': 'OBJ 1-0-0-10 (v0)',
+    'objective_name': 'OBJ 1-0-0-10 (v1)',
     'recon_weight': 1,
     'isPediatric_weight': 0,
     'cohortLabel_weight':0,
@@ -122,7 +122,7 @@ STUDY_INFO_DICT10 = {
 
 #
 STUDY_INFO_DICT11 = {
-    'objective_name': 'OBJ 10-0-0-1 (v0)',
+    'objective_name': 'OBJ 1-2-2-10 (v1)',
     'recon_weight': 1,
     'isPediatric_weight': 2,
     'cohortLabel_weight':2,
@@ -250,11 +250,11 @@ if __name__ == '__main__':
             # STUDY_INFO_DICT3,
             # STUDY_INFO_DICT4,
             STUDY_INFO_DICT5,
-            # STUDY_INFO_DICT6,
-            # STUDY_INFO_DICT7,
-            # STUDY_INFO_DICT8,
-            # STUDY_INFO_DICT9,
-            # STUDY_INFO_DICT0,
+            STUDY_INFO_DICT6,
+            STUDY_INFO_DICT7,
+            STUDY_INFO_DICT8,
+            STUDY_INFO_DICT9,
+            STUDY_INFO_DICT0,
             STUDY_INFO_DICT10,
             STUDY_INFO_DICT11
         ]
