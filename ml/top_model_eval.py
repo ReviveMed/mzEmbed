@@ -27,7 +27,11 @@ if not os.path.exists(data_dir+'/X_pretrain_train.csv'):
     download_data_dir(data_url, save_dir=data_dir)
 
 # run_id = 'RCC-1296'
-run_id = 'RCC-1216' # this was TGEM Ecnoder!
+# run_id = 'RCC-1216' # this was TGEM Ecnoder!
+
+run_id = input('Enter Run id: ')
+if isinstance(run_id,int):
+    run_id = 'RCC-'+str(run_id)
 kwargs = {}
 
 ###############################
@@ -40,7 +44,7 @@ kwargs['run_training'] = False
 # kwargs['save_latent_space'] = True
 kwargs['save_latent_space'] = False
 
-kwargs['plot_latent_space'] = 'sns' #'both'
+kwargs['plot_latent_space'] = 'plotly' #'sns' #'both'
 kwargs['plot_latent_space_cols'] = ['Study ID','Cohort Label','is Pediatric']
 
 # run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
@@ -105,3 +109,15 @@ run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwa
 # kwargs['run_random_init'] = True
 # kwargs['load_model_weights'] = False
 # _ = setup_neptune_run(data_dir,setup_id='randinit_mkscc',with_run_id=run_id,**kwargs)
+
+
+
+run = neptune.init_run(project='revivemed/RCC',
+                api_token=NEPTUNE_API_TOKEN,
+                with_id=run_id,
+                capture_stdout=False,
+                capture_stderr=False,
+                capture_hardware_metrics=False)
+
+run['sys/failed'] = False
+run.stop()
