@@ -135,9 +135,10 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         train_name = kwargs.get('train_name', 'train')
         eval_name = kwargs.get('eval_name', 'val')
         X_size = None
+        train_dataset = None
+        eval_dataset = None
 
-
-        if run_training or run_evaluation or True:
+        if run_training or run_evaluation:
             X_data_train = pd.read_csv(f'{data_dir}/{X_filename}_{train_name}.csv', index_col=0)
             y_data_train = pd.read_csv(f'{data_dir}/{y_filename}_{train_name}.csv', index_col=0)
             X_size = X_data_train.shape[1]
@@ -164,7 +165,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             print('UNLESS you are using a scheduler, in which case the holdout_frac is used for the scheduler')
             holdout_frac = 0
 
-        if run_training or run_evaluation or True:
+        if run_training or run_evaluation:
             train_dataset = CompoundDataset(X_data_train,y_data_train[y_head_cols], y_data_train[y_adv_cols])
             eval_dataset = CompoundDataset(X_data_eval,y_data_eval[y_head_cols], y_data_eval[y_adv_cols])
 
@@ -255,7 +256,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             print(f'{h.kind} {h.name} uses columns: {cols}')
 
         # Assign the class weights to the head and adv models so the loss is balanced
-        head.update_class_weights(train_dataset.y_head)
+        if train_dataset is not None:
+            #TODO: loadd the class weights from the model json
+            head.update_class_weights(train_dataset.y_head)
 
 
         if load_head_loc and load_model_weights:
@@ -300,8 +303,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             cols = y_adv_col_array[a.y_idx]
             print(f'{a.kind} {a.name} uses columns: {cols}')
 
-
-        adv.update_class_weights(train_dataset.y_adv)
+        if train_dataset is not None:
+            #TODO load the class weights from the model info json
+            adv.update_class_weights(train_dataset.y_adv)
 
         if load_adv_loc and load_model_weights:
             adv_file_ids = adv.get_file_ids()
