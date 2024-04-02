@@ -137,7 +137,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         X_size = None
 
 
-        if run_training or run_evaluation:
+        if run_training or run_evaluation or True:
             X_data_train = pd.read_csv(f'{data_dir}/{X_filename}_{train_name}.csv', index_col=0)
             y_data_train = pd.read_csv(f'{data_dir}/{y_filename}_{train_name}.csv', index_col=0)
             X_size = X_data_train.shape[1]
@@ -164,7 +164,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             print('UNLESS you are using a scheduler, in which case the holdout_frac is used for the scheduler')
             holdout_frac = 0
 
-        if run_training or run_evaluation:
+        if run_training or run_evaluation or True:
             train_dataset = CompoundDataset(X_data_train,y_data_train[y_head_cols], y_data_train[y_adv_cols])
             eval_dataset = CompoundDataset(X_data_eval,y_data_eval[y_head_cols], y_data_eval[y_adv_cols])
 
