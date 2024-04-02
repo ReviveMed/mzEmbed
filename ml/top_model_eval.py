@@ -31,11 +31,11 @@ def main(run_id=None):
 
     if run_id is None:
         run_id = input('Enter Run id: ')
-        try:
-            run_id = int(run_id)
-            run_id = 'RCC-'+str(run_id)
-        except:
-            pass
+    try:
+        run_id = int(run_id)
+        run_id = 'RCC-'+str(run_id)
+    except:
+        pass
 
     kwargs = {}
 
