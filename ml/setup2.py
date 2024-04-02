@@ -422,21 +422,25 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
         if save_latent_space:
             
-            Z = generate_latent_space(X_data_eval, encoder)
-            Z.to_csv(os.path.join(save_dir, f'Z_{eval_name}.csv'))
+            if check_neptune_existance(run,f'{setup_id}/Z_{eval_name}'):
+                print(f'Z_{eval_name} already exists in {setup_id} of run {run_id}')
+            
+            else:
+                Z = generate_latent_space(X_data_eval, encoder)
+                Z.to_csv(os.path.join(save_dir, f'Z_{eval_name}.csv'))
 
-            Z_pca = generate_pca_embedding(Z)
-            Z_pca.to_csv(os.path.join(save_dir, f'Z_pca_{eval_name}.csv'))
-            Z_pca.columns = [f'PCA{i+1}' for i in range(Z_pca.shape[1])]
+                Z_pca = generate_pca_embedding(Z)
+                Z_pca.to_csv(os.path.join(save_dir, f'Z_pca_{eval_name}.csv'))
+                Z_pca.columns = [f'PCA{i+1}' for i in range(Z_pca.shape[1])]
 
-            Z_umap = generate_umap_embedding(Z)
-            Z_umap.to_csv(os.path.join(save_dir, f'Z_umap_{eval_name}.csv'))
-            Z_umap.columns = [f'UMAP{i+1}' for i in range(Z_umap.shape[1])]
+                Z_umap = generate_umap_embedding(Z)
+                Z_umap.to_csv(os.path.join(save_dir, f'Z_umap_{eval_name}.csv'))
+                Z_umap.columns = [f'UMAP{i+1}' for i in range(Z_umap.shape[1])]
 
-            Z_embed = pd.concat([Z_pca, Z_umap], axis=1)
-            Z_embed = Z_embed.join(y_data_eval)
-            Z_embed.to_csv(Z_embed_savepath)
-            run[f'{setup_id}/Z_embed_{eval_name}'].upload(Z_embed_savepath)
+                Z_embed = pd.concat([Z_pca, Z_umap], axis=1)
+                Z_embed = Z_embed.join(y_data_eval)
+                Z_embed.to_csv(Z_embed_savepath)
+                run[f'{setup_id}/Z_embed_{eval_name}'].upload(Z_embed_savepath)
 
 
 
