@@ -14,23 +14,81 @@ from sklearn.linear_model import LogisticRegression
 import time
 from neptune.exceptions import NeptuneException
 
+
+
+
+
 data_dir = '/DATA2'
 
 
 run_id = 'RCC-1296'
 kwargs = {}
-kwargs['overwrite_existing_kwargs'] = True
-kwargs['load_model_loc'] = 'pretrain'
-kwargs['run_evaluation'] = False
-kwargs['run_training'] = False
+
+###############################
+## Plot the latent space
+# kwargs['overwrite_existing_kwargs'] = True
+# kwargs['load_model_loc'] = 'pretrain'
+# kwargs['run_evaluation'] = False
+# kwargs['run_training'] = False
+# kwargs['save_latent_space'] = True
+# kwargs['plot_latent_space'] = 'both'
+# kwargs['plot_latent_space_cols'] = ['Study ID','Cohort Label','is Pediatric']
+
+# run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+
+# kwargs['eval_name'] = 'train'
+# run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+
+# kwargs['eval_name'] = 'test'
+# run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+
+
+###############################
+## Run the finetune with random init
+
+kwargs['load_encoder_loc'] = 'pretrain'
+kwargs['X_filename'] = 'X_finetune'
+kwargs['y_filename'] = 'y_finetune'
+kwargs['run_training'] = True
+kwargs['run_evaluation'] = True
 kwargs['save_latent_space'] = True
-kwargs['plot_latent_space'] = 'both'
-kwargs['plot_latent_space_cols'] = ['Study ID','Cohort Label','is Pediatric']
+kwargs['plot_latent_space'] = 'sns'
+kwargs['plot_latent_space_cols'] = ['MSKCC']
+kwargs['y_head_cols'] = ['MSKCC BINARY']
+kwargs['y_adv_cols'] = []
 
-run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
 
-kwargs['eval_name'] = 'train'
-run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+kwargs['head_kwargs_dict'] = {}
+kwargs['adv_kwargs_dict'] = {}
+kwargs['head_kwargs_list'] = [{
+    'kind': 'Binary',
+    'name': 'MSKCC',
+    'weight': 1,
+    'y_idx': 0,
+    'hidden_size': 4,
+    'num_hidden_layers': 0,
+    'dropout_rate': 0,
+    'activation': 'leakyrelu',
+    'use_batch_norm': False,
+    'num_classes': 2,
+    }]
 
-kwargs['eval_name'] = 'test'
-run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+kwargs['adv_kwargs_list'] = []
+kwargs['train_kwargs']['num_epochs'] = 50
+kwargs['train_kwargs']['early_stopping_patience'] = 10
+kwargs['train_kwargs']['head_weight'] = 1
+kwargs['train_kwargs']['encoder_weight'] = 0
+kwargs['train_kwargs']['adversary_weight'] = 0
+kwargs['run_evaluation'] = True
+kwargs['eval_kwargs'] = {}
+kwargs['eval_kwargs']['sklearn_models'] = {}
+
+kwargs = convert_model_kwargs_list_to_dict(kwargs)
+
+# kwargs = convert_model_kwargs_list_to_dict(kwargs)
+# run_id = setup_neptune_run(data_dir,setup_id='finetune_mkscc',with_run_id=run_id,**kwargs)
+
+
+kwargs['run_random_init'] = True
+kwargs['load_model_weights'] = False
+_ = setup_neptune_run(data_dir,setup_id='randinit_mkscc',with_run_id=run_id,**kwargs)
