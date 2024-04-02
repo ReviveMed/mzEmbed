@@ -28,6 +28,35 @@ if not os.path.exists(data_dir+'/X_pretrain_train.csv'):
 
 def compute_mskcc_finetune(run_id):
 
+
+        ###############################
+        ### Plot the latent space
+        kwargs = {}
+        kwargs['overwrite_existing_kwargs'] = True
+        kwargs['encoder_kind'] = 'AE'
+        kwargs['load_model_loc'] = 'pretrain'
+        kwargs['run_evaluation'] = False
+        kwargs['run_training'] = False
+        kwargs['save_latent_space'] = True
+        # kwargs['save_latent_space'] = False
+
+        kwargs['plot_latent_space'] = 'sns' #'both'
+        kwargs['plot_latent_space_cols'] = ['Study ID','Cohort Label','is Pediatric']
+
+        # run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+
+        kwargs['eval_name'] = 'train'
+        run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+
+        kwargs['eval_name'] = 'test'
+        run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+
+        kwargs['eval_name'] = 'val'
+        run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+
+
+        ############################### Finetune
+
         # kwargs = {}
         # kwargs['load_model_loc'] = 'finetune_mkscc'
         # kwargs['run_train'] = False
@@ -45,17 +74,20 @@ def compute_mskcc_finetune(run_id):
 
         kwargs = run['pretrain/kwargs'].fetch()
         kwargs = convert_neptune_kwargs(kwargs)
-        if check_neptune_existance(run,'finetune_mkscc_1'):
-
-            score = run['finetune_mkscc_1/eval/val/Binary_MSKCC/AUROC (micro)'].fetch()
-            if score > 0.95:
-                del run['finetune_mkscc_1/kwargs']
-                del run['finetune_mkscc_1']
-                run.stop()
-            else:
-                run.stop()
-                return run_id
         
+        if check_neptune_existance(run,'finetune_mkscc_1'):
+            run.stop()
+            return run_id
+            # score = run['finetune_mkscc_1/eval/val/Binary_MSKCC/AUROC (micro)'].fetch()
+            # if score > 0.95:
+            #     del run['finetune_mkscc_1/kwargs']
+            #     del run['finetune_mkscc_1']
+            #     run.stop()
+            # else:
+            #     run.stop()
+            #     return run_id
+        run.stop()
+
         # pause for 2 seconds
         # time.sleep(2)
 
@@ -131,8 +163,9 @@ def compute_mskcc_finetune(run_id):
 if __name__ == '__main__':
 
     already_run = []
-    run_id_list = ['RCC-1296']
-    # run_id_list = get_run_id_list()
+    # run_id_list = ['RCC-1296']
+    # run_id_list = ['RCC-924','RCC-973','RCC-938','RCC-931','RCC-984','RCC-933','RCC-1416','RCC-1364','RCC-1129']
+    run_id_list = get_run_id_list(tags=['april2'],encoder_kind='AE')
     for run_id in run_id_list:
         if run_id in already_run:
             continue

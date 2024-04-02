@@ -245,7 +245,9 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
     head_weight = FloatDistribution(0,5,step=0.1)
     # head_weight = FloatDistribution(0.1, 10, log=True)
     adv_weight = FloatDistribution(0,50,step=0.1)
-    if encoder_kind in ['AE','VAE']:
+    isfemale_weight = 0
+    
+    if encoder_kind in ['AE']:
         encoder_kwargs = {
                     'activation': activation,
                     'latent_size': latent_size,
@@ -262,12 +264,26 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
         adversarial_mini_epochs = 5
         early_stopping_patience_step = 10
         early_stopping_patience_max = 50
-        if encoder_kind == 'AE':
-            l2_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
-        else:
-            #TODO why does loss explode for VAE when l2_reg_weight is not 0?
-            l2_reg_weight = 0
-        
+        l2_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
+
+    elif encoder_kind == 'VAE':        
+        encoder_kwargs = {
+                    'activation': activation,
+                    'latent_size': latent_size,
+                    'num_hidden_layers': num_hidden_layers,
+                    'dropout_rate': 0,
+                    'use_batch_norm': False,
+                    # 'hidden_size': int(1.5*latent_size),
+                    'hidden_size_mult' : 1.5
+                    }
+        encoder_weight = FloatDistribution(0,5,step=0.1)
+        num_epochs_min = 50
+        num_epochs_max = 200
+        num_epochs_step = 10
+        adversarial_mini_epochs = 5
+        early_stopping_patience_step = 10
+        early_stopping_patience_max = 50
+        l2_reg_weight = 0 # loss explodes if not 0
 
     elif encoder_kind == 'TGEM_Encoder':
         encoder_kwargs = {
@@ -286,78 +302,90 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
         l2_reg_weight = 0
 
     kwargs = {
-                    ################
-                    ## General ##
-                    'encoder_kind': encoder_kind,
-                    'encoder_kwargs': encoder_kwargs,
-                    'other_size': 1,
-                    'y_head_cols' : ['is Pediatric','Cohort Label ENC'],
-                    'y_adv_cols' : ['Study ID ENC'],
+                ################
+                ## General ##
+                'encoder_kind': encoder_kind,
+                'encoder_kwargs': encoder_kwargs,
+                'other_size': 1,
+                'y_head_cols' : ['is Pediatric','Cohort Label ENC', 'is Female'],
+                'y_adv_cols' : ['Study ID ENC'],
 
-                    ################
-                    ## Pretrain ##
+                ################
+                ## Pretrain ##
 
-                    'holdout_frac': 0.2, # each trial the train/val samples will be different, also not stratified?
-                    'batch_size': 64,
-                    
-                    'head_kwargs_list': [
-                        {
-                            'kind': 'Binary',
-                            'name': 'isPediatric',
-                            'y_idx': 0,
-                            'weight': 1.0,
-                            'hidden_size': 4,
-                            'num_hidden_layers': 1,
-                            'dropout_rate': 0,
-                            'activation': 'leakyrelu',
-                            'use_batch_norm': False,
-                            'num_classes': 2,
-                        },
-                        {
-                            'kind': 'MultiClass',
-                            'name': 'Cohort Label',
-                            'y_idx': 1,
-                            'weight': cohort_label_weight,
-                            'hidden_size': 4,
-                            'num_hidden_layers': 1,
-                            'dropout_rate': 0,
-                            'activation': 'leakyrelu',
-                            'use_batch_norm': False,
-                            'num_classes': 4,
-                        },
-                    ],
-                    
-                    'adv_kwargs_list': [
-                        {
-                            'kind': 'MultiClass',
-                            'name': 'Adv StudyID',
-                            'y_idx': 0,
-                            'weight': 1.0, 
-                            'hidden_size': 4,
-                            'num_hidden_layers': 1,
-                            'dropout_rate': 0,
-                            'activation': 'leakyrelu',
-                            'use_batch_norm': False,
-                            'num_classes': 19,
-                        },
-                    ],
-
-                    'train_kwargs': {
-                        # 'num_epochs': trial.suggest_int('pretrain_epochs', 10, 100,log=True),
-                        'num_epochs': IntDistribution(num_epochs_min, num_epochs_max, step=num_epochs_step),
-                        'lr': FloatDistribution(0.0001, 0.05, log=True),
-                        # 'lr': 0.01,
-                        'weight_decay': 0,
-                        'l1_reg_weight': 0,
-                        # 'l2_reg_weight': 0.001,
-                        'l2_reg_weight': l2_reg_weight,
-                        'encoder_weight': encoder_weight,
-                        'head_weight': head_weight,
-                        'adversary_weight': adv_weight,
-                        'noise_factor': 0.1,
-                        'early_stopping_patience': IntDistribution(0, early_stopping_patience_max, step=early_stopping_patience_step),
-                        'adversarial_mini_epochs': adversarial_mini_epochs,
+                'holdout_frac': 0.2, # each trial the train/val samples will be different, also not stratified?
+                'batch_size': 64,
+                
+                'head_kwargs_list': [
+                    {
+                        'kind': 'Binary',
+                        'name': 'isPediatric',
+                        'y_idx': 0,
+                        'weight': 1.0,
+                        'hidden_size': 4,
+                        'num_hidden_layers': 1,
+                        'dropout_rate': 0,
+                        'activation': 'leakyrelu',
+                        'use_batch_norm': False,
+                        'num_classes': 2,
                     },
+                    {
+                        'kind': 'MultiClass',
+                        'name': 'Cohort Label',
+                        'y_idx': 1,
+                        'weight': cohort_label_weight,
+                        'hidden_size': 4,
+                        'num_hidden_layers': 1,
+                        'dropout_rate': 0,
+                        'activation': 'leakyrelu',
+                        'use_batch_norm': False,
+                        'num_classes': 4,
+                    },
+                    {
+                        'kind': 'Binary',
+                        'name': 'isFemale',
+                        'y_idx': 2,
+                        'weight': isfemale_weight,
+                        'hidden_size': 4,
+                        'num_hidden_layers': 1,
+                        'dropout_rate': 0,
+                        'activation': 'leakyrelu',
+                        'use_batch_norm': False,
+                        'num_classes': 2,
+                    },
+                ],
+                
+                'adv_kwargs_list': [
+                    {
+                        'kind': 'MultiClass',
+                        'name': 'Adv StudyID',
+                        'y_idx': 0,
+                        'weight': 1.0, 
+                        'hidden_size': 4,
+                        'num_hidden_layers': 1,
+                        'dropout_rate': 0,
+                        'activation': 'leakyrelu',
+                        'use_batch_norm': False,
+                        'num_classes': 19,
+                    },
+                ],
+
+                'train_kwargs': {
+                    # 'num_epochs': trial.suggest_int('pretrain_epochs', 10, 100,log=True),
+                    'num_epochs': IntDistribution(num_epochs_min, num_epochs_max, step=num_epochs_step),
+                    'lr': FloatDistribution(0.0001, 0.05, log=True),
+                    # 'lr': 0.01,
+                    'weight_decay': 0,
+                    'l1_reg_weight': 0,
+                    # 'l2_reg_weight': 0.001,
+                    'l2_reg_weight': l2_reg_weight,
+                    'encoder_weight': encoder_weight,
+                    'head_weight': head_weight,
+                    'adversary_weight': adv_weight,
+                    'noise_factor': 0.1,
+                    'early_stopping_patience': IntDistribution(0, early_stopping_patience_max, step=early_stopping_patience_step),
+                    'adversarial_mini_epochs': adversarial_mini_epochs,
+                },
 
         }
     
@@ -526,6 +554,8 @@ def dict_diff_cleanup(diff,ignore_keys_list=None):
         ignore_keys_list = ['run_evaluation','save_latent_space','plot_latent_space_cols','plot_latent_space',\
                     'eval_kwargs','train_kwargs__eval_funcs','run_training','encoder_kwargs__hidden_size','overwrite_existing_kwargs',\
                     'load_model_loc']
+        new_ignore_keys_list = ['y_head_cols']
+        ignore_keys_list.extend(new_ignore_keys_list)
 
     diff_clean = {}
     for key, val in diff.items():

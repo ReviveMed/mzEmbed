@@ -18,7 +18,7 @@ def convert_neptune_kwargs(kwargs):
     else:
         return kwargs    
 
-def get_run_id_list(encoder_kind='AE'):
+def get_run_id_list(encoder_kind='AE',tags=['v3.1']):
 
     project = neptune.init_project(
         project='revivemed/RCC',
@@ -26,7 +26,7 @@ def get_run_id_list(encoder_kind='AE'):
         api_token=NEPTUNE_API_TOKEN
     )
 
-    runs_table_df = project.fetch_runs_table(tag=['v3.1'],state='inactive').to_pandas()
+    runs_table_df = project.fetch_runs_table(tag=tags,state='inactive').to_pandas()
 
     #drop the failed runs
     runs_table_df = runs_table_df[~runs_table_df['sys/failed']].copy()
