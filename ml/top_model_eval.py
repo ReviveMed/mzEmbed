@@ -73,6 +73,7 @@ kwargs['head_kwargs_list'] = [{
     'num_classes': 2,
     }]
 
+kwargs['encoder_kind'] = 'AE'
 kwargs['adv_kwargs_list'] = []
 kwargs['train_kwargs'] = {}
 kwargs['train_kwargs']['num_epochs'] = 50

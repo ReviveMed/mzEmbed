@@ -434,17 +434,43 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
                 for hue_col in plot_latent_space_cols:
                     palette = get_color_map(Z_embed[hue_col].nunique())
 
+                    ## PCA ##
                     fig = sns.scatterplot(data=Z_embed, x='PCA1', y='PCA2', hue=hue_col, palette=palette,s=marker_sz)
                     # place the legend outside the plot
                     plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+                    
+                    # edit the legend to include the number of samples in each cohort
+                    handles, labels = fig.get_legend_handles_labels()
+                    labels = [f'{label} ({Z_embed[Z_embed[hue_col]==label].shape[0]})' for label in labels]
+                    # make the size of the markers in the handles larger
+                    for handle in handles:
+                        # print(dir(handle))
+                        handle.set_markersize(10)
+                        # handle._sizes = [100]
+                    
+                    plt.legend(handles, labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+
                     plt.savefig(os.path.join(save_dir, f'Z_pca_{hue_col}_{eval_name}.png'), bbox_inches='tight')
                     run[f'{setup_id}/sns_Z_pca_{hue_col}_{eval_name}'].upload(os.path.join(save_dir, f'Z_pca_{hue_col}_{eval_name}.png'))
-
                     plt.close()
 
+                    ## UMAP ##
                     fig = sns.scatterplot(data=Z_embed, x='UMAP1', y='UMAP2', hue=hue_col, palette=palette,s=marker_sz)
                     # place the legend outside the plot
                     plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+
+                    # edit the legend to include the number of samples in each cohort
+                    handles, labels = fig.get_legend_handles_labels()
+                    labels = [f'{label} ({Z_embed[Z_embed[hue_col]==label].shape[0]})' for label in labels]
+                    # make the size of the markers in the handles larger
+                    for handle in handles:
+                        # print(dir(handle))
+                        handle.set_markersize(10)
+                        # handle._sizes = [100]
+                    
+                    plt.legend(handles, labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+
+
                     plt.savefig(os.path.join(save_dir, f'Z_umap_{hue_col}_{eval_name}.png'), bbox_inches='tight')
                     run[f'{setup_id}/sns_Z_umap_{hue_col}_{eval_name}'].upload(os.path.join(save_dir, f'Z_umap_{hue_col}_{eval_name}.png'))
                     plt.close()
