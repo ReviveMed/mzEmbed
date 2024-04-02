@@ -28,9 +28,9 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 
 
 def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
-
+    print(setup_id)
     run, is_run_new = start_neptune_run(with_run_id=with_run_id)
-    if is_run_new:
+    if not is_run_new:
         setup_is_new = not check_neptune_existance(run,f'{setup_id}/kwargs')
         if setup_is_new:
             setup_is_new = not check_neptune_existance(run,f'{setup_id}/original_kwargs')

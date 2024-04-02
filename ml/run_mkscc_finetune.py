@@ -54,7 +54,7 @@ def compute_mskcc_finetune(run_id):
         # time.sleep(2)
 
         kwargs['load_encoder_loc'] = 'pretrain'
-        # kwargs['load_model_loc'] = 'finetune'
+        kwargs['load_model_loc'] = False
         kwargs['X_filename'] = 'X_finetune'
         kwargs['y_filename'] = 'y_finetune'
         kwargs['run_training'] = True
@@ -100,7 +100,6 @@ def compute_mskcc_finetune(run_id):
 
 
         kwargs = convert_model_kwargs_list_to_dict(kwargs)
-
 
         # kwargs = convert_model_kwargs_list_to_dict(kwargs)
         # run_id = setup_neptune_run(data_dir,setup_id='finetune_mkscc',with_run_id=run_id,**kwargs)
