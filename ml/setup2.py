@@ -429,7 +429,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
             
             if (plot_latent_space=='seaborn') or (plot_latent_space=='both') or (plot_latent_space=='sns'):
-                marker_sz = 10/np.log1p(Z_embed.shape[0])
+                marker_sz = 25/(1+np.log10(Z_embed.shape[0]))
 
                 for hue_col in plot_latent_space_cols:
                     palette = get_color_map(Z_embed[hue_col].nunique())
@@ -478,12 +478,12 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             if (plot_latent_space=='plotly') or (plot_latent_space=='both') or (plot_latent_space=='px'):
                 for hue_col in plot_latent_space_cols:
                     plotly_fig = px.scatter(Z_embed, x='PCA1', y='PCA2', color=hue_col, title=f'PCA {hue_col}')
-                    plotly_fig.update_traces(marker=dict(size=marker_sz))
+                    plotly_fig.update_traces(marker=dict(size=2*marker_sz))
                     run[f'{setup_id}/px_Z_pca_{hue_col}_{eval_name}'].upload(plotly_fig)
                     plt.close()
 
                     plotly_fig = px.scatter(Z_embed, x='UMAP1', y='UMAP2', color=hue_col)
-                    plotly_fig.update_traces(marker=dict(size=marker_sz))
+                    plotly_fig.update_traces(marker=dict(size=2*marker_sz))
                     run[f'{setup_id}/px_Z_umap_{hue_col}_{eval_name}'].upload(plotly_fig)
                     plt.close()
 
