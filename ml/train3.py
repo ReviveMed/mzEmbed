@@ -5,7 +5,14 @@ import json
 import os
 import torch.nn.functional as F
 from models import get_reg_penalty
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler, WeightedRandomSampler
+from sklearn.model_selection import train_test_split
+
+import random
+import math
+import torch.utils.data
+from collections import defaultdict
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -52,7 +59,29 @@ class CompoundDataset(Dataset):
 
 
 
-def create_dataloaders(torch_dataset, batch_size, holdout_frac=0, shuffle=True, set_name='train'):
+
+def stratified_split(dataset : torch.utils.data.Dataset, labels, fraction, random_state=None):
+    # Code from Alvtron on Github
+    #  a simple function for conducting a stratified split with random shuffling, 
+    # similar to that of StratifiedShuffleSplit from scikit-learn
+    # https://gist.github.com/Alvtron/9b9c2f870df6a54fda24dbd1affdc254
+    if random_state: random.seed(random_state)
+    indices_per_label = defaultdict(list)
+    for index, label in enumerate(labels):
+        indices_per_label[label].append(index)
+    first_set_indices, second_set_indices = list(), list()
+    for label, indices in indices_per_label.items():
+        n_samples_for_label = round(len(indices) * fraction)
+        random_indices_sample = random.sample(indices, n_samples_for_label)
+        first_set_indices.extend(random_indices_sample)
+        second_set_indices.extend(set(indices) - set(random_indices_sample))
+    first_set_inputs = torch.utils.data.Subset(dataset, first_set_indices)
+    first_set_labels = list(map(labels.__getitem__, first_set_indices))
+    second_set_inputs = torch.utils.data.Subset(dataset, second_set_indices)
+    second_set_labels = list(map(labels.__getitem__, second_set_indices))
+    return first_set_inputs, first_set_labels, second_set_inputs, second_set_labels
+
+def create_dataloaders_old(torch_dataset, batch_size, holdout_frac=0, shuffle=True, set_name='train'):
     
     if holdout_frac == 0:
         return {set_name: DataLoader(torch_dataset, batch_size=batch_size, shuffle=shuffle)}
@@ -64,6 +93,31 @@ def create_dataloaders(torch_dataset, batch_size, holdout_frac=0, shuffle=True, 
 
     return {set_name: DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle),
             f'{set_name}_holdout': DataLoader(holdout_dataset, batch_size=batch_size, shuffle=False)}
+
+
+def create_dataloaders(torch_dataset, batch_size, holdout_frac=0, shuffle=True, set_name='train', stratify=None):
+    if holdout_frac == 0:
+        return {set_name: DataLoader(torch_dataset, batch_size=batch_size, shuffle=shuffle)}
+
+    # Get the targets of your dataset if it's available
+    if stratify is not None:
+        targets = [item[stratify] for item in torch_dataset]
+        # convert nans to -1 for the purpose of stratification
+        for item in targets:
+            item[torch.isnan(item)] = -1
+    else:
+        targets = None
+
+    # Split the indices of your dataset
+    indices = list(range(len(torch_dataset)))
+    train_indices, holdout_indices = train_test_split(indices, test_size=holdout_frac, stratify=targets)
+
+    # Create samplers
+    train_sampler = SubsetRandomSampler(train_indices)
+    holdout_sampler = SubsetRandomSampler(holdout_indices)
+
+    return {set_name: DataLoader(torch_dataset, batch_size=batch_size, sampler=train_sampler),
+            f'{set_name}_holdout': DataLoader(torch_dataset, batch_size=batch_size, sampler=holdout_sampler)}
 
 
 ##################################################################################
@@ -379,7 +433,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
             ############ end of training adversary on fixed latent space
             #turn on inference mode
             with torch.inference_mode():
-                
+                # divide losses by the number of batches
                 running_losses['encoder'] /= len(dataloaders[phase])
                 running_losses['head'] /= len(dataloaders[phase])
                 running_losses['adversary'] /= len(dataloaders[phase])

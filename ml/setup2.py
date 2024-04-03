@@ -169,7 +169,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             train_dataset = CompoundDataset(X_data_train,y_data_train[y_head_cols], y_data_train[y_adv_cols])
             eval_dataset = CompoundDataset(X_data_eval,y_data_eval[y_head_cols], y_data_eval[y_adv_cols])
 
-            train_loader_dct = create_dataloaders(train_dataset, batch_size, holdout_frac, set_name=train_name)
+            # stratify on the adversarial column (stratify=2)
+            # this is probably not the most memory effecient method, would be better to do stratification before creating the dataset
+            train_loader_dct = create_dataloaders(train_dataset, batch_size, holdout_frac, set_name=train_name, stratify=2)
             eval_loader_dct = create_dataloaders(eval_dataset, batch_size, set_name = eval_name)
             eval_loader_dct.update(train_loader_dct)
 
