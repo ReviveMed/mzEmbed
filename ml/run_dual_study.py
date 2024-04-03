@@ -21,7 +21,9 @@ USE_WEBAPP_DB = True
 SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
-ADD_EXISTING_RUNS_TO_STUDY = False
+ADD_EXISTING_RUNS_TO_STUDY = True
+limit_add = 0 # limit the number of runs added to the study
+
 # get user input
 encoder_kind = input('Enter encoder kind (AE, VAE, TGEM_Encoder): ')
 num_trials = int(input('Enter number of trials: '))
@@ -30,11 +32,11 @@ num_trials = int(input('Enter number of trials: '))
 # encoder_kind = 'TGEM_Encoder'
 
 STUDY_INFO_DICT = {
-    'study_name': 'Dual Obj 3',
+    'study_name': 'Dual Obj 4',
     'directions': ['maximize','minimize'],
     'objective_info_list': [
         {
-        'objective_name': 'OBJ Clasifiers (v1)',
+        'objective_name': 'OBJ Clasifiers (v2)',
         'recon_weight': 1,
         'isPediatric_weight': 1,
         'cohortLabel_weight': 0.5,
@@ -42,7 +44,7 @@ STUDY_INFO_DICT = {
         'isFemale_weight': 2,
         },
         {
-        'objective_name': 'OBJ Adv StudyID (v1)',
+        'objective_name': 'OBJ Adv StudyID (v2)',
         'recon_weight': 0,
         'isPediatric_weight': 0,
         'cohortLabel_weight':0,
@@ -134,13 +136,13 @@ def main(STUDY_INFO_DICT_LIST):
 
         kwargs = convert_model_kwargs_list_to_dict(kwargs)
 
-        # kwargs = convert_model_kwargs_list_to_dict(kwargs)
-        run_id = setup_neptune_run(data_dir,setup_id='finetune_mkscc',with_run_id=run_id,**kwargs)
-
-
-        kwargs['run_random_init'] = True
-        kwargs['load_model_weights'] = False
-        _ = setup_neptune_run(data_dir,setup_id='randinit_mkscc',with_run_id=run_id,**kwargs)
+        ### finetune
+        # run_id = setup_neptune_run(data_dir,setup_id='finetune_mkscc',with_run_id=run_id,**kwargs)
+        
+        ### randinit
+        # kwargs['run_random_init'] = True
+        # kwargs['load_model_weights'] = False
+        # _ = setup_neptune_run(data_dir,setup_id='randinit_mkscc',with_run_id=run_id,**kwargs)
 
         return compute_objective(run_id)
 
@@ -169,7 +171,8 @@ def main(STUDY_INFO_DICT_LIST):
         add_runs_to_study(study,
                         objective_func=compute_objective,
                         study_kwargs=make_kwargs(encoder_kind=encoder_kind),
-                        run_id_list=get_run_id_list(encoder_kind=encoder_kind))
+                        run_id_list=get_run_id_list(encoder_kind=encoder_kind),
+                        limit_add=limit_add)
 
 
     study.optimize(objective, n_trials=num_trials)

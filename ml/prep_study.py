@@ -49,13 +49,15 @@ def cleanup_runs(run_id_list=None):
 
 
 
-def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=None):
+def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=None,limit_add=0):
     if run_id_list is None:
         run_id_list = get_run_id_list()
 
     print('number of runs: ', len(run_id_list))
-    # if len(run_id_list) > 20:
-        # run_id_list = run_id_list[:20]
+    
+    if limit_add>0:
+        if len(run_id_list) > limit_add:
+            run_id_list = run_id_list[:limit_add]
 
     if study_kwargs is None:
         study_kwargs = make_kwargs()
@@ -228,13 +230,13 @@ def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=Non
         else:
             isPediatric_auc = 0.5
 
-        if 'MultiClass_CohortLabel' in eval_res:
-            cohortLabel_auc = eval_res['MultiClass_CohortLabel']['AUROC (ovo, macro)']
+        if 'MultiClass_Cohort Label' in eval_res:
+            cohortLabel_auc = eval_res['MultiClass_Cohort Label']['AUROC (ovo, macro)']
         else:
             cohortLabel_auc = 0.5
 
-        if 'MultiClass_AdvStudyID' in eval_res:
-            advStudyID_auc = eval_res['MultiClass_AdvStudyID']['AUROC (ovo, macro)']
+        if 'MultiClass_Adv StudyID' in eval_res:
+            advStudyID_auc = eval_res['MultiClass_Adv StudyID']['AUROC (ovo, macro)']
         else:
             advStudyID_auc = 0.5
 
