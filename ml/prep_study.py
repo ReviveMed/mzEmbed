@@ -270,11 +270,11 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
     activation = 'leakyrelu'
     latent_size = IntDistribution(4, 64, step=1)
     num_hidden_layers = IntDistribution(1, 8)
-    cohort_label_weight = FloatDistribution(0,2,step=0.1)
-    isfemale_weight = FloatDistribution(0,10,step=0.1)
-    ispediatric_weight = FloatDistribution(0,5,step=0.1)
-    head_weight = FloatDistribution(0,5,step=0.1)
-    adv_weight = FloatDistribution(0,50,step=0.1)
+    cohort_label_weight = FloatDistribution(0,2,step=0.1) #10
+    isfemale_weight = FloatDistribution(0,10,step=0.1) #20
+    ispediatric_weight = FloatDistribution(0,5,step=0.1) #10
+    head_weight = FloatDistribution(0,5,step=0.1) # 10
+    adv_weight = FloatDistribution(0,50,step=0.1) #50
     
     if encoder_kind in ['AE']:
         encoder_kwargs = {

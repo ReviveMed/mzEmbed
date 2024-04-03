@@ -229,13 +229,13 @@ if __name__ == '__main__':
     already_run = []
     run_id_list = ['RCC-1296']
     # run_id_list = ['RCC-924','RCC-973','RCC-938','RCC-931','RCC-984','RCC-933','RCC-1416','RCC-1364','RCC-1129']
-    # run_id_list = get_run_id_list(tags=['april2'],encoder_kind='AE')
+    # run_id_list = get_run_id_list(tags=['april03_pareto'],encoder_kind='AE')
     for run_id in run_id_list:
         if run_id in already_run:
             continue
         print('run_id:',run_id)
         try:
-            run_id = compute_mskcc_finetune(run_id,n_trials=5)
+            run_id = compute_mskcc_finetune(run_id,n_trials=5,plot_latent_space=True)
         except NeptuneException as e:
             print('NeptuneException:',e)
             continue
