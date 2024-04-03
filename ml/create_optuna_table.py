@@ -74,19 +74,19 @@ def apply_cutoffs(df, min_cutoffs, max_cutoffs):
     return df
 
 
-def pareto_reduction(df, sense_list=None, current_set=None, target_size=None, objective_cols=None):
-    if target_size is None:
-        target_size = np.floor(0.2*df.shape[0])
+def pareto_reduction(df, sense_list=None, current_set=None, desired_num=None, objective_cols=None):
+    if desired_num is None:
+        desired_num = np.floor(0.2*df.shape[0])
     if objective_cols is None:
         objective_cols = df.columns
 
-    if df.shape[0] < target_size*1.5:
+    if df.shape[0] < desired_num*1.5:
         return df
 
     mask = paretoset(df[objective_cols], sense=sense_list)
     current_set = pd.concat([current_set, df[mask]])
-    if current_set.shape[0] < target_size:
-        return pareto_reduction(df[~mask], sense_list, current_set, target_size, objective_cols)
+    if current_set.shape[0] < desired_num:
+        return pareto_reduction(df[~mask], sense_list, current_set, desired_num, objective_cols)
     else:
         return current_set
 
@@ -140,7 +140,7 @@ def choose_top_trials(df, top_trial_perc=0.1, directions=None,
     sense_list = ['max' if direction == 'maximize' else 'min' for direction in directions]
     top_trials = pareto_reduction(df, 
                                 sense_list=sense_list, 
-                                target_size=top_trials_count,
+                                desired_num=top_trials_count,
                                 objective_cols=objective_cols)
 
     print('found ', top_trials.shape[0], ' trials near the pareto frontier')
