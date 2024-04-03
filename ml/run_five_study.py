@@ -33,19 +33,35 @@ num_trials = int(input('Enter number of trials: '))
 # encoder_kind = 'TGEM_Encoder'
 
 STUDY_INFO_DICT = {
-    'study_name': 'Dual Obj 4',
-    'directions': ['maximize','minimize'],
+    'study_name': 'Multi Obj 1',
+    'directions': ['minimize','maximize','maximize','minimize'],
     'objective_info_list': [
         {
-        'objective_name': 'OBJ Clasifiers (v2)',
-        'recon_weight': 1,
-        'isPediatric_weight': 1,
-        'cohortLabel_weight': 0.5,
+        'objective_name': 'OBJ Recon (v3)',
+        'recon_weight': -1,
+        'isPediatric_weight': 0,
+        'cohortLabel_weight': 0,
         'advStudyID_weight': 0,
-        'isFemale_weight': 2,
+        'isFemale_weight': 0,
         },
         {
-        'objective_name': 'OBJ Adv StudyID (v2)',
+        'objective_name': 'OBJ Pediatric (v3)',
+        'recon_weight': 0,
+        'isPediatric_weight': 1,
+        'cohortLabel_weight': 0,
+        'advStudyID_weight': 0,
+        'isFemale_weight': 0,
+        },
+        {
+        'objective_name': 'OBJ Gender (v3)',
+        'recon_weight': 0,
+        'isPediatric_weight': 0,
+        'cohortLabel_weight': 0,
+        'advStudyID_weight': 0,
+        'isFemale_weight': 1,
+        },
+        {
+        'objective_name': 'OBJ Adv StudyID (v3)',
         'recon_weight': 0,
         'isPediatric_weight': 0,
         'cohortLabel_weight':0,
@@ -88,7 +104,7 @@ def main(STUDY_INFO_DICT_LIST):
         kwargs['run_evaluation'] = True
         kwargs['eval_kwargs'] = {
             'sklearn_models': {
-                'Adversary Logistic Regression': LogisticRegression(max_iter=10000, C=1.0, solver='lbfgs'),
+                'Adversary Logistic Regression': LogisticRegression(max_iter=1000, C=1.0, solver='lbfgs'),
                 # 'Adversary KNN': KNeighborsClassifier(n_neighbors=5, weights='uniform', algorithm='auto'),
             }
         }
