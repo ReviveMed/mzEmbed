@@ -105,7 +105,10 @@ def main(STUDY_INFO_DICT_LIST):
         storage_name = WEBAPP_DB_LOC
 
     if 'study_name' in STUDY_INFO_DICT:
-        study_name = STUDY_INFO_DICT['study_name']
+        if encoder_kind == 'AE':
+            study_name = STUDY_INFO_DICT['study_name']
+        else:
+            study_name = STUDY_INFO_DICT['study_name'] + f' {encoder_kind}'
     else:
         study_name = [STUDY_INFO_DICT['objective_name'] for STUDY_INFO_DICT in STUDY_INFO_DICT_LIST]
         study_name = '__'.join(study_name)

@@ -317,8 +317,8 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
     elif encoder_kind == 'TGEM_Encoder':
         encoder_kwargs = {
                     'activation': 'linear',
-                    'n_head': IntDistribution(1, 5, step=1),
-                    'n_layers': IntDistribution(1, 3, step=1),
+                    'n_head': IntDistribution(2, 5, step=1),
+                    'n_layers': IntDistribution(2, 3, step=1),
                     'dropout_rate': FloatDistribution(0, 0.5, step=0.1),
                     }
         encoder_weight = 0
