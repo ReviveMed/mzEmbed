@@ -21,7 +21,7 @@ USE_WEBAPP_DB = True
 SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
-ADD_EXISTING_RUNS_TO_STUDY = True
+ADD_EXISTING_RUNS_TO_STUDY = False
 limit_add = 0 # limit the number of runs added to the study
 
 # get user input
