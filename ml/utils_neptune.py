@@ -96,6 +96,20 @@ def start_neptune_run(with_run_id=None,tags=['v3.1']):
 
 
 
+def neptunize_dict_keys(eval_res,prefix='/'):
+    new_dict = {}
+    for key, val in eval_res.items():
+        if isinstance(val,dict):
+            if prefix is None:
+                prefix = key
+            else:
+                prefix = prefix + '/' + key
+            new_dict.update(neptunize_dict_keys(val,prefix))
+        else:
+            new_dict[prefix + '/' + key] = val
+    return new_dict
+
+
 ######
 if __name__ == '__main__':
     run_id = 'RCC-1603'

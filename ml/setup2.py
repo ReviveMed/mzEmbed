@@ -10,7 +10,7 @@ from models import get_model, Binary_Head, Dummy_Head, MultiClass_Head, MultiHea
 from train3 import CompoundDataset, train_compound_model, get_end_state_eval_funcs, evaluate_compound_model, create_dataloaders, create_dataloaders_old
 import neptune
 from neptune.utils import stringify_unsupported
-from utils_neptune import check_neptune_existance, start_neptune_run, convert_neptune_kwargs
+from utils_neptune import check_neptune_existance, start_neptune_run, convert_neptune_kwargs, neptunize_dict_keys
 from neptune_pytorch import NeptuneLogger
 from viz import generate_latent_space, generate_umap_embedding, generate_pca_embedding
 from misc import assign_color_map, get_color_map
@@ -414,6 +414,13 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             evaluate_compound_model(eval_loader_dct, 
                                     encoder, head, adv, 
                                     run=run, **eval_kwargs)
+
+            # save a history of evaluation results
+            eval_res = run[f'{setup_id}/eval'].fetch()
+            eval_dict = neptunize_dict_keys(eval_res, f'eval')
+            for key, val in eval_dict.items():
+                run[f'{setup_id}/history/{key}'].append(val)
+
         except Exception as e:
             run['sys/tag'].add('evaluation failed')
             run.stop()
