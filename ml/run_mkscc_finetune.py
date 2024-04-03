@@ -66,6 +66,7 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
 
             kwargs['plot_latent_space'] = 'sns' #'both'
             kwargs['plot_latent_space_cols'] = ['Study ID','Cohort Label','is Pediatric','is Female']
+            # kwargs['plot_latent_space_cols'] = ['is Pediatric','is Female']
 
             # run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
 
@@ -213,11 +214,8 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
             run['summary/'+key+ ' avg'] = np.mean(vals)
             run['summary/'+key+ ' std'] = np.std(vals)
             run['summary/'+key+ ' count'] = len(vals)
-
             run['summary/'+key+ ' list'] = []
-            for val in vals:
-                run['summary/'+key+ ' list'].append(val)
-
+            run['summary/'+key+ ' list'].extend(vals)
         run.stop()
 
         return run_id
@@ -235,7 +233,7 @@ if __name__ == '__main__':
             continue
         print('run_id:',run_id)
         try:
-            run_id = compute_mskcc_finetune(run_id,n_trials=5,plot_latent_space=True)
+            run_id = compute_mskcc_finetune(run_id,n_trials=0,plot_latent_space=True)
         except NeptuneException as e:
             print('NeptuneException:',e)
             continue

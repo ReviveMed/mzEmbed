@@ -468,6 +468,14 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
                 run[f'{setup_id}/Z_embed_{eval_name}'].download(Z_embed_savepath)
                 Z_embed = pd.read_csv(Z_embed_savepath, index_col=0)
 
+            missing_cols = [col for col in y_data_eval.columns if col not in Z_embed.columns]
+            if len(missing_cols) > 0:
+                print(f'Adding missing columns to Z_embed: {missing_cols}')
+                Z_embed = Z_embed.join(y_data_eval[missing_cols])
+                Z_embed.to_csv(Z_embed_savepath)
+                run[f'{setup_id}/Z_embed_{eval_name}'].upload(Z_embed_savepath)
+
+
             marker_sz = 5/(1+np.log10(Z_embed.shape[0]))
             if (plot_latent_space=='seaborn') or (plot_latent_space=='both') or (plot_latent_space=='sns'):
 
@@ -488,9 +496,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
                         labels = [f'{label} ({Z_embed[Z_embed[hue_col]==label].shape[0]})' for label in labels]
                     else:
                         new_labels = []
-                        Z_counts = Z_embed[Z_embed[hue_col]].value_counts()
+                        Z_counts = Z_embed[hue_col].value_counts()
                         for label in labels:
-                            new_labels.append(f'{label} ({Z_counts[label]})')
+                            new_labels.append(f'{label} ({Z_counts.loc[eval(label)]})')
                     
                     # make the size of the markers in the handles larger
                     for handle in handles:
@@ -498,7 +506,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
                         handle.set_markersize(10)
                         # handle._sizes = [100]
                     
-                    plt.legend(handles, labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+                    plt.legend(handles, labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., title=hue_col)
 
                     plt.savefig(os.path.join(save_dir, f'Z_pca_{hue_col}_{eval_name}.png'), bbox_inches='tight')
                     run[f'{setup_id}/sns_Z_pca_{hue_col}_{eval_name}'].upload(os.path.join(save_dir, f'Z_pca_{hue_col}_{eval_name}.png'))
@@ -515,16 +523,16 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
                         labels = [f'{label} ({Z_embed[Z_embed[hue_col]==label].shape[0]})' for label in labels]
                     else:
                         new_labels = []
-                        Z_counts = Z_embed[Z_embed[hue_col]].value_counts()
+                        Z_counts = Z_embed[hue_col].value_counts()
                         for label in labels:
-                            new_labels.append(f'{label} ({Z_counts[label]})')
+                            new_labels.append(f'{label} ({Z_counts.loc[eval(label)]})')
                     # make the size of the markers in the handles larger
                     for handle in handles:
                         # print(dir(handle))
                         handle.set_markersize(10)
                         # handle._sizes = [100]
                     
-                    plt.legend(handles, labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+                    plt.legend(handles, labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., title=hue_col)
 
 
                     plt.savefig(os.path.join(save_dir, f'Z_umap_{hue_col}_{eval_name}.png'), bbox_inches='tight', dpi=300)

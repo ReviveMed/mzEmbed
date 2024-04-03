@@ -6,7 +6,21 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 from neptune.exceptions import NeptuneException
 
 
+def count_fields(d):
+    return sum([count_fields(v) if isinstance(v, dict)
+                     else 1 for v in d.values()])
+
+def get_num_fields_in_run(run_id):
+    # https://docs.neptune.ai/help/error_field_count_limit_exceeded/
+    #  The limit for a single run or other Neptune object is 9000 unique fields.
+    run = neptune.init_run(project='revivemed/RCC',
+        api_token= NEPTUNE_API_TOKEN,
+        with_id=run_id,
+        mode="read-only")    
     
+    num_fields = count_fields(run.get_structure())
+    return num_fields
+
 def convert_neptune_kwargs(kwargs):
     if isinstance(kwargs, dict):
         return {k: convert_neptune_kwargs(v) for k, v in kwargs.items()}
@@ -79,3 +93,11 @@ def start_neptune_run(with_run_id=None,tags=['v3.1']):
             is_run_new = True
 
     return run, is_run_new
+
+
+
+######
+if __name__ == '__main__':
+    run_id = 'RCC-1603'
+    num_fields = get_num_fields_in_run(run_id)
+    print(num_fields)
