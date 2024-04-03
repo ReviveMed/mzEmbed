@@ -205,3 +205,15 @@ def assign_color_map(unique_vals):
     my_colors = get_color_map(len(unique_vals))
     color_map = dict(zip(np.sort(unique_vals), my_colors))
     return color_map    
+
+
+
+def unravel_dict(d, prefix='a',sep='_'):
+    unravel = {}
+    for k, v in d.items():
+        unravel[prefix + sep + k] = v
+    for k, v in list(unravel.items()):  # Create a copy of the items
+        if isinstance(v, dict):
+            unravel.update(unravel_dict(v, k,sep=sep))
+            del unravel[k] 
+    return unravel

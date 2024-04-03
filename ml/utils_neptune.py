@@ -4,7 +4,7 @@ import neptune
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
 from neptune.exceptions import NeptuneException
-
+from misc import unravel_dict
 
 def count_fields(d):
     return sum([count_fields(v) if isinstance(v, dict)
@@ -97,17 +97,18 @@ def start_neptune_run(with_run_id=None,tags=['v3.1']):
 
 
 def neptunize_dict_keys(eval_res,prefix='/'):
-    new_dict = {}
-    for key, val in eval_res.items():
-        if isinstance(val,dict):
-            if prefix is None:
-                prefix = key
-            else:
-                prefix = prefix + '/' + key
-            new_dict.update(neptunize_dict_keys(val,prefix))
-        else:
-            new_dict[prefix + '/' + key] = val
-    return new_dict
+    return unravel_dict(eval_res,prefix,sep='_')
+    # new_dict = {}
+    # for key, val in eval_res.items():
+    #     if isinstance(val,dict):
+    #         if prefix is None:
+    #             prefix = key
+    #         else:
+    #             prefix = prefix + '/' + key
+    #         new_dict.update(neptunize_dict_keys(val,prefix))
+    #     else:
+    #         new_dict[prefix + '/' + key] = val
+    # return new_dict
 
 
 ######

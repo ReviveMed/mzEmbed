@@ -95,54 +95,6 @@ def main(STUDY_INFO_DICT_LIST):
         trial.set_user_attr('run_id',run_id)
         trial.set_user_attr('setup_id',setup_id)
 
-        kwargs['load_encoder_loc'] = 'pretrain'
-        # kwargs['load_model_loc'] = 'finetune'
-        kwargs['X_filename'] = 'X_finetune'
-        kwargs['y_filename'] = 'y_finetune'
-        kwargs['run_training'] = True
-        kwargs['run_evaluation'] = True
-        kwargs['save_latent_space'] = True
-        kwargs['plot_latent_space'] = 'sns'
-        kwargs['plot_latent_space_cols'] = ['MSKCC']
-        kwargs['y_head_cols'] = ['MSKCC BINARY']
-        kwargs['y_adv_cols'] = []
-
-
-        kwargs['head_kwargs_dict'] = {}
-        kwargs['adv_kwargs_dict'] = {}
-        kwargs['head_kwargs_list'] = [{
-            'kind': 'Binary',
-            'name': 'MSKCC',
-            'weight': 1,
-            'y_idx': 0,
-            'hidden_size': 4,
-            'num_hidden_layers': 0,
-            'dropout_rate': 0,
-            'activation': 'leakyrelu',
-            'use_batch_norm': False,
-            'num_classes': 2,
-            }]
-        
-        kwargs['adv_kwargs_list'] = []
-        kwargs['train_kwargs']['learning_rate'] = 0.0001
-        kwargs['train_kwargs']['num_epochs'] = 20
-        kwargs['train_kwargs']['early_stopping_patience'] = 0
-        kwargs['train_kwargs']['head_weight'] = 1
-        kwargs['train_kwargs']['encoder_weight'] = 0
-        kwargs['train_kwargs']['adversary_weight'] = 0
-        kwargs['run_evaluation'] = True
-        kwargs['eval_kwargs'] = {}
-        kwargs['eval_kwargs']['sklearn_models'] = {}
-
-        kwargs = convert_model_kwargs_list_to_dict(kwargs)
-
-        ### finetune
-        # run_id = setup_neptune_run(data_dir,setup_id='finetune_mkscc',with_run_id=run_id,**kwargs)
-        
-        ### randinit
-        # kwargs['run_random_init'] = True
-        # kwargs['load_model_weights'] = False
-        # _ = setup_neptune_run(data_dir,setup_id='randinit_mkscc',with_run_id=run_id,**kwargs)
 
         return compute_objective(run_id)
 

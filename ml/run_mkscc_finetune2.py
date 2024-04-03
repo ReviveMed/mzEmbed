@@ -85,9 +85,9 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
         ############################################################
         ## Finetune
         ############################################################
-        if n_trials==0:
-            print('skip finetune')
-            return run_id
+        # if n_trials==0:
+        #     print('skip finetune')
+        #     return run_id
 
         run = neptune.init_run(project='revivemed/RCC',
                         api_token=NEPTUNE_API_TOKEN,
@@ -163,20 +163,6 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
         for ii in range(n_trials):
             _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
 
-            # run = neptune.init_run(project='revivemed/RCC',
-            #         api_token=NEPTUNE_API_TOKEN,
-            #         with_id=run_id,
-            #         capture_stdout=False,
-            #         capture_stderr=False,
-            #         capture_hardware_metrics=False)
-
-            # for key,val_loc in metric_string_dct.items():
-            #     loc = setup_id + '/' + val_loc
-            #     if check_neptune_existance(run,loc):
-            #         metric_val = run[loc].fetch()
-            #         run[setup_id+'/history/'+key].append(metric_val)
-
-            # run.stop()
 
 
         # either one of these settings should run a model with random initialized weights, but do both just in case
@@ -187,20 +173,6 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
         for ii in range(n_trials):
             _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
 
-            # run = neptune.init_run(project='revivemed/RCC',
-            #         api_token=NEPTUNE_API_TOKEN,
-            #         with_id=run_id,
-            #         capture_stdout=False,
-            #         capture_stderr=False,
-            #         capture_hardware_metrics=False)
-
-            # for key,val_loc in metric_string_dct.items():
-            #     loc = setup_id + '/' + val_loc
-            #     if check_neptune_existance(run,loc):
-            #         metric_val = run[loc].fetch()
-            #         run[setup_id+'/history/'+key].append(metric_val)
-
-            # run.stop()
 
 
         ############################################################
@@ -218,13 +190,19 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
 
 
         for setup_id in ['finetune_'+desc_str,'randinit_'+desc_str]:
+            print('setup_id:',setup_id)
             for key, key_loc in metric_string_dct.items():
-                vals = run[f'{setup_id}/history/'+key_loc].fetch()
+                key_loc = key_loc.replace('/','_')
+                print('key:',key_loc)
+                vals_table = run[f'{setup_id}/history/'+key_loc].fetch_values()
+                vals = vals_table['value']
+                # print(vals)
                 run[f'summary/{setup_id}/{key} avg'] = np.mean(vals)
                 run[f'summary/{setup_id}/{key} std'] = np.std(vals)
                 run[f'summary/{setup_id}/{key} count'] = len(vals)
 
 
+        run['sys/failed'] = False
         run.stop()
 
         return run_id
@@ -237,12 +215,13 @@ if __name__ == '__main__':
     # run_id_list = ['RCC-1296']
     # run_id_list = ['RCC-924','RCC-973','RCC-938','RCC-931','RCC-984','RCC-933','RCC-1416','RCC-1364','RCC-1129']
     run_id_list = get_run_id_list(tags=['april03_pareto'],encoder_kind='AE')
-    for run_id in run_id_list[:2]:
+    run_id_list.append('RCC-1603')
+    for run_id in run_id_list:
         if run_id in already_run:
             continue
         print('run_id:',run_id)
         try:
-            run_id = compute_mskcc_finetune(run_id,n_trials=5,plot_latent_space=False)
+            run_id = compute_mskcc_finetune(run_id,n_trials=10,plot_latent_space=False,desc_str='MSKCC0')
         except NeptuneException as e:
             print('NeptuneException:',e)
             continue
