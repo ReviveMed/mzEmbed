@@ -21,6 +21,7 @@ USE_WEBAPP_DB = True
 SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
+ADD_EXISTING_RUNS_TO_STUDY = False
 # get user input
 encoder_kind = input('Enter encoder kind (AE, VAE, TGEM_Encoder): ')
 num_trials = int(input('Enter number of trials: '))
@@ -29,7 +30,7 @@ num_trials = int(input('Enter number of trials: '))
 # encoder_kind = 'TGEM_Encoder'
 
 STUDY_INFO_DICT = {
-    'study_name': 'Dual Obj 2',
+    'study_name': 'Dual Obj 3',
     'directions': ['maximize','minimize'],
     'objective_info_list': [
         {
@@ -164,10 +165,11 @@ def main(STUDY_INFO_DICT_LIST):
 
 
     # if len(study.trials) < 20:
-    add_runs_to_study(study,
-                      objective_func=compute_objective,
-                      study_kwargs=make_kwargs(encoder_kind=encoder_kind),
-                      run_id_list=get_run_id_list(encoder_kind=encoder_kind))
+    if ADD_EXISTING_RUNS_TO_STUDY:
+        add_runs_to_study(study,
+                        objective_func=compute_objective,
+                        study_kwargs=make_kwargs(encoder_kind=encoder_kind),
+                        run_id_list=get_run_id_list(encoder_kind=encoder_kind))
 
 
     study.optimize(objective, n_trials=num_trials)

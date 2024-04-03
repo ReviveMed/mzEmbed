@@ -7,7 +7,7 @@ import numpy as np
 import os
 import json
 from models import get_model, Binary_Head, Dummy_Head, MultiClass_Head, MultiHead
-from train3 import CompoundDataset, train_compound_model, get_end_state_eval_funcs, evaluate_compound_model, create_dataloaders
+from train3 import CompoundDataset, train_compound_model, get_end_state_eval_funcs, evaluate_compound_model, create_dataloaders, create_dataloaders_old
 import neptune
 from neptune.utils import stringify_unsupported
 from utils_neptune import check_neptune_existance, start_neptune_run, convert_neptune_kwargs
@@ -62,6 +62,11 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         y_head_cols = kwargs.get('y_head_cols', ['is Pediatric'])
         y_adv_cols = kwargs.get('y_adv_cols', ['Study ID ENC'])
         
+        if isinstance(y_head_cols, dict):
+            y_head_cols = y_head_cols.values()
+        if isinstance(y_adv_cols, dict):
+            y_adv_cols = y_adv_cols.values()
+
         if not isinstance(y_head_cols, list):
             y_head_cols = [y_head_cols]
 
@@ -171,7 +176,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
             # stratify on the adversarial column (stratify=2)
             # this is probably not the most memory effecient method, would be better to do stratification before creating the dataset
-            train_loader_dct = create_dataloaders(train_dataset, batch_size, holdout_frac, set_name=train_name, stratify=2)
+            # train_loader_dct = create_dataloaders(train_dataset, batch_size, holdout_frac, set_name=train_name, stratify=2)
+            train_loader_dct = create_dataloaders_old(train_dataset, batch_size, holdout_frac, set_name=train_name)
             eval_loader_dct = create_dataloaders(eval_dataset, batch_size, set_name = eval_name)
             eval_loader_dct.update(train_loader_dct)
 

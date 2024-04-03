@@ -534,8 +534,13 @@ def flatten_dict(d, parent_key='', sep='__'):
             if isinstance(v, dict):
                 items.extend(flatten_dict(v, new_key, sep=sep).items())
             elif isinstance(v,list):
-                for i, item in enumerate(v):
-                    items.extend(flatten_dict(item, new_key + sep + str(i), sep=sep).items())            
+                if len(v) == 0:
+                    items.append((new_key, v))
+                elif isinstance(v[0], dict):
+                    for i, item in enumerate(v):
+                        items.extend(flatten_dict(item, new_key + sep + str(i), sep=sep).items())            
+                else:
+                    items.append((new_key, v))
             else:
                 items.append((new_key, v))
         return dict(items)
