@@ -5,6 +5,7 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 
 import neptune
 import os
+import numpy as np
 import optuna
 import json
 from prep_study import add_runs_to_study, reuse_run, convert_neptune_kwargs, \
@@ -16,6 +17,7 @@ from utils_neptune import  get_run_id_list, check_neptune_existance
 from sklearn.linear_model import LogisticRegression
 import time
 from neptune.exceptions import NeptuneException
+from collections import defaultdict
 
 data_dir = '/DATA2'
 os.makedirs(data_dir, exist_ok=True)
@@ -26,135 +28,197 @@ if not os.path.exists(data_dir+'/X_pretrain_train.csv'):
     download_data_dir(data_url, save_dir=data_dir)
 
 
-def compute_mskcc_finetune(run_id):
+def compute_mskcc_finetune(run_id,plot_latent_space=False,
+                           n_trials=3,recompute=False,desc_str='mskcc'):
 
 
-        ###############################
-        ### Plot the latent space
+
+        #############################################################
+        ## Plot the latent space
+        ############################################################
         kwargs = {}
-        kwargs['overwrite_existing_kwargs'] = True
-        kwargs['encoder_kind'] = 'AE'
-        kwargs['load_model_loc'] = 'pretrain'
-        kwargs['run_evaluation'] = False
-        kwargs['run_training'] = False
-        kwargs['save_latent_space'] = True
-        # kwargs['save_latent_space'] = False
+        if plot_latent_space:
+            
+            ### ### ###
+            ### Need to check if the encoder_kind is TGEM_Encoder
+            run = neptune.init_run(project='revivemed/RCC',
+                    api_token=NEPTUNE_API_TOKEN,
+                    with_id=run_id,
+                    capture_stdout=False,
+                    capture_stderr=False,
+                    capture_hardware_metrics=False,
+                    mode='read-only')
 
-        kwargs['plot_latent_space'] = 'sns' #'both'
-        kwargs['plot_latent_space_cols'] = ['Study ID','Cohort Label','is Pediatric']
+            original_kwargs = run['pretrain/original_kwargs'].fetch()
+            run.stop()
+            original_kwargs = convert_neptune_kwargs(original_kwargs)
+            encoder_kind = original_kwargs['encoder_kind']
+            print('encoder_kind:',encoder_kind)
+            ### ### ###
 
-        # run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+            kwargs['overwrite_existing_kwargs'] = True
+            # kwargs['encoder_kind'] = 'AE'
+            kwargs['load_model_loc'] = 'pretrain'
+            kwargs['run_evaluation'] = False
+            kwargs['run_training'] = False
+            kwargs['save_latent_space'] = True
+            # kwargs['save_latent_space'] = False
 
-        kwargs['eval_name'] = 'train'
-        run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+            kwargs['plot_latent_space'] = 'sns' #'both'
+            kwargs['plot_latent_space_cols'] = ['Study ID','Cohort Label','is Pediatric','is Female']
 
-        kwargs['eval_name'] = 'test'
-        run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+            # run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
 
-        kwargs['eval_name'] = 'val'
-        run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+            kwargs['eval_name'] = 'val'
+            run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+
+            if not (encoder_kind == 'TGEM_Encoder'):
+                
+                kwargs['eval_name'] = 'train'
+                run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+
+                kwargs['eval_name'] = 'test'
+                run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
 
 
-        ############################### Finetune
-
-        # kwargs = {}
-        # kwargs['load_model_loc'] = 'finetune_mkscc'
-        # kwargs['run_train'] = False
-        # kwargs['run_evaluation'] = True
-        # kwargs['eval_kwargs'] = {}
-        # kwargs['eval_kwargs']['sklearn_models'] = {}
-        # kwargs['overwrite_existing_kwargs'] = True
+        ############################################################
+        ## Finetune
+        ############################################################
+        if n_trials==0:
+            print('skip finetune')
+            return run_id
 
         run = neptune.init_run(project='revivemed/RCC',
                         api_token=NEPTUNE_API_TOKEN,
                         with_id=run_id,
                         capture_stdout=False,
                         capture_stderr=False,
-                        capture_hardware_metrics=False)
+                        capture_hardware_metrics=False,
+                        mode='read-only')
 
-        kwargs = run['pretrain/kwargs'].fetch()
+        kwargs = run['pretrain/original_kwargs'].fetch()
         kwargs = convert_neptune_kwargs(kwargs)
         
-        if check_neptune_existance(run,'finetune_mkscc_1'):
-            run.stop()
-            return run_id
-            # score = run['finetune_mkscc_1/eval/val/Binary_MSKCC/AUROC (micro)'].fetch()
-            # if score > 0.95:
-            #     del run['finetune_mkscc_1/kwargs']
-            #     del run['finetune_mkscc_1']
-            #     run.stop()
-            # else:
-            #     run.stop()
-            #     return run_id
-        run.stop()
-
-        # pause for 2 seconds
-        # time.sleep(2)
-
-        kwargs['load_encoder_loc'] = 'pretrain'
-        kwargs['load_model_loc'] = False
-        kwargs['X_filename'] = 'X_finetune'
-        kwargs['y_filename'] = 'y_finetune'
-        kwargs['eval_name'] = 'val'
-        kwargs['run_training'] = True
-        kwargs['run_evaluation'] = True
-        kwargs['save_latent_space'] = True
-        kwargs['plot_latent_space'] = 'sns'
-        kwargs['plot_latent_space_cols'] = ['MSKCC']
-        kwargs['y_head_cols'] = ['MSKCC BINARY']
-        kwargs['y_adv_cols'] = []
-
-
-        kwargs['head_kwargs_dict'] = {}
-        kwargs['adv_kwargs_dict'] = {}
-        kwargs['head_kwargs_list'] = [{
-            'kind': 'Binary',
-            'name': 'MSKCC',
-            'weight': 1,
-            'y_idx': 0,
-            'hidden_size': 4,
-            'num_hidden_layers': 0,
-            'dropout_rate': 0,
-            'activation': 'leakyrelu',
-            'use_batch_norm': False,
-            'num_classes': 2,
-            }]
+        finetune_setup_id_list = []
+        randinit_setup_id_list = []
         
-        kwargs['encoder_kwargs']['dropout_rate'] = 0.2
-        kwargs['adv_kwargs_list'] = []
-        kwargs['train_kwargs']['num_epochs'] = 20
-        kwargs['train_kwargs']['early_stopping_patience'] = 0
-        kwargs['holdout_frac'] = 0
-        kwargs['train_kwargs']['head_weight'] = 1
-        kwargs['train_kwargs']['encoder_weight'] = 0
-        kwargs['train_kwargs']['adversary_weight'] = 0
-        kwargs['train_kwargs']['learning_rate'] = 0.001
-        kwargs['train_kwargs']['l2_reg_weight'] = 0.0005
-        kwargs['train_kwargs']['l1_reg_weight'] = 0.005
-        kwargs['train_kwargs']['noise_factor'] = 0.1
-        kwargs['train_kwargs']['weight_decay'] = 0
-        kwargs['run_evaluation'] = True
-        kwargs['eval_kwargs'] = {}
-        kwargs['eval_kwargs']['sklearn_models'] = {}
+        for ii in range(n_trials):
+            if (not check_neptune_existance(run,f'finetune_{desc_str}_'+str(ii))) or recompute:
+                finetune_setup_id_list.append(f'finetune_{desc_str}_'+str(ii))
+        
+            if (not check_neptune_existance(run,f'randinit_{desc_str}_'+str(ii))) or recompute:
+                randinit_setup_id_list.append(f'randinit_{desc_str}_'+str(ii))
+
+        run.stop()
+        
+        num_trials_to_run = len(finetune_setup_id_list) + len(randinit_setup_id_list)
+        print('num_trials_to_run:',num_trials_to_run)
+        if num_trials_to_run > 0:
+
+            kwargs['overwrite_existing_kwargs'] = True
+            kwargs['load_encoder_loc'] = 'pretrain'
+            kwargs['load_model_loc'] = False
+            kwargs['X_filename'] = 'X_finetune'
+            kwargs['y_filename'] = 'y_finetune'
+            kwargs['eval_name'] = 'val'
+            kwargs['run_training'] = True
+            kwargs['run_evaluation'] = True
+            kwargs['save_latent_space'] = True
+            kwargs['plot_latent_space'] = 'sns'
+            kwargs['plot_latent_space_cols'] = ['MSKCC']
+            kwargs['y_head_cols'] = ['MSKCC BINARY']
+            kwargs['y_adv_cols'] = []
 
 
-        kwargs = convert_model_kwargs_list_to_dict(kwargs)
+            kwargs['head_kwargs_dict'] = {}
+            kwargs['adv_kwargs_dict'] = {}
+            kwargs['head_kwargs_list'] = [{
+                'kind': 'Binary',
+                'name': 'MSKCC',
+                'weight': 1,
+                'y_idx': 0,
+                'hidden_size': 4,
+                'num_hidden_layers': 0,
+                'dropout_rate': 0,
+                'activation': 'leakyrelu',
+                'use_batch_norm': False,
+                'num_classes': 2,
+                }]
+            
+            kwargs['encoder_kwargs']['dropout_rate'] = 0.2
+            kwargs['adv_kwargs_list'] = []
+            kwargs['train_kwargs']['num_epochs'] = 20
+            kwargs['train_kwargs']['early_stopping_patience'] = 0
+            kwargs['holdout_frac'] = 0
+            kwargs['train_kwargs']['head_weight'] = 1
+            kwargs['train_kwargs']['encoder_weight'] = 0
+            kwargs['train_kwargs']['adversary_weight'] = 0
+            kwargs['train_kwargs']['learning_rate'] = 0.001
+            kwargs['train_kwargs']['l2_reg_weight'] = 0.0005
+            kwargs['train_kwargs']['l1_reg_weight'] = 0.005
+            kwargs['train_kwargs']['noise_factor'] = 0.1
+            kwargs['train_kwargs']['weight_decay'] = 0
+            kwargs['run_evaluation'] = True
+            kwargs['eval_kwargs'] = {}
+            kwargs['eval_kwargs']['sklearn_models'] = {}
 
-        # kwargs = convert_model_kwargs_list_to_dict(kwargs)
-        # run_id = setup_neptune_run(data_dir,setup_id='finetune_mkscc',with_run_id=run_id,**kwargs)
-        _ = setup_neptune_run(data_dir,setup_id='finetune_mkscc_0',with_run_id=run_id,**kwargs)
-        _ = setup_neptune_run(data_dir,setup_id='finetune_mkscc_1',with_run_id=run_id,**kwargs)
-        _ = setup_neptune_run(data_dir,setup_id='finetune_mkscc_2',with_run_id=run_id,**kwargs)
 
-        kwargs['run_random_init'] = True
-        _ = setup_neptune_run(data_dir,setup_id='randinit_mkscc_0',with_run_id=run_id,**kwargs)
+            kwargs = convert_model_kwargs_list_to_dict(kwargs)
 
-        kwargs['load_model_weights'] = False
-        _ = setup_neptune_run(data_dir,setup_id='randinit_mkscc_1',with_run_id=run_id,**kwargs)
+            for setup_id in finetune_setup_id_list:
+                _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
 
-        kwargs['load_model_weights'] = False
-        kwargs['run_random_init'] = False
-        _ = setup_neptune_run(data_dir,setup_id='randinit_mkscc_2',with_run_id=run_id,**kwargs)
+
+            # either one of these settings should run a model with random initialized weights, but do both just in case
+            kwargs['run_random_init'] = True
+            kwargs['load_model_weights'] = False
+            for setup_id in randinit_setup_id_list:
+                _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
+            _ = setup_neptune_run(data_dir,setup_id=f'randinit_{desc_str}_',with_run_id=run_id,**kwargs)
+
+        ############################################################
+        ## Get the Average AUROC for the finetune models
+        ############################################################
+        
+        # Save the Average AUC for the finetune models
+        run = neptune.init_run(project='revivemed/RCC',
+                        api_token=NEPTUNE_API_TOKEN,
+                        with_id=run_id,
+                        capture_stdout=False,
+                        capture_stderr=False,
+                        capture_hardware_metrics=False)
+        
+        metric_string_dct = {}
+        metric_string_dct['MSKCC Train AUROC'] = 'eval/train/Binary_MSKCC/AUROC (micro)'
+        metric_string_dct['MSKCC Val AUROC'] = 'eval/val/Binary_MSKCC/AUROC (micro)'
+        # metric_calcs = ['mean','std','count']
+        metric_vals_dct = defaultdict(list)
+
+        for ii in range(n_trials):
+            for key,val in metric_string_dct.items():
+                
+                suffix = ' (finetune)'
+                loc = f'finetune_{desc_str}_'+str(ii)+ '/' + val
+                if check_neptune_existance(run,loc):
+                    metric_vals_dct[key+suffix].append(run[loc].fetch())
+                    # metric_vals_dct[key+suffix].append(run[loc].fetch_last())
+
+                suffix = ' (randinit)'
+                loc = f'randinit_{desc_str}_'+str(ii)+ '/' + val
+                if check_neptune_existance(run,loc):
+                    metric_vals_dct[key+suffix].append(run[loc].fetch())
+                    # metric_vals_dct[key+suffix].append(run[loc].fetch_last())
+
+        for key,vals in metric_vals_dct.items():
+            run['summary/'+key+ ' avg'] = np.mean(vals)
+            run['summary/'+key+ ' std'] = np.std(vals)
+            run['summary/'+key+ ' count'] = len(vals)
+
+            run['summary/'+key+ ' list'] = []
+            for val in vals:
+                run['summary/'+key+ ' list'].append(val)
+
+        run.stop()
 
         return run_id
 
@@ -163,15 +227,15 @@ def compute_mskcc_finetune(run_id):
 if __name__ == '__main__':
 
     already_run = []
-    # run_id_list = ['RCC-1296']
+    run_id_list = ['RCC-1296']
     # run_id_list = ['RCC-924','RCC-973','RCC-938','RCC-931','RCC-984','RCC-933','RCC-1416','RCC-1364','RCC-1129']
-    run_id_list = get_run_id_list(tags=['april2'],encoder_kind='AE')
+    # run_id_list = get_run_id_list(tags=['april2'],encoder_kind='AE')
     for run_id in run_id_list:
         if run_id in already_run:
             continue
         print('run_id:',run_id)
         try:
-            run_id = compute_mskcc_finetune(run_id)
+            run_id = compute_mskcc_finetune(run_id,n_trials=5)
         except NeptuneException as e:
             print('NeptuneException:',e)
             continue
