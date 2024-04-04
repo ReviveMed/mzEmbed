@@ -255,7 +255,7 @@ if __name__ == '__main__':
             continue
         print('run_id:',run_id)
         try:
-            run_id = compute_mskcc_finetune(run_id,n_trials=n_trials,plot_latent_space=False,desc_str='Apr04_MSKCC')
+            run_id = compute_mskcc_finetune(run_id,n_trials=n_trials,plot_latent_space=plot_latent_space,desc_str='Apr04_MSKCC')
         except NeptuneException as e:
             print('NeptuneException:',e)
             continue
