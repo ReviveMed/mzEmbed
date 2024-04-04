@@ -49,6 +49,7 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
                 capture_hardware_metrics=False,
                 mode='read-only')
 
+        run_struc= run.get_structure()
         original_kwargs = run['pretrain/original_kwargs'].fetch()
         run.stop()
         original_kwargs = convert_neptune_kwargs(original_kwargs)
@@ -71,14 +72,23 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
 
         if not (encoder_kind == 'TGEM_Encoder'):
             
-            kwargs['eval_name'] = 'train'
-            run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+            if not ('sns_Z_umap_is Female_train' in run_struc):
+                kwargs['eval_name'] = 'train'
+                run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+            else:
+                print('Already plotted train')
 
-            kwargs['eval_name'] = 'test'
-            run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+            if not ('sns_Z_umap_is Female_test' in run_struc):
+                kwargs['eval_name'] = 'test'
+                run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+            else:
+                print('Already plotted test')
 
-        kwargs['eval_name'] = 'val'
-        run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+        if not ('sns_Z_umap_is Female_val' in run_struc):
+            kwargs['eval_name'] = 'val'
+            run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+        else:
+            print('Already plotted val')
 
     ############################################################
     ## Finetune
