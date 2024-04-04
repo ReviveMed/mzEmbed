@@ -141,7 +141,7 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
         kwargs['train_kwargs']['head_weight'] = 1
         kwargs['train_kwargs']['encoder_weight'] = 0
         kwargs['train_kwargs']['adversary_weight'] = 0
-        kwargs['train_kwargs']['learning_rate'] = 0.001
+        kwargs['train_kwargs']['learning_rate'] = 0.0001
         kwargs['train_kwargs']['l2_reg_weight'] = 0.0005
         kwargs['train_kwargs']['l1_reg_weight'] = 0.005
         kwargs['train_kwargs']['noise_factor'] = 0.1
@@ -214,14 +214,13 @@ if __name__ == '__main__':
     already_run = []
     # run_id_list = ['RCC-1296']
     # run_id_list = ['RCC-924','RCC-973','RCC-938','RCC-931','RCC-984','RCC-933','RCC-1416','RCC-1364','RCC-1129']
-    run_id_list = get_run_id_list(tags=['april03_pareto'],encoder_kind='AE')
-    run_id_list.append('RCC-1603')
+    run_id_list = get_run_id_list(tags=['april04_pareto'],encoder_kind='AE')
     for run_id in run_id_list:
         if run_id in already_run:
             continue
         print('run_id:',run_id)
         try:
-            run_id = compute_mskcc_finetune(run_id,n_trials=0,plot_latent_space=True,desc_str='MSKCC0')
+            run_id = compute_mskcc_finetune(run_id,n_trials=5,plot_latent_space=True,desc_str='Apr04_MSKCC')
         except NeptuneException as e:
             print('NeptuneException:',e)
             continue
