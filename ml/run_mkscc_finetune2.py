@@ -115,6 +115,7 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
         kwargs['plot_latent_space_cols'] = ['MSKCC']
         kwargs['y_head_cols'] = ['MSKCC BINARY']
         kwargs['y_adv_cols'] = []
+        kwargs['upload_models_to_neptune'] = False
 
 
         kwargs['head_kwargs_dict'] = {}

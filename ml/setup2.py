@@ -189,139 +189,145 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
     ####################################
     ###### Create the Encoder Models ######
     try:
-        print('creating models')
-        encoder_kind = kwargs.get('encoder_kind', 'AE')
-        encoder_kwargs = kwargs.get('encoder_kwargs', {})
-        other_input_size = kwargs.get('other_input_size', 1)
-        latent_size = encoder_kwargs.get('latent_size', 8)
-        input_size = kwargs.get('input_size', None)
-        load_model_weights = kwargs.get('load_model_weights', True)
-        
-        if input_size is None:
-            try:
-                input_size = run['input_size'].fetch()
-            except NeptuneException:
-                input_size = X_size
-                run['input_size'] = input_size
-        if X_size is not None:
-            assert input_size == X_size
-        # if input_size is None:
-
-
-        if encoder_kind == 'TGEM_Encoder':
-            latent_size = input_size
-
-        if 'hidden_size_mult' in encoder_kwargs:
-            encoder_kwargs['hidden_size'] = int(encoder_kwargs['hidden_size_mult']*latent_size)
-            # remove the hidden_size_mult key
-            encoder_kwargs.pop('hidden_size_mult')
-    
-        encoder = get_model(encoder_kind, input_size, **encoder_kwargs)
-
-
-        if (load_encoder_loc) and (load_model_weights):
-            os.makedirs(os.path.join(save_dir,load_encoder_loc), exist_ok=True)
-
-            run[f'{load_encoder_loc}/models/encoder_state_dict'].download(f'{save_dir}/{load_encoder_loc}/encoder_state_dict.pth')
-            encoder_state_dict = torch.load(f'{save_dir}/{load_encoder_loc}/encoder_state_dict.pth')
-            encoder.load_state_dict(encoder_state_dict)
-
-        ####################################
-        ###### Create the Head Models ######
-
-        head_kwargs_dict = kwargs.get('head_kwargs_dict', {})
-        if head_kwargs_dict:
-            head_kwargs_list = [head_kwargs_dict[k] for k in head_kwargs_dict.keys()]
-        else:
-            head_kwargs_list = kwargs.get('head_kwargs_list', [])
-
-        head_list = []
-        for head_kwargs in head_kwargs_list:
+        if run_training or run_evaluation or save_latent_space:
+            print('creating models')
+            encoder_kind = kwargs.get('encoder_kind', 'AE')
+            encoder_kwargs = kwargs.get('encoder_kwargs', {})
+            other_input_size = kwargs.get('other_input_size', 1)
+            latent_size = encoder_kwargs.get('latent_size', 8)
+            input_size = kwargs.get('input_size', None)
+            load_model_weights = kwargs.get('load_model_weights', True)
             
-            head_kind = head_kwargs.get('kind', 'NA')
-            if 'input_size' not in head_kwargs:
-                head_kwargs['input_size'] = latent_size+other_input_size
+            if input_size is None:
+                try:
+                    input_size = run['input_size'].fetch()
+                except NeptuneException:
+                    input_size = X_size
+                    run['input_size'] = input_size
+            if X_size is not None:
+                assert input_size == X_size
+            # if input_size is None:
 
-            if head_kind == 'Binary':
-                head_list.append(Binary_Head(**head_kwargs))
-            elif head_kind == 'MultiClass':
-                head_list.append(MultiClass_Head(**head_kwargs))
-            # elif head_kind == 'Regression':
-                # head_list.append(Regression_Head(**head_kwargs))
-            elif head_kind == 'NA':
-                head_list.append(Dummy_Head())
+
+            if encoder_kind == 'TGEM_Encoder':
+                latent_size = input_size
+
+            if 'hidden_size_mult' in encoder_kwargs:
+                encoder_kwargs['hidden_size'] = int(encoder_kwargs['hidden_size_mult']*latent_size)
+                # remove the hidden_size_mult key
+                encoder_kwargs.pop('hidden_size_mult')
+        
+            encoder = get_model(encoder_kind, input_size, **encoder_kwargs)
+
+
+            if (load_encoder_loc) and (load_model_weights):
+                os.makedirs(os.path.join(save_dir,load_encoder_loc), exist_ok=True)
+                local_path = f'{save_dir}/{load_encoder_loc}/encoder_state_dict.pth'
+                if not os.path.exists(local_path):
+                    run[f'{load_encoder_loc}/models/encoder_state_dict'].download(local_path)
+                encoder_state_dict = torch.load(local_path)
+                encoder.load_state_dict(encoder_state_dict)
+
+            ####################################
+            ###### Create the Head Models ######
+
+            head_kwargs_dict = kwargs.get('head_kwargs_dict', {})
+            if head_kwargs_dict:
+                head_kwargs_list = [head_kwargs_dict[k] for k in head_kwargs_dict.keys()]
             else:
-                raise ValueError(f'Invalid head_kind: {head_kind}')
+                head_kwargs_list = kwargs.get('head_kwargs_list', [])
+
+            head_list = []
+            for head_kwargs in head_kwargs_list:
+                
+                head_kind = head_kwargs.get('kind', 'NA')
+                if 'input_size' not in head_kwargs:
+                    head_kwargs['input_size'] = latent_size+other_input_size
+
+                if head_kind == 'Binary':
+                    head_list.append(Binary_Head(**head_kwargs))
+                elif head_kind == 'MultiClass':
+                    head_list.append(MultiClass_Head(**head_kwargs))
+                # elif head_kind == 'Regression':
+                    # head_list.append(Regression_Head(**head_kwargs))
+                elif head_kind == 'NA':
+                    head_list.append(Dummy_Head())
+                else:
+                    raise ValueError(f'Invalid head_kind: {head_kind}')
 
 
-        head = MultiHead(head_list)
+            head = MultiHead(head_list)
 
-        # confirm that the heads and adv use the correct columns
-        y_head_col_array = np.array(y_head_cols)
+            # confirm that the heads and adv use the correct columns
+            y_head_col_array = np.array(y_head_cols)
 
-        for h in head_list:
-            cols = y_head_col_array[h.y_idx]
-            print(f'{h.kind} {h.name} uses columns: {cols}')
+            for h in head_list:
+                cols = y_head_col_array[h.y_idx]
+                print(f'{h.kind} {h.name} uses columns: {cols}')
 
-        # Assign the class weights to the head and adv models so the loss is balanced
-        if train_dataset is not None:
-            #TODO: loadd the class weights from the model json
-            head.update_class_weights(train_dataset.y_head)
+            # Assign the class weights to the head and adv models so the loss is balanced
+            if train_dataset is not None:
+                #TODO: loadd the class weights from the model json
+                head.update_class_weights(train_dataset.y_head)
 
 
-        if load_head_loc and load_model_weights:
-            head_file_ids = head.get_file_ids()
-            for head_file_id in head_file_ids:
-                run[f'{load_head_loc}/models/{head_file_id}_state'].download(f'{save_dir}/{load_head_loc}/{head_file_id}_state.pt')
-                run[f'{load_head_loc}/models/{head_file_id}_info'].download(f'{save_dir}/{load_head_loc}/{head_file_id}_info.json')
-                # head_state_dict = torch.load(f'{save_dir}/{load_head_loc}/{head_file_id}_state.pt')
-            head.load_state_from_path(f'{save_dir}/{load_head_loc}')
+            if load_head_loc and load_model_weights:
+                head_file_ids = head.get_file_ids()
+                for head_file_id in head_file_ids:
+                    local_path = f'{save_dir}/{load_head_loc}/{head_file_id}_state.pt'
+                    if not os.path.exists(local_path):
+                        run[f'{load_head_loc}/models/{head_file_id}_state'].download(f'{save_dir}/{load_head_loc}/{head_file_id}_state.pt')
+                        run[f'{load_head_loc}/models/{head_file_id}_info'].download(f'{save_dir}/{load_head_loc}/{head_file_id}_info.json')
+                    # head_state_dict = torch.load(f'{save_dir}/{load_head_loc}/{head_file_id}_state.pt')
+                head.load_state_from_path(f'{save_dir}/{load_head_loc}')
 
-        ####################################
-        ###### Create the Adversarial Models ######
+            ####################################
+            ###### Create the Adversarial Models ######
 
-        adv_kwargs_dict = kwargs.get('adv_kwargs_dict', {})
-        if adv_kwargs_dict:
-            adv_kwargs_list = [adv_kwargs_dict[k] for k in adv_kwargs_dict.keys()]
-        else:
-            adv_kwargs_list = kwargs.get('adv_kwargs_list', [])
-
-        adv_list = []
-        for adv_kwargs in adv_kwargs_list:
-            adv_kind = adv_kwargs.get('kind', 'NA')
-
-            if 'input_size' not in adv_kwargs:
-                adv_kwargs['input_size'] = latent_size
-
-            if adv_kind == 'Binary':
-                adv_list.append(Binary_Head(**adv_kwargs))
-            elif adv_kind == 'MultiClass':
-                adv_list.append(MultiClass_Head(**adv_kwargs))
-            # elif adv_kind == 'Regression':
-                # adv_list.append(Regression_Head(**adv_kwargs))
-            elif adv_kind == 'NA':
-                adv_list.append(Dummy_Head())
+            adv_kwargs_dict = kwargs.get('adv_kwargs_dict', {})
+            if adv_kwargs_dict:
+                adv_kwargs_list = [adv_kwargs_dict[k] for k in adv_kwargs_dict.keys()]
             else:
-                raise ValueError(f'Invalid adv_kind: {adv_kind}')
+                adv_kwargs_list = kwargs.get('adv_kwargs_list', [])
 
-        adv = MultiHead(adv_list)
+            adv_list = []
+            for adv_kwargs in adv_kwargs_list:
+                adv_kind = adv_kwargs.get('kind', 'NA')
 
-        y_adv_col_array = np.array(y_adv_cols)
-        for a in adv_list:
-            cols = y_adv_col_array[a.y_idx]
-            print(f'{a.kind} {a.name} uses columns: {cols}')
+                if 'input_size' not in adv_kwargs:
+                    adv_kwargs['input_size'] = latent_size
 
-        if train_dataset is not None:
-            #TODO load the class weights from the model info json
-            adv.update_class_weights(train_dataset.y_adv)
+                if adv_kind == 'Binary':
+                    adv_list.append(Binary_Head(**adv_kwargs))
+                elif adv_kind == 'MultiClass':
+                    adv_list.append(MultiClass_Head(**adv_kwargs))
+                # elif adv_kind == 'Regression':
+                    # adv_list.append(Regression_Head(**adv_kwargs))
+                elif adv_kind == 'NA':
+                    adv_list.append(Dummy_Head())
+                else:
+                    raise ValueError(f'Invalid adv_kind: {adv_kind}')
 
-        if load_adv_loc and load_model_weights:
-            adv_file_ids = adv.get_file_ids()
-            for adv_file_id in adv_file_ids:
-                run[f'{load_adv_loc}/models/{adv_file_id}_state'].download(f'{save_dir}/{load_adv_loc}/{adv_file_id}_state.pt')
-                run[f'{load_adv_loc}/models/{adv_file_id}_info'].download(f'{save_dir}/{load_adv_loc}/{adv_file_id}_info.json')
-                # adv_state_dict = torch.load(f'{save_dir}/{load_adv_loc}/{adv_file_id}_state.pt')
-            adv.load_state_from_path(f'{save_dir}/{load_adv_loc}')
+            adv = MultiHead(adv_list)
+
+            y_adv_col_array = np.array(y_adv_cols)
+            for a in adv_list:
+                cols = y_adv_col_array[a.y_idx]
+                print(f'{a.kind} {a.name} uses columns: {cols}')
+
+            if train_dataset is not None:
+                #TODO load the class weights from the model info json
+                adv.update_class_weights(train_dataset.y_adv)
+
+            if load_adv_loc and load_model_weights:
+                adv_file_ids = adv.get_file_ids()
+                for adv_file_id in adv_file_ids:
+                    local_path = f'{save_dir}/{load_adv_loc}/{adv_file_id}_state.pt'
+                    if not os.path.exists(local_path):
+                        run[f'{load_adv_loc}/models/{adv_file_id}_state'].download(f'{save_dir}/{load_adv_loc}/{adv_file_id}_state.pt')
+                        run[f'{load_adv_loc}/models/{adv_file_id}_info'].download(f'{save_dir}/{load_adv_loc}/{adv_file_id}_info.json')
+                    # adv_state_dict = torch.load(f'{save_dir}/{load_adv_loc}/{adv_file_id}_state.pt')
+                adv.load_state_from_path(f'{save_dir}/{load_adv_loc}')
             
     except Exception as e:
         run['sys/tag'].add('model-creation failed')
@@ -332,6 +338,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
     ###### Train the Models ######
     run_training = kwargs.get('run_training', True)
     run_random_init = kwargs.get('run_random_init', False) # this should be redundant with load_model_weights
+    upload_models_to_neptune = kwargs.get('upload_models_to_neptune', True)
+
 
     if run_training:
         try:
@@ -376,27 +384,29 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             torch.save(encoder.state_dict(), f'{save_dir}/{setup_id}_encoder_state_dict.pth')
             # torch.save(head.state_dict(), f'{save_dir}/{setup_id}_head_state_dict.pth')
             # torch.save(adv.state_dict(), f'{save_dir}/{setup_id}_adv_state_dict.pth')
-
-            run[f'{setup_id}/models/encoder_state_dict'].upload(f'{save_dir}/{setup_id}_encoder_state_dict.pth')
+            if upload_models_to_neptune:
+                run[f'{setup_id}/models/encoder_state_dict'].upload(f'{save_dir}/{setup_id}_encoder_state_dict.pth')
             # run[f'{setup_id}/models/head_state_dict'].upload(f'{save_dir}/{setup_id}_head_state_dict.pth')
             # run[f'{setup_id}/models/adv_state_dict'].upload(f'{save_dir}/{setup_id}_adv_state_dict.pth')
-            run.wait()
+                run.wait()
+                
             os.makedirs(os.path.join(save_dir,setup_id), exist_ok=True)
             head.save_state_to_path(f'{save_dir}/{setup_id}')
             adv.save_state_to_path(f'{save_dir}/{setup_id}')
             head.save_info(f'{save_dir}/{setup_id}')
             adv.save_info(f'{save_dir}/{setup_id}')
 
-            head_file_ids = head.get_file_ids()
-            for head_file_id in head_file_ids:
-                run[f'{setup_id}/models/{head_file_id}_state'].upload(f'{save_dir}/{setup_id}/{head_file_id}_state.pt')
-                run[f'{setup_id}/models/{head_file_id}_info'].upload(f'{save_dir}/{setup_id}/{head_file_id}_info.json')
-                run.wait()
-            adv_file_ids = adv.get_file_ids()
-            for adv_file_id in adv_file_ids:
-                run[f'{setup_id}/models/{adv_file_id}_state'].upload(f'{save_dir}/{setup_id}/{adv_file_id}_state.pt')
-                run[f'{setup_id}/models/{adv_file_id}_info'].upload(f'{save_dir}/{setup_id}/{adv_file_id}_info.json')
-                run.wait()
+            if upload_models_to_neptune:
+                head_file_ids = head.get_file_ids()
+                for head_file_id in head_file_ids:
+                    run[f'{setup_id}/models/{head_file_id}_state'].upload(f'{save_dir}/{setup_id}/{head_file_id}_state.pt')
+                    run[f'{setup_id}/models/{head_file_id}_info'].upload(f'{save_dir}/{setup_id}/{head_file_id}_info.json')
+                    run.wait()
+                adv_file_ids = adv.get_file_ids()
+                for adv_file_id in adv_file_ids:
+                    run[f'{setup_id}/models/{adv_file_id}_state'].upload(f'{save_dir}/{setup_id}/{adv_file_id}_state.pt')
+                    run[f'{setup_id}/models/{adv_file_id}_info'].upload(f'{save_dir}/{setup_id}/{adv_file_id}_info.json')
+                    run.wait()
 
         except Exception as e:
             run['sys/tag'].add('training failed')
