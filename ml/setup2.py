@@ -435,6 +435,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,**kwargs):
                                     run=run, **eval_kwargs)
 
             # save a history of evaluation results
+            run.wait()
             eval_res = run[f'{setup_id}/eval'].fetch()
             eval_dict = neptunize_dict_keys(eval_res, f'eval')
             for key, val in eval_dict.items():

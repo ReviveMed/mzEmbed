@@ -158,7 +158,9 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
         kwargs = convert_model_kwargs_list_to_dict(kwargs)
 
         setup_id = f'finetune_{desc_str}'
+        print('ID:',setup_id)
         for ii in range(n_trials):
+            print('trial #:',ii)
             _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
 
 
@@ -168,7 +170,9 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
         kwargs['load_model_weights'] = False
         
         setup_id = f'randinit_{desc_str}'
+        print('ID:',setup_id)
         for ii in range(n_trials):
+            print('trial #:',ii)
             _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
 
 
