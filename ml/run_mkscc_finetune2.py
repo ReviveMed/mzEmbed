@@ -198,6 +198,7 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
             run[f'summary/{setup_id}/{key} avg'] = np.mean(vals)
             run[f'summary/{setup_id}/{key} std'] = np.std(vals)
             run[f'summary/{setup_id}/{key} count'] = len(vals)
+            run.wait()
 
 
     run['sys/failed'] = False

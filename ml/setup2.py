@@ -380,7 +380,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             run[f'{setup_id}/models/encoder_state_dict'].upload(f'{save_dir}/{setup_id}_encoder_state_dict.pth')
             # run[f'{setup_id}/models/head_state_dict'].upload(f'{save_dir}/{setup_id}_head_state_dict.pth')
             # run[f'{setup_id}/models/adv_state_dict'].upload(f'{save_dir}/{setup_id}_adv_state_dict.pth')
-
+            run.wait()
             os.makedirs(os.path.join(save_dir,setup_id), exist_ok=True)
             head.save_state_to_path(f'{save_dir}/{setup_id}')
             adv.save_state_to_path(f'{save_dir}/{setup_id}')
@@ -391,10 +391,12 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             for head_file_id in head_file_ids:
                 run[f'{setup_id}/models/{head_file_id}_state'].upload(f'{save_dir}/{setup_id}/{head_file_id}_state.pt')
                 run[f'{setup_id}/models/{head_file_id}_info'].upload(f'{save_dir}/{setup_id}/{head_file_id}_info.json')
+                run.wait()
             adv_file_ids = adv.get_file_ids()
             for adv_file_id in adv_file_ids:
                 run[f'{setup_id}/models/{adv_file_id}_state'].upload(f'{save_dir}/{setup_id}/{adv_file_id}_state.pt')
                 run[f'{setup_id}/models/{adv_file_id}_info'].upload(f'{save_dir}/{setup_id}/{adv_file_id}_info.json')
+                run.wait()
 
         except Exception as e:
             run['sys/tag'].add('training failed')
@@ -456,7 +458,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
                 Z_embed = Z_embed.join(y_data_eval)
                 Z_embed.to_csv(Z_embed_savepath)
                 run[f'{setup_id}/Z_embed_{eval_name}'].upload(Z_embed_savepath)
-
+            run.wait()
 
 
         plot_latent_space = kwargs.get('plot_latent_space', '')
@@ -560,6 +562,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
                     plotly_fig.update_traces(marker=dict(size=2*marker_sz))
                     run[f'{setup_id}/px_Z_umap_{hue_col}_{eval_name}'].upload(plotly_fig)
                     plt.close()
+
+            run.wait()
 
     except Exception as e:
         run['sys/tag'].add('plotting failed')
