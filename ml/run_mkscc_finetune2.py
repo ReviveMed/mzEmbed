@@ -87,6 +87,10 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
     #     print('skip finetune')
     #     return run_id
 
+    metric_string_dct = {}
+    metric_string_dct['MSKCC Train AUROC'] = 'eval/train/Binary_MSKCC/AUROC (micro)'
+    metric_string_dct['MSKCC Val AUROC'] = 'eval/val/Binary_MSKCC/AUROC (micro)'
+
     if n_trials>0:
         run = neptune.init_run(project='revivemed/RCC',
                         api_token=NEPTUNE_API_TOKEN,
@@ -152,12 +156,6 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
 
 
         kwargs = convert_model_kwargs_list_to_dict(kwargs)
-
-
-        metric_string_dct = {}
-        metric_string_dct['MSKCC Train AUROC'] = 'eval/train/Binary_MSKCC/AUROC (micro)'
-        metric_string_dct['MSKCC Val AUROC'] = 'eval/val/Binary_MSKCC/AUROC (micro)'
-
 
         setup_id = f'finetune_{desc_str}'
         for ii in range(n_trials):
