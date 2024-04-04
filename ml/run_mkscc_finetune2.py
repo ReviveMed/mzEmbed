@@ -72,19 +72,19 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
 
         if not (encoder_kind == 'TGEM_Encoder'):
             
-            if not ('sns_Z_umap_is Female_train' in run_struc):
+            if not ('sns_Z_umap_is Female_train' in run_struc.keys()):
                 kwargs['eval_name'] = 'train'
                 run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
             else:
                 print('Already plotted train')
 
-            if not ('sns_Z_umap_is Female_test' in run_struc):
+            if not ('sns_Z_umap_is Female_test' in run_struc.keys()):
                 kwargs['eval_name'] = 'test'
                 run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
             else:
                 print('Already plotted test')
 
-        if not ('sns_Z_umap_is Female_val' in run_struc):
+        if not ('sns_Z_umap_is Female_val' in run_struc.keys()):
             kwargs['eval_name'] = 'val'
             run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
         else:
@@ -149,13 +149,15 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
         
         kwargs['encoder_kwargs']['dropout_rate'] = 0.2
         kwargs['adv_kwargs_list'] = []
-        kwargs['train_kwargs']['num_epochs'] = 20
+        kwargs['train_kwargs']['num_epochs'] = 30
+        # kwargs['train_kwargs']['num_epochs'] = 20
         kwargs['train_kwargs']['early_stopping_patience'] = 0
         kwargs['holdout_frac'] = 0
         kwargs['train_kwargs']['head_weight'] = 1
         kwargs['train_kwargs']['encoder_weight'] = 0
         kwargs['train_kwargs']['adversary_weight'] = 0
-        kwargs['train_kwargs']['learning_rate'] = 0.0001
+        kwargs['train_kwargs']['learning_rate'] = 0.0005
+        # kwargs['train_kwargs']['learning_rate'] = 0.0001
         kwargs['train_kwargs']['l2_reg_weight'] = 0.0005
         kwargs['train_kwargs']['l1_reg_weight'] = 0.005
         kwargs['train_kwargs']['noise_factor'] = 0.1
@@ -257,7 +259,8 @@ if __name__ == '__main__':
     if chosen_run_id is not None:
         run_id_list = [chosen_run_id]
     else:
-        run_id_list = get_run_id_list(tags=['april04_pareto'],encoder_kind='AE')
+        # run_id_list = get_run_id_list(tags=['april04_pareto'],encoder_kind='AE')
+        run_id_list = get_run_id_list(tags=['top'],encoder_kind='AE')
 
     # run_id_list = ['RCC-1735']
     for run_id in run_id_list:
@@ -265,7 +268,8 @@ if __name__ == '__main__':
             continue
         print('run_id:',run_id)
         try:
-            run_id = compute_mskcc_finetune(run_id,n_trials=n_trials,plot_latent_space=plot_latent_space,desc_str='Apr04_MSKCC')
+            # run_id = compute_mskcc_finetune(run_id,n_trials=n_trials,plot_latent_space=plot_latent_space,desc_str='Apr04_MSKCC')
+            run_id = compute_mskcc_finetune(run_id,n_trials=n_trials,plot_latent_space=plot_latent_space,desc_str='Apr04.1_MSKCC')
         except NeptuneException as e:
             print('NeptuneException:',e)
             continue
