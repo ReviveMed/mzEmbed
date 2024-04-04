@@ -640,16 +640,16 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
                             if adv0.kind =='Binary':
                                 task = 'binary'
                                 num_classes = 2
-                                metric = AUROC(task=task,average='weighted')
+                                metric = AUROC(task=task,average='macro')
                                 probs = torch.tensor(model.predict_proba(latent_outputs[nan_mask].detach().numpy()))[:,1]
                             elif adv0.kind == 'MultiClass':
                                 task = 'multiclass'
                                 num_classes = adv0.num_classes
-                                metric = AUROC(task=task,average='weighted',num_classes=num_classes)
+                                metric = AUROC(task=task,average='macro',num_classes=num_classes)
                                 probs = torch.tensor(model.predict_proba(latent_outputs[nan_mask].detach().numpy()))
                             
                             metric(probs,adv0_targets[nan_mask].long())
-                            run[f'{prefix}/{phase}/{adv0.kind}_{adv0_name}/{model_name} AUROC (weighted)'] = stringify_unsupported(metric.compute().item())
+                            run[f'{prefix}/{phase}/{adv0.kind}_{adv0_name}/{model_name} AUROC (macro)'] = stringify_unsupported(metric.compute().item())
             
         except Exception as e:
             print('Error in sklearn model evaluation:', e)

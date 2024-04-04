@@ -268,11 +268,11 @@ def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=Non
 
 def make_kwargs(sig_figs=2,encoder_kind='AE'):
     activation = 'leakyrelu'
-    latent_size = IntDistribution(4, 64, step=1)
-    num_hidden_layers = IntDistribution(1, 10)
-    cohort_label_weight = FloatDistribution(0,10,step=0.1) #10
-    isfemale_weight = FloatDistribution(0,10,step=0.1) #20
-    ispediatric_weight = FloatDistribution(0,10,step=0.1) #10
+    latent_size = IntDistribution(8, 64, step=4)
+    num_hidden_layers = IntDistribution(2, 10)
+    cohort_label_weight = FloatDistribution(0,2,step=0.1) #10
+    isfemale_weight = FloatDistribution(0.1,10,step=0.1) #20
+    ispediatric_weight = FloatDistribution(0.1,10,step=0.1) #10
     head_weight = FloatDistribution(0,10,step=0.1) # 10
     adv_weight = FloatDistribution(0.1,50,step=0.1) #50
     
@@ -288,12 +288,13 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
                     }
         encoder_weight = FloatDistribution(0,5,step=0.1)
         num_epochs_min = 50
-        num_epochs_max = 200
+        num_epochs_max = 300
         num_epochs_step = 10
         adversarial_mini_epochs = 5
         early_stopping_patience_step = 10
         early_stopping_patience_max = 50
         l2_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
+        l1_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
 
     elif encoder_kind == 'VAE':        
         encoder_kwargs = {
@@ -313,6 +314,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
         early_stopping_patience_step = 10
         early_stopping_patience_max = 50
         l2_reg_weight = 0 # loss explodes if not 0
+        l1_reg_weight = 0
 
     elif encoder_kind == 'TGEM_Encoder':
         encoder_kwargs = {
@@ -329,6 +331,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
         early_stopping_patience_step = 5
         early_stopping_patience_max = 20
         l2_reg_weight = 0
+        l1_reg_weight = 0
 
     kwargs = {
                 ################
@@ -406,7 +409,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
                     'lr': FloatDistribution(0.0001, 0.05, log=True),
                     # 'lr': 0.01,
                     'weight_decay': 0,
-                    'l1_reg_weight': 0,
+                    'l1_reg_weight': l1_reg_weight,
                     # 'l2_reg_weight': 0.001,
                     'l2_reg_weight': l2_reg_weight,
                     'encoder_weight': encoder_weight,
