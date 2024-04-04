@@ -29,66 +29,65 @@ if not os.path.exists(data_dir+'/X_pretrain_train.csv'):
 
 
 def compute_mskcc_finetune(run_id,plot_latent_space=False,
-                           n_trials=3,recompute=False,desc_str='MSKCC'):
+                           n_trials=3,desc_str='MSKCC'):
 
 
 
-        #############################################################
-        ## Plot the latent space
-        ############################################################
-        kwargs = {}
-        if plot_latent_space:
+    #############################################################
+    ## Plot the latent space
+    ############################################################
+    kwargs = {}
+    if plot_latent_space:
+        
+        ### ### ###
+        ### Need to check if the encoder_kind is TGEM_Encoder
+        run = neptune.init_run(project='revivemed/RCC',
+                api_token=NEPTUNE_API_TOKEN,
+                with_id=run_id,
+                capture_stdout=False,
+                capture_stderr=False,
+                capture_hardware_metrics=False,
+                mode='read-only')
+
+        original_kwargs = run['pretrain/original_kwargs'].fetch()
+        run.stop()
+        original_kwargs = convert_neptune_kwargs(original_kwargs)
+        encoder_kind = original_kwargs['encoder_kind']
+        print('encoder_kind:',encoder_kind)
+        ### ### ###
+
+        kwargs['overwrite_existing_kwargs'] = True
+        # kwargs['encoder_kind'] = 'AE'
+        kwargs['load_model_loc'] = 'pretrain'
+        kwargs['run_evaluation'] = False
+        kwargs['run_training'] = False
+        kwargs['save_latent_space'] = True
+        # kwargs['save_latent_space'] = False
+
+        kwargs['plot_latent_space'] = 'sns' #'both'
+        kwargs['plot_latent_space_cols'] = ['Study ID','Cohort Label','is Pediatric','is Female']
+
+        # run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+
+        if not (encoder_kind == 'TGEM_Encoder'):
             
-            ### ### ###
-            ### Need to check if the encoder_kind is TGEM_Encoder
-            run = neptune.init_run(project='revivemed/RCC',
-                    api_token=NEPTUNE_API_TOKEN,
-                    with_id=run_id,
-                    capture_stdout=False,
-                    capture_stderr=False,
-                    capture_hardware_metrics=False,
-                    mode='read-only')
-
-            original_kwargs = run['pretrain/original_kwargs'].fetch()
-            run.stop()
-            original_kwargs = convert_neptune_kwargs(original_kwargs)
-            encoder_kind = original_kwargs['encoder_kind']
-            print('encoder_kind:',encoder_kind)
-            ### ### ###
-
-            kwargs['overwrite_existing_kwargs'] = True
-            # kwargs['encoder_kind'] = 'AE'
-            kwargs['load_model_loc'] = 'pretrain'
-            kwargs['run_evaluation'] = False
-            kwargs['run_training'] = False
-            kwargs['save_latent_space'] = True
-            # kwargs['save_latent_space'] = False
-
-            kwargs['plot_latent_space'] = 'sns' #'both'
-            kwargs['plot_latent_space_cols'] = ['Study ID','Cohort Label','is Pediatric','is Female']
-            # kwargs['plot_latent_space_cols'] = ['is Pediatric','is Female']
-
-            # run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
-
-            kwargs['eval_name'] = 'val'
+            kwargs['eval_name'] = 'train'
             run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
 
-            if not (encoder_kind == 'TGEM_Encoder'):
-                
-                kwargs['eval_name'] = 'train'
-                run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+            kwargs['eval_name'] = 'test'
+            run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
 
-                kwargs['eval_name'] = 'test'
-                run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+        kwargs['eval_name'] = 'val'
+        run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
 
+    ############################################################
+    ## Finetune
+    ############################################################
+    # if n_trials==0:
+    #     print('skip finetune')
+    #     return run_id
 
-        ############################################################
-        ## Finetune
-        ############################################################
-        # if n_trials==0:
-        #     print('skip finetune')
-        #     return run_id
-
+    if n_trials>0:
         run = neptune.init_run(project='revivemed/RCC',
                         api_token=NEPTUNE_API_TOKEN,
                         with_id=run_id,
@@ -174,38 +173,37 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
             _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
 
 
-
-        ############################################################
-        ## Get the Average AUROC for the finetune models
-        ############################################################
-        
-        # Save the Average AUC for the finetune models
-        run = neptune.init_run(project='revivemed/RCC',
-                        api_token=NEPTUNE_API_TOKEN,
-                        with_id=run_id,
-                        capture_stdout=False,
-                        capture_stderr=False,
-                        capture_hardware_metrics=False)
-        
-
-
-        for setup_id in ['finetune_'+desc_str,'randinit_'+desc_str]:
-            print('setup_id:',setup_id)
-            for key, key_loc in metric_string_dct.items():
-                key_loc = key_loc.replace('/','_')
-                print('key:',key_loc)
-                vals_table = run[f'{setup_id}/history/'+key_loc].fetch_values()
-                vals = vals_table['value']
-                # print(vals)
-                run[f'summary/{setup_id}/{key} avg'] = np.mean(vals)
-                run[f'summary/{setup_id}/{key} std'] = np.std(vals)
-                run[f'summary/{setup_id}/{key} count'] = len(vals)
+    ############################################################
+    ## Get the Average AUROC for the finetune models
+    ############################################################
+    
+    # Save the Average AUC for the finetune models
+    run = neptune.init_run(project='revivemed/RCC',
+                    api_token=NEPTUNE_API_TOKEN,
+                    with_id=run_id,
+                    capture_stdout=False,
+                    capture_stderr=False,
+                    capture_hardware_metrics=False)
+    
 
 
-        run['sys/failed'] = False
-        run.stop()
+    for setup_id in ['finetune_'+desc_str,'randinit_'+desc_str]:
+        print('setup_id:',setup_id)
+        for key, key_loc in metric_string_dct.items():
+            key_loc = key_loc.replace('/','_')
+            print('key:',key_loc)
+            vals_table = run[f'{setup_id}/history/'+key_loc].fetch_values()
+            vals = vals_table['value']
+            # print(vals)
+            run[f'summary/{setup_id}/{key} avg'] = np.mean(vals)
+            run[f'summary/{setup_id}/{key} std'] = np.std(vals)
+            run[f'summary/{setup_id}/{key} count'] = len(vals)
 
-        return run_id
+
+    run['sys/failed'] = False
+    run.stop()
+
+    return run_id
 
 # def main():
 

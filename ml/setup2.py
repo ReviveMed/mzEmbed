@@ -461,6 +461,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
         plot_latent_space = kwargs.get('plot_latent_space', '')
         plot_latent_space_cols = kwargs.get('plot_latent_space_cols', [y_head_cols, y_adv_cols])
+        yes_plot_pca = kwargs.get('yes_plot_pca', False)
         print('plot_latent_space:', plot_latent_space)
         print('plot_latent_space_cols:', plot_latent_space_cols)
         if plot_latent_space:
@@ -493,31 +494,32 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
                     palette = get_color_map(Z_embed[hue_col].nunique())
 
                     ## PCA ##
-                    fig = sns.scatterplot(data=Z_embed, x='PCA1', y='PCA2', hue=hue_col, palette=palette,s=marker_sz)
-                    # place the legend outside the plot
-                    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-                    
-                    # edit the legend to include the number of samples in each cohort
-                    handles, labels = fig.get_legend_handles_labels()
-                    if len(labels) > 2:
-                        new_labels = [f'{label} ({Z_embed[Z_embed[hue_col]==label].shape[0]})' for label in labels]
-                    else:
-                        new_labels = []
-                        Z_counts = Z_embed[hue_col].value_counts()
-                        for label in labels:
-                            new_labels.append(f'{label} ({Z_counts.loc[eval(label)]})')
-                    
-                    # make the size of the markers in the handles larger
-                    for handle in handles:
-                        # print(dir(handle))
-                        handle.set_markersize(10)
-                        # handle._sizes = [100]
-                    
-                    plt.legend(handles, new_labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., title=hue_col)
+                    if yes_plot_pca:
+                        fig = sns.scatterplot(data=Z_embed, x='PCA1', y='PCA2', hue=hue_col, palette=palette,s=marker_sz)
+                        # place the legend outside the plot
+                        plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+                        
+                        # edit the legend to include the number of samples in each cohort
+                        handles, labels = fig.get_legend_handles_labels()
+                        if len(labels) > 2:
+                            new_labels = [f'{label} ({Z_embed[Z_embed[hue_col]==label].shape[0]})' for label in labels]
+                        else:
+                            new_labels = []
+                            Z_counts = Z_embed[hue_col].value_counts()
+                            for label in labels:
+                                new_labels.append(f'{label} ({Z_counts.loc[eval(label)]})')
+                        
+                        # make the size of the markers in the handles larger
+                        for handle in handles:
+                            # print(dir(handle))
+                            handle.set_markersize(10)
+                            # handle._sizes = [100]
+                        
+                        plt.legend(handles, new_labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., title=hue_col)
 
-                    plt.savefig(os.path.join(save_dir, f'Z_pca_{hue_col}_{eval_name}.png'), bbox_inches='tight')
-                    run[f'{setup_id}/sns_Z_pca_{hue_col}_{eval_name}'].upload(os.path.join(save_dir, f'Z_pca_{hue_col}_{eval_name}.png'))
-                    plt.close()
+                        plt.savefig(os.path.join(save_dir, f'Z_pca_{hue_col}_{eval_name}.png'), bbox_inches='tight')
+                        run[f'{setup_id}/sns_Z_pca_{hue_col}_{eval_name}'].upload(os.path.join(save_dir, f'Z_pca_{hue_col}_{eval_name}.png'))
+                        plt.close()
 
                     ## UMAP ##
                     fig = sns.scatterplot(data=Z_embed, x='UMAP1', y='UMAP2', hue=hue_col, palette=palette,s=marker_sz)
@@ -548,10 +550,11 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
 
             if (plot_latent_space=='plotly') or (plot_latent_space=='both') or (plot_latent_space=='px'):
                 for hue_col in plot_latent_space_cols:
-                    plotly_fig = px.scatter(Z_embed, x='PCA1', y='PCA2', color=hue_col, title=f'PCA {hue_col}')
-                    plotly_fig.update_traces(marker=dict(size=2*marker_sz))
-                    run[f'{setup_id}/px_Z_pca_{hue_col}_{eval_name}'].upload(plotly_fig)
-                    plt.close()
+                    if yes_plot_pca:
+                        plotly_fig = px.scatter(Z_embed, x='PCA1', y='PCA2', color=hue_col, title=f'PCA {hue_col}')
+                        plotly_fig.update_traces(marker=dict(size=2*marker_sz))
+                        run[f'{setup_id}/px_Z_pca_{hue_col}_{eval_name}'].upload(plotly_fig)
+                        plt.close()
 
                     plotly_fig = px.scatter(Z_embed, x='UMAP1', y='UMAP2', color=hue_col)
                     plotly_fig.update_traces(marker=dict(size=2*marker_sz))
