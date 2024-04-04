@@ -259,7 +259,7 @@ if __name__ == '__main__':
     if chosen_run_id is not None:
         run_id_list = [chosen_run_id]
     else:
-        run_id_list = get_run_id_list(tags=['april04_pareto'],encoder_kind='AE')
+        run_id_list = get_run_id_list(tags=['april04_top200'],encoder_kind='AE')
         already_run = get_run_id_list(tags=['top'],encoder_kind='AE')
     run_id_list.append('RCC-1620')
 
