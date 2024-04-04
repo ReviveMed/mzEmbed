@@ -27,9 +27,15 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 
 
 
-def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
+def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,**kwargs):
     print(setup_id)
-    run, is_run_new = start_neptune_run(with_run_id=with_run_id)
+    if run is None:
+        run, is_run_new = start_neptune_run(with_run_id=with_run_id)
+        ret_run_id = True
+    else:
+        is_run_new = False
+        ret_run_id = False
+
     if not is_run_new:
         setup_is_new = not check_neptune_existance(run,f'{setup_id}/kwargs')
         if setup_is_new:
@@ -50,6 +56,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             new_kwargs = {**existing_kwargs}
             new_kwargs.update(kwargs)
             kwargs = new_kwargs
+
 
     run_id = run["sys/id"].fetch()
     try:
@@ -389,7 +396,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
             # run[f'{setup_id}/models/head_state_dict'].upload(f'{save_dir}/{setup_id}_head_state_dict.pth')
             # run[f'{setup_id}/models/adv_state_dict'].upload(f'{save_dir}/{setup_id}_adv_state_dict.pth')
                 run.wait()
-                
+
             os.makedirs(os.path.join(save_dir,setup_id), exist_ok=True)
             head.save_state_to_path(f'{save_dir}/{setup_id}')
             adv.save_state_to_path(f'{save_dir}/{setup_id}')
@@ -581,8 +588,12 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,**kwargs):
         raise e
 
 
-    run.stop()
-    return run_id
+    if ret_run_id:
+        run.stop()
+        return run_id
+    else:
+        print('Returning Neptune Run, it has NOT been stopped')
+        return run
 
 
 # Run an example

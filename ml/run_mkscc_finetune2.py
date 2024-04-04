@@ -211,17 +211,49 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
 
 if __name__ == '__main__':
 
+
+    # get user from the command line
+    import sys
+    if len(sys.argv)>1:
+        plot_latent_space = bool(int(sys.argv[1]))
+    else:
+        plot_latent_space = False
+
+    if len(sys.argv)>2:
+        n_trials = int(sys.argv[2])
+    else:
+        n_trials = 0
+
+
+    if len(sys.argv)>3:
+        chosen_run_id = sys.argv[3]
+    else:
+        chosen_run_id = None
+
+    # if chosen_run_id is None:
+        # chosen_run_id = input('Enter Run id: ')
+    try:
+        chosen_run_id = int(chosen_run_id)
+        chosen_run_id = 'RCC-'+str(chosen_run_id)
+    except:
+        pass
+
+
     already_run = []
     # run_id_list = ['RCC-1296']
     # run_id_list = ['RCC-924','RCC-973','RCC-938','RCC-931','RCC-984','RCC-933','RCC-1416','RCC-1364','RCC-1129']
-    run_id_list = get_run_id_list(tags=['april04_pareto'],encoder_kind='AE')
-    run_id_list = ['RCC-1735']
+    if chosen_run_id is not None:
+        run_id_list = [chosen_run_id]
+    else:
+        run_id_list = get_run_id_list(tags=['april04_pareto'],encoder_kind='AE')
+
+    # run_id_list = ['RCC-1735']
     for run_id in run_id_list:
         if run_id in already_run:
             continue
         print('run_id:',run_id)
         try:
-            run_id = compute_mskcc_finetune(run_id,n_trials=5,plot_latent_space=False,desc_str='Apr04_MSKCC')
+            run_id = compute_mskcc_finetune(run_id,n_trials=n_trials,plot_latent_space=False,desc_str='Apr04_MSKCC')
         except NeptuneException as e:
             print('NeptuneException:',e)
             continue
