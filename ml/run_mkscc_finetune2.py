@@ -110,6 +110,17 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
                         capture_hardware_metrics=False,
                         mode='read-only')
 
+
+        run_struc= run.get_structure()
+        # if 'summary/randinit_Apr04.1_MSKCC/MSKCC Train AUROC avg':
+        if 'summary' in run_struc.keys():
+            if 'randinit_Apr04.1_MSKCC' in run_struc['summary'].keys():
+                if 'MSKCC Train AUROC avg' in run_struc['summary']['randinit_Apr04.1_MSKCC'].keys():
+                    print('Already computed')
+                    run.stop()
+                    return run_id
+
+
         kwargs = run['pretrain/original_kwargs'].fetch()
         kwargs = convert_neptune_kwargs(kwargs)
         
@@ -261,7 +272,7 @@ if __name__ == '__main__':
     else:
         run_id_list = get_run_id_list(tags=['april04_top200'],encoder_kind='AE')
         # already_run = get_run_id_list(tags=['top'],encoder_kind='AE')
-    run_id_list.append('RCC-1620')
+    # run_id_list.append('RCC-1620')
     print(len(run_id_list))
 
     # run_id_list = ['RCC-1735']
