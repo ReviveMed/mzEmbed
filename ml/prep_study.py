@@ -49,13 +49,13 @@ def cleanup_runs(run_id_list=None):
 
 
 
-def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=None,limit_add=0):
+def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=None,limit_add=-1):
     if run_id_list is None:
         run_id_list = get_run_id_list()
 
     print('number of runs: ', len(run_id_list))
     
-    if limit_add>0:
+    if limit_add>-1:
         if len(run_id_list) > limit_add:
             run_id_list = run_id_list[:limit_add]
 
@@ -96,12 +96,32 @@ def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=No
 ########################################################################################
 ########################################################################################
 
-
 ########################################################################################
 
-def reuse_run(run_id,study_kwargs=None,objective_func=None):
+def get_default_kwarg_val_dict():
+    default_val_dict = {
+        'head_kwargs_dict__Regression_Age__weight': 0,
+        'head_kwargs_dict__Binary_isFemale__weight': 0,
+        'train_kwargs__l1_reg_weight': 0
+    }
+
+    return default_val_dict
+
+
+
+def reuse_run(run_id,study_kwargs=None,objective_func=None,ignore_keys_list=None,default_kwarg_val_dict=None):
     if study_kwargs is None:
         study_kwargs = make_kwargs()
+
+    if ignore_keys_list is None:
+        ignore_keys_list = ['run_evaluation','save_latent_space','plot_latent_space_cols','plot_latent_space',\
+            'eval_kwargs','train_kwargs__eval_funcs','run_training','encoder_kwargs__hidden_size','overwrite_existing_kwargs',\
+            'load_model_loc','y_head_cols','head_kwargs_dict__Binary_isFemale','eval_name','train_name','head_kwargs_dict__Regression_Age',\
+            'study_info_dict']
+
+
+    if default_kwarg_val_dict is None:
+        default_kwarg_val_dict = get_default_kwarg_val_dict()
 
     run = neptune.init_run(project='revivemed/RCC',
                         api_token=NEPTUNE_API_TOKEN,
@@ -120,17 +140,38 @@ def reuse_run(run_id,study_kwargs=None,objective_func=None):
     study_kwargs = convert_model_kwargs_list_to_dict(study_kwargs)
 
     diff = dict_diff(flatten_dict(study_kwargs), flatten_dict(pretrain_kwargs))
-    diff_clean = dict_diff_cleanup(diff)
+    # diff_clean = dict_diff_cleanup(diff)
 
     # check that the first value of each tuple is a distribution
     yes_raise = False
-    for k, v in diff_clean.items():
+    diff_clean = {}
+    for k, v in diff.items():
+        yes_ignore = False
         if not isinstance(v[0], optuna.distributions.BaseDistribution):
-            yes_raise = True
-            print(f"Value {v} for key {k} is not a distribution")
-    
+
+            for ignore_key in ignore_keys_list:
+                if k.startswith(ignore_key):
+                    print(f"Ignoring key {k}")
+                    yes_ignore = True
+                    break
+            
+            if (not yes_ignore):
+                yes_raise = True
+                print(f"Value {v} for key {k} is not a distribution")
+
+        else:
+            if v[1] is None:
+                if k in default_kwarg_val_dict:
+                    diff_clean[k] = (v[0], default_kwarg_val_dict[k])
+                else:
+                    print(f"Value {v} for key {k} is None")
+                    yes_raise = True
+                    diff_clean[k] = v
+            else:
+                diff_clean[k] = v
+
     if yes_raise:
-        raise ValueError("Some values are not distributions")
+        raise ValueError("Some values are not distributions or are missing")
         
     params = {k: v[1] for k, v in diff_clean.items()}
     # print(params)
@@ -154,10 +195,85 @@ def reuse_run(run_id,study_kwargs=None,objective_func=None):
             values=objective_val,
             user_attrs={'run_id': run_id, 'setup_id': setup_id})
     
+    print('Adding run {} to study [{}] with parameters {}'.format(run_id,objective_val,params))
+
     return trial
 
 
 ########################################################################################
+
+def get_study_objective_keys(study_info_dict):
+    objective_keys = list(study_info_dict['objectives'].keys())
+    return sorted(objective_keys)
+
+def get_study_objective_directions(study_info_dict):
+    objective_keys = get_study_objective_keys(study_info_dict)
+    directions = [study_info_dict['objectives'][k]['direction'] for k in objective_keys]
+    return directions
+
+
+def objective_func3(run_id,data_dir,recompute_eval=False,objective_keys=None):
+
+    if objective_keys is None:
+        objective_keys = ['reconstruction_loss','Binary_isPediatric','MultiClass_Cohort Label','MultiClass_Adv StudyID','Binary_isFemale','Regression_Age']
+    objective_keys = sorted(objective_keys)
+
+    default_objective_vals_dict = {
+        'reconstruction_loss': 9999,
+        'Binary_isPediatric': 0.5,
+        'MultiClass_Cohort Label': 0.5,
+        'MultiClass_Adv StudyID': 0.5,
+        'Binary_isFemale': 0.5,
+        'Regression_Age': 100
+    }
+
+    run = neptune.init_run(project='revivemed/RCC',
+                    api_token=NEPTUNE_API_TOKEN,
+                    with_id=run_id,
+                    capture_stdout=False,
+                    capture_stderr=False,
+                    capture_hardware_metrics=False,
+                    mode='read-only')
+
+
+    obj_vals = []
+    try:
+        pretrain_output = run['pretrain'].fetch()
+    
+    except NeptuneException as e:
+        print(f"Error with run {run_id}: {e}")
+        run.stop()
+        raise ValueError(f"Error with run {run_id}: {e}")
+
+
+    if 'eval' in pretrain_output:
+        eval_res = pretrain_output['eval']['val']
+
+        for objective_key in objective_keys:
+            if objective_key not in eval_res.keys():
+                # raise ValueError(f"Objective {objective_key} not in eval results")
+                print(f"Objective {objective_key} not in eval results, use default value")
+                obj_val = default_objective_vals_dict[objective_key]
+            
+            else:
+                if isinstance(eval_res[objective_key],dict):
+                    sub_keys = list(eval_res[objective_key].keys())
+                    if len(sub_keys) == 1:
+                        obj_val = eval_res[objective_key][sub_keys[0]]
+                    else:
+                        # get the average of the sub_keys
+                        obj_val = np.mean([eval_res[objective_key][k] for k in sub_keys])
+
+                else:
+                    obj_val = eval_res[objective_key]
+                    # if objective_key == 'reconstruction_loss':
+                        # obj_val = np.log10(obj_val)
+        
+            obj_vals.append(obj_val)
+
+    return tuple(obj_vals)
+
+
 
 
 def objective_func2(run_id,data_dir,recompute_eval=False,objective_info_dict_list=None):
@@ -179,6 +295,7 @@ def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=Non
         cohortLabel_weight = 1
         advStudyID_weight = 1
         isFemale_weight = 0
+        Age_weight = 0
         objective_name = 'OBJ4 equal weights (v0)'
 
     recon_weight = objective_info_dict.get('recon_weight',1)
@@ -186,6 +303,7 @@ def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=Non
     cohortLabel_weight = objective_info_dict.get('cohortLabel_weight',1)
     advStudyID_weight = objective_info_dict.get('advStudyID_weight',1)
     isFemale_weight = objective_info_dict.get('isFemale_weight',0)
+    Age_weight = objective_info_dict.get('Age_weight',0)
     objective_name = objective_info_dict.get('objective_name','OBJ4 equal weights (v0)')
 
 
@@ -268,13 +386,13 @@ def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=Non
 
 def make_kwargs(sig_figs=2,encoder_kind='AE'):
     activation = 'leakyrelu'
-    latent_size = IntDistribution(8, 64, step=4)
-    num_hidden_layers = IntDistribution(2, 10)
+    latent_size = IntDistribution(4, 64, step=1)
+    num_hidden_layers = IntDistribution(1, 10)
     cohort_label_weight = FloatDistribution(0,2,step=0.1) #10
-    isfemale_weight = FloatDistribution(0.1,10,step=0.1) #20
-    ispediatric_weight = FloatDistribution(0.1,10,step=0.1) #10
+    isfemale_weight = FloatDistribution(0,10,step=0.1) #20
+    ispediatric_weight = FloatDistribution(0,10,step=0.1) #10
     head_weight = FloatDistribution(0,10,step=0.1) # 10
-    adv_weight = FloatDistribution(0.1,50,step=0.1) #50
+    adv_weight = FloatDistribution(0,50,step=0.1) #50
     age_weight = FloatDistribution(0,10,step=0.1) #10
     
     if encoder_kind in ['AE']:
@@ -604,7 +722,7 @@ def dict_diff_cleanup(diff,ignore_keys_list=None):
         ignore_keys_list = ['run_evaluation','save_latent_space','plot_latent_space_cols','plot_latent_space',\
                     'eval_kwargs','train_kwargs__eval_funcs','run_training','encoder_kwargs__hidden_size','overwrite_existing_kwargs',\
                     'load_model_loc']
-        new_ignore_keys_list = ['y_head_cols','head_kwargs_dict__Binary_isFemale','eval_name','train_name',\
+        new_ignore_keys_list = ['y_head_cols','head_kwargs_dict__Binary_isFemale','eval_name','train_name',
                                 'head_kwargs_dict__Regression_Age']
                                 # 'head_kwargs_dict__MultiClass_Cohort','head_kwargs_dict__Binary_isPediatric',\
                                 # 'head_kwargs_dict__MultiClass_Cohort'

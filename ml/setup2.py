@@ -385,7 +385,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,**kwargs):
 
 
             train_kwargs = kwargs.get('train_kwargs', {})
-            train_kwargs['prefix'] = f'{setup_id}/train'
+            train_kwargs['prefix'] = f'{setup_id}/train2'
             encoder, head, adv = train_compound_model(train_loader_dct, 
                                                     encoder, head, adv, 
                                                     run=run, **train_kwargs)

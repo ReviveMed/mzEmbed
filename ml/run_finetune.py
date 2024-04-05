@@ -24,8 +24,8 @@ import shutil
 data_dir = get_latest_dataset()
 
 
-def compute_mskcc_finetune(run_id,plot_latent_space=False,
-                           n_trials=3,desc_str='MSKCC'):
+def compute_finetune(run_id,plot_latent_space=False,
+                           n_trials=3,desc_str='finetune'):
 
 
 
@@ -93,9 +93,30 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
     #     print('skip finetune')
     #     return run_id
 
-    metric_string_dct = {}
-    metric_string_dct['MSKCC Train AUROC'] = 'eval/train/Binary_MSKCC/AUROC (micro)'
-    metric_string_dct['MSKCC Val AUROC'] = 'eval/val/Binary_MSKCC/AUROC (micro)'
+    if 'mskcc' in desc_str.lower():
+        metric_string_dct = {}
+        count_check_name = 'MSKCC Train AUROC count'
+        y_head_cols = ['MSKCC BINARY']
+        head_name = 'MSKCC'
+        head_kind = 'Binary'
+        num_classes = 2
+        plot_latent_space_cols = ['MSKCC']
+        metric_string_dct['MSKCC Train AUROC'] = 'eval/train/Binary_MSKCC/AUROC (micro)'
+        metric_string_dct['MSKCC Val AUROC'] = 'eval/val/Binary_MSKCC/AUROC (micro)'
+
+    elif 'imdc' in desc_str.lower():
+        metric_string_dct = {}
+        count_check_name = 'IMDC Train AUROC count'
+        y_head_cols = ['IMDC BINARY']
+        head_name = 'IMDC'
+        head_kind = 'Binary'
+        num_classes = 2
+        plot_latent_space_cols = ['IMDC']
+        metric_string_dct['IMDC Train AUROC'] = 'eval/train/Binary_IMDC/AUROC (micro)'
+        metric_string_dct['IMDC Val AUROC'] = 'eval/val/Binary_IMDC/AUROC (micro)'
+
+    else:
+        raise ValueError('Unknown desc_str:',desc_str)
 
     if n_trials>0:
         run = neptune.init_run(project='revivemed/RCC',
@@ -110,10 +131,10 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
         run_struc= run.get_structure()
         # if 'summary/randinit_Apr04.1_MSKCC/MSKCC Train AUROC avg':
         if 'summary' in run_struc.keys():
-            if 'randinit_Apr04.1_MSKCC' in run_struc['summary'].keys():
-                if 'MSKCC Train AUROC count' in run_struc['summary']['randinit_Apr04.1_MSKCC'].keys():
+            if f'randinit_{desc_str}' in run_struc['summary'].keys():
+                if count_check_name in run_struc['summary'][f'randinit_{desc_str}'].keys():
 
-                    run_counts = run['summary/randinit_Apr04.1_MSKCC/MSKCC Train AUROC count'].fetch()
+                    run_counts = run[f'summary/randinit_{desc_str}/{count_check_name}'].fetch()
                     if run_counts > n_trials:
                         print('Already computed over {} trials'.format(run_counts))
                         run.stop()
@@ -138,8 +159,8 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
         kwargs['run_evaluation'] = True
         kwargs['save_latent_space'] = False
         kwargs['plot_latent_space'] = ''
-        kwargs['plot_latent_space_cols'] = ['MSKCC']
-        kwargs['y_head_cols'] = ['MSKCC BINARY']
+        kwargs['plot_latent_space_cols'] = plot_latent_space_cols
+        kwargs['y_head_cols'] = y_head_cols
         kwargs['y_adv_cols'] = []
         kwargs['upload_models_to_neptune'] = False
 
@@ -147,8 +168,8 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
         kwargs['head_kwargs_dict'] = {}
         kwargs['adv_kwargs_dict'] = {}
         kwargs['head_kwargs_list'] = [{
-            'kind': 'Binary',
-            'name': 'MSKCC',
+            'kind': head_kind,
+            'name': head_name,
             'weight': 1,
             'y_idx': 0,
             'hidden_size': 4,
@@ -156,7 +177,7 @@ def compute_mskcc_finetune(run_id,plot_latent_space=False,
             'dropout_rate': 0,
             'activation': 'leakyrelu',
             'use_batch_norm': False,
-            'num_classes': 2,
+            'num_classes': num_classes,
             }]
         
         kwargs['encoder_kwargs']['dropout_rate'] = 0.2
@@ -248,33 +269,37 @@ if __name__ == '__main__':
     if len(sys.argv)>2:
         n_trials = int(sys.argv[2])
     else:
-        n_trials = 0
+        n_trials = 1
 
 
     if len(sys.argv)>3:
-        chosen_run_id = sys.argv[3]
+        chosen_id = sys.argv[3]
     else:
-        chosen_run_id = None
+        chosen_id = None
 
-    # if chosen_run_id is None:
-        # chosen_run_id = input('Enter Run id: ')
+    if len(sys.argv)>4:
+        desc_str = sys.argv[4]
+    else:
+        desc_str = 'Apr04.1_MSKCC'
+
+    if chosen_id is None:
+        chosen_id = input('Enter Run id: ')
+
     try:
-        chosen_run_id = int(chosen_run_id)
-        chosen_run_id = 'RCC-'+str(chosen_run_id)
+        chosen_id = int(chosen_id)
+        chosen_id = 'RCC-'+str(chosen_id)
     except:
         pass
 
+    if 'RCC' not in chosen_id:
+        tags = [chosen_id]
+        run_id_list = get_run_id_list(tags=tags,encoder_kind='AE')
+    else:
+        run_id_list =  [chosen_id]
+
 
     already_run = []
-    # run_id_list = ['RCC-1296']
-    # run_id_list = ['RCC-924','RCC-973','RCC-938','RCC-931','RCC-984','RCC-933','RCC-1416','RCC-1364','RCC-1129']
-    if chosen_run_id is not None:
-        run_id_list = [chosen_run_id]
-    else:
-        run_id_list = get_run_id_list(tags=['april04_top200'],encoder_kind='AE')
-        # already_run = get_run_id_list(tags=['top'],encoder_kind='AE')
-    run_id_list.append('RCC-1698')
-    print(len(run_id_list))
+    print('Number of runs to finetune:',len(run_id_list))
 
     # run_id_list = ['RCC-1735']
     for run_id in run_id_list:
@@ -282,25 +307,7 @@ if __name__ == '__main__':
             continue
         print('run_id:',run_id)
         try:
-            # run_id = compute_mskcc_finetune(run_id,n_trials=n_trials,plot_latent_space=plot_latent_space,desc_str='Apr04_MSKCC')
-            run_id = compute_mskcc_finetune(run_id,n_trials=n_trials,plot_latent_space=plot_latent_space,desc_str='Apr04.1_MSKCC')
+            run_id = compute_finetune(run_id,n_trials=n_trials,plot_latent_space=plot_latent_space,desc_str=desc_str)
         except NeptuneException as e:
             print('NeptuneException:',e)
             continue
-
-
-    # clean up the previously failed runs #RCC-1132, RCC-1126
-    # run_id_list = ['RCC-926', 'RCC-927', 'RCC-928','RCC-929']
-    # for run_id in run_id_list:
-    #     print('run_id:',run_id)
-    #     run_id = compute_mskcc_finetune(run_id)
-
-    #     run = neptune.init_run(project='revivemed/RCC',
-    #                     api_token=NEPTUNE_API_TOKEN,
-    #                     with_id=run_id,
-    #                     capture_stdout=False,
-    #                     capture_stderr=False,
-    #                     capture_hardware_metrics=False)
-        
-    #     run['sys/failed'] = False
-    #     run.stop()

@@ -345,8 +345,8 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         head_loss = torch.tensor(0.0)
 
                     run[f'{prefix}/{phase}/batch/encoder_loss'].append(encoder_loss)
-                    run[f'{prefix}/{phase}/batch/head_loss'].append(head_loss)
-                    run[f'{prefix}/{phase}/batch/adversary_loss'].append(adversary_loss)
+                    run[f'{prefix}/{phase}/batch/multi_head_loss'].append(head_loss)
+                    run[f'{prefix}/{phase}/batch/multi_adversary_loss'].append(adversary_loss)
 
                     # new addition, if join loss is 0, then only nans are present
                     # we don't want to backpropagate
@@ -447,7 +447,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                             else:
                                 adversary_loss = multi_loss
 
-                            run[f'{prefix}/{phase}/adversary_loss'].append(adversary_loss)
+                            run[f'{prefix}/{phase}/multi_adversary_loss'].append(adversary_loss)
                         
                             if phase == 'train':
                                 adversary_loss.backward()
@@ -468,8 +468,8 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         running_losses[k] = 0 #torch.tensor(0.0)
 
                 run[f'{prefix}/{phase}/epoch/encoder_loss'].append(running_losses['encoder'])
-                run[f'{prefix}/{phase}/epoch/head_loss'].append(running_losses['head'])
-                run[f'{prefix}/{phase}/epoch/adversary_loss'].append(running_losses['adversary'])
+                run[f'{prefix}/{phase}/epoch/multi_head_loss'].append(running_losses['head'])
+                run[f'{prefix}/{phase}/epoch/multi_adversary_loss'].append(running_losses['adversary'])
                 run[f'{prefix}/{phase}/epoch/joint_loss'].append(running_losses['joint'])
 
                 loss_history['encoder'][phase].append(running_losses['encoder'])
@@ -573,8 +573,8 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
                 recon_loss += F.mse_loss(X_recon, X)* X.size(0)
                 y_head_output = head(torch.cat((z, clin_vars), 1))
                 y_adversary_output = adversary(z)
-                head_loss += head.loss(y_head_output, y_head) * y_head.size(0)
-                adversary_loss += adversary.loss(y_adversary_output, y_adversary) * y_adversary.size(0)
+                head_loss += head.joint_loss(y_head_output, y_head) * y_head.size(0)
+                adversary_loss += adversary.joint_loss(y_adversary_output, y_adversary) * y_adversary.size(0)
                 
                 if isinstance(y_head_output, dict):
                     if isinstance(head_ouputs, dict):
