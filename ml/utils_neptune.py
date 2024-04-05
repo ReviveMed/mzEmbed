@@ -4,7 +4,40 @@ import neptune
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
 from neptune.exceptions import NeptuneException
-from misc import unravel_dict
+from misc import unravel_dict, download_data_dir
+
+import os
+import shutil
+
+def get_latest_dataset(data_dir='/DATA'):
+    project = neptune.init_project(project="revivemed/RCC", api_token=NEPTUNE_API_TOKEN)
+    data_url = project["dataset/latest_link"].fetch()
+    latest_hash = project["dataset/latest"].fetch_hash()
+    need_to_download = False
+
+    if not os.path.exists(data_dir+'/hash.txt'):
+        need_to_download = True
+    else:
+        with open(data_dir+'/hash.txt','r') as f:
+            current_hash = f.read()
+        if current_hash != latest_hash:
+            need_to_download = True
+
+    if need_to_download:
+        # delete the old data
+        if os.path.exists(data_dir):
+            print('Deleting the old data')
+            shutil.rmtree(data_dir, ignore_errors=True)
+
+        os.makedirs(data_dir, exist_ok=True)
+        with open(data_dir+'/hash.txt','w') as f:
+            f.write(latest_hash)
+
+        print('Downloading the latest dataset')
+        download_data_dir(data_url, save_dir=data_dir)
+
+    return data_dir
+
 
 def count_fields(d):
     return sum([count_fields(v) if isinstance(v, dict)
@@ -32,7 +65,7 @@ def convert_neptune_kwargs(kwargs):
     else:
         return kwargs    
 
-def get_run_id_list(encoder_kind='AE',tags=['v3.1']):
+def get_run_id_list(encoder_kind='AE',tags=[]):
 
     project = neptune.init_project(
         project='revivemed/RCC',
@@ -62,7 +95,7 @@ def check_neptune_existance(run,attribute):
     
 
 
-def start_neptune_run(with_run_id=None,tags=['v3.1']):
+def start_neptune_run(with_run_id=None,tags=['v3.2']):
     is_run_new = False
     if with_run_id is None:
         run = neptune.init_run(project='revivemed/RCC',

@@ -10,13 +10,10 @@ from prep_study import add_runs_to_study, get_run_id_list, reuse_run, \
     objective_func2, make_kwargs, convert_distributions_to_suggestion, convert_model_kwargs_list_to_dict,\
     round_kwargs_to_sig, flatten_dict, unflatten_dict
 from setup2 import setup_neptune_run
-from misc import download_data_dir
+from utils_neptune import get_latest_dataset
 from sklearn.linear_model import LogisticRegression
-from sklearn.neighbors import KNeighborsClassifier
+# from sklearn.neighbors import KNeighborsClassifier
 
-# BASE_DIR = '/DATA2'
-# DATA_DIR = f'{BASE_DIR}/data'
-# TRIAL_DIR = f'{BASE_DIR}/trials'
 storage_name = 'optuna'
 USE_WEBAPP_DB = True
 SAVE_TRIALS = True
@@ -77,13 +74,8 @@ STUDY_INFO_DICT = {
 #TODO save the study info dict to neptune metadata
 
 def main(STUDY_INFO_DICT_LIST):
-    data_dir = '/DATA2'
-    os.makedirs(data_dir, exist_ok=True)
-
-    if not os.path.exists(data_dir+'/X_pretrain_train.csv'):
-        # data_url = 'https://www.dropbox.com/scl/fo/iy2emxpwa4rkr3ad7vhc2/h?rlkey=hvhfa3ny9dlavnooka3kwvu5v&dl=1' #march 22
-        data_url = 'https://www.dropbox.com/scl/fo/2xr104jnz9qda7oemrwob/h?rlkey=wy7q95pj81qpgcn7zida2xjps&dl=1' #march 29
-        download_data_dir(data_url, save_dir=data_dir)
+    
+    data_dir = get_latest_dataset()
 
 
     def compute_objective(run_id):

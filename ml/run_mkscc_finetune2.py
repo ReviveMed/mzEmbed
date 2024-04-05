@@ -13,19 +13,15 @@ from prep_study import add_runs_to_study, reuse_run, convert_neptune_kwargs, \
     round_kwargs_to_sig
 from setup2 import setup_neptune_run
 from misc import download_data_dir
-from utils_neptune import  get_run_id_list, check_neptune_existance
+from utils_neptune import  get_run_id_list, check_neptune_existance, get_latest_dataset
 from sklearn.linear_model import LogisticRegression
 import time
 from neptune.exceptions import NeptuneException
 from collections import defaultdict
+import shutil
 
-data_dir = '/DATA2'
-os.makedirs(data_dir, exist_ok=True)
 
-if not os.path.exists(data_dir+'/X_pretrain_train.csv'):
-    # data_url = 'https://www.dropbox.com/scl/fo/iy2emxpwa4rkr3ad7vhc2/h?rlkey=hvhfa3ny9dlavnooka3kwvu5v&dl=1' #march 22
-    data_url = 'https://www.dropbox.com/scl/fo/2xr104jnz9qda7oemrwob/h?rlkey=wy7q95pj81qpgcn7zida2xjps&dl=1' #march 29
-    download_data_dir(data_url, save_dir=data_dir)
+data_dir = get_latest_dataset()
 
 
 def compute_mskcc_finetune(run_id,plot_latent_space=False,
@@ -272,7 +268,7 @@ if __name__ == '__main__':
     else:
         run_id_list = get_run_id_list(tags=['april04_top200'],encoder_kind='AE')
         # already_run = get_run_id_list(tags=['top'],encoder_kind='AE')
-    # run_id_list.append('RCC-1620')
+    run_id_list.append('RCC-1698')
     print(len(run_id_list))
 
     # run_id_list = ['RCC-1735']

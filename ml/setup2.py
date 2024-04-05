@@ -10,7 +10,7 @@ from models import get_model, Binary_Head, Dummy_Head, MultiClass_Head, MultiHea
 from train3 import CompoundDataset, train_compound_model, get_end_state_eval_funcs, evaluate_compound_model, create_dataloaders, create_dataloaders_old
 import neptune
 from neptune.utils import stringify_unsupported
-from utils_neptune import check_neptune_existance, start_neptune_run, convert_neptune_kwargs, neptunize_dict_keys
+from utils_neptune import check_neptune_existance, start_neptune_run, convert_neptune_kwargs, neptunize_dict_keys, get_latest_dataset
 from neptune_pytorch import NeptuneLogger
 from viz import generate_latent_space, generate_umap_embedding, generate_pca_embedding
 from misc import assign_color_map, get_color_map
@@ -141,6 +141,10 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,**kwargs):
     
     try:
         print('loading data')
+        if os.path.exists(f'{data_dir}/hash.txt'):
+            dataset_hash = open(f'{data_dir}/hash.txt','r').read()
+            run['datasets/hash'] = dataset_hash
+
         X_filename = kwargs.get('X_filename', 'X_pretrain')
         y_filename = kwargs.get('y_filename', 'y_pretrain')
         # nan_filename = kwargs.get('nan_filename', 'nans')
@@ -154,11 +158,15 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,**kwargs):
             X_data_train = pd.read_csv(f'{data_dir}/{X_filename}_{train_name}.csv', index_col=0)
             y_data_train = pd.read_csv(f'{data_dir}/{y_filename}_{train_name}.csv', index_col=0)
             X_size = X_data_train.shape[1]
+            run[f'{setup_id}/datasets/X_train'].track_files(f'{data_dir}/{X_filename}_{train_name}.csv')
+            run[f'{setup_id}/datasets/y_train'].track_files(f'{data_dir}/{y_filename}_{train_name}.csv')
         # nan_data = pd.read_csv(f'{data_dir}/{nan_filename}_{train_name}.csv', index_col=0)
 
         if run_evaluation or save_latent_space:
             X_data_eval = pd.read_csv(f'{data_dir}/{X_filename}_{eval_name}.csv', index_col=0)
             y_data_eval = pd.read_csv(f'{data_dir}/{y_filename}_{eval_name}.csv', index_col=0)
+            run[f'{setup_id}/datasets/X_eval'].track_files(f'{data_dir}/{X_filename}_{eval_name}.csv')
+            run[f'{setup_id}/datasets/y_eval'].track_files(f'{data_dir}/{y_filename}_{eval_name}.csv')
             X_size = X_data_eval.shape[1]
         # nan_data = pd.read_csv(f'{data_dir}/{nan_filename}_{eval_name}.csv', index_col=0)
 
@@ -606,8 +614,8 @@ def main():
     from sklearn.linear_model import LogisticRegression
 
 
-    data_dir = '/DATA2'
-    # data_dir = os.path.expanduser(data_dir)
+    data_dir = '/DATA'
+    data_dir = get_latest_dataset(data_dir)
 
     kwargs = {
         'X_filename': 'X_finetune',
