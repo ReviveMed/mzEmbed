@@ -414,10 +414,13 @@ class MultiHead(nn.Module):
         for head in self.heads:
             head.reset_params()
 
-    def loss(self, outputs, y_true):
+    def joint_loss(self, outputs, y_true):
         losses = self.multi_loss(outputs, y_true)
         joint_loss = sum([head.weight * losses[f'{head.kind}_{head.name}'] for head in self.heads])
         return joint_loss
+    
+    def loss(self, outputs, y_true):
+        return self.multi_loss(outputs, y_true)
     
     def save_state_to_path(self, save_path):
         for head in self.heads:

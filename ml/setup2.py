@@ -143,7 +143,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,**kwargs):
         print('loading data')
         if os.path.exists(f'{data_dir}/hash.txt'):
             dataset_hash = open(f'{data_dir}/hash.txt','r').read()
-            run['datasets/hash'] = dataset_hash
+            run[f'{setup_id}/datasets/hash'] = dataset_hash
 
         X_filename = kwargs.get('X_filename', 'X_pretrain')
         y_filename = kwargs.get('y_filename', 'y_pretrain')

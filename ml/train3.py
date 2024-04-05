@@ -301,7 +301,15 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
 
                     if head_weight > 0:
                         y_head_output = head(torch.cat((z, clin_vars), 1))
-                        head_loss = head.loss(y_head_output, y_head)
+                        # multi_loss = head.multi_loss(y_head_output, y_head)
+                        multi_loss = head.loss(y_head_output, y_head)
+                        if isinstance(multi_loss, dict):
+                            for key, loss_val in multi_loss.items():
+                                run[f'{prefix}/{phase}/batch/head_loss/{key}'].append(loss_val)
+                            head_loss = sum([h.weight * multi_loss[f'{h.kind}_{h.name}'] for h in head.heads])
+                        else:
+                            head_loss = multi_loss
+                        
                     else:
                         y_head_output = torch.tensor([])
                         head_loss = torch.tensor(0)
@@ -312,7 +320,14 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         z2.requires_grad = True
 
                         y_adversary_output = adversary(z2)
-                        adversary_loss = adversary.loss(y_adversary_output, y_adversary)
+                        # adversary_loss = adversary.loss(y_adversary_output, y_adversary)
+                        multi_loss = adversary.loss(y_adversary_output, y_adversary)
+                        if isinstance(multi_loss, dict):
+                            for key, loss_val in multi_loss.items():
+                                run[f'{prefix}/{phase}/batch/adversary_loss/{key}'].append(loss_val)
+                            adversary_loss = sum([h.weight * multi_loss[f'{h.kind}_{h.name}'] for h in adversary.heads])
+                        else:
+                            adversary_loss = multi_loss
                     else:
                         y_adversary_output = torch.tensor([])
                         adversary_loss = torch.tensor(0)
@@ -423,7 +438,15 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                             z.requires_grad = True
                             adversary_optimizer.zero_grad()
                             y_adversary_output = adversary(z)
-                            adversary_loss = adversary.loss(y_adversary_output, y_adversary)
+                            # adversary_loss = adversary.loss(y_adversary_output, y_adversary)
+                            multi_loss = adversary.loss(y_adversary_output, y_adversary)
+                            if isinstance(multi_loss, dict):
+                                for key, loss_val in multi_loss.items():
+                                    run[f'{prefix}/{phase}/adversary_loss/{key}'].append(loss_val)
+                                adversary_loss = sum([h.weight * multi_loss[f'{h.kind}_{h.name}'] for h in adversary.heads])
+                            else:
+                                adversary_loss = multi_loss
+
                             run[f'{prefix}/{phase}/adversary_loss'].append(adversary_loss)
                         
                             if phase == 'train':
