@@ -295,7 +295,10 @@ if __name__ == '__main__':
         tags = [chosen_id]
         run_id_list = get_run_id_list(tags=tags,encoder_kind='AE')
     else:
-        run_id_list =  [chosen_id]
+        if ',' in chosen_id:
+            run_id_list = chosen_id.split(',')
+        else:
+            run_id_list =  [chosen_id]
 
 
     already_run = []
