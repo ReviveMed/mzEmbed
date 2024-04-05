@@ -275,6 +275,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
     ispediatric_weight = FloatDistribution(0.1,10,step=0.1) #10
     head_weight = FloatDistribution(0,10,step=0.1) # 10
     adv_weight = FloatDistribution(0.1,50,step=0.1) #50
+    age_weight = FloatDistribution(0,10,step=0.1) #10
     
     if encoder_kind in ['AE']:
         encoder_kwargs = {
@@ -391,7 +392,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
                         'kind': 'Regression',
                         'name': 'Age',
                         'y_idx': 3,
-                        'weight': 1,
+                        'weight': age_weight,
                         'hidden_size': 4,
                         'num_hidden_layers': 1,
                         'dropout_rate': 0,

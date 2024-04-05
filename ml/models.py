@@ -763,7 +763,8 @@ class Regression_Head(Head):
         self.output_size = kwargs.get('output_size', 1)
         self.file_id = self.kind + '_' + self.name
         self.loss_func = nn.MSELoss(reduction=self.loss_reduction)
-        self.score_func_dict = {'MSE': lambda y_score, y_true: F.mse_loss(y_score, y_true)}
+        self.score_func_dict = {'MSE': lambda y_score, y_true: F.mse_loss(y_score, y_true),
+                                'MAE': lambda y_score, y_true: F.l1_loss(y_score, y_true)}
         # self.network = nn.Identity()
         # self.network = Dense_Layers(**kwargs)
 
