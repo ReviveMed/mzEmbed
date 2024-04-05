@@ -262,6 +262,7 @@ if __name__ == '__main__':
         run_id_list = get_run_id_list(tags=['april04_top200'],encoder_kind='AE')
         # already_run = get_run_id_list(tags=['top'],encoder_kind='AE')
     run_id_list.append('RCC-1620')
+    print(len(run_id_list))
 
     # run_id_list = ['RCC-1735']
     for run_id in run_id_list:
