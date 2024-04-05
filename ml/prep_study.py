@@ -603,7 +603,8 @@ def dict_diff_cleanup(diff,ignore_keys_list=None):
         ignore_keys_list = ['run_evaluation','save_latent_space','plot_latent_space_cols','plot_latent_space',\
                     'eval_kwargs','train_kwargs__eval_funcs','run_training','encoder_kwargs__hidden_size','overwrite_existing_kwargs',\
                     'load_model_loc']
-        new_ignore_keys_list = ['y_head_cols','head_kwargs_dict__Binary_isFemale','eval_name','train_name']
+        new_ignore_keys_list = ['y_head_cols','head_kwargs_dict__Binary_isFemale','eval_name','train_name',\
+                                'head_kwargs_dict__Regression_Age']
                                 # 'head_kwargs_dict__MultiClass_Cohort','head_kwargs_dict__Binary_isPediatric',\
                                 # 'head_kwargs_dict__MultiClass_Cohort'
                                 
