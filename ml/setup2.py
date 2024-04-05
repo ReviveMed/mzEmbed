@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 import os
 import json
-from models import get_model, Binary_Head, Dummy_Head, MultiClass_Head, MultiHead
+from models import get_model, Binary_Head, Dummy_Head, MultiClass_Head, MultiHead, Regression_Head
 from train3 import CompoundDataset, train_compound_model, get_end_state_eval_funcs, evaluate_compound_model, create_dataloaders, create_dataloaders_old
 import neptune
 from neptune.utils import stringify_unsupported
