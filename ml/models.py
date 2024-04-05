@@ -778,7 +778,7 @@ class Regression_Head(Head):
         y0, y1 = _nan_cleaner(y_output, y_true, ignore_nan)
         if y0 is None:
             return torch.tensor(0, dtype=torch.float32)
-        return self.loss_func(y0, y1)
+        return self.loss_func(y0.squeeze(), y1.squeeze())
 
     def score(self, y_output, y_data, ignore_nan=True):
         try:
@@ -786,7 +786,7 @@ class Regression_Head(Head):
             y0, y1 = _nan_cleaner(y_output.detach(), y_true.detach(), ignore_nan)
             if y0 is None:
                 return torch.tensor(0, dtype=torch.float32)
-            return {k: v(y0, y1) for k, v in self.score_func_dict.items()}
+            return {k: v(y0.squeeze(), y1.squeeze()) for k, v in self.score_func_dict.items()}
         except IndexError as e:
             print(f'when calculate score get IndexError: {e}')
             traceback.print_exc()
