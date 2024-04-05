@@ -263,8 +263,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,**kwargs):
                     head_list.append(Binary_Head(**head_kwargs))
                 elif head_kind == 'MultiClass':
                     head_list.append(MultiClass_Head(**head_kwargs))
-                # elif head_kind == 'Regression':
-                    # head_list.append(Regression_Head(**head_kwargs))
+                elif head_kind == 'Regression':
+                    head_list.append(Regression_Head(**head_kwargs))
                 elif head_kind == 'NA':
                     head_list.append(Dummy_Head())
                 else:

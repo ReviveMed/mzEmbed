@@ -680,7 +680,6 @@ class MultiClass_Head(Head):
                                 roc_auc_score(y_true.numpy(), y_score.numpy(), average='macro', multi_class='ovo')}
         # larger classes are given MORE weight when average="weighted"
 
-        #     AUROC(task='multiclass', average='weighted', num_classes=num_classes)}
 
 
     def define_architecture(self, **kwargs):
@@ -716,13 +715,6 @@ class MultiClass_Head(Head):
         if y0 is None:
             return torch.tensor(0, dtype=torch.float32)
         return self.loss_func(y0, y1.long())
-        # if ignore_nan:
-        #     mask = ~torch.isnan(y_true)
-        #     if mask.sum().item() == 0:
-        #         return torch.tensor(0, dtype=torch.float32)
-        #     return self.loss_func(y_logits[mask], y_true[mask].long())
-        # else:
-        #     return self.loss_func(y_logits, y_true.long())
 
     def logits_to_proba(self, y_logits):
         return F.softmax(y_logits, dim=1)
@@ -749,21 +741,57 @@ class MultiClass_Head(Head):
             traceback.print_exc()
             return {k: 0 for k, v in self.score_func_dict.items()}
 
-    # def score(self, y_logits, y_data, ignore_nan=True):
-    #     y_true = y_data[:,self.y_idx]
-    #     y0, y1 = _nan_cleaner(y_logits, y_true, ignore_nan)
-    #     if y0 is None:
-    #         return {k: torch.tensor(0, dtype=torch.float32) for k in self.score_func_dict.keys()}
-    #     return {k: v(y0, y1.long()) for k, v in self.score_func_dict.items()}
-        # return {k: v(y0, y1.long()).compute().item() for k, v in self.score_func_dict.items()}
-    
-        # if ignore_nan:
-        #     mask = ~torch.isnan(y_true)
-        #     if mask.sum().item() == 0:
-        #         return torch.tensor(0, dtype=torch.float32)
-        #     return self.score_func(y_logits[mask], y_true[mask].long())
-        # else:
-        #     return self.score_func(y_logits, y_true.long())
+#########################################################
+
+
+class Regression_Head(Head):
+    def __init__(self, name='Regression', y_idx=0, weight=1.0, kind='Regression', **kwargs):
+        super(Regression_Head, self).__init__()
+        self.goal = 'regress'
+        self.kind = 'Regression'
+        assert self.kind == kind
+        self.name = name
+        self.y_idx = y_idx
+        self.weight = weight
+        self.architecture = kwargs
+        self.loss_reduction = 'mean'
+        self.network = Dense_Layers(**kwargs)
+        self.input_size = kwargs.get('input_size', 1)
+        self.output_size = kwargs.get('output_size', 1)
+        self.file_id = self.kind + '_' + self.name
+        self.loss_func = nn.MSELoss(reduction=self.loss_reduction)
+        self.score_func_dict = {'MSE': lambda y_score, y_true: F.mse_loss(y_score, y_true)}
+        # self.network = nn.Identity()
+        # self.network = Dense_Layers(**kwargs)
+
+    def define_architecture(self, **kwargs):
+        self.architecture = kwargs
+        self.input_size = kwargs.get('input_size', 1)
+        self.output_size = kwargs.get('output_size', 1)
+        self.network = Dense_Layers(**kwargs)
+        pass
+
+    def loss(self, y_output, y_data, ignore_nan=True):
+        if self.weight == 0:
+            return torch.tensor(0, dtype=torch.float32)
+        y_true = y_data[:,self.y_idx]
+        y0, y1 = _nan_cleaner(y_output, y_true, ignore_nan)
+        if y0 is None:
+            return torch.tensor(0, dtype=torch.float32)
+        return self.loss_func(y0, y1)
+
+    def score(self, y_output, y_data, ignore_nan=True):
+        try:
+            y_true = y_data[:,self.y_idx]
+            y0, y1 = _nan_cleaner(y_output.detach(), y_true.detach(), ignore_nan)
+            if y0 is None:
+                return torch.tensor(0, dtype=torch.float32)
+            return {k: v(y0, y1) for k, v in self.score_func_dict.items()}
+        except IndexError as e:
+            print(f'when calculate score get IndexError: {e}')
+            traceback.print_exc()
+            return {k: 0 for k, v in self.score_func_dict.items()}
+
 
 
 #########################################################
