@@ -19,7 +19,7 @@ import time
 from neptune.exceptions import NeptuneException
 from collections import defaultdict
 import shutil
-
+import re
 
 data_dir = get_latest_dataset()
 
@@ -115,6 +115,16 @@ def compute_finetune(run_id,plot_latent_space=False,
         metric_string_dct['IMDC Train AUROC'] = 'eval/train/Binary_IMDC/AUROC (micro)'
         metric_string_dct['IMDC Val AUROC'] = 'eval/val/Binary_IMDC/AUROC (micro)'
 
+
+    num_epochs = None
+    if 'epoch_' in desc_str.lower():
+        match = re.search(r'epoch_(\d+)', desc_str.lower())
+        if match:
+            num_epochs = int(match.group(1))
+
+
+            
+
     else:
         raise ValueError('Unknown desc_str:',desc_str)
 
@@ -183,7 +193,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         
         kwargs['encoder_kwargs']['dropout_rate'] = 0.2
         kwargs['adv_kwargs_list'] = []
-        kwargs['train_kwargs']['num_epochs'] = 30
+
         # kwargs['train_kwargs']['num_epochs'] = 20
         kwargs['train_kwargs']['early_stopping_patience'] = 0
         kwargs['holdout_frac'] = 0
@@ -200,9 +210,14 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['eval_kwargs'] = {}
         kwargs['eval_kwargs']['sklearn_models'] = {}
 
-
-        if encoder_kind == 'TGEM_Encoder':
-            kwargs['train_kwargs']['num_epochs'] = 3
+        if num_epochs is None:
+            if encoder_kind == 'TGEM_Encoder':
+                kwargs['train_kwargs']['num_epochs'] = 3
+            else:
+                kwargs['train_kwargs']['num_epochs'] = 30
+        else:
+            kwargs['train_kwargs']['num_epochs'] = num_epochs
+            print('num_epochs:',num_epochs)
 
         kwargs = convert_model_kwargs_list_to_dict(kwargs)
 
