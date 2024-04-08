@@ -146,6 +146,7 @@ def compute_finetune(run_id,plot_latent_space=False,
 
         kwargs = run['pretrain/original_kwargs'].fetch()
         kwargs = convert_neptune_kwargs(kwargs)
+        encoder_kind = kwargs['encoder_kind']
         run.stop()
         
     if n_trials>0:    
@@ -199,6 +200,9 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['eval_kwargs'] = {}
         kwargs['eval_kwargs']['sklearn_models'] = {}
 
+
+        if encoder_kind == 'TGEM_Encoder':
+            kwargs['train_kwargs']['num_epochs'] = 3
 
         kwargs = convert_model_kwargs_list_to_dict(kwargs)
 
@@ -294,6 +298,7 @@ if __name__ == '__main__':
     if 'RCC' not in chosen_id:
         tags = [chosen_id]
         run_id_list = get_run_id_list(tags=tags,encoder_kind='AE')
+        # run_id_list = get_run_id_list(tags=tags)
     else:
         if ',' in chosen_id:
             run_id_list = chosen_id.split(',')
