@@ -219,12 +219,12 @@ def objective_func3(run_id,data_dir,recompute_eval=False,objective_keys=None):
     objective_keys = sorted(objective_keys)
 
     default_objective_vals_dict = {
-        'reconstruction_loss': 9999,
+        'reconstruction_loss': 99999,
         'Binary_isPediatric': 0.5,
         'MultiClass_Cohort Label': 0.5,
         'MultiClass_Adv StudyID': 0.5,
         'Binary_isFemale': 0.5,
-        'Regression_Age': 100
+        'Regression_Age': 9999
     }
 
     run = neptune.init_run(project='revivemed/RCC',

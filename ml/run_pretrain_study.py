@@ -19,7 +19,7 @@ USE_WEBAPP_DB = True
 SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
-ADD_EXISTING_RUNS_TO_STUDY = False
+ADD_EXISTING_RUNS_TO_STUDY = True
 limit_add = -1 # limit the number of runs added to the study
 
 # get user input
@@ -30,7 +30,7 @@ num_trials = int(input('Enter number of trials: '))
 # encoder_kind = 'TGEM_Encoder'
 
 STUDY_DICT = {
-    'study_name': 'Multi Obj Apr5',
+    'study_name': 'Multi Obj Apr08',
     'encoder_kind': encoder_kind,
     'objectives': {
         'reconstruction_loss':{
@@ -38,21 +38,21 @@ STUDY_DICT = {
             'name': 'Reconstruction Loss',
             'direction': 'minimize'
         },
-        'Binary_isPediatric':{
-            'weight': 1,
-            'name': 'Pediatric Prediction',
-            'direction': 'maximize'
-        },
+        # 'Binary_isPediatric':{
+        #     'weight': 1,
+        #     'name': 'Pediatric Prediction',
+        #     'direction': 'maximize'
+        # },
         # 'MultiClass_Cohort Label':{
         #     'weight': 1,
         #     'name': 'Cohort Label Prediction',
         #     'direction': 'maximize'
         # },
-        'MultiClass_Adv StudyID':{
-            'weight': 1,
-            'name': 'Adv StudyID Prediction',
-            'direction': 'minimize'
-        },
+        # 'MultiClass_Adv StudyID':{
+        #     'weight': 1,
+        #     'name': 'Adv StudyID Prediction',
+        #     'direction': 'minimize'
+        # },
         'Binary_isFemale':{
             'weight': 1,
             'name': 'Gender Prediction',
