@@ -24,8 +24,20 @@ import re
 data_dir = get_latest_dataset()
 
 
+default_sweep_kwargs = {
+    'holdout_frac': 0,
+    'encoder_kwargs__dropout_rate': 0.2,
+    'train_kwargs__num_epochs': 30,
+    'train_kwargs__early_stopping_patience': 0,
+    'train_kwargs__learning_rate': 0.0005,
+    'train_kwargs__l2_reg_weight': 0.0005,
+    'train_kwargs__l1_reg_weight': 0.005,
+    'train_kwargs__noise_factor': 0.1,
+    'train_kwargs__weight_decay': 0,
+}
+
 def compute_finetune(run_id,plot_latent_space=False,
-                           n_trials=3,desc_str='finetune'):
+                           n_trials=3,desc_str='finetune',sweep_kwargs=None):
 
 
 
@@ -117,6 +129,13 @@ def compute_finetune(run_id,plot_latent_space=False,
     else:
         raise ValueError('Unknown desc_str:',desc_str)
 
+    if sweep_kwargs is None:
+        sweep_kwargs = default_sweep_kwargs
+    
+    for key in default_sweep_kwargs.keys():
+        if key not in sweep_kwargs.keys():
+            sweep_kwargs[key] = default_sweep_kwargs[key]
+
     num_epochs = None
     if 'epoch_' in desc_str.lower():
         match = re.search(r'epoch_(\d+)', desc_str.lower())
@@ -187,21 +206,21 @@ def compute_finetune(run_id,plot_latent_space=False,
             'num_classes': num_classes,
             }]
         
-        kwargs['encoder_kwargs']['dropout_rate'] = 0.2
+        kwargs['encoder_kwargs']['dropout_rate'] = sweep_kwargs.get('encoder_kwargs__dropout_rate')
         kwargs['adv_kwargs_list'] = []
 
         # kwargs['train_kwargs']['num_epochs'] = 20
-        kwargs['train_kwargs']['early_stopping_patience'] = 0
-        kwargs['holdout_frac'] = 0
+        kwargs['train_kwargs']['early_stopping_patience'] = sweep_kwargs.get('train_kwargs__early_stopping_patience')
+        kwargs['holdout_frac'] = sweep_kwargs.get('holdout_frac')
         kwargs['train_kwargs']['head_weight'] = 1
         kwargs['train_kwargs']['encoder_weight'] = 0
         kwargs['train_kwargs']['adversary_weight'] = 0
-        kwargs['train_kwargs']['learning_rate'] = 0.0005
+        kwargs['train_kwargs']['learning_rate'] = sweep_kwargs.get('train_kwargs__learning_rate')
         # kwargs['train_kwargs']['learning_rate'] = 0.0001
-        kwargs['train_kwargs']['l2_reg_weight'] = 0.0005
-        kwargs['train_kwargs']['l1_reg_weight'] = 0.005
-        kwargs['train_kwargs']['noise_factor'] = 0.1
-        kwargs['train_kwargs']['weight_decay'] = 0
+        kwargs['train_kwargs']['l2_reg_weight'] = sweep_kwargs.get('train_kwargs__l2_reg_weight')
+        kwargs['train_kwargs']['l1_reg_weight'] = sweep_kwargs.get('train_kwargs__l1_reg_weight')
+        kwargs['train_kwargs']['noise_factor'] = sweep_kwargs.get('train_kwargs__noise_factor')
+        kwargs['train_kwargs']['weight_decay'] = sweep_kwargs.get('train_kwargs__weight_decay')
         kwargs['run_evaluation'] = True
         kwargs['eval_kwargs'] = {}
         kwargs['eval_kwargs']['sklearn_models'] = {}
@@ -210,10 +229,10 @@ def compute_finetune(run_id,plot_latent_space=False,
             if encoder_kind == 'TGEM_Encoder':
                 kwargs['train_kwargs']['num_epochs'] = 3
             else:
-                kwargs['train_kwargs']['num_epochs'] = 30
+                kwargs['train_kwargs']['num_epochs'] = sweep_kwargs.get('train_kwargs__num_epochs')
         else:
             kwargs['train_kwargs']['num_epochs'] = num_epochs
-            print('num_epochs:',num_epochs)
+        print('num_epochs:',num_epochs)
 
         kwargs = convert_model_kwargs_list_to_dict(kwargs)
 
