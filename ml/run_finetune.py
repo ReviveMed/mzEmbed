@@ -114,7 +114,8 @@ def compute_finetune(run_id,plot_latent_space=False,
         plot_latent_space_cols = ['IMDC']
         metric_string_dct['IMDC Train AUROC'] = 'eval/train/Binary_IMDC/AUROC (micro)'
         metric_string_dct['IMDC Val AUROC'] = 'eval/val/Binary_IMDC/AUROC (micro)'
-
+    else:
+        raise ValueError('Unknown desc_str:',desc_str)
 
     num_epochs = None
     if 'epoch_' in desc_str.lower():
@@ -122,11 +123,6 @@ def compute_finetune(run_id,plot_latent_space=False,
         if match:
             num_epochs = int(match.group(1))
 
-
-            
-
-    else:
-        raise ValueError('Unknown desc_str:',desc_str)
 
     if n_trials>0:
         run = neptune.init_run(project='revivemed/RCC',
