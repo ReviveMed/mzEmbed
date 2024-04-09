@@ -30,13 +30,14 @@ num_trials = int(input('Enter number of trials: '))
 # encoder_kind = 'TGEM_Encoder'
 
 STUDY_DICT = {
-    'study_name': 'Multi Obj Apr08',
+    'study_name': 'Multi Obj Apr09',
     'encoder_kind': encoder_kind,
     'objectives': {
         'reconstruction_loss':{
             'weight': 1,
             'name': 'Reconstruction Loss',
-            'direction': 'minimize'
+            'direction': 'minimize',
+            'transform': 'log10'
         },
         # 'Binary_isPediatric':{
         #     'weight': 1,
@@ -61,7 +62,8 @@ STUDY_DICT = {
         'Regression_Age':{
             'weight': 1,
             'name': 'Age Prediction',
-            'direction': 'minimize'
+            'direction': 'minimize',
+            'transform': 'log10'
         },
         }
 }
@@ -78,7 +80,8 @@ def main(STUDY_INFO_DICT):
     def compute_objective(run_id):
         return objective_func3(run_id,
                             data_dir=data_dir,
-                            objective_keys=get_study_objective_keys(STUDY_INFO_DICT))
+                            objective_keys=get_study_objective_keys(STUDY_INFO_DICT),
+                            objectives_info_dict=STUDY_INFO_DICT['objectives'])
 
 
     def objective(trial):

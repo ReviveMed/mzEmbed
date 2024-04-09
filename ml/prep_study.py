@@ -69,6 +69,9 @@ def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=No
         raise ValueError("Objective function is None")
 
     
+    # shuffle the run_id_list
+    np.random.shuffle(run_id_list)
+
     for run_id in run_id_list:
         #TODO test this code
         #check if the trial is already in the study by looking at the user attributes
@@ -212,7 +215,10 @@ def get_study_objective_directions(study_info_dict):
     return directions
 
 
-def objective_func3(run_id,data_dir,recompute_eval=False,objective_keys=None):
+def objective_func3(run_id,data_dir,recompute_eval=False,objective_keys=None,objectives_info_dict=None):
+
+    if objectives_info_dict is None:
+        objectives_info_dict = {}
 
     if objective_keys is None:
         objective_keys = ['reconstruction_loss','Binary_isPediatric','MultiClass_Cohort Label','MultiClass_Adv StudyID','Binary_isFemale','Regression_Age']
@@ -269,6 +275,16 @@ def objective_func3(run_id,data_dir,recompute_eval=False,objective_keys=None):
                     # if objective_key == 'reconstruction_loss':
                         # obj_val = np.log10(obj_val)
         
+            if objective_key in objectives_info_dict:
+                if 'transform' in objectives_info_dict[objective_key]:
+                    transform_str = objectives_info_dict[objective_key]['transform']
+                    if transform_str == 'log10':
+                        obj_val = np.log10(obj_val)
+                    elif transform_str == 'neg':
+                        obj_val = -1*obj_val 
+                    elif transform_str == 'neglog10':
+                        obj_val = -1*np.log10(obj_val)
+
             obj_vals.append(obj_val)
 
     return tuple(obj_vals)
