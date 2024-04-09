@@ -486,6 +486,28 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,**kwargs):
                 run[f'{setup_id}/Z_embed_{eval_name}'].upload(Z_embed_savepath)
             run.wait()
 
+            if check_neptune_existance(run,f'{setup_id}/Z_{train_name}'):
+                print(f'Z_{train_name} already exists in {setup_id} of run {run_id}')
+            
+            else:
+                Z_embed_train_savepath = os.path.join(save_dir, f'Z_embed_{train_name}.csv')
+                Z = generate_latent_space(X_data_train, encoder)
+                Z.to_csv(os.path.join(save_dir, f'Z_{train_name}.csv'))
+
+                Z_pca = generate_pca_embedding(Z)
+                Z_pca.to_csv(os.path.join(save_dir, f'Z_pca_{train_name}.csv'))
+                Z_pca.columns = [f'PCA{i+1}' for i in range(Z_pca.shape[1])]
+
+                Z_umap = generate_umap_embedding(Z)
+                Z_umap.to_csv(os.path.join(save_dir, f'Z_umap_{train_name}.csv'))
+                Z_umap.columns = [f'UMAP{i+1}' for i in range(Z_umap.shape[1])]
+
+                Z_embed = pd.concat([Z_pca, Z_umap], axis=1)
+                Z_embed = Z_embed.join(y_data_train)
+                Z_embed.to_csv(Z_embed_train_savepath)
+                run[f'{setup_id}/Z_embed_{train_name}'].upload(Z_embed_train_savepath)
+            run.wait()
+
 
         plot_latent_space = kwargs.get('plot_latent_space', '')
         plot_latent_space_cols = kwargs.get('plot_latent_space_cols', [y_head_cols, y_adv_cols])

@@ -37,7 +37,7 @@ default_sweep_kwargs = {
 }
 
 def compute_finetune(run_id,plot_latent_space=False,
-                           n_trials=3,desc_str='finetune',sweep_kwargs=None):
+                           n_trials=3,desc_str='finetune',sweep_kwargs=None,eval_name='val'):
 
 
 
@@ -105,27 +105,32 @@ def compute_finetune(run_id,plot_latent_space=False,
     #     print('skip finetune')
     #     return run_id
 
+    if eval_name.lower() == 'val':
+        train_name = 'train'
+    elif eval_name.lower() == 'test':
+        train_name = 'trainval'
+
     if 'mskcc' in desc_str.lower():
         metric_string_dct = {}
-        count_check_name = 'MSKCC Train AUROC count'
+        count_check_name = f'MSKCC {train_name} AUROC count'
         y_head_cols = ['MSKCC BINARY']
         head_name = 'MSKCC'
         head_kind = 'Binary'
         num_classes = 2
         plot_latent_space_cols = ['MSKCC']
-        metric_string_dct['MSKCC Train AUROC'] = 'eval/train/Binary_MSKCC/AUROC (micro)'
-        metric_string_dct['MSKCC Val AUROC'] = 'eval/val/Binary_MSKCC/AUROC (micro)'
+        metric_string_dct[f'MSKCC {train_name} AUROC'] = f'eval/{train_name}/Binary_MSKCC/AUROC (micro)'
+        metric_string_dct[f'MSKCC {eval_name} AUROC'] = f'eval/{eval_name}/Binary_MSKCC/AUROC (micro)'
 
     elif 'imdc' in desc_str.lower():
         metric_string_dct = {}
-        count_check_name = 'IMDC Train AUROC count'
+        count_check_name = f'IMDC {train_name} AUROC count'
         y_head_cols = ['IMDC BINARY']
         head_name = 'IMDC'
         head_kind = 'Binary'
         num_classes = 2
         plot_latent_space_cols = ['IMDC']
-        metric_string_dct['IMDC Train AUROC'] = 'eval/train/Binary_IMDC/AUROC (micro)'
-        metric_string_dct['IMDC Val AUROC'] = 'eval/val/Binary_IMDC/AUROC (micro)'
+        metric_string_dct[f'IMDC {train_name} AUROC'] = f'eval/{train_name}/Binary_IMDC/AUROC (micro)'
+        metric_string_dct[f'IMDC {eval_name} AUROC'] = f'eval/{eval_name}/Binary_IMDC/AUROC (micro)'
     else:
         raise ValueError('Unknown desc_str:',desc_str)
 
@@ -157,9 +162,13 @@ def compute_finetune(run_id,plot_latent_space=False,
         # if 'summary/randinit_Apr04.1_MSKCC/MSKCC Train AUROC avg':
         if 'summary' in run_struc.keys():
             if f'randinit_{desc_str}' in run_struc['summary'].keys():
-                if count_check_name in run_struc['summary'][f'randinit_{desc_str}'].keys():
-
+                keys_list = run_struc['summary'][f'randinit_{desc_str}'].keys()
+                # keys_list_lower = [key.lower() for key in keys_list]
+                # if count_check_name in keys_list_lower:
+                if count_check_name in keys_list:
+                    # actual_count_check_name = keys_list[np.argmax([key.lower() == count_check_name for key in keys_list_lower])]
                     run_counts = run[f'summary/randinit_{desc_str}/{count_check_name}'].fetch()
+                    # run_counts = run[f'summary/randinit_{desc_str}/{actual_count_check_name}'].fetch()
                     if run_counts > n_trials:
                         print('Already computed over {} trials'.format(run_counts))
                         run.stop()
@@ -180,7 +189,8 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['load_model_loc'] = False
         kwargs['X_filename'] = 'X_finetune'
         kwargs['y_filename'] = 'y_finetune'
-        kwargs['eval_name'] = 'val'
+        kwargs['eval_name'] = eval_name
+        kwargs['train_name'] = train_name
         kwargs['run_training'] = True
         kwargs['run_evaluation'] = True
         kwargs['save_latent_space'] = False
@@ -240,6 +250,8 @@ def compute_finetune(run_id,plot_latent_space=False,
         print('ID:',setup_id)
         for ii in range(n_trials):
             print('trial #:',ii)
+            if ii == n_trials-1:
+                kwargs['save_latent_space'] = True
             _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
 
 
@@ -247,6 +259,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         # either one of these settings should run a model with random initialized weights, but do both just in case
         kwargs['run_random_init'] = True
         kwargs['load_model_weights'] = False
+        kwargs['save_latent_space'] = False
         
         setup_id = f'randinit_{desc_str}'
         print('ID:',setup_id)
@@ -316,6 +329,11 @@ if __name__ == '__main__':
     else:
         desc_str = 'Apr04.1_MSKCC'
 
+    if len(sys.argv)>5:
+        eval_name = sys.argv[5]
+    else:
+        eval_name = 'val'
+
     if chosen_id is None:
         chosen_id = input('Enter Run id: ')
 
@@ -345,7 +363,7 @@ if __name__ == '__main__':
             continue
         print('run_id:',run_id)
         try:
-            run_id = compute_finetune(run_id,n_trials=n_trials,plot_latent_space=plot_latent_space,desc_str=desc_str)
+            run_id = compute_finetune(run_id,n_trials=n_trials,plot_latent_space=plot_latent_space,desc_str=desc_str,eval_name=eval_name)
         except NeptuneException as e:
             print('NeptuneException:',e)
             continue

@@ -142,12 +142,23 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
     verbose = kwargs.get('verbose', True)
     adversarial_mini_epochs = kwargs.get('adversarial_mini_epochs', 20)
     prefix = kwargs.get('prefix', 'train')
+    train_name = kwargs.get(f'train_name', 'train')
 
     
 
     if phase_list is None:
         phase_list = list(dataloaders.keys())
-    
+
+    print('Training on', train_name)
+    if train_name not in phase_list:
+        print(f'Warning: train_name ({train_name}) not in phase_list')
+        for phase in phase_list:
+            if 'train' in phase:
+                train_name = phase
+                break
+    print('Training on', train_name)
+
+
     if scheduler_kind is not None:
         # Right now, Scheduler only impacts the encoder optimizer
         #TODO Do we want to combine the encoder and head optimizers so it impacts both?
@@ -226,11 +237,11 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
 
     # define the loss history and best params with associated losses
     loss_history = {
-        'encoder': {'train': [], 'train_holdout': []},
-        'head': {'train': [], 'train_holdout': []},
-        'adversary': {'train': [], 'train_holdout': []},
-        'joint': {'train': [], 'train_holdout': []},
-        'epoch' : {'train': [], 'train_holdout': []},
+        'encoder': {f'{train_name}': [], f'{train_name}_holdout': []},
+        'head': {f'{train_name}': [], f'{train_name}_holdout': []},
+        'adversary': {f'{train_name}': [], f'{train_name}_holdout': []},
+        'joint': {f'{train_name}': [], f'{train_name}_holdout': []},
+        'epoch' : {f'{train_name}': [], f'{train_name}_holdout': []},
     }
     best_loss = {'encoder': 1e10, 'head': 1e10, 'adversary': 1e10, 'joint': 1e10, 'epoch': 0}
     best_wts = {'encoder': encoder.state_dict(), 'head': head.state_dict(), 'adversary': adversary.state_dict()}
@@ -249,10 +260,10 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
             break
 
 
-        for phase in ['train', 'train_holdout']:
+        for phase in [f'{train_name}', f'{train_name}_holdout']:
             if phase not in dataloaders:
                 continue
-            if phase == 'train':
+            if phase == f'{train_name}':
                 encoder.train()
                 head.train()
                 adversary.train()
@@ -283,7 +294,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                 clin_vars = clin_vars.to(device)
 
                 # noise injection for training to make model more robust
-                if (noise_factor>0) and (phase == 'train'):
+                if (noise_factor>0) and (phase == f'{train_name}'):
                     X = X + noise_factor * torch.randn_like(X)
 
                 encoder_optimizer.zero_grad()
@@ -291,7 +302,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                     head_optimizer.zero_grad()
                 if adversary_weight > 0:
                     adversary_optimizer.zero_grad()
-                with torch.set_grad_enabled(phase == 'train'):
+                with torch.set_grad_enabled(phase == f'{train_name}'):
                     if encoder_weight > 0:
                         z, encoder_loss = encoder.transform_with_loss(X)
                     else:
@@ -386,7 +397,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
 
                     run[f'{prefix}/{phase}/batch/joint_loss'].append(joint_loss)
                     
-                    if phase == 'train':
+                    if phase == f'{train_name}':
                         
                         joint_loss_w_penalty = joint_loss
                         # right now we are also penalizing the weights in the decoder, do we want to do that?
@@ -420,7 +431,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
 
 
             ########  Train the adversary on the fixed latent space for a few epochs
-            if (adversary_weight > 0) and (phase == 'train'):
+            if (adversary_weight > 0) and (phase == f'{train_name}'):
                 encoder.eval()
                 head.eval()
                 for mini_epoch in range(adversarial_mini_epochs):       
@@ -433,7 +444,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         if (noise_factor>0):
                             X = X + noise_factor * torch.randn_like(X)
 
-                        with torch.set_grad_enabled(phase == 'train'):
+                        with torch.set_grad_enabled(phase == f'{train_name}'):
                             z = encoder.transform(X).detach()
                             z.requires_grad = True
                             adversary_optimizer.zero_grad()
@@ -449,7 +460,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
 
                             run[f'{prefix}/{phase}/multi_adversary_loss'].append(adversary_loss)
                         
-                            if phase == 'train':
+                            if phase == f'{train_name}':
                                 adversary_loss.backward()
                                 adversary_optimizer.step()
             
@@ -498,7 +509,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                     if encoder_weight > 0:
                         print(f'{phase} Encoder Loss: {loss_history["encoder"][phase][-1]:.4f}')
 
-            if phase == 'train_holdout':
+            if phase == f'{train_name}_holdout':
                 if scheduler is not None:
                     scheduler.step(loss_history['joint'][phase][-1])
 
@@ -530,6 +541,7 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
     prefix = kwargs.get('prefix', 'eval')
     sklearn_models = kwargs.get('sklearn_models', None)
     
+    
     encoder.eval()
     head.eval()
     adversary.eval()
@@ -541,10 +553,19 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
     end_state_losses = {}
     end_state_eval = {}
     phase_list = list(dataloaders.keys())
-    if 'train' in phase_list:
+
+    train_name = kwargs.get(f'train_name', 'train')
+
+    if train_name not in phase_list:
+        for phase in phase_list:
+            if 'train' in phase:
+                train_name = phase
+                break
+
+    if f'{train_name}' in phase_list:
         # put train at the beginning
-        phase_list.remove('train')
-        phase_list = ['train'] + phase_list
+        phase_list.remove(f'{train_name}')
+        phase_list = [f'{train_name}'] + phase_list
 
 
     latent_outputs_by_phase = defaultdict(dict)
@@ -653,7 +674,7 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
                     for model_name, model in sklearn_models.items():
                         nan_mask = ~torch.isnan(adv0_targets)
 
-                        if phase == 'train':
+                        if phase == f'{train_name}':
                             model.fit(
                                 latent_outputs[nan_mask].detach().numpy(), 
                                 # adversary_targets[nan_mask].detach().long().numpy())

@@ -12,8 +12,8 @@ data_dir = get_latest_dataset()
 
 run_id = 'RCC-1915'
 sweep_desc = 'IMDC'
-key1 = 'IMDC Val AUROC'
-key2 = 'IMDC Train AUROC'
+key1 = 'IMDC val AUROC'
+key2 = 'IMDC train AUROC'
 storage_name = 'optuna'
 USE_WEBAPP_DB = True
 SAVE_TRIALS = True
@@ -22,10 +22,11 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 def objective(trial):
 
     sweep_id = f'optuna_{sweep_desc}__{trial.number}'
-
-    num_epochs = trial.suggest_int('num_epochs', 1, 50, step=2)
+    holdout_frac = 0
+    num_epochs = trial.suggest_int('num_epochs', 5, 50, step=5)
+    early_stopping_patience = 0
     if num_epochs > 20:
-        early_stopping_patience = trial.suggest_int('early_stopping_patience', 0, 10 ,step=5)
+        early_stopping_patience = trial.suggest_int('early_stopping_patience', 0, 10, step=5)
         if early_stopping_patience == 0:
             holdout_frac = 0
         else:
@@ -54,15 +55,23 @@ def objective(trial):
             with_id=run_id,
             capture_stdout=False,
             capture_stderr=False,
-            capture_hardware_metrics=False,
-            mode='read-only')
+            capture_hardware_metrics=False)
     
     key1_finetune_val = run[f'summary/finetune_{sweep_id}/{key1} avg'].fetch()
     key1_randinit_val = run[f'summary/randinit_{sweep_id}/{key1} avg'].fetch()
     key2_finetune_val = run[f'summary/finetune_{sweep_id}/{key2} avg'].fetch()
 
+    run.wait()
+    del run['finetune_'+sweep_id]
+    del run['randinit_'+sweep_id]
+    
+
     if key2_finetune_val < key1_finetune_val:
         key1_finetune_val = key2_finetune_val
+        # raise optuna.TrialPruned()
+
+    # if key1_randinit_val > key1_finetune_val:
+        # raise optuna.TrialPruned()
 
     return key1_finetune_val, key2_finetune_val, key1_randinit_val
 
