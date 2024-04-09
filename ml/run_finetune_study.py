@@ -76,7 +76,11 @@ def objective(trial):
     return key1_finetune_val, key2_finetune_val, key1_randinit_val
 
 
-
+import sys
+if len(sys.argv)>1:
+    n_optuna_trials = int(sys.argv[1])
+else:
+    n_optuna_trials = 100
 
 if USE_WEBAPP_DB:
     print('using webapp database')
@@ -94,4 +98,4 @@ study = optuna.create_study(directions=['maximize', 'minimize', 'minimize'],
 
 
 
-study.optimize(objective, n_trials=10)
+study.optimize(objective, n_trials=n_optuna_trials)
