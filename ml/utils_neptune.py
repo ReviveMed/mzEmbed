@@ -35,7 +35,7 @@ def get_latest_dataset(data_dir='/DATA'):
 
         print('Downloading the latest dataset')
         download_data_dir(data_url, save_dir=data_dir)
-
+    project.stop()
     return data_dir
 
 
@@ -82,6 +82,7 @@ def get_run_id_list(encoder_kind='AE',tags=[]):
     runs_table_df = runs_table_df[runs_table_df['pretrain/kwargs/encoder_kind'] == encoder_kind].copy()
 
     run_id_list = runs_table_df['sys/id'].tolist()
+    project.stop()
     return run_id_list
 
 
