@@ -26,6 +26,7 @@ def get_model(model_kind, input_size, **kwargs):
         model = AE(input_size = input_size, **kwargs)
     elif model_kind == 'TGEM_Encoder':
         model = TGEM_Encoder(input_size = input_size, **kwargs)
+    else:
         raise ValueError('model_kind not recognized')
     return model
 
