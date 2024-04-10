@@ -63,6 +63,15 @@ def _reset_params(layer):
             for child in layer.children():
                 _reset_params(child)
 
+def _init_weights_xavier(layer,gain=1.0):
+    if hasattr(layer, '.weight'):
+        # nn.init.xavier_normal_(layer.weight.data,gain=gain)
+        nn.init.xavier_uniform_(layer.weight.data,gain=gain)
+    else:
+        if hasattr(layer, 'children'):
+            for child in layer.children():
+                _init_weights_xavier(child,gain=gain)
+
 def get_reg_penalty_slow(model,l1_lambda,l2_lambda):
     #this is probably slower, but more memory efficient 
     reg_loss = torch.tensor(0, dtype=torch.float32)
@@ -134,7 +143,7 @@ class Dense_Layers(nn.Module):
             if key not in ['input_size', 'hidden_size', 'output_size', 'num_hidden_layers', 'dropout_rate', 'activation', 'use_batch_norm', 'act_on_output_layer']:
                 print(f'Warning: {key} is not a valid argument for Dense_Layers')
 
-        if activation == 'leakyrelu':
+        if activation == 'leakyrelu' or activation == 'leaky_relu':
             activation_func = nn.LeakyReLU()
         elif activation == 'relu':
             activation_func = nn.ReLU()
@@ -202,7 +211,7 @@ class Dense_Layers(nn.Module):
 class VAE(nn.Module):
     def __init__(self, input_size, hidden_size, latent_size,
                  num_hidden_layers=1, dropout_rate=0,
-                 activation='leakyrelu', use_batch_norm=False, act_on_latent_layer=False):
+                 activation='leaky_relu', use_batch_norm=False, act_on_latent_layer=False):
         super(VAE, self).__init__()
         self.goal = 'encode'
         self.kind = 'VAE'
@@ -211,9 +220,13 @@ class VAE(nn.Module):
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
         self.dropout_rate = dropout_rate
-        self.activation = activation
+        if activation == 'leakyrelu':
+            self.activation = 'leaky_relu'
+        else:
+            self.activation = activation
         self.use_batch_norm = use_batch_norm
         self.act_on_latent_layer = act_on_latent_layer
+        self.kl_weight = 1.0
 
         self.encoder = Dense_Layers(input_size=input_size, 
                                     hidden_size=hidden_size, 
@@ -240,7 +253,14 @@ class VAE(nn.Module):
         # self.decoder = Dense_Layers(latent_size, hidden_size, input_size,
         #                             num_hidden_layers, dropout_rate, activation,
         #                             use_batch_norm)
-        
+
+    def init_layers(self):
+        # Weight Initialization: Proper weight initialization can help mitigate 
+        # the vanishing/exploding gradients problem. 
+        # Techniques like Xavier/Glorot or He initialization can be used
+        _init_weights_xavier(self.encoder,gain=nn.init.calculate_gain(self.activation))
+        _init_weights_xavier(self.decoder,gain=nn.init.calculate_gain(self.activation))  
+
     def reparameterize(self, mu, log_var):
         std = torch.exp(0.5*log_var)
         eps = torch.randn_like(std)
@@ -257,10 +277,19 @@ class VAE(nn.Module):
 
     def loss(self, x, x_recon, mu, log_var):
         # taking the average over the batch helps with stability
-        recon_loss = F.mse_loss(x_recon, x, reduction='sum')
-        kl_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
-        return torch.div(torch.add(recon_loss, kl_loss), x.size(0))
-        # return torch.add(recon_loss, kl_loss)
+        # recon_loss = F.mse_loss(x_recon, x, reduction='sum')
+        # kl_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+        # return torch.div(torch.add(recon_loss, kl_loss), x.size(0))
+
+        # recon_loss = F.mse_loss(x_recon, x, reduction='mean')
+        # kl_loss = -0.5 * (1 + log_var - mu.pow(2) - log_var.exp()).sum() / (mu.size(0) * mu.size(1))
+        # return torch.add(recon_loss, self.kl_weight*kl_loss)
+    
+        recon_loss = F.mse_loss(x_recon, x, reduction='mean')
+        # print('recon_loss', recon_loss)
+        kl_loss = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
+        # print('kl_loss', kl_loss)
+        return torch.add(recon_loss, self.kl_weight*kl_loss)
     
     def forward_to_loss(self, x):
         mu, log_var = self.encoder(x).chunk(2, dim=1)
@@ -300,7 +329,7 @@ class VAE(nn.Module):
 class AE(nn.Module):
     def __init__(self, input_size, hidden_size, latent_size,
                  num_hidden_layers=1, dropout_rate=0,
-                 activation='leakyrelu', use_batch_norm=False, act_on_latent_layer=False):
+                 activation='leaky_relu', use_batch_norm=False, act_on_latent_layer=False):
         super(AE, self).__init__()
         self.goal = 'encode'
         self.kind = 'AE'
@@ -309,7 +338,10 @@ class AE(nn.Module):
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
         self.dropout_rate = dropout_rate
-        self.activation = activation
+        if activation == 'leakyrelu':
+            self.activation = 'leaky_relu'
+        else:
+            self.activation = activation
         self.use_batch_norm = use_batch_norm
         self.act_on_latent_layer = act_on_latent_layer
         self.encoder = Dense_Layers(input_size=input_size, 
@@ -328,7 +360,14 @@ class AE(nn.Module):
                                     dropout_rate = dropout_rate,
                                     activation = activation,
                                     use_batch_norm = use_batch_norm)
-        
+
+    def init_layers(self):
+        # Weight Initialization: Proper weight initialization can help mitigate 
+        # the vanishing/exploding gradients problem. 
+        # Techniques like Xavier/Glorot or He initialization can be used
+        _init_weights_xavier(self.encoder,gain=nn.init.calculate_gain(self.activation))
+        _init_weights_xavier(self.decoder,gain=nn.init.calculate_gain(self.activation))  
+
     def forward(self, x):
         z = self.encoder(x)
         return self.decoder(z)
@@ -1221,6 +1260,10 @@ class TGEM_Encoder(torch.nn.Module):
         self.dropout = nn.Dropout(dropout_rate)
         self.sublayer = res_connect(input_size, dropout_rate)
     
+
+    def init_layers(self):
+        pass
+
     def reset_params(self):
         _reset_params(self)
 

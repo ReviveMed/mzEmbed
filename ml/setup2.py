@@ -242,6 +242,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,**kwargs):
                     run[f'{load_encoder_loc}/models/encoder_state_dict'].download(local_path)
                 encoder_state_dict = torch.load(local_path)
                 encoder.load_state_dict(encoder_state_dict)
+            else:
+                encoder.init_layers()
 
             ####################################
             ###### Create the Head Models ######
@@ -379,7 +381,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,**kwargs):
             #     )
 
             if run_random_init:
-                encoder.reset_params()
+                # encoder.reset_params()
+                encoder.init_layers()
                 head.reset_params()
                 adv.reset_params()
 

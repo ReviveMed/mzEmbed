@@ -143,8 +143,14 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
     adversarial_mini_epochs = kwargs.get('adversarial_mini_epochs', 20)
     prefix = kwargs.get('prefix', 'train')
     train_name = kwargs.get(f'train_name', 'train')
-
     
+    clip_grads_with_norm = kwargs.get('clip_grads_with_norm', True)
+    clip_grads_with_value = kwargs.get('clip_grads_with_value', False)
+    clip_value = kwargs.get('clip_value', 1)
+
+    if (not clip_grads_with_norm) and (not clip_grads_with_value):
+        print('Warning: clip_grads_with_norm=False and clip_grads_with_value=False: this may lead to exploding gradients')
+    assert clip_value > 0
 
     if phase_list is None:
         phase_list = list(dataloaders.keys())
@@ -247,6 +253,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
     best_wts = {'encoder': encoder.state_dict(), 'head': head.state_dict(), 'adversary': adversary.state_dict()}
     patience_counter = 0
 
+
     # start the training loop
     for epoch in range(num_epochs):
         if encoder_type == 'TGEM_Encoder':
@@ -347,27 +354,17 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                     if torch.isnan(encoder_loss):
                         if run_status:
                             print('Encoder loss is nan!')
-                        encoder_loss = torch.tensor(0.0)
+                    else:
+                        run[f'{prefix}/{phase}/batch/encoder_loss'].append(encoder_loss)
 
                     if torch.isnan(head_loss):
                         if run_status:
                             print('Head loss is nan!')
-                        # print('Head loss is nan!')
-                        head_loss = torch.tensor(0.0)
+                    else:
+                        run[f'{prefix}/{phase}/batch/multi_head_loss'].append(head_loss)
 
-                    run[f'{prefix}/{phase}/batch/encoder_loss'].append(encoder_loss)
-                    run[f'{prefix}/{phase}/batch/multi_head_loss'].append(head_loss)
                     run[f'{prefix}/{phase}/batch/multi_adversary_loss'].append(adversary_loss)
 
-                    # new addition, if join loss is 0, then only nans are present
-                    # we don't want to backpropagate
-                    if (encoder_loss.item() == 0) and (head_loss.item() == 0):
-                        if run_status:
-                            print('skipping backprop')
-                            # print('y head output:', y_head_output)
-                            # print('y_head:', y_head.view(-1))
-                            run_status = False
-                        continue
 
                     if isinstance(y_head_output, dict):
                         if isinstance(epoch_head_outputs, dict):
@@ -395,7 +392,8 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         head_weight*head_loss - \
                         adversary_weight*adversary_loss)
 
-                    run[f'{prefix}/{phase}/batch/joint_loss'].append(joint_loss)
+                    if not torch.isnan(joint_loss):
+                        run[f'{prefix}/{phase}/batch/joint_loss'].append(joint_loss)
                     
                     if phase == f'{train_name}':
                         
@@ -410,7 +408,14 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         # joint_loss += get_reg_penalty(adversary, l1_reg_weight, l2_reg_weight)
 
                         joint_loss_w_penalty.backward(retain_graph=True)
-                        
+                        if clip_grads_with_norm:
+                            torch.nn.utils.clip_grad_norm_(encoder.parameters(), clip_value)
+                            torch.nn.utils.clip_grad_norm_(head.parameters(), clip_value)
+                            # torch.nn.utils.clip_grad_value_(encoder.parameters(), 1)
+                        if clip_grads_with_value:
+                            torch.nn.utils.clip_grad_value_(encoder.parameters(), clip_value)
+                            torch.nn.utils.clip_grad_value_(head.parameters(), clip_value)
+
                         encoder_optimizer.step()
                         if head_weight > 0:
                             head_optimizer.step()
@@ -423,11 +428,14 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                             adversary_loss.backward()
                             adversary_optimizer.step()
                     
-
-                    running_losses['encoder'] += encoder_loss.item()
-                    running_losses['head'] += head_loss.item()
-                    running_losses['adversary'] += adversary_loss.item()
-                    running_losses['joint'] += joint_loss.item()
+                    if not torch.isnan(encoder_loss):
+                        running_losses['encoder'] += encoder_loss.item()
+                    if not torch.isnan(head_loss):
+                        running_losses['head'] += head_loss.item()
+                    if not torch.isnan(adversary_loss):
+                        running_losses['adversary'] += adversary_loss.item()
+                    if not torch.isnan(joint_loss):
+                        running_losses['joint'] += joint_loss.item()
 
 
             ########  Train the adversary on the fixed latent space for a few epochs
