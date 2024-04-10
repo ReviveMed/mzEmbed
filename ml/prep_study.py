@@ -405,13 +405,13 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
 
     if encoder_kind in ['AE','VAE']:
         latent_size = IntDistribution(4, 64, step=1)
-        
+
     cohort_label_weight = FloatDistribution(0,2,step=0.1) #10
     isfemale_weight = FloatDistribution(0,10,step=0.1) #20
     ispediatric_weight = FloatDistribution(0,10,step=0.1) #10
     head_weight = FloatDistribution(0,10,step=0.1) # 10
     adv_weight = FloatDistribution(0,50,step=0.1) #50
-    age_weight = FloatDistribution(0,10,step=0.1) #10
+    age_weight = FloatDistribution(0,2,step=0.1) #10
     
     if encoder_kind in ['AE']:
         num_hidden_layers = IntDistribution(1, 10)
@@ -428,7 +428,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
         num_epochs_min = 50
         num_epochs_max = 300
         num_epochs_step = 10
-        adversarial_mini_epochs = 5
+        adversarial_mini_epochs = 2
         early_stopping_patience_step = 10
         early_stopping_patience_max = 50
         l2_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
@@ -449,7 +449,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
         num_epochs_min = 50
         num_epochs_max = 200
         num_epochs_step = 10
-        adversarial_mini_epochs = 5
+        adversarial_mini_epochs = 2
         early_stopping_patience_step = 10
         early_stopping_patience_max = 50
         l2_reg_weight = 0 # loss explodes if not 0

@@ -95,7 +95,7 @@ def check_neptune_existance(run,attribute):
     
 
 
-def start_neptune_run(with_run_id=None,tags=['v3.2']):
+def start_neptune_run(with_run_id=None,tags=['v3.2'],yes_logging=False):
     is_run_new = False
     if with_run_id is None:
         run = neptune.init_run(project='revivemed/RCC',
@@ -106,7 +106,10 @@ def start_neptune_run(with_run_id=None,tags=['v3.2']):
         try:
             run = neptune.init_run(project='revivemed/RCC',
                                    api_token=NEPTUNE_API_TOKEN,
-                                   with_id=with_run_id)
+                                   with_id=with_run_id,
+                                    capture_stdout=yes_logging,
+                                    capture_stderr=yes_logging,
+                                    capture_hardware_metrics=yes_logging)
             print('Continuing run:', with_run_id)
             # add tags to the run
             run["sys/tags"].add(tags[0])
@@ -121,6 +124,9 @@ def start_neptune_run(with_run_id=None,tags=['v3.2']):
             run = neptune.init_run(project='revivemed/RCC',
                 api_token=NEPTUNE_API_TOKEN,
                 # custom_run_id=with_run_id,
+                capture_stdout=yes_logging,
+                capture_stderr=yes_logging,
+                capture_hardware_metrics=yes_logging,
                 tags=tags)
             print('Starting new run:', run['sys/id'].fetch())
             is_run_new = True
