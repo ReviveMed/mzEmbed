@@ -2,27 +2,32 @@ from setup2 import setup_neptune_run
 from utils_neptune import  get_run_id_list, check_neptune_existance, get_latest_dataset
 import pandas as pd
 import numpy as np
-
+import shutil
+import os
 data_dir = get_latest_dataset()
 setup_id = 'surv_finetune_2'
 kwargs = {}
 run_id = 'RCC-2027'
 
 
+if not os.path.exists(f'{data_dir}/X_finetune_val2.csv'):
+    y_val_data = pd.read_csv(f'{data_dir}/y_finetune_val.csv')
+    y_val_data['NIVO OS'] = np.nan
+    y_val_data.loc[y_val_data['Treatment']=='NIVOLUMAB', 'NIVO OS'] = y_val_data.loc[y_val_data['Treatment']=='NIVOLUMAB', 'OS']
+    y_val_data['EVER OS'] = np.nan
+    y_val_data.loc[y_val_data['Treatment']=='EVEROLIMUS', 'EVER OS'] = y_val_data.loc[y_val_data['Treatment']=='EVEROLIMUS', 'OS']
+    y_val_data.to_csv(f'{data_dir}/y_finetune_val2.csv',index=False)
 
-y_val_data = pd.read_csv(f'{data_dir}/y_finetune_val.csv')
-y_val_data['NIVO OS'] = np.nan
-y_val_data.loc[y_val_data['Treatment']=='NIVOLUMAB', 'NIVO OS'] = y_val_data.loc[y_val_data['Treatment']=='NIVOLUMAB', 'OS']
-y_val_data['EVER OS'] = np.nan
-y_val_data.loc[y_val_data['Treatment']=='EVEROLIMUS', 'EVER OS'] = y_val_data.loc[y_val_data['Treatment']=='EVEROLIMUS', 'OS']
-y_val_data.to_csv(f'{data_dir}/y_finetune_val2.csv',index=False)
+    y_train_data = pd.read_csv(f'{data_dir}/y_finetune_train.csv')
+    y_train_data['NIVO OS'] = np.nan
+    y_train_data.loc[y_train_data['Treatment']=='NIVOLUMAB', 'NIVO OS'] = y_train_data.loc[y_train_data['Treatment']=='NIVOLUMAB', 'OS']
+    y_train_data['EVER OS'] = np.nan
+    y_train_data.loc[y_train_data['Treatment']=='EVEROLIMUS', 'EVER OS'] = y_train_data.loc[y_train_data['Treatment']=='EVEROLIMUS', 'OS']
+    y_train_data.to_csv(f'{data_dir}/y_finetune_train2.csv',index=False)
 
-y_train_data = pd.read_csv(f'{data_dir}/y_finetune_train.csv')
-y_train_data['NIVO OS'] = np.nan
-y_train_data.loc[y_train_data['Treatment']=='NIVOLUMAB', 'NIVO OS'] = y_train_data.loc[y_train_data['Treatment']=='NIVOLUMAB', 'OS']
-y_train_data['EVER OS'] = np.nan
-y_train_data.loc[y_train_data['Treatment']=='EVEROLIMUS', 'EVER OS'] = y_train_data.loc[y_train_data['Treatment']=='EVEROLIMUS', 'OS']
-y_train_data.to_csv(f'{data_dir}/y_finetune_train2.csv',index=False)
+    # copy X_finetune_train to X_finetune_train2
+    shutil.copy(f'{data_dir}/X_finetune_train.csv',f'{data_dir}/X_finetune_train2.csv')
+    shutil.copy(f'{data_dir}/X_finetune_val.csv',f'{data_dir}/X_finetune_val2.csv')
 
 
 encoder_kwargs = {

@@ -223,6 +223,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['train_kwargs']['early_stopping_patience'] = sweep_kwargs.get('train_kwargs__early_stopping_patience')
         kwargs['holdout_frac'] = sweep_kwargs.get('holdout_frac')
         kwargs['train_kwargs']['head_weight'] = 1
+        kwargs['train_kwargs']['clip_grads_with_norm'] = False
         kwargs['train_kwargs']['encoder_weight'] = 0
         kwargs['train_kwargs']['adversary_weight'] = 0
         kwargs['train_kwargs']['learning_rate'] = sweep_kwargs.get('train_kwargs__learning_rate')
