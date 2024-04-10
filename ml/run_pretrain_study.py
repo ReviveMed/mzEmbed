@@ -22,9 +22,21 @@ WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 ADD_EXISTING_RUNS_TO_STUDY = True
 limit_add = -1 # limit the number of runs added to the study
 
+import sys
+if len(sys.argv)>1:
+    encoder_kind = sys.argv[1]
+else:
+    encoder_kind = input('Enter encoder kind (AE, VAE, TGEM_Encoder): ')
+
+
+if len(sys.argv)>2:
+    num_trials = int(sys.argv[2])
+else:
+    num_trials = int(input('Enter number of trials: '))
+
 # get user input
-encoder_kind = input('Enter encoder kind (AE, VAE, TGEM_Encoder): ')
-num_trials = int(input('Enter number of trials: '))
+# encoder_kind = input('Enter encoder kind (AE, VAE, TGEM_Encoder): ')
+# num_trials = int(input('Enter number of trials: '))
 
 # encoder_kind = 'VAE'
 # encoder_kind = 'TGEM_Encoder'

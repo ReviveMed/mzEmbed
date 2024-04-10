@@ -402,8 +402,10 @@ def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=Non
 
 def make_kwargs(sig_figs=2,encoder_kind='AE'):
     activation = 'leakyrelu'
-    latent_size = IntDistribution(4, 64, step=1)
-    num_hidden_layers = IntDistribution(1, 10)
+
+    if encoder_kind in ['AE','VAE']:
+        latent_size = IntDistribution(4, 64, step=1)
+        
     cohort_label_weight = FloatDistribution(0,2,step=0.1) #10
     isfemale_weight = FloatDistribution(0,10,step=0.1) #20
     ispediatric_weight = FloatDistribution(0,10,step=0.1) #10
@@ -412,6 +414,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
     age_weight = FloatDistribution(0,10,step=0.1) #10
     
     if encoder_kind in ['AE']:
+        num_hidden_layers = IntDistribution(1, 10)
         encoder_kwargs = {
                     'activation': activation,
                     'latent_size': latent_size,
@@ -431,7 +434,8 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
         l2_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
         l1_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
 
-    elif encoder_kind == 'VAE':        
+    elif encoder_kind == 'VAE':       
+        num_hidden_layers = IntDistribution(1, 5) 
         encoder_kwargs = {
                     'activation': activation,
                     'latent_size': latent_size,

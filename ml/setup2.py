@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 import os
 import json
-from models import get_model, Binary_Head, Dummy_Head, MultiClass_Head, MultiHead, Regression_Head
+from models import get_model, Binary_Head, Dummy_Head, MultiClass_Head, MultiHead, Regression_Head, Cox_Head
 from train3 import CompoundDataset, train_compound_model, get_end_state_eval_funcs, evaluate_compound_model, create_dataloaders, create_dataloaders_old
 import neptune
 from neptune.utils import stringify_unsupported
@@ -267,6 +267,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,**kwargs):
                     head_list.append(MultiClass_Head(**head_kwargs))
                 elif head_kind == 'Regression':
                     head_list.append(Regression_Head(**head_kwargs))
+                elif head_kind == 'Cox':
+                    head_list.append(Cox_Head(**head_kwargs))
                 elif head_kind == 'NA':
                     head_list.append(Dummy_Head())
                 else:
@@ -318,8 +320,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,**kwargs):
                     adv_list.append(Binary_Head(**adv_kwargs))
                 elif adv_kind == 'MultiClass':
                     adv_list.append(MultiClass_Head(**adv_kwargs))
-                # elif adv_kind == 'Regression':
-                    # adv_list.append(Regression_Head(**adv_kwargs))
+                elif adv_kind == 'Regression':
+                    adv_list.append(Regression_Head(**adv_kwargs))
                 elif adv_kind == 'NA':
                     adv_list.append(Dummy_Head())
                 else:
@@ -451,6 +453,10 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,**kwargs):
             eval_dict = neptunize_dict_keys(eval_res, f'eval')
             for key, val in eval_dict.items():
                 run[f'{setup_id}/history/{key}'].append(val)
+
+            # save the all_outputs and all_targets to a csv
+            
+
 
         except Exception as e:
             run['sys/tag'].add('evaluation failed')

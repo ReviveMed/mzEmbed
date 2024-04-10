@@ -6,10 +6,13 @@ import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint as cp
 import os
 from misc import save_json
+import numpy as np
 
 # from torchmetrics import AUROC
 from sklearn.metrics import roc_auc_score
 import traceback
+
+from lifelines.utils import concordance_index
 
 ####################################################################################
 # Helper functions
@@ -23,13 +26,6 @@ def get_model(model_kind, input_size, **kwargs):
         model = AE(input_size = input_size, **kwargs)
     elif model_kind == 'TGEM_Encoder':
         model = TGEM_Encoder(input_size = input_size, **kwargs)
-    elif model_kind == 'TGEM':
-        model = TGEM(input_size = input_size, **kwargs)
-    elif model_kind == 'BinaryClassifier':
-        model = BinaryClassifier(input_size = input_size, **kwargs)
-    elif model_kind == 'MultiClassClassifier':
-        model = MultiClassClassifier(input_size = input_size, **kwargs)
-    else:
         raise ValueError('model_kind not recognized')
     return model
 
@@ -226,7 +222,7 @@ class VAE(nn.Module):
             self.activation = activation
         self.use_batch_norm = use_batch_norm
         self.act_on_latent_layer = act_on_latent_layer
-        self.kl_weight = 1.0
+        self.kl_weight = 1.0/np.sqrt(num_hidden_layers)
 
         self.encoder = Dense_Layers(input_size=input_size, 
                                     hidden_size=hidden_size, 
@@ -836,6 +832,69 @@ class Regression_Head(Head):
             return {k: 0 for k, v in self.score_func_dict.items()}
 
 
+class Cox_Head(Head):
+    def __init__(self, name='Cox', y_idx=[0,1], weight=1.0, kind='Cox', **kwargs):
+        super(Cox_Head, self).__init__()
+        self.goal = 'survival'
+        self.kind = 'Cox'
+        assert self.kind == kind
+        self.name = name
+        self.y_idx = y_idx
+        assert len(y_idx) == 2
+        self.weight = weight
+        self.architecture = kwargs
+        self.loss_reduction = 'mean'
+        self.network = Dense_Layers(**kwargs)
+        self.input_size = kwargs.get('input_size', 1)
+        self.output_size = kwargs.get('output_size', 1)
+        self.file_id = self.kind + '_' + self.name
+        self.loss_func = CoxPHLoss()
+        self.score_func_dict = {'Concordance Index': lambda y_score, y_true, y_event: concordance_index(y_true, y_score, y_event)}
+        # self.network = nn.Identity()
+        # self.network = Dense_Layers(**kwargs)
+
+    def define_architecture(self, **kwargs):
+        self.architecture = kwargs
+        self.input_size = kwargs.get('input_size', 1)
+        self.output_size = kwargs.get('output_size', 1)
+        self.network = Dense_Layers(**kwargs)
+        pass
+
+    def forward(self, x):
+        return self.network(x)
+
+    def loss(self, y_output, y_data, ignore_nan=True):
+        if self.weight == 0:
+            return torch.tensor(0, dtype=torch.float32)
+        y_true = y_data[:,self.y_idx[0]]
+        y_event = y_data[:,self.y_idx[1]]
+        mask = ~torch.isnan(y_true)
+        if mask.sum().item() == 0:
+            return torch.tensor(0, dtype=torch.float32)
+        return self.loss_func(y_output[mask].squeeze(), y_true[mask].squeeze(), y_event[mask].squeeze())
+
+    def predict_risk(self, x):
+        # which is the correct output layer?
+        # return F.sigmoid(self.network(x))
+        return torch.exp(self.network(x))
+
+    def score(self, y_output, y_data, ignore_nan=True):
+        try:
+            y_true = y_data[:,self.y_idx[0]]
+            y_event = y_data[:,self.y_idx[1]]
+            mask = ~torch.isnan(y_true)
+            if mask.sum().item() == 0:
+                return {k: 0 for k, v in self.score_func_dict.items()}
+            y0 = -1*torch.exp(y_output.detach()[mask]) 
+            y1 = y_true.detach()[mask]
+            y2 = y_event.detach()[mask]
+
+            return {k: v(y0.squeeze(), y1.squeeze(), y2.squeeze()) for k, v in self.score_func_dict.items()}
+        except IndexError as e:
+            print(f'when calculate score get IndexError: {e}')
+            traceback.print_exc()
+            return {k: 0 for k, v in self.score_func}
+
 
 #########################################################
 #########################################################
@@ -854,246 +913,55 @@ class Regression_Head(Head):
 ############ Classification Models ############
 
 
-
-### Binary Classifier
-class BinaryClassifier(nn.Module):
-    def __init__(self, input_size, hidden_size, 
-                 num_hidden_layers=1, dropout_rate=0.2,
-                 activation='leakyrelu', use_batch_norm=False,num_classes=2):
-        super(BinaryClassifier, self).__init__()
-        self.goal = 'classify'
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.num_hidden_layers = num_hidden_layers
-        self.dropout_rate = dropout_rate
-        self.activation = activation
-        if num_classes != 2:
-            raise ValueError('num_classes must be 2 for BinaryClassifier')
-        self.num_classes = 2
-        self.use_batch_norm = use_batch_norm
-        self.network = Dense_Layers(input_size, hidden_size,
-                                    output_size=1, 
-                                    num_hidden_layers=num_hidden_layers,
-                                    dropout_rate=dropout_rate,
-                                    activation=activation,
-                                    use_batch_norm=use_batch_norm)
-
-        self.loss_func = nn.BCEWithLogitsLoss()
-
-    def define_loss(self, class_weight=None, reduction='mean'):
-        self.class_weight = class_weight
-        self.reduction = reduction
-        # self.loss_func = nn.BCEWithLogitsLoss(weight=class_weight,
-                                                # reduction=reduction)
-        # pos weight = # of negative samples / # of positive samples
-        # class_weight = [1/(# of negative samples), 1/(# of positive samples)]
-        # so pos_weight = (1/neg_weight)/(1/pos_weight) = pos_weight/neg_weight
-        pos_weight = class_weight[1]/class_weight[0]
-        self.loss_func = nn.BCEWithLogitsLoss(reduction=reduction,
-                                                pos_weight=pos_weight)
-
-    def forward(self, x):
-        return self.network(x)
-    
-    def logits_to_proba(self, y_logits):
-        return F.sigmoid(y_logits)
-
-    def predict_proba(self, x):
-        return F.sigmoid(self.network(x))
-    
-    def predict(self, x, threshold=0.5):
-        return (self.predict_proba(x) > threshold).float()
-
-    def loss(self, y_logits, y_true, ignore_nan=True):
-        if ignore_nan:
-            mask = ~torch.isnan(y_true)
-            if mask.sum().item() == 0:
-                return torch.tensor(0, dtype=torch.float32)
-            return self.loss_func(y_logits[mask].squeeze(), y_true[mask].squeeze())
-        else:
-            return self.loss_func(y_logits.squeeze(), y_true.squeeze())
-            # return F.binary_cross_entropy_with_logits(y_logits, y_true, 
-            #                                 reduction=reduction,
-            #                                 weight= class_weight)
-
-    def reset_params(self):
-        _reset_params(self)
-
-    def get_hyperparameters(self):
-        return {'input_size': self.input_size,
-                'hidden_size': self.hidden_size,
-                'num_hidden_layers': self.num_hidden_layers,
-                'dropout_rate': self.dropout_rate,
-                'activation': self.activation,
-                'use_batch_norm': self.use_batch_norm}
-
-
-### Multi-class Classifier
-class MultiClassClassifier(nn.Module):
-    def __init__(self, input_size, hidden_size, num_classes, 
-                 num_hidden_layers=1, dropout_rate=0.2,
-                 activation='leakyrelu', use_batch_norm=False):
-        super(MultiClassClassifier, self).__init__()
-        self.goal = 'classify'
-        self.input_size = input_size
-        self.num_classes = num_classes
-        self.hidden_size = hidden_size
-        self.num_hidden_layers = num_hidden_layers
-        self.dropout_rate = dropout_rate
-        self.activation = activation
-        self.use_batch_norm = use_batch_norm
-        self.network = Dense_Layers(input_size, hidden_size,
-                                    output_size=num_classes, 
-                                    num_hidden_layers=num_hidden_layers,
-                                    dropout_rate=dropout_rate,
-                                    activation=activation,
-                                    use_batch_norm=use_batch_norm)
-        
-        self.loss_func = nn.CrossEntropyLoss()
-        # CrossEntropyLoss automatically applies softmax to the output layer
-    
-    def define_loss(self, class_weight=None, label_smoothing=0, reduction='mean'):
-        self.class_weight = class_weight
-        self.label_smoothing = label_smoothing
-        self.reduction = reduction
-        self.loss_func = nn.CrossEntropyLoss(weight=class_weight,
-                                                label_smoothing=label_smoothing,
-                                                reduction=reduction)
-
-    def forward(self, x):
-        return self.network(x)
-    
-    def logits_to_proba(self, y_logits):
-        return F.softmax(y_logits, dim=1)
-
-    def predict_proba(self, x):
-        return F.softmax(self.network(x), dim=1)
-    
-    def predict(self, x):
-        return torch.argmax(self.predict_proba(x), dim=1)
-
-    def loss(self, y_logits, y_true, ignore_nan=True):
-        if ignore_nan:
-            mask = ~torch.isnan(y_true)
-            if mask.sum().item() == 0:
-                return torch.tensor(0, dtype=torch.float32)
-            return self.loss_func(y_logits[mask], y_true[mask].long())
-        else:
-            return self.loss_func(y_logits, y_true.long())
-            # return F.cross_entropy(y_logits, y_true,
-            #                         weight=self.class_weight,
-            #                         reduction=self.reduction)
-
-    def forward_to_loss(self, x, y_true):
-        return self.loss(self.forward(x), y_true)
-
-    def reset_params(self):
-        _reset_params(self)
-
-    def get_hyperparameters(self):
-        return {'input_size': self.input_size,
-                'hidden_size': self.hidden_size,
-                'num_classes': self.num_classes,
-                'num_hidden_layers': self.num_hidden_layers,
-                'dropout_rate': self.dropout_rate,
-                'activation': self.activation,
-                'use_batch_norm': self.use_batch_norm}
-
-#########################################################
-##### Regression Models #####
-        
-### Linear Regression
-class RegressionNN(nn.Module):
-    def __init__(self, input_size, hidden_size, 
-                 num_hidden_layers=1, dropout_rate=0.2,
-                 activation='leakyrelu', use_batch_norm=False):
-        super(RegressionNN, self).__init__()
-        self.goal = 'regress'
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.num_hidden_layers = num_hidden_layers
-        self.dropout_rate = dropout_rate
-        self.activation = activation
-        self.network = Dense_Layers(input_size, hidden_size,
-                                    output_size=1, 
-                                    num_hidden_layers=num_hidden_layers,
-                                    dropout_rate=dropout_rate,
-                                    activation=activation,
-                                    use_batch_norm=use_batch_norm)
-        
-        self.loss_func = nn.MSELoss()
-    
-    def forward(self, x):
-        return self.network(x)
-    
-    def loss(self, y_pred, y_true, ignore_nan=False):
-        if ignore_nan:
-            mask = ~torch.isnan(y_true)
-            if mask.sum().item() == 0:
-                return torch.tensor(0, dtype=torch.float32)
-            return self.loss_func(y_pred[mask], y_true[mask])
-        else:
-            return self.loss_func(y_pred, y_true)
-            # return F.mse_loss(y_pred, y_true, reduction='mean')
-        
-    def reset_params(self):
-        _reset_params(self)
-
-    def get_hyperparameters(self):
-        return {'input_size': self.input_size,
-                'hidden_size': self.hidden_size,
-                'num_hidden_layers': self.num_hidden_layers,
-                'dropout_rate': self.dropout_rate}
-
 ### Cox Proportional Hazards Neural Network Model
 # TODO: not sure if this is the correct implementation
-class CoxNN(nn.Module):
-    def __init__(self, input_size, hidden_size, 
-                 num_hidden_layers=1, dropout_rate=0.2,
-                 activation='leakyrelu', use_batch_norm=False):
-        super(CoxNN, self).__init__()
-        self.goal = 'regress'
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.num_hidden_layers = num_hidden_layers
-        self.dropout_rate = dropout_rate
-        self.activation = activation
-        self.network = Dense_Layers(input_size, hidden_size,
-                                    output_size=1, 
-                                    num_hidden_layers=num_hidden_layers,
-                                    dropout_rate=dropout_rate,
-                                    activation=activation,
-                                    use_batch_norm=use_batch_norm)
+# class CoxNN(nn.Module):
+#     def __init__(self, input_size, hidden_size, 
+#                  num_hidden_layers=1, dropout_rate=0.2,
+#                  activation='leakyrelu', use_batch_norm=False):
+#         super(CoxNN, self).__init__()
+#         self.goal = 'regress'
+#         self.input_size = input_size
+#         self.hidden_size = hidden_size
+#         self.num_hidden_layers = num_hidden_layers
+#         self.dropout_rate = dropout_rate
+#         self.activation = activation
+#         self.network = Dense_Layers(input_size, hidden_size,
+#                                     output_size=1, 
+#                                     num_hidden_layers=num_hidden_layers,
+#                                     dropout_rate=dropout_rate,
+#                                     activation=activation,
+#                                     use_batch_norm=use_batch_norm)
         
-        self.loss_func = CoxPHLoss()
+#         self.loss_func = CoxPHLoss()
     
-    def forward(self, x):
-        return self.network(x)
+#     def forward(self, x):
+#         return self.network(x)
     
-    def loss(self, y_output, durations, events, ignore_nan=False):
-        if ignore_nan:
-            mask = ~torch.isnan(durations)
-            if mask.sum().item() == 0:
-                return torch.tensor(0, dtype=torch.float32)
-            return self.loss_func(y_output[mask], durations[mask], events[mask])
-        else:
-            return self.loss_func(y_output, durations, events)
+#     def loss(self, y_output, durations, events, ignore_nan=False):
+#         if ignore_nan:
+#             mask = ~torch.isnan(durations)
+#             if mask.sum().item() == 0:
+#                 return torch.tensor(0, dtype=torch.float32)
+#             return self.loss_func(y_output[mask], durations[mask], events[mask])
+#         else:
+#             return self.loss_func(y_output, durations, events)
     
-    def predict_risk(self, x):
-        # which is the correct output layer?
-        # return F.sigmoid(self.network(x))
-        return torch.exp(self.network(x))
+#     def predict_risk(self, x):
+#         # which is the correct output layer?
+#         # return F.sigmoid(self.network(x))
+#         return torch.exp(self.network(x))
     
-    def reset_params(self):
-        _reset_params(self)
+#     def reset_params(self):
+#         _reset_params(self)
 
-    def get_hyperparameters(self):
-        return {'input_size': self.input_size,
-                'hidden_size': self.hidden_size,
-                'num_hidden_layers': self.num_hidden_layers,
-                'dropout_rate': self.dropout_rate,
-                'activation': self.activation,
-                'use_batch_norm': self.use_batch_norm}
+#     def get_hyperparameters(self):
+#         return {'input_size': self.input_size,
+#                 'hidden_size': self.hidden_size,
+#                 'num_hidden_layers': self.num_hidden_layers,
+#                 'dropout_rate': self.dropout_rate,
+#                 'activation': self.activation,
+#                 'use_batch_norm': self.use_batch_norm}
     
 #########################################################
 ### TGEM Models ###
@@ -1320,150 +1188,6 @@ class TGEM_Encoder(torch.nn.Module):
 
 
 
-
-class TGEM(torch.nn.Module):
-    def __init__(self, input_size,  n_head, num_classes, dropout_rate=0.3, act_fun='linear', 
-                 query_gene=64, d_ff=1024, mode=0):
-        super(TGEM, self).__init__()
-        self.goal = 'classify'
-        self.n_head = n_head
-        self.input_size = input_size
-        self.num_classes = num_classes
-        self.d_ff = d_ff
-        self.dropout_rate = dropout_rate
-        self.act_fun = act_fun
-        # mode 1 is not working right now.
-        self.mode = mode
-        self.query_gene = query_gene #in original version, this was not a object parameter 
-
-        if self.act_fun == 'relu':
-            self.activation_func = torch.nn.ReLU()
-        elif self.act_fun == 'leakyrelu':
-            self.activation_func = torch.nn.LeakyReLU(0.1)
-        elif self.act_fun == 'gelu':
-            self.activation_func = torch.nn.GELU()
-        elif self.act_fun == 'linear':
-            self.activation_func = torch.nn.Identity()
-        else:
-            raise ValueError('{} is not a valid activation function'.format(self.act_fun))
-
-
-        self.activation_func 
-        self.mulitiattention1 = mulitiattention( self.n_head, self.input_size, query_gene,
-                                                mode)
-        self.mulitiattention2 = mulitiattention( self.n_head, self.input_size, query_gene,
-                                                mode)
-        self.mulitiattention3 = mulitiattention( self.n_head, self.input_size, query_gene,
-                                                mode)
-        self.fc = nn.Linear(self.input_size, self.num_classes)
-        torch.nn.init.xavier_uniform_(self.fc.weight, gain=1)
-        self.ffn1 = nn.Linear(self.input_size, self.d_ff)
-        self.ffn2 = nn.Linear(self.d_ff, self.input_size)
-        self.dropout = nn.Dropout(dropout_rate)
-        self.sublayer = res_connect(input_size, dropout_rate)
-
-        self.loss_func = nn.CrossEntropyLoss()
-        # CrossEntropyLoss automatically applies softmax to the output layer
-    
-    def define_loss(self, class_weight=None, label_smoothing=0, reduction='mean'):
-        self.class_weight = class_weight
-        self.label_smoothing = label_smoothing
-        self.reduction = reduction
-        # self.loss_func = nn.NLLLoss(weight=class_weight,
-        #                             label_smoothing=label_smoothing,
-        #                             reduction=reduction)
-        self.loss_func = nn.CrossEntropyLoss(weight=class_weight,
-                                                label_smoothing=label_smoothing,
-                                                reduction=reduction)
-
-    def feedforward(self, x):
-        out = F.relu(self.ffn1(x))
-        out = self.ffn2(self.dropout(out))
-        return out
-
-    def forward(self, x):
-
-        out_attn = self.mulitiattention1(x)
-        out_attn_1 = self.sublayer(x, out_attn)
-        out_attn_2 = self.mulitiattention2(out_attn_1)
-        out_attn_2 = self.sublayer(out_attn_1, out_attn_2)
-        out_attn_3 = self.mulitiattention3(out_attn_2)
-        out_attn_3 = self.sublayer(out_attn_2, out_attn_3)
-        out_attn_3 = self.activation_func(out_attn_3)
-        y_output = self.fc(out_attn_3)
-        # y_output = F.log_softmax(y_output, dim=1) # not as numerically stable as using CrossEntropyLoss
-
-        return y_output
-
-    def loss(self, y_logits, y_true, ignore_nan=False):
-        if ignore_nan:
-            mask = ~torch.isnan(y_true)
-            return self.loss_func(y_logits[mask], y_true[mask])
-        else:
-            return self.loss_func(y_logits, y_true)
-            # return F.cross_entropy(y_logits, y_true,
-            #                         weight=self.class_weight,
-            #                         reduction=self.reduction)
-
-    def forward_to_loss(self, x, y_true):
-        return self.loss(self.forward(x), y_true)
-
-    def logits_to_proba(self, y_logits):
-        # return np.exp(y_logits) # when the logits are the log_softmax
-        return F.softmax(y_logits, dim=1)
-    
-    def get_hyperparameters(self):
-        return {
-                'n_head': self.n_head,
-                'input_size': self.input_size,
-                'query_gene': self.query_gene,
-                'num_classes': self.num_classes,
-                'd_ff': self.d_ff,
-                'dropout_rate': self.dropout_rate,
-                'act_fun': self.act_fun}        
-
-
-
-class TGEMRegression(TGEM):
-    def __init__(self, *args, **kwargs):
-        super(TGEMRegression, self).__init__(*args, **kwargs)
-
-        # Change the final layer to output a single value for regression
-        self.fc = nn.Linear(self.input_size, 1) # I could consider adding some additional layers
-        # self.fc1 = nn.Linear(self.input_size, 4)
-        # self.fc2 = nn.Linear(4, 1)
-
-        self.loss_func = nn.MSELoss()
-        # CrossEntropyLoss automatically applies softmax to the output layer
-    
-    def define_loss(self, reduction='mean'):
-
-        self.reduction = reduction
-        self.loss_func = nn.MSELoss(reduction=reduction)
-
-
-    def forward(self, x):
-        out_attn = self.mulitiattention1(x)
-        out_attn_1 = self.sublayer(x, out_attn)
-        out_attn_2 = self.mulitiattention2(out_attn_1)
-        out_attn_2 = self.sublayer(out_attn_1, out_attn_2)
-        out_attn_3 = self.mulitiattention3(out_attn_2)
-        out_attn_3 = self.sublayer(out_attn_2, out_attn_3)
-        if self.act_fun == 'relu':
-            out_attn_3 = F.relu(out_attn_3)
-        if self.act_fun == 'leakyrelu':
-            m = torch.nn.LeakyReLU(0.1)
-            out_attn_3 = m(out_attn_3)
-        if self.act_fun == 'gelu':
-            m = torch.nn.GELU()
-            out_attn_3 = m(out_attn_3)
-        
-        # out1 = self.fc1(out_attn_3)
-        # out1 = F.relu(out1)
-        # y_pred = self.fc2(out1)
-        y_pred = self.fc(out_attn_3)
-
-        return y_pred
     
 
 #########################################################

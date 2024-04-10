@@ -10,7 +10,7 @@ data_dir = '/DATA'
 
 
 setup_id = 'pretrain'
-run_id = 'RCC-1797'
+run_id = 'RCC-2025'
 
 run_id = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,overwrite_existing_kwargs=True)
 

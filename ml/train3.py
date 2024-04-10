@@ -351,15 +351,15 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         adversary_loss = torch.tensor(0)
 
                     # check if the losses are nan
-                    if torch.isnan(encoder_loss):
+                    if torch.isnan(encoder_loss) or torch.isinf(encoder_loss):
                         if run_status:
-                            print('Encoder loss is nan!')
+                            print('Encoder loss is nan/inf!')
                     else:
                         run[f'{prefix}/{phase}/batch/encoder_loss'].append(encoder_loss)
 
-                    if torch.isnan(head_loss):
+                    if torch.isnan(head_loss) or torch.isinf(head_loss):
                         if run_status:
-                            print('Head loss is nan!')
+                            print('Head loss is nan/inf!')
                     else:
                         run[f'{prefix}/{phase}/batch/multi_head_loss'].append(head_loss)
 
@@ -392,7 +392,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         head_weight*head_loss - \
                         adversary_weight*adversary_loss)
 
-                    if not torch.isnan(joint_loss):
+                    if not torch.isnan(joint_loss) or torch.isinf(joint_loss):
                         run[f'{prefix}/{phase}/batch/joint_loss'].append(joint_loss)
                     
                     if phase == f'{train_name}':
@@ -428,13 +428,13 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                             adversary_loss.backward()
                             adversary_optimizer.step()
                     
-                    if not torch.isnan(encoder_loss):
+                    if not torch.isnan(encoder_loss) or torch.isinf(encoder_loss):
                         running_losses['encoder'] += encoder_loss.item()
-                    if not torch.isnan(head_loss):
+                    if not torch.isnan(head_loss) or torch.isinf(head_loss):
                         running_losses['head'] += head_loss.item()
-                    if not torch.isnan(adversary_loss):
+                    if not torch.isnan(adversary_loss) or torch.isinf(adversary_loss):
                         running_losses['adversary'] += adversary_loss.item()
-                    if not torch.isnan(joint_loss):
+                    if not torch.isnan(joint_loss) or torch.isinf(joint_loss):
                         running_losses['joint'] += joint_loss.item()
 
 
@@ -578,7 +578,9 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
 
     latent_outputs_by_phase = defaultdict(dict)
     adversary_targets_by_phase = defaultdict(dict)
-
+    all_outputs = defaultdict(dict)
+    all_targets = defaultdict(dict)
+    
     for phase in phase_list:
         recon_loss = torch.tensor(0.0)
         head_loss = torch.tensor(0.0)
@@ -625,6 +627,15 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
 
                 head_targets = torch.cat((head_targets, y_head), 0)
                 adversary_targets = torch.cat((adversary_targets, y_adversary), 0)
+
+            # all_outputs[phase] = {
+            #     'head': head_ouputs,
+            #     'adversary': adversary_outputs
+            # }
+            # all_targets[phase] = {
+            #     'head': head_targets,
+            #     'adversary': adversary_targets
+            # }
 
             latent_outputs_by_phase[phase] = latent_outputs
             adversary_targets_by_phase[phase] = adversary_targets
