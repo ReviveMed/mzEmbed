@@ -46,8 +46,6 @@ def compute_finetune(run_id,plot_latent_space=False,
     ## Plot the latent space
     ############################################################
     kwargs = {}
-    kwargs['train_kwargs'] = {}
-    kwargs['encoder_kwargs'] = {}
     if plot_latent_space:
         
         ### ### ###
@@ -161,6 +159,9 @@ def compute_finetune(run_id,plot_latent_space=False,
         
     if n_trials>0:    
         kwargs = {}
+        kwargs['train_kwargs'] = {}
+        kwargs['encoder_kwargs'] = {}
+
         kwargs['overwrite_existing_kwargs'] = True
         kwargs['load_encoder_loc'] = 'pretrain'
         kwargs['load_model_loc'] = False
