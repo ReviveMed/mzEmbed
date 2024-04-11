@@ -27,7 +27,8 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 
 
 
-def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,neptune_mode='async',**kwargs):
+def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
+                      neptune_mode='async',save_kwargs_to_neptune=False,**kwargs):
     print(setup_id)
     if run is None:
         run, is_run_new = start_neptune_run(with_run_id=with_run_id,neptune_mode=neptune_mode)
@@ -37,9 +38,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,neptune_mode='
         ret_run_id = False
 
     if not is_run_new:
-        setup_is_new = not check_neptune_existance(run,f'{setup_id}/kwargs')
-        if setup_is_new:
-            setup_is_new = not check_neptune_existance(run,f'{setup_id}/original_kwargs')
+        # setup_is_new = not check_neptune_existance(run,f'{setup_id}/kwargs')
+        # if setup_is_new:
+        setup_is_new = not check_neptune_existance(run,f'{setup_id}/original_kwargs')
     else:
         setup_is_new = False
     
@@ -82,7 +83,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,neptune_mode='
         
         if load_encoder_loc:
             print('loading pretrained encoders, overwriting encoder_kwargs')
-            load_kwargs = run[f'{load_encoder_loc}/kwargs'].fetch()
+            load_kwargs = run[f'{load_encoder_loc}/original_kwargs'].fetch()
             load_kwargs = convert_neptune_kwargs(load_kwargs)
             # kwargs['encoder_kwargs'].update(load_kwargs['encoder_kwargs'])
             if kwargs['encoder_kind'] != load_kwargs['encoder_kind']:
@@ -95,27 +96,29 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,neptune_mode='
 
         if load_head_loc:
             print('loading pretrained heads, overwriting head_kwargs_list')
-            load_kwargs = run[f'{load_head_loc}/kwargs'].fetch()
+            load_kwargs = run[f'{load_head_loc}/original_kwargs'].fetch()
             kwargs['head_kwargs_dict'] = load_kwargs.get('head_kwargs_dict', {})
             kwargs['head_kwargs_list'] = eval(load_kwargs.get('head_kwargs_list', '[]'))
             # assert len(kwargs['head_kwargs_list']) <= len(y_head_cols)
 
         if load_adv_loc:
             print('loading pretrained advs, overwriting adv_kwargs_list')
-            load_kwargs = run[f'{load_adv_loc}/kwargs'].fetch()
+            load_kwargs = run[f'{load_adv_loc}/original_kwargs'].fetch()
             kwargs['adv_kwargs_dict'] = load_kwargs.get('adv_kwargs_dict', {})
             kwargs['adv_kwargs_list'] = eval(load_kwargs.get('adv_kwargs_list', '[]'))
             # assert len(kwargs['adv_kwargs_list']) <= len(y_adv_cols)
 
-        if check_neptune_existance(run,f'{setup_id}/kwargs'):
-            if not overwrite_existing_kwargs:
-                raise ValueError(f'{setup_id} already exists in run {run_id} and overwrite_existing_kwargs is False')
+        if save_kwargs_to_neptune:
+            #Set to True for debugging
+            if check_neptune_existance(run,f'{setup_id}/kwargs'):
+                if not overwrite_existing_kwargs:
+                    raise ValueError(f'{setup_id} already exists in run {run_id} and overwrite_existing_kwargs is False')
+                else:
+                    print(f'Overwriting existing {setup_id} in run {run_id}')
+                    del run[f'{setup_id}/kwargs']
+                    run[f'{setup_id}/kwargs'] = stringify_unsupported(kwargs)
             else:
-                print(f'Overwriting existing {setup_id} in run {run_id}')
-                del run[f'{setup_id}/kwargs']
                 run[f'{setup_id}/kwargs'] = stringify_unsupported(kwargs)
-        else:
-            run[f'{setup_id}/kwargs'] = stringify_unsupported(kwargs)
         
         if is_run_new:
             run[f'{setup_id}/original_kwargs'] = stringify_unsupported(kwargs)

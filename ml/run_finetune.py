@@ -55,12 +55,12 @@ def compute_finetune(run_id,plot_latent_space=False,
                 with_id=run_id,
                 capture_stdout=False,
                 capture_stderr=False,
-                capture_hardware_metrics=False,
-                mode='read-only')
+                capture_hardware_metrics=False)
+                # mode='read-only')
 
         run_struc= run.get_structure()
         original_kwargs = run['pretrain/original_kwargs'].fetch()
-        run.stop()
+        # run.stop()
         original_kwargs = convert_neptune_kwargs(original_kwargs)
         encoder_kind = original_kwargs['encoder_kind']
         print('encoder_kind:',encoder_kind)
@@ -75,7 +75,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         # kwargs['save_latent_space'] = False
 
         kwargs['plot_latent_space'] = 'sns' #'both'
-        kwargs['plot_latent_space_cols'] = ['Study ID','Cohort Label','is Pediatric','is Female']
+        kwargs['plot_latent_space_cols'] = ['Study ID','Cohort Label','is Pediatric','is Female', 'Age']
 
         # run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
 
@@ -83,21 +83,26 @@ def compute_finetune(run_id,plot_latent_space=False,
             
             if not ('sns_Z_umap_is Female_train' in run_struc.keys()):
                 kwargs['eval_name'] = 'train'
-                run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+                # run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+                setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,run=run,**kwargs)
             else:
                 print('Already plotted train')
 
             if not ('sns_Z_umap_is Female_test' in run_struc.keys()):
                 kwargs['eval_name'] = 'test'
-                run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+                # run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+                setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,run=run,**kwargs)
             else:
                 print('Already plotted test')
 
         if not ('sns_Z_umap_is Female_val' in run_struc.keys()):
             kwargs['eval_name'] = 'val'
-            run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+            # run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+            setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,run=run,**kwargs)
         else:
             print('Already plotted val')
+
+        run.stop()
 
     ############################################################
     ## Finetune
