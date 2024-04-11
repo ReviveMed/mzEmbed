@@ -324,7 +324,9 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                             for key, loss_val in multi_loss.items():
                                 run[f'{prefix}/{phase}/batch/head_loss/{key}'].append(loss_val)
                             head_loss = sum([h.weight * multi_loss[f'{h.kind}_{h.name}'] for h in head.heads])
-                            # head_loss /= sum([h.weight for h in head.heads])
+                            # head_weight_sum = sum([h.weight for h in head.heads])
+                            # if head_weight_sum>0.1:
+                                # head_loss /= head_weight_sum
                         else:
                             head_loss = multi_loss
                         
@@ -344,7 +346,9 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                             for key, loss_val in multi_loss.items():
                                 run[f'{prefix}/{phase}/batch/adversary_loss/{key}'].append(loss_val)
                             adversary_loss = sum([h.weight * multi_loss[f'{h.kind}_{h.name}'] for h in adversary.heads])
-                            # adversary_loss /= sum([h.weight for h in adversary.heads])
+                            # adv_weight_sum = sum([h.weight for h in adversary.heads])
+                            # if adv_weight_sum>0.1:
+                                # adversary_loss /= adv_weight_sum
                         else:
                             adversary_loss = multi_loss
                     else:
