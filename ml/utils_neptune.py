@@ -65,6 +65,25 @@ def convert_neptune_kwargs(kwargs):
     else:
         return kwargs    
 
+
+def get_run_id_list_from_query(query,limit=100):
+    project = neptune.init_project(
+        project='revivemed/RCC',
+        mode="read-only",
+        api_token=NEPTUNE_API_TOKEN
+    )
+    runs_table_df = project.fetch_runs_table(query=query,limit=limit).to_pandas()
+    
+    #drop the failed runs
+    runs_table_df = runs_table_df[~runs_table_df['sys/failed']].copy()
+    # select only the inactive runs
+    runs_table_df = runs_table_df[runs_table_df['sys/state']== 'Inactive'].copy()
+    
+    run_id_list = runs_table_df['sys/id'].tolist()
+    project.stop()
+    return run_id_list
+
+
 def get_run_id_list(encoder_kind='AE',tags=[]):
 
     project = neptune.init_project(

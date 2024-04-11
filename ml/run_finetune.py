@@ -13,7 +13,7 @@ from prep_study import add_runs_to_study, reuse_run, convert_neptune_kwargs, \
     round_kwargs_to_sig
 from setup2 import setup_neptune_run
 from misc import download_data_dir
-from utils_neptune import  get_run_id_list, check_neptune_existance, get_latest_dataset
+from utils_neptune import  get_run_id_list, check_neptune_existance, get_latest_dataset, get_run_id_list_from_query
 from sklearn.linear_model import LogisticRegression
 import time
 from neptune.exceptions import NeptuneException
@@ -319,8 +319,12 @@ if __name__ == '__main__':
         pass
 
     if 'RCC' not in chosen_id:
-        tags = [chosen_id]
-        run_id_list = get_run_id_list(tags=tags,encoder_kind='AE')
+        # tags = [chosen_id]
+        # run_id_list = get_run_id_list(tags=tags,encoder_kind='AE')
+
+        query = chosen_id
+        run_id_list = get_run_id_list_from_query(query=query,limit=100)
+
         # run_id_list = get_run_id_list(tags=tags)
     else:
         if ',' in chosen_id:
