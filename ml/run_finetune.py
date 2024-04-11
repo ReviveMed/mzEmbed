@@ -299,9 +299,9 @@ if __name__ == '__main__':
 
     # description string of the finetuning task
     if len(sys.argv)>4:
-        desc_str = sys.argv[4]
+        chosen_finetune_desc = sys.argv[4]
     else:
-        desc_str = None
+        chosen_finetune_desc = None
 
     # which dataset is used for evaluation
     if len(sys.argv)>5:
@@ -309,9 +309,9 @@ if __name__ == '__main__':
     else:
         eval_name = 'val'
 
+
     if chosen_id is None:
         chosen_id = input('Enter Run id: ')
-
     try:
         chosen_id = int(chosen_id)
         chosen_id = 'RCC-'+str(chosen_id)
@@ -328,13 +328,22 @@ if __name__ == '__main__':
         else:
             run_id_list =  [chosen_id]
 
-    
+    if ',' in chosen_finetune_desc:
+        desc_str_list = chosen_finetune_desc.split(',')
+    else:
+        desc_str_list = [chosen_finetune_desc]
+
+
     if plot_latent_space<2:
         recompute_plot = False
     else:
         recompute_plot = True
         print('will recompute the plots')
     plot_latent_space =bool(plot_latent_space)
+
+    if (desc_str_list) > 1 and recompute_plot:
+        print('more than one desc_str, do not waste time recomputing plots')
+        recompute_plot = False
 
 
     already_run = []
@@ -345,12 +354,16 @@ if __name__ == '__main__':
         if run_id in already_run:
             continue
         print('run_id:',run_id)
-        try:
-            run_id = compute_finetune(run_id,n_trials=n_trials,
-                                      plot_latent_space=plot_latent_space,
-                                      desc_str=desc_str,
-                                      eval_name=eval_name,
-                                      recompute_plot=recompute_plot)
-        except NeptuneException as e:
-            print('NeptuneException:',e)
-            continue
+        plot_latent_space0 = plot_latent_space
+        for desc_str in desc_str_list:
+            try:
+                run_id = compute_finetune(run_id,n_trials=n_trials,
+                                        plot_latent_space=plot_latent_space0,
+                                        desc_str=desc_str,
+                                        eval_name=eval_name,
+                                        recompute_plot=recompute_plot)
+                # do not bother attempting to plot the latent space again
+                plot_latent_space0 = False
+            except NeptuneException as e:
+                print('NeptuneException:',e)
+                continue
