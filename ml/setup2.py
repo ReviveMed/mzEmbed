@@ -654,6 +654,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                         palette = assign_color_map(Z_embed[hue_col].unique())
                         Z_counts = Z_embed[hue_col].value_counts()
 
+                    plot_title = f'{setup_id} Latent Space of {eval_name} (N={Z_count_sum})'
                     # choose the marker size based on the number of nonnan values
                     marker_sz = 10/(1+np.log(Z_count_sum))
 
@@ -688,7 +689,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                             # handle._sizes = [100]
                         
                         plt.legend(handles, new_labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., title=hue_col)
-
+                        plt.title(plot_title)
                         plt.savefig(os.path.join(save_dir, f'Z_pca_{hue_col}_{eval_name}.png'), bbox_inches='tight')
                         run[f'{setup_id}/sns_Z_pca_{hue_col}_{eval_name}'].upload(os.path.join(save_dir, f'Z_pca_{hue_col}_{eval_name}.png'))
                         plt.close()
@@ -722,7 +723,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                     
                     plt.legend(handles, new_labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., title=hue_col)
 
-
+                    plt.title(plot_title)
                     plt.savefig(os.path.join(save_dir, f'Z_umap_{hue_col}_{eval_name}.png'), bbox_inches='tight', dpi=300)
                     run[f'{setup_id}/sns_Z_umap_{hue_col}_{eval_name}'].upload(os.path.join(save_dir, f'Z_umap_{hue_col}_{eval_name}.png'))
                     plt.close()
