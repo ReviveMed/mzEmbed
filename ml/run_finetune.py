@@ -341,7 +341,7 @@ if __name__ == '__main__':
         print('will recompute the plots')
     plot_latent_space =bool(plot_latent_space)
 
-    if (desc_str_list) > 1 and recompute_plot:
+    if len(desc_str_list) > 1 and recompute_plot:
         print('more than one desc_str, do not waste time recomputing plots')
         recompute_plot = False
 
