@@ -680,8 +680,10 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
             run[f'{prefix}/{phase}/reconstruction_loss'].append(recon_loss)
             run[f'{prefix}/{phase}/head_loss'].append(head_loss)
             run[f'{prefix}/{phase}/adversary_loss'].append(adversary_loss)
-            for eval_name, eval_val in end_state_eval[phase].items():
-                run[f'{prefix}/{phase}/{eval_name}'].append(stringify_unsupported(eval_val))
+            
+            # this line below is redundent
+            # for eval_name, eval_val in end_state_eval[phase].items():
+            #     run[f'{prefix}/{phase}/{eval_name}'].append(stringify_unsupported(eval_val))
 
             # run[f'{prefix}/{phase}/reconstruction_loss'] = recon_loss
             # run[f'{prefix}/{phase}/head_loss'] = head_loss

@@ -38,7 +38,8 @@ default_sweep_kwargs = {
 
 def compute_finetune(run_id,plot_latent_space=False,
                            n_trials=5,desc_str=None,
-                           sweep_kwargs=None,eval_name='val'):
+                           sweep_kwargs=None,eval_name='val',
+                           recompute_plot=False):
 
 
 
@@ -81,21 +82,21 @@ def compute_finetune(run_id,plot_latent_space=False,
 
         if not (encoder_kind == 'TGEM_Encoder'):
             
-            if not ('sns_Z_umap_is Female_train' in run_struc.keys()):
+            if (not ('sns_Z_umap_is Female_train' in run_struc.keys())) or recompute_plot:
                 kwargs['eval_name'] = 'train'
                 # run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
                 setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,run=run,**kwargs)
             else:
                 print('Already plotted train')
 
-            if not ('sns_Z_umap_is Female_test' in run_struc.keys()):
+            if (not ('sns_Z_umap_is Female_test' in run_struc.keys())) or recompute_plot:
                 kwargs['eval_name'] = 'test'
                 # run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
                 setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,run=run,**kwargs)
             else:
                 print('Already plotted test')
 
-        if not ('sns_Z_umap_is Female_val' in run_struc.keys()):
+        if (not ('sns_Z_umap_is Female_val' in run_struc.keys())) or recompute_plot:
             kwargs['eval_name'] = 'val'
             # run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
             setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,run=run,**kwargs)
@@ -280,9 +281,9 @@ if __name__ == '__main__':
     # get user from the command line
     import sys
     if len(sys.argv)>1:
-        plot_latent_space = bool(int(sys.argv[1]))
+        plot_latent_space = int(sys.argv[1])
     else:
-        plot_latent_space = False
+        plot_latent_space = 0
 
     # number of trials/repeats for finetuning
     if len(sys.argv)>2:
@@ -327,6 +328,14 @@ if __name__ == '__main__':
         else:
             run_id_list =  [chosen_id]
 
+    
+    if plot_latent_space<2:
+        recompute_plot = False
+    else:
+        recompute_plot = True
+        print('will recompute the plots')
+    plot_latent_space =bool(plot_latent_space)
+
 
     already_run = []
     print('Number of runs to finetune:',len(run_id_list))
@@ -337,7 +346,11 @@ if __name__ == '__main__':
             continue
         print('run_id:',run_id)
         try:
-            run_id = compute_finetune(run_id,n_trials=n_trials,plot_latent_space=plot_latent_space,desc_str=desc_str,eval_name=eval_name)
+            run_id = compute_finetune(run_id,n_trials=n_trials,
+                                      plot_latent_space=plot_latent_space,
+                                      desc_str=desc_str,
+                                      eval_name=eval_name,
+                                      recompute_plot=recompute_plot)
         except NeptuneException as e:
             print('NeptuneException:',e)
             continue
