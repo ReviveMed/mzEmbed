@@ -629,22 +629,6 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,neptune_mode='
                 run[f'{setup_id}/Z_embed_{eval_name}'].upload(Z_embed_savepath)
 
 
-            # Get the counts for each instance of the hue column, and the corresponding colormap
-            Z_count_sum = (~Z_embed[hue_col].isnull()).sum()
-            print(f'Number of samples in {eval_name}: {Z_count_sum}')
-            if Z_embed[hue_col].nunique() > 30:
-                # if more than 30 unique values, then assume its continuous
-                palette = 'flare'
-                Z_counts = None
-            else:
-                # if fewer than 30 unique values, then assume its categorical
-                # palette = get_color_map(Z_embed[hue_col].nunique())
-                palette = assign_color_map(Z_embed[hue_col].unique())
-                Z_counts = Z_embed[hue_col].value_counts()
-
-            # choose the marker size based on the number of nonnan values
-            marker_sz = 10/(1+np.log(Z_count_sum))
-
 
             if (plot_latent_space=='seaborn') or (plot_latent_space=='both') or (plot_latent_space=='sns'):
 
@@ -652,7 +636,24 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,neptune_mode='
                     if hue_col not in Z_embed.columns:
                         print(f'{hue_col} not in Z_embed columns')
                         continue
-                    palette = get_color_map(Z_embed[hue_col].nunique())
+
+
+                    # palette = get_color_map(Z_embed[hue_col].nunique())
+                    # Get the counts for each instance of the hue column, and the corresponding colormap
+                    Z_count_sum = (~Z_embed[hue_col].isnull()).sum()
+                    print(f'Number of samples in {eval_name}: {Z_count_sum}')
+                    if Z_embed[hue_col].nunique() > 30:
+                        # if more than 30 unique values, then assume its continuous
+                        palette = 'flare'
+                        Z_counts = None
+                    else:
+                        # if fewer than 30 unique values, then assume its categorical
+                        # palette = get_color_map(Z_embed[hue_col].nunique())
+                        palette = assign_color_map(Z_embed[hue_col].unique())
+                        Z_counts = Z_embed[hue_col].value_counts()
+
+                    # choose the marker size based on the number of nonnan values
+                    marker_sz = 10/(1+np.log(Z_count_sum))
 
                     ## PCA ##
                     if yes_plot_pca:
