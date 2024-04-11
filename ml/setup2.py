@@ -161,6 +161,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,neptune_mode='
             run[f'{setup_id}/datasets/X_train'].track_files(f'{data_dir}/{X_filename}_{train_name}.csv')
             run[f'{setup_id}/datasets/y_train'].track_files(f'{data_dir}/{y_filename}_{train_name}.csv')
         # nan_data = pd.read_csv(f'{data_dir}/{nan_filename}_{train_name}.csv', index_col=0)
+        else:
+            X_data_train = None
 
         if run_evaluation or save_latent_space:
             X_data_eval = pd.read_csv(f'{data_dir}/{X_filename}_{eval_name}.csv', index_col=0)
@@ -577,21 +579,27 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,neptune_mode='
             
             else:
                 Z_embed_train_savepath = os.path.join(save_dir, f'Z_embed_{train_name}.csv')
-                Z = generate_latent_space(X_data_train, encoder)
-                Z.to_csv(os.path.join(save_dir, f'Z_{train_name}.csv'))
+                if (not os.path.exists(Z_embed_train_savepath)):
+                    if X_data_train is None:
+                        X_data_train = pd.read_csv(f'{data_dir}/{X_filename}_{train_name}.csv', index_col=0)
+                        y_data_train = pd.read_csv(f'{data_dir}/{y_filename}_{train_name}.csv', index_col=0)
 
-                Z_pca = generate_pca_embedding(Z)
-                Z_pca.to_csv(os.path.join(save_dir, f'Z_pca_{train_name}.csv'))
-                Z_pca.columns = [f'PCA{i+1}' for i in range(Z_pca.shape[1])]
+                    Z = generate_latent_space(X_data_train, encoder)
+                    Z.to_csv(os.path.join(save_dir, f'Z_{train_name}.csv'))
 
-                Z_umap = generate_umap_embedding(Z)
-                Z_umap.to_csv(os.path.join(save_dir, f'Z_umap_{train_name}.csv'))
-                Z_umap.columns = [f'UMAP{i+1}' for i in range(Z_umap.shape[1])]
+                    Z_pca = generate_pca_embedding(Z)
+                    Z_pca.to_csv(os.path.join(save_dir, f'Z_pca_{train_name}.csv'))
+                    Z_pca.columns = [f'PCA{i+1}' for i in range(Z_pca.shape[1])]
 
-                Z_embed = pd.concat([Z_pca, Z_umap], axis=1)
-                Z_embed = Z_embed.join(y_data_train)
-                Z_embed.to_csv(Z_embed_train_savepath)
-                run[f'{setup_id}/Z_embed_{train_name}'].upload(Z_embed_train_savepath)
+                    Z_umap = generate_umap_embedding(Z)
+                    Z_umap.to_csv(os.path.join(save_dir, f'Z_umap_{train_name}.csv'))
+                    Z_umap.columns = [f'UMAP{i+1}' for i in range(Z_umap.shape[1])]
+
+                    Z_embed = pd.concat([Z_pca, Z_umap], axis=1)
+                    Z_embed = Z_embed.join(y_data_train)
+                    Z_embed.to_csv(Z_embed_train_savepath)
+                    run[f'{setup_id}/Z_embed_{train_name}'].upload(Z_embed_train_savepath)
+                    
             run.wait()
 
 
