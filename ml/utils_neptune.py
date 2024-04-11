@@ -92,7 +92,7 @@ def get_run_id_list(encoder_kind='AE',tag=None):
         api_token=NEPTUNE_API_TOKEN
     )
 
-    query = f'(`pretrain/kwargs/encoder_kind`:string = "{encoder_kind}") AND `sys/state`:string = "inactive"'
+    query = f'(`pretrain/kwargs/encoder_kind`:string = "{encoder_kind}") AND `sys/state`:experimentState = "inactive"'
     if tag is not None:
         query += f' AND`sys/tags`:stringSet CONTAINS "{tag}"'
     runs_table_df = project.fetch_runs_table(query=query).to_pandas()

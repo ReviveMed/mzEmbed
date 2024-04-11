@@ -42,7 +42,7 @@ else:
 # encoder_kind = 'TGEM_Encoder'
 
 STUDY_DICT = {
-    'study_name': 'Multi Obj Apr11',
+    'study_name': 'Multi Obj Apr11v2',
     'encoder_kind': encoder_kind,
     'objectives': {
         'reconstruction_loss':{
