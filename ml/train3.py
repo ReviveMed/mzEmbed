@@ -656,12 +656,15 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
             end_state_eval[phase] = head.score(head_ouputs, head_targets)
             end_state_eval[phase].update(adversary.score(adversary_outputs, adversary_targets))
             
+            # we now append the evaluation metrics, so we have a history of them
             for eval_name, eval_val in end_state_eval[phase].items():
                 if isinstance(eval_val, dict):
                     for k, v in eval_val.items():
-                        run[f'{prefix}/{phase}/{eval_name}/{k}'] = stringify_unsupported(v)
+                        # run[f'{prefix}/{phase}/{eval_name}/{k}'] = stringify_unsupported(v)
+                        run[f'{prefix}/{phase}/{eval_name}__{k}'].append(stringify_unsupported(v))
                 else:
-                    run[f'{prefix}/{phase}/{eval_name}'] = stringify_unsupported(eval_val)
+                    # run[f'{prefix}/{phase}/{eval_name}'] = stringify_unsupported(eval_val)
+                    run[f'{prefix}/{phase}/{eval_name}'].append(stringify_unsupported(eval_val))
 
             if not torch.isfinite(recon_loss):
                 print(f'Warning: recon loss is not finite')
@@ -673,16 +676,22 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
                 print(f'Warning: adversary loss is not finite')
                 adversary_loss = torch.tensor(0.0)
 
-
-            run[f'{prefix}/{phase}/reconstruction_loss'] = recon_loss
-            run[f'{prefix}/{phase}/head_loss'] = head_loss
-            run[f'{prefix}/{phase}/adversary_loss'] = adversary_loss
+            # We now append the losses, so we can have a history over multiple iterations of evaluation
+            run[f'{prefix}/{phase}/reconstruction_loss'].append(recon_loss)
+            run[f'{prefix}/{phase}/head_loss'].append(head_loss)
+            run[f'{prefix}/{phase}/adversary_loss'].append(adversary_loss)
             for eval_name, eval_val in end_state_eval[phase].items():
-                run[f'{prefix}/{phase}/{eval_name}'] = stringify_unsupported(eval_val)
+                run[f'{prefix}/{phase}/{eval_name}'].append(stringify_unsupported(eval_val))
+
+            # run[f'{prefix}/{phase}/reconstruction_loss'] = recon_loss
+            # run[f'{prefix}/{phase}/head_loss'] = head_loss
+            # run[f'{prefix}/{phase}/adversary_loss'] = adversary_loss
+            # for eval_name, eval_val in end_state_eval[phase].items():
+            #     run[f'{prefix}/{phase}/{eval_name}'] = stringify_unsupported(eval_val)
 
 
-    #TODO This part is messy, need to clean up
-    if sklearn_models:
+    #TODO This part is messy, need to clean up, currently skipping
+    if (sklearn_models) and (False):
         try:  
             for adv0 in adversary.heads:
 
@@ -715,7 +724,9 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
                                 probs = torch.tensor(model.predict_proba(latent_outputs[nan_mask].detach().numpy()))
                             
                             metric(probs,adv0_targets[nan_mask].long())
-                            run[f'{prefix}/{phase}/{adv0.kind}_{adv0_name}/{model_name} AUROC (macro)'] = stringify_unsupported(metric.compute().item())
+                            # run[f'{prefix}/{phase}/{adv0.kind}_{adv0_name}/{model_name} AUROC (macro)'] = stringify_unsupported(metric.compute().item())
+                            run[f'{prefix}/{phase}/{adv0.kind}_{adv0_name}/{model_name}_AUROC (macro)'].append(stringify_unsupported(metric.compute().item()))
+
             
         except Exception as e:
             print('Error in sklearn model evaluation:', e)
