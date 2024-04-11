@@ -46,6 +46,8 @@ def compute_finetune(run_id,plot_latent_space=False,
     ## Plot the latent space
     ############################################################
     kwargs = {}
+    kwargs['train_kwargs'] = {}
+    kwargs['encoder_kwargs'] = {}
     if plot_latent_space:
         
         ### ### ###
