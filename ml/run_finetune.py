@@ -37,7 +37,8 @@ default_sweep_kwargs = {
 }
 
 def compute_finetune(run_id,plot_latent_space=False,
-                           n_trials=3,desc_str='finetune',sweep_kwargs=None,eval_name='val'):
+                           n_trials=3,desc_str='finetune',
+                           sweep_kwargs=None,eval_name='val'):
 
 
 
@@ -104,6 +105,10 @@ def compute_finetune(run_id,plot_latent_space=False,
     # if n_trials==0:
     #     print('skip finetune')
     #     return run_id
+    if desc_str is None:
+        print('No desc_str')
+        return
+
 
     if eval_name.lower() == 'val':
         train_name = 'train'
@@ -146,44 +151,9 @@ def compute_finetune(run_id,plot_latent_space=False,
         match = re.search(r'epoch_(\d+)', desc_str.lower())
         if match:
             num_epochs = int(match.group(1))
-
-
-    if n_trials>0:
-        run = neptune.init_run(project='revivemed/RCC',
-                        api_token=NEPTUNE_API_TOKEN,
-                        with_id=run_id,
-                        capture_stdout=False,
-                        capture_stderr=False,
-                        capture_hardware_metrics=False,
-                        mode='read-only')
-
-
-        run_struc= run.get_structure()
-        # if 'summary/randinit_Apr04.1_MSKCC/MSKCC Train AUROC avg':
-        if 'summary' in run_struc.keys():
-            if f'randinit_{desc_str}' in run_struc['summary'].keys():
-                keys_list = run_struc['summary'][f'randinit_{desc_str}'].keys()
-                # keys_list_lower = [key.lower() for key in keys_list]
-                # if count_check_name in keys_list_lower:
-                if count_check_name in keys_list:
-                    # actual_count_check_name = keys_list[np.argmax([key.lower() == count_check_name for key in keys_list_lower])]
-                    run_counts = run[f'summary/randinit_{desc_str}/{count_check_name}'].fetch()
-                    # run_counts = run[f'summary/randinit_{desc_str}/{actual_count_check_name}'].fetch()
-                    if run_counts > n_trials:
-                        print('Already computed over {} trials'.format(run_counts))
-                        run.stop()
-                        return run_id
-                    
-                    n_trials = n_trials - run_counts
-                    print('computing {} more trials'.format(n_trials))
-
-
-        kwargs = run['pretrain/original_kwargs'].fetch()
-        kwargs = convert_neptune_kwargs(kwargs)
-        encoder_kind = kwargs['encoder_kind']
-        run.stop()
         
     if n_trials>0:    
+        kwargs = {}
         kwargs['overwrite_existing_kwargs'] = True
         kwargs['load_encoder_loc'] = 'pretrain'
         kwargs['load_model_loc'] = False
@@ -193,12 +163,13 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['train_name'] = train_name
         kwargs['run_training'] = True
         kwargs['run_evaluation'] = True
-        kwargs['save_latent_space'] = False
+        kwargs['save_latent_space'] = True
         kwargs['plot_latent_space'] = ''
         kwargs['plot_latent_space_cols'] = plot_latent_space_cols
         kwargs['y_head_cols'] = y_head_cols
         kwargs['y_adv_cols'] = []
         kwargs['upload_models_to_neptune'] = False
+        kwargs['num_repeats'] = n_trials
 
 
         kwargs['head_kwargs_dict'] = {}
@@ -237,23 +208,18 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['eval_kwargs']['sklearn_models'] = {}
 
         if num_epochs is None:
-            if encoder_kind == 'TGEM_Encoder':
-                kwargs['train_kwargs']['num_epochs'] = 3
-            else:
-                kwargs['train_kwargs']['num_epochs'] = sweep_kwargs.get('train_kwargs__num_epochs')
+            # if encoder_kind == 'TGEM_Encoder':
+            #     kwargs['train_kwargs']['num_epochs'] = 3
+            # else:
+            kwargs['train_kwargs']['num_epochs'] = sweep_kwargs.get('train_kwargs__num_epochs')
         else:
             kwargs['train_kwargs']['num_epochs'] = num_epochs
         print('num_epochs:',num_epochs)
 
         kwargs = convert_model_kwargs_list_to_dict(kwargs)
 
-        setup_id = f'finetune_{desc_str}'
-        print('ID:',setup_id)
-        for ii in range(n_trials):
-            print('trial #:',ii)
-            if ii == n_trials-1:
-                kwargs['save_latent_space'] = True
-            _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
+        setup_id = f'{desc_str}_finetune'
+        _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
 
 
 
@@ -262,39 +228,36 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['load_model_weights'] = False
         kwargs['save_latent_space'] = False
         
-        setup_id = f'randinit_{desc_str}'
-        print('ID:',setup_id)
-        for ii in range(n_trials):
-            print('trial #:',ii)
-            _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
+        setup_id = f'{desc_str}_randinit'
+        _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
 
 
-    ############################################################
-    ## Get the Average AUROC for the finetune models
-    ############################################################
+    # ############################################################
+    # ## Get the Average AUROC for the finetune models
+    # ############################################################
     
-    # Save the Average AUC for the finetune models
-    run = neptune.init_run(project='revivemed/RCC',
-                    api_token=NEPTUNE_API_TOKEN,
-                    with_id=run_id,
-                    capture_stdout=False,
-                    capture_stderr=False,
-                    capture_hardware_metrics=False)
+    # # Save the Average AUC for the finetune models
+    # run = neptune.init_run(project='revivemed/RCC',
+    #                 api_token=NEPTUNE_API_TOKEN,
+    #                 with_id=run_id,
+    #                 capture_stdout=False,
+    #                 capture_stderr=False,
+    #                 capture_hardware_metrics=False)
     
 
 
-    for setup_id in ['finetune_'+desc_str,'randinit_'+desc_str]:
-        print('setup_id:',setup_id)
-        for key, key_loc in metric_string_dct.items():
-            key_loc = key_loc.replace('/','_')
-            print('key:',key_loc)
-            vals_table = run[f'{setup_id}/history/'+key_loc].fetch_values()
-            vals = vals_table['value']
-            # print(vals)
-            run[f'summary/{setup_id}/{key} avg'] = np.mean(vals)
-            run[f'summary/{setup_id}/{key} std'] = np.std(vals)
-            run[f'summary/{setup_id}/{key} count'] = len(vals)
-            run.wait()
+    # for setup_id in ['finetune_'+desc_str,'randinit_'+desc_str]:
+    #     print('setup_id:',setup_id)
+    #     for key, key_loc in metric_string_dct.items():
+    #         key_loc = key_loc.replace('/','_')
+    #         print('key:',key_loc)
+    #         vals_table = run[f'{setup_id}/history/'+key_loc].fetch_values()
+    #         vals = vals_table['value']
+    #         # print(vals)
+    #         run[f'summary/{setup_id}/{key} avg'] = np.mean(vals)
+    #         run[f'summary/{setup_id}/{key} std'] = np.std(vals)
+    #         run[f'summary/{setup_id}/{key} count'] = len(vals)
+    #         run.wait()
 
 
     run['sys/failed'] = False
@@ -314,22 +277,25 @@ if __name__ == '__main__':
     else:
         plot_latent_space = False
 
+    # number of trials/repeats for finetuning
     if len(sys.argv)>2:
         n_trials = int(sys.argv[2])
     else:
         n_trials = 1
 
-
+    # run_id to finetune, or list of run_ids, or a tag
     if len(sys.argv)>3:
         chosen_id = sys.argv[3]
     else:
         chosen_id = None
 
+    # description string of the finetuning task
     if len(sys.argv)>4:
         desc_str = sys.argv[4]
     else:
-        desc_str = 'Apr04.1_MSKCC'
+        desc_str = None
 
+    # which dataset is used for evaluation
     if len(sys.argv)>5:
         eval_name = sys.argv[5]
     else:
