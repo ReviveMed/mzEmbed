@@ -86,8 +86,11 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             load_kwargs = run[f'{load_encoder_loc}/original_kwargs'].fetch()
             load_kwargs = convert_neptune_kwargs(load_kwargs)
             # kwargs['encoder_kwargs'].update(load_kwargs['encoder_kwargs'])
-            if kwargs['encoder_kind'] != load_kwargs['encoder_kind']:
-                raise ValueError(f'Encoder kind mismatch: {kwargs["encoder_kind"]} vs {load_kwargs["encoder_kind"]}')
+            if 'encoder_kind' in kwargs:
+                if kwargs['encoder_kind'] != load_kwargs['encoder_kind']:
+                    raise ValueError(f'Encoder kind mismatch: {kwargs["encoder_kind"]} vs {load_kwargs["encoder_kind"]}')
+            else:
+                kwargs['encoder_kind'] = load_kwargs['encoder_kind']
             
             encoder_kwargs = load_kwargs.get('encoder_kwargs', {})
             encoder_kwargs.update(kwargs.get('encoder_kwargs', {}))
