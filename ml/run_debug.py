@@ -10,7 +10,13 @@ data_dir = '/DATA'
 
 
 setup_id = 'pretrain'
-run_id = 'RCC-2025'
+run_id = 'RCC-2117'
 
-run_id = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,overwrite_existing_kwargs=True)
+run_id = setup_neptune_run(data_dir,setup_id=setup_id,
+                           with_run_id=run_id,
+                           neptune_mode='async',
+                           overwrite_existing_kwargs=True,
+                           batch_size=32)
+                        #    encoder_kind='VAE',
+                        #    encoder_kwargs=encoder_kwargs)
 

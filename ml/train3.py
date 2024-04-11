@@ -258,7 +258,6 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
     for epoch in range(num_epochs):
         if encoder_type == 'TGEM_Encoder':
             print('Epoch', epoch)
-        run_status = True
         if patience_counter > early_stopping_patience:
             print('Early stopping at epoch', epoch)
             encoder.load_state_dict(best_wts['encoder'])
@@ -325,6 +324,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                             for key, loss_val in multi_loss.items():
                                 run[f'{prefix}/{phase}/batch/head_loss/{key}'].append(loss_val)
                             head_loss = sum([h.weight * multi_loss[f'{h.kind}_{h.name}'] for h in head.heads])
+                            # head_loss /= sum([h.weight for h in head.heads])
                         else:
                             head_loss = multi_loss
                         
@@ -344,6 +344,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                             for key, loss_val in multi_loss.items():
                                 run[f'{prefix}/{phase}/batch/adversary_loss/{key}'].append(loss_val)
                             adversary_loss = sum([h.weight * multi_loss[f'{h.kind}_{h.name}'] for h in adversary.heads])
+                            # adversary_loss /= sum([h.weight for h in adversary.heads])
                         else:
                             adversary_loss = multi_loss
                     else:
@@ -352,14 +353,16 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
 
                     # check if the losses are nan
                     if torch.isnan(encoder_loss) or torch.isinf(encoder_loss):
-                        if run_status:
-                            print('Encoder loss is nan/inf!')
+                        print('Encoder loss is nan/inf!')
+                        print('your learning rate is probably too high')
+                        return None, None, None
                     else:
                         run[f'{prefix}/{phase}/batch/encoder_loss'].append(encoder_loss)
 
                     if torch.isnan(head_loss) or torch.isinf(head_loss):
-                        if run_status:
-                            print('Head loss is nan/inf!')
+                        print('Head loss is nan/inf!')
+                        print('your learning rate is probably too high')
+                        return None, None, None
                     else:
                         run[f'{prefix}/{phase}/batch/multi_head_loss'].append(head_loss)
 
@@ -390,7 +393,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                     
                     joint_loss = (encoder_weight*encoder_loss + \
                         head_weight*head_loss - \
-                        adversary_weight*adversary_loss)
+                        adversary_weight*adversary_loss) #/ (encoder_weight + head_weight + adversary_weight)
 
                     if not torch.isnan(joint_loss) or torch.isinf(joint_loss):
                         run[f'{prefix}/{phase}/batch/joint_loss'].append(joint_loss)

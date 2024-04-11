@@ -435,7 +435,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
         l1_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
 
     elif encoder_kind == 'VAE':       
-        num_hidden_layers = IntDistribution(1, 5) 
+        num_hidden_layers = IntDistribution(1, 3) 
         encoder_kwargs = {
                     'activation': activation,
                     'latent_size': latent_size,
@@ -447,7 +447,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
                     }
         encoder_weight = FloatDistribution(0,5,step=0.1)
         num_epochs_min = 50
-        num_epochs_max = 200
+        num_epochs_max = 300
         num_epochs_step = 10
         adversarial_mini_epochs = 2
         early_stopping_patience_step = 10

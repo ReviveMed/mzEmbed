@@ -98,28 +98,34 @@ def main(STUDY_INFO_DICT):
 
     def objective(trial):
 
-        kwargs = make_kwargs(encoder_kind=encoder_kind)
-        kwargs = convert_model_kwargs_list_to_dict(kwargs)
-        kwargs = flatten_dict(kwargs) # flatten the dict for optuna compatibility
-        kwargs = convert_distributions_to_suggestion(kwargs, trial) # convert the distributions to optuna suggestions
-        kwargs = round_kwargs_to_sig(kwargs,sig_figs=2)
-        kwargs = unflatten_dict(kwargs) # unflatten the dict for the setup function
+        try:
+            kwargs = make_kwargs(encoder_kind=encoder_kind)
+            kwargs = convert_model_kwargs_list_to_dict(kwargs)
+            kwargs = flatten_dict(kwargs) # flatten the dict for optuna compatibility
+            kwargs = convert_distributions_to_suggestion(kwargs, trial) # convert the distributions to optuna suggestions
+            kwargs = round_kwargs_to_sig(kwargs,sig_figs=2)
+            kwargs = unflatten_dict(kwargs) # unflatten the dict for the setup function
 
-        kwargs['run_evaluation'] = True
-        kwargs['eval_kwargs'] = {
-            'sklearn_models': {
-                'Adversary Logistic Regression': LogisticRegression(max_iter=1000, C=1.0, solver='lbfgs'),
-                # 'Adversary KNN': KNeighborsClassifier(n_neighbors=5, weights='uniform', algorithm='auto'),
+            kwargs['run_evaluation'] = True
+            kwargs['eval_kwargs'] = {
+                'sklearn_models': {
+                    'Adversary Logistic Regression': LogisticRegression(max_iter=1000, C=1.0, solver='lbfgs'),
+                    # 'Adversary KNN': KNeighborsClassifier(n_neighbors=5, weights='uniform', algorithm='auto'),
+                }
             }
-        }
-        kwargs['study_info_dict'] = STUDY_INFO_DICT
-        setup_id = 'pretrain'
-        run_id = setup_neptune_run(data_dir,setup_id=setup_id,**kwargs)
-        trial.set_user_attr('run_id',run_id)
-        trial.set_user_attr('setup_id',setup_id)
+            kwargs['study_info_dict'] = STUDY_INFO_DICT
+            setup_id = 'pretrain'
+            run_id = setup_neptune_run(data_dir,setup_id=setup_id,**kwargs)
+            trial.set_user_attr('run_id',run_id)
+            trial.set_user_attr('setup_id',setup_id)
 
-
-        return compute_objective(run_id)
+            return compute_objective(run_id)
+        
+        # except Exception as e:
+        except ValueError as e:
+            print(e)
+            # return float('nan')
+            raise optuna.TrialPruned()
 
 
 

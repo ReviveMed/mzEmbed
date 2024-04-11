@@ -223,7 +223,8 @@ class VAE(nn.Module):
             self.activation = activation
         self.use_batch_norm = use_batch_norm
         self.act_on_latent_layer = act_on_latent_layer
-        self.kl_weight = 1.0/np.sqrt(num_hidden_layers)
+        # self.kl_weight = 1.0/np.sqrt(num_hidden_layers)
+        self.kl_weight = 1.0
 
         self.encoder = Dense_Layers(input_size=input_size, 
                                     hidden_size=hidden_size, 
@@ -278,12 +279,14 @@ class VAE(nn.Module):
         # kl_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
         # return torch.div(torch.add(recon_loss, kl_loss), x.size(0))
 
-        # recon_loss = F.mse_loss(x_recon, x, reduction='mean')
-        # kl_loss = -0.5 * (1 + log_var - mu.pow(2) - log_var.exp()).sum() / (mu.size(0) * mu.size(1))
+        # recon_loss2 = F.mse_loss(x_recon, x, reduction='mean')
+        # print('recon_loss2', recon_loss2)
+        # kl_loss2 = -0.5 * (1 + log_var - mu.pow(2) - log_var.exp()).sum() / (mu.size(0) * mu.size(1))
+        # print('kl_loss2', kl_loss2)
         # return torch.add(recon_loss, self.kl_weight*kl_loss)
     
         recon_loss = F.mse_loss(x_recon, x, reduction='mean')
-        # print('recon_loss', recon_loss)
+        # print('recon_loss', recon_loss) 
         kl_loss = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
         # print('kl_loss', kl_loss)
         return torch.add(recon_loss, self.kl_weight*kl_loss)

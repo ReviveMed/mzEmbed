@@ -96,7 +96,7 @@ def check_neptune_existance(run,attribute):
     
 
 
-def start_neptune_run(with_run_id=None,tags=['v3.2'],yes_logging=False):
+def start_neptune_run(with_run_id=None,tags=['v3.2'],yes_logging=False,neptune_mode='async'):
     is_run_new = False
     if with_run_id is None:
         run = neptune.init_run(project='revivemed/RCC',
@@ -108,6 +108,7 @@ def start_neptune_run(with_run_id=None,tags=['v3.2'],yes_logging=False):
             run = neptune.init_run(project='revivemed/RCC',
                                    api_token=NEPTUNE_API_TOKEN,
                                    with_id=with_run_id,
+                                   mode=neptune_mode,
                                     capture_stdout=yes_logging,
                                     capture_stderr=yes_logging,
                                     capture_hardware_metrics=yes_logging)

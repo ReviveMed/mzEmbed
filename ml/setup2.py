@@ -27,10 +27,10 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 
 
 
-def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,**kwargs):
+def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,neptune_mode='async',**kwargs):
     print(setup_id)
     if run is None:
-        run, is_run_new = start_neptune_run(with_run_id=with_run_id)
+        run, is_run_new = start_neptune_run(with_run_id=with_run_id,neptune_mode=neptune_mode)
         ret_run_id = True
     else:
         is_run_new = False
@@ -244,6 +244,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,**kwargs):
                 encoder.load_state_dict(encoder_state_dict)
             else:
                 encoder.init_layers()
+                # encoder.reset_params()
+                print('encoder random initialized')
 
             ####################################
             ###### Create the Head Models ######
@@ -394,6 +396,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,**kwargs):
             encoder, head, adv = train_compound_model(train_loader_dct, 
                                                     encoder, head, adv, 
                                                     run=run, **train_kwargs)
+            if encoder is None:
+                raise ValueError('Encoder is None after training')
 
             # log the models
             # run[f'{setup_id}/encoder'] = npt_logger.log_model('encoder')
