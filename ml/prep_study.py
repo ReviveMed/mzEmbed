@@ -256,25 +256,60 @@ def objective_func3(run_id,data_dir,recompute_eval=False,objective_keys=None,obj
         eval_res = pretrain_output['eval']['val']
 
         for objective_key in objective_keys:
-            if objective_key not in eval_res.keys():
-                # raise ValueError(f"Objective {objective_key} not in eval results")
-                print(f"Objective {objective_key} not in eval results, use default value")
-                obj_val = default_objective_vals_dict[objective_key]
-            
-            else:
-                if isinstance(eval_res[objective_key],dict):
-                    sub_keys = list(eval_res[objective_key].keys())
-                    if len(sub_keys) == 1:
-                        obj_val = eval_res[objective_key][sub_keys[0]]
-                    else:
-                        # get the average of the sub_keys
-                        obj_val = np.mean([eval_res[objective_key][k] for k in sub_keys])
 
-                else:
-                    obj_val = eval_res[objective_key]
-                    # if objective_key == 'reconstruction_loss':
-                        # obj_val = np.log10(obj_val)
-        
+            if objective_key not in eval_res.keys():
+                print(f'no exact match of {objective_key} in eval_res')
+                eval_key_matches = []
+                for eval_key in eval_res.keys():
+                    if objective_key in eval_res[eval_key]:
+                        eval_key_matches.append(eval_key)
+                
+                if len(eval_key_matches) == 0:
+                    # raise ValueError(f"Objective {objective_key} not in eval results")
+                    print(f"Objective {objective_key} not in eval results, use default value")
+                    obj_val = default_objective_vals_dict[objective_key]    
+            else:
+                eval_key_matches = [objective_key]
+            
+
+            if len(eval_key_matches) == 1:
+                for eval_key in eval_key_matches:
+                    if isinstance(eval_res[eval_key],dict):
+                        sub_keys = list(eval_res[eval_key].keys())
+                        if len(sub_keys) == 1:
+                            obj_val = eval_res[eval_key][sub_keys[0]]
+                        else:
+                            # get the average of the sub_keys
+                            obj_val = np.mean([eval_res[eval_key][k] for k in sub_keys])
+
+                    else:
+                        obj_val = eval_res[eval_key]
+                        # if objective_key == 'reconstruction_loss':
+                            # obj_val = np.log10(obj_val)
+
+            elif len(eval_key_matches) > 1:
+                print(f'Objective {objective_key} will be the average of values from {eval_key_matches}')
+                obj_vals = []
+                for eval_key in eval_key_matches:
+                    if isinstance(eval_res[eval_key],dict):
+                        sub_keys = list(eval_res[eval_key].keys())
+                        if len(sub_keys) == 1:
+                            obj_val = eval_res[eval_key][sub_keys[0]]
+                        else:
+                            # get the average of the sub_keys
+                            obj_val = np.mean([eval_res[eval_key][k] for k in sub_keys])
+
+                    else:
+                        obj_val = eval_res[eval_key]
+                        # if objective_key == 'reconstruction_loss':
+                            # obj_val = np.log10(obj_val)
+                    obj_vals.append(obj_val)
+                obj_val = np.mean(obj_vals)
+            else:
+                print(f'set {objective_key} obj_val to nan')
+                obj_val = float('nan')
+
+
             if objective_key in objectives_info_dict:
                 if 'transform' in objectives_info_dict[objective_key]:
                     transform_str = objectives_info_dict[objective_key]['transform']
