@@ -102,6 +102,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         else:
             print('Already plotted val')
 
+        run['sys/failed'] = False
         run.stop()
 
     ############################################################
@@ -268,8 +269,6 @@ def compute_finetune(run_id,plot_latent_space=False,
     #         run.wait()
 
 
-    run['sys/failed'] = False
-    run.stop()
 
     return run_id
 

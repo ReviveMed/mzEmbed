@@ -747,7 +747,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         run.stop()
         raise e
 
-
+    run['sys/failed'] = False
     if ret_run_id:
         run.stop()
         return run_id
