@@ -84,7 +84,7 @@ def get_run_id_list_from_query(query,limit=100):
     return run_id_list
 
 
-def get_run_id_list(encoder_kind='AE',tags=[]):
+def get_run_id_list(encoder_kind='AE',tag=None):
 
     project = neptune.init_project(
         project='revivemed/RCC',
@@ -92,13 +92,17 @@ def get_run_id_list(encoder_kind='AE',tags=[]):
         api_token=NEPTUNE_API_TOKEN
     )
 
-    runs_table_df = project.fetch_runs_table(tag=tags,state='inactive').to_pandas()
+    query = f'(`pretrain/kwargs/encoder_kind`:string = "{encoder_kind}") AND `sys/state`:string = "inactive"'
+    if tag is not None:
+        query += f' AND`sys/tags`:stringSet CONTAINS "{tag}"'
+    runs_table_df = project.fetch_runs_table(query=query).to_pandas()
+    # runs_table_df = project.fetch_runs_table(tag=tags,state='inactive').to_pandas()
 
     #drop the failed runs
     runs_table_df = runs_table_df[~runs_table_df['sys/failed']].copy()
 
     #filter by encoder_kind
-    runs_table_df = runs_table_df[runs_table_df['pretrain/kwargs/encoder_kind'] == encoder_kind].copy()
+    # runs_table_df = runs_table_df[runs_table_df['pretrain/kwargs/encoder_kind'] == encoder_kind].copy()
 
     run_id_list = runs_table_df['sys/id'].tolist()
     project.stop()

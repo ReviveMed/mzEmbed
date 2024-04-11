@@ -19,7 +19,7 @@ USE_WEBAPP_DB = True
 SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
-ADD_EXISTING_RUNS_TO_STUDY = False
+ADD_EXISTING_RUNS_TO_STUDY = True
 limit_add = -1 # limit the number of runs added to the study
 
 import sys
@@ -42,7 +42,7 @@ else:
 # encoder_kind = 'TGEM_Encoder'
 
 STUDY_DICT = {
-    'study_name': 'Multi Obj Apr10',
+    'study_name': 'Multi Obj Apr11',
     'encoder_kind': encoder_kind,
     'objectives': {
         'reconstruction_loss':{
@@ -141,16 +141,14 @@ def main(STUDY_INFO_DICT):
     else:
         study_name = f'{encoder_kind} Study'
 
-
-
+    
     study = optuna.create_study(directions=get_study_objective_directions(STUDY_INFO_DICT),
                     study_name=study_name, 
                     storage=storage_name, 
                     load_if_exists=True)
 
 
-    # if len(study.trials) < 20:
-    if ADD_EXISTING_RUNS_TO_STUDY:
+    if (len(study.trials) < 50) and ADD_EXISTING_RUNS_TO_STUDY:
         add_runs_to_study(study,
                         objective_func=compute_objective,
                         study_kwargs=make_kwargs(encoder_kind=encoder_kind),

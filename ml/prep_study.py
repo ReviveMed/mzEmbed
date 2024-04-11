@@ -261,7 +261,7 @@ def objective_func3(run_id,data_dir,recompute_eval=False,objective_keys=None,obj
                 print(f'no exact match of {objective_key} in eval_res')
                 eval_key_matches = []
                 for eval_key in eval_res.keys():
-                    if objective_key in eval_res[eval_key]:
+                    if objective_key in eval_key:
                         eval_key_matches.append(eval_key)
                 
                 if len(eval_key_matches) == 0:
@@ -305,9 +305,9 @@ def objective_func3(run_id,data_dir,recompute_eval=False,objective_keys=None,obj
                             # obj_val = np.log10(obj_val)
                     obj_vals.append(obj_val)
                 obj_val = np.mean(obj_vals)
-            else:
-                print(f'set {objective_key} obj_val to nan')
-                obj_val = float('nan')
+            # else:
+            #     print(f'set {objective_key} obj_val to nan')
+            #     obj_val = float('nan')
 
 
             if objective_key in objectives_info_dict:
@@ -321,7 +321,11 @@ def objective_func3(run_id,data_dir,recompute_eval=False,objective_keys=None,obj
                         obj_val = -1*np.log10(obj_val)
 
             obj_vals.append(obj_val)
+    else:
+        run.stop()
+        raise ValueError(f"no evaluation results for {run_id}")
 
+    run.stop()
     return tuple(obj_vals)
 
 
@@ -470,7 +474,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
         l1_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
 
     elif encoder_kind == 'VAE':       
-        num_hidden_layers = IntDistribution(1, 3) 
+        num_hidden_layers = IntDistribution(1, 5) 
         encoder_kwargs = {
                     'activation': activation,
                     'latent_size': latent_size,
