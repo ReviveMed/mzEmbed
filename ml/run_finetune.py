@@ -41,7 +41,27 @@ def compute_finetune(run_id,plot_latent_space=False,
                            sweep_kwargs=None,eval_name='val',
                            recompute_plot=False):
 
+    run = neptune.init_run(project='revivemed/RCC',
+            api_token=NEPTUNE_API_TOKEN,
+            with_id=run_id,
+            capture_stdout=False,
+            capture_stderr=False,
+            capture_hardware_metrics=False,
+            mode='read-only')
 
+    run_struc= run.get_structure()
+    if 'pretrain' not in run_struc:
+        print('No pretrain in run:',run_id)
+        run.stop()
+        return run_id
+    if 'models' not in run_struc['pretrain']:
+        print('No saved models in run:',run_id)
+        run.stop()
+        return run_id
+    if 'encoder_state_dict' not in run_struc['pretrain']['models']:
+        print('No saved encoder_state_dict in run:',run_id)
+        run.stop()
+        return run_id
 
     #############################################################
     ## Plot the latent space
@@ -59,7 +79,6 @@ def compute_finetune(run_id,plot_latent_space=False,
                 capture_hardware_metrics=False)
                 # mode='read-only')
 
-        run_struc= run.get_structure()
         original_kwargs = run['pretrain/original_kwargs'].fetch()
         # run.stop()
         original_kwargs = convert_neptune_kwargs(original_kwargs)
