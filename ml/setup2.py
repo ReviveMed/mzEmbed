@@ -218,12 +218,13 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,neptune_mode='
     encoder_kwargs = kwargs.get('encoder_kwargs', {})
     other_input_size = kwargs.get('other_input_size', 1)
     load_model_weights = kwargs.get('load_model_weights', True)
+
+    latent_size = encoder_kwargs.get('latent_size', 8)
+    input_size = kwargs.get('input_size', None)
     if 'hidden_size_mult' in encoder_kwargs:
         encoder_kwargs['hidden_size'] = int(encoder_kwargs['hidden_size_mult']*latent_size)
         # remove the hidden_size_mult key
         encoder_kwargs.pop('hidden_size_mult')
-    latent_size = encoder_kwargs.get('latent_size', 8)
-    input_size = kwargs.get('input_size', None)
     
     if input_size is None:
         try:
@@ -599,7 +600,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,neptune_mode='
                     Z_embed = Z_embed.join(y_data_train)
                     Z_embed.to_csv(Z_embed_train_savepath)
                     run[f'{setup_id}/Z_embed_{train_name}'].upload(Z_embed_train_savepath)
-                    
+
             run.wait()
 
 
