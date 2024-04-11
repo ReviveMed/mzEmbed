@@ -620,7 +620,23 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,neptune_mode='
                 run[f'{setup_id}/Z_embed_{eval_name}'].upload(Z_embed_savepath)
 
 
-            marker_sz = 5/(1+np.log10(Z_embed.shape[0]))
+            # Get the counts for each instance of the hue column, and the corresponding colormap
+            Z_count_sum = (~Z_embed[hue_col].isnull()).sum()
+            print(f'Number of samples in {eval_name}: {Z_count_sum}')
+            if Z_embed[hue_col].nunique() > 30:
+                # if more than 30 unique values, then assume its continuous
+                palette = 'flare'
+                Z_counts = None
+            else:
+                # if fewer than 30 unique values, then assume its categorical
+                # palette = get_color_map(Z_embed[hue_col].nunique())
+                palette = assign_color_map(Z_embed[hue_col].unique())
+                Z_counts = Z_embed[hue_col].value_counts()
+
+            # choose the marker size based on the number of nonnan values
+            marker_sz = 10/(1+np.log(Z_count_sum))
+
+
             if (plot_latent_space=='seaborn') or (plot_latent_space=='both') or (plot_latent_space=='sns'):
 
                 for hue_col in plot_latent_space_cols:
@@ -637,14 +653,22 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,neptune_mode='
                         
                         # edit the legend to include the number of samples in each cohort
                         handles, labels = fig.get_legend_handles_labels()
-                        if len(labels) > 2:
-                            new_labels = [f'{label} ({Z_embed[Z_embed[hue_col]==label].shape[0]})' for label in labels]
-                        else:
-                            new_labels = []
-                            Z_counts = Z_embed[hue_col].value_counts()
-                            for label in labels:
-                                new_labels.append(f'{label} ({Z_counts.loc[eval(label)]})')
                         
+
+                        # Add the counts to the legend if hue_col is categorical
+                        if Z_counts is not None:
+                            # new_labels = [f'{label} ({Z_embed[Z_embed[hue_col]==label].shape[0]})' for label in labels]
+                            new_labels = []
+                            for label in labels:
+                                # new_labels.append(f'{label} ({Z_counts.loc[eval(label)]})')
+                                try:
+                                    new_labels.append(f'{label} ({Z_counts.loc[label]})')
+                                except KeyError:
+                                    new_labels.append(f'{label} ({Z_counts.loc[eval(label)]})')
+                        else:
+                            new_labels = labels
+
+
                         # make the size of the markers in the handles larger
                         for handle in handles:
                             # print(dir(handle))
@@ -664,13 +688,20 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,neptune_mode='
 
                     # edit the legend to include the number of samples in each cohort
                     handles, labels = fig.get_legend_handles_labels()
-                    if len(labels) > 2:
-                        new_labels = [f'{label} ({Z_embed[Z_embed[hue_col]==label].shape[0]})' for label in labels]
-                    else:
+
+                    # Add the counts to the legend if hue_col is categorical
+                    if Z_counts is not None:
+                        # new_labels = [f'{label} ({Z_embed[Z_embed[hue_col]==label].shape[0]})' for label in labels]
                         new_labels = []
-                        Z_counts = Z_embed[hue_col].value_counts()
                         for label in labels:
-                            new_labels.append(f'{label} ({Z_counts.loc[eval(label)]})')
+                            # new_labels.append(f'{label} ({Z_counts.loc[eval(label)]})')
+                            try:
+                                new_labels.append(f'{label} ({Z_counts.loc[label]})')
+                            except KeyError:
+                                new_labels.append(f'{label} ({Z_counts.loc[eval(label)]})')
+                    else:
+                        new_labels = labels
+
                     # make the size of the markers in the handles larger
                     for handle in handles:
                         # print(dir(handle))

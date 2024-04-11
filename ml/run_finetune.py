@@ -37,7 +37,7 @@ default_sweep_kwargs = {
 }
 
 def compute_finetune(run_id,plot_latent_space=False,
-                           n_trials=3,desc_str='finetune',
+                           n_trials=5,desc_str=None,
                            sweep_kwargs=None,eval_name='val'):
 
 
