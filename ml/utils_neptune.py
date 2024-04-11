@@ -96,7 +96,7 @@ def check_neptune_existance(run,attribute):
     
 
 
-def start_neptune_run(with_run_id=None,tags=['v3.2'],yes_logging=False,neptune_mode='async'):
+def start_neptune_run(with_run_id=None,tags=['v3.3'],yes_logging=False,neptune_mode='async'):
     is_run_new = False
     if with_run_id is None:
         run = neptune.init_run(project='revivemed/RCC',
