@@ -82,7 +82,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             y_adv_cols = [y_adv_cols]
         
         if load_encoder_loc:
-            print('loading pretrained encoders, overwriting encoder_kwargs')
+            print('loading pretrained encoder info, overwriting encoder_kwargs')
             load_kwargs = run[f'{load_encoder_loc}/original_kwargs'].fetch()
             load_kwargs = convert_neptune_kwargs(load_kwargs)
             # kwargs['encoder_kwargs'].update(load_kwargs['encoder_kwargs'])
@@ -123,10 +123,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             else:
                 run[f'{setup_id}/kwargs'] = stringify_unsupported(kwargs)
         
-        if is_run_new:
-            run[f'{setup_id}/original_kwargs'] = stringify_unsupported(kwargs)
-
-        if setup_is_new:
+        if is_run_new or setup_is_new:
             run[f'{setup_id}/original_kwargs'] = stringify_unsupported(kwargs)
 
         local_dir = kwargs.get('local_dir', f'~/output')
@@ -135,7 +132,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         os.makedirs(save_dir, exist_ok=True)
 
     except Exception as e:
-        run['sys/tag'].add('init failed')
+        run['sys/tags'].add('init failed')
         run.stop()
         raise e
 
@@ -205,7 +202,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             eval_loader_dct.update(train_loader_dct)
 
     except Exception as e:
-        run['sys/tag'].add('data-load failed')
+        run['sys/tags'].add('data-load failed')
         run.stop()
         raise e
 
@@ -254,15 +251,14 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     upload_models_to_neptune = kwargs.get('upload_models_to_neptune', True)
     upload_models_to_gcp = kwargs.get('upload_models_to_gcp', False)
     eval_kwargs = kwargs.get('eval_kwargs', {})
-    if 'prefix' in eval_kwargs:
-        eval_prefix = eval_kwargs['prefix']
-    else:
-        eval_prefix = f'{setup_id}/eval'
-        eval_kwargs['prefix'] = eval_prefix
+
+    eval_prefix = f'{setup_id}/eval'
+    eval_kwargs['prefix'] = eval_prefix
 
     try:
         eval_recon_loss_history = run[f'{eval_prefix}/{eval_name}/reconstruction_loss'].fetch_values()
         num_existing_repeats = len(eval_recon_loss_history)
+        print(f'Already computed {num_existing_repeats} train/eval repeats')
     except NeptuneException:
         num_existing_repeats = 0
 
@@ -410,7 +406,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                     adv.load_state_from_path(f'{save_dir}/{load_adv_loc}')
                 
         except Exception as e:
-            run['sys/tag'].add('model-creation failed')
+            run['sys/tags'].add('model-creation failed')
             run.stop()
             raise e
 
@@ -495,7 +491,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                         raise NotImplementedError('upload_models_to_gcp not implemented')
 
             except Exception as e:
-                run['sys/tag'].add('training failed')
+                run['sys/tags'].add('training failed')
                 run.stop()
                 raise e
 
@@ -520,7 +516,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                 
 
             except Exception as e:
-                run['sys/tag'].add('evaluation failed')
+                run['sys/tags'].add('evaluation failed')
                 run.stop()
                 raise e
 
@@ -747,7 +743,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             run.wait()
 
     except Exception as e:
-        run['sys/tag'].add('plotting failed')
+        run['sys/tags'].add('plotting failed')
         run.stop()
         raise e
 
