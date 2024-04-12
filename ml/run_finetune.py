@@ -351,10 +351,14 @@ if __name__ == '__main__':
         else:
             run_id_list =  [chosen_id]
 
-    if ',' in chosen_finetune_desc:
-        desc_str_list = chosen_finetune_desc.split(',')
+
+    if chosen_finetune_desc is not None:
+        if ',' in chosen_finetune_desc:
+            desc_str_list = chosen_finetune_desc.split(',')
+        else:
+            desc_str_list = [chosen_finetune_desc]
     else:
-        desc_str_list = [chosen_finetune_desc]
+        desc_str_list = [None]
 
 
     if plot_latent_space<2:
