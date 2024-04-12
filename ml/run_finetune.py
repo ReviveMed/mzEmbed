@@ -342,7 +342,7 @@ if __name__ == '__main__':
         # run_id_list = get_run_id_list(tags=tags,encoder_kind='AE')
 
         query = chosen_id
-        run_id_list = get_run_id_list_from_query(query=query,limit=100)
+        run_id_list = get_run_id_list_from_query(query=query,limit=1000)
 
         # run_id_list = get_run_id_list(tags=tags)
     else:

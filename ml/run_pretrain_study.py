@@ -148,7 +148,7 @@ def main(STUDY_INFO_DICT):
                     load_if_exists=True)
 
 
-    if (len(study.trials) < 25) and ADD_EXISTING_RUNS_TO_STUDY:
+    if (len(study.trials) < 250) and ADD_EXISTING_RUNS_TO_STUDY:
         add_runs_to_study(study,
                         objective_func=compute_objective,
                         study_kwargs=make_kwargs(encoder_kind=encoder_kind),
