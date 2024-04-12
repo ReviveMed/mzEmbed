@@ -143,6 +143,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
     adversarial_mini_epochs = kwargs.get('adversarial_mini_epochs', 20)
     prefix = kwargs.get('prefix', 'train')
     train_name = kwargs.get(f'train_name', 'train')
+    optimizer_name = kwargs.get('optimizer_name', 'adam')
     
     clip_grads_with_norm = kwargs.get('clip_grads_with_norm', True)
     clip_grads_with_value = kwargs.get('clip_grads_with_value', False)
@@ -214,17 +215,28 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
     head.to(device)
     adversary.to(device)
 
-    # define the optimizers
-    encoder_optimizer = torch.optim.Adam(encoder.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    if head_weight > 0:
-        head_optimizer = torch.optim.Adam(head.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    else:
-        head_optimizer = None
-    
-    if adversary_weight > 0:
-        adversary_optimizer = torch.optim.Adam(adversary.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    else:
-        adversary_optimizer = None
+    if optimizer_name.lower()=='adam':
+        encoder_optimizer = torch.optim.Adam(encoder.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        if head_weight > 0:
+            head_optimizer = torch.optim.Adam(head.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        else:
+            head_optimizer = None
+        
+        if adversary_weight > 0:
+            adversary_optimizer = torch.optim.Adam(adversary.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        else:
+            adversary_optimizer = None
+    elif optimizer_name.lower()=='adamw':
+        encoder_optimizer = torch.optim.AdamW(encoder.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        if head_weight > 0:
+            head_optimizer = torch.optim.AdamW(head.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        else:
+            head_optimizer = None
+        
+        if adversary_weight > 0:
+            adversary_optimizer = torch.optim.AdamW(adversary.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        else:
+            adversary_optimizer = None
 
     scheduler = None
     if scheduler_kind is not None:

@@ -105,7 +105,8 @@ def get_default_kwarg_val_dict():
     default_val_dict = {
         'head_kwargs_dict__Regression_Age__weight': 0,
         'head_kwargs_dict__Binary_isFemale__weight': 0,
-        'train_kwargs__l1_reg_weight': 0
+        'train_kwargs__l1_reg_weight': 0,
+        'train_kwargs__optimizer_name': 'adam'
     }
 
     return default_val_dict
@@ -468,7 +469,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
         latent_size = IntDistribution(4, 64, step=1)
 
     cohort_label_weight = FloatDistribution(0,2,step=0.1) #10
-    isfemale_weight = FloatDistribution(0,10,step=0.1) #20
+    isfemale_weight = FloatDistribution(0,20,step=0.1) #20
     ispediatric_weight = FloatDistribution(0,10,step=0.1) #10
     head_weight = FloatDistribution(0,10,step=0.1) # 10
     adv_weight = FloatDistribution(0,50,step=0.1) #50
@@ -501,7 +502,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
                     'activation': activation,
                     'latent_size': latent_size,
                     'num_hidden_layers': num_hidden_layers,
-                    'dropout_rate': 0,
+                    'dropout_rate': FloatDistribution(0, 0.3, step=0.15),
                     'use_batch_norm': False,
                     # 'hidden_size': int(1.5*latent_size),
                     'hidden_size_mult' : 1.5
@@ -510,7 +511,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
         num_epochs_min = 50
         num_epochs_max = 300
         num_epochs_step = 10
-        adversarial_mini_epochs = 2
+        adversarial_mini_epochs = IntDistribution(2, 6, step=2)
         early_stopping_patience_step = 10
         early_stopping_patience_max = 50
         l2_reg_weight = 0 # loss explodes if not 0
@@ -616,10 +617,11 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
                 ],
 
                 'train_kwargs': {
+                    'optimizer_name': CategoricalDistribution(['adam','adamw']),
                     'num_epochs': IntDistribution(num_epochs_min, num_epochs_max, step=num_epochs_step),
                     'lr': FloatDistribution(0.0001, 0.05, log=True),
                     # 'lr': 0.01,
-                    'weight_decay': 0,
+                    'weight_decay': FloatDistribution(0, 0.0005, step=0.00001),
                     'l1_reg_weight': l1_reg_weight,
                     # 'l2_reg_weight': 0.001,
                     'l2_reg_weight': l2_reg_weight,

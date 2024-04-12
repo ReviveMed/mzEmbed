@@ -42,7 +42,7 @@ else:
 # encoder_kind = 'TGEM_Encoder'
 
 STUDY_DICT = {
-    'study_name': 'Multi Obj Apr11v2',
+    'study_name': 'Multi Obj Apr12',
     'encoder_kind': encoder_kind,
     'objectives': {
         'reconstruction_loss':{
@@ -51,21 +51,21 @@ STUDY_DICT = {
             'direction': 'minimize',
             'transform': 'log10'
         },
-        # 'Binary_isPediatric':{
-        #     'weight': 1,
-        #     'name': 'Pediatric Prediction',
-        #     'direction': 'maximize'
-        # },
+        'Binary_isPediatric':{
+            'weight': 1,
+            'name': 'Pediatric Prediction',
+            'direction': 'maximize'
+        },
         'MultiClass_Cohort Label':{
             'weight': 1,
             'name': 'Cohort Label Prediction',
             'direction': 'maximize'
         },
-        # 'MultiClass_Adv StudyID':{
-        #     'weight': 1,
-        #     'name': 'Adv StudyID Prediction',
-        #     'direction': 'minimize'
-        # },
+        'MultiClass_Adv StudyID':{
+            'weight': 1,
+            'name': 'Adv StudyID Prediction',
+            'direction': 'minimize'
+        },
         'Binary_isFemale':{
             'weight': 1,
             'name': 'Gender Prediction',
