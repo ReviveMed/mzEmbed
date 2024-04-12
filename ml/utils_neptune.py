@@ -95,7 +95,7 @@ def get_run_id_list(encoder_kind='AE',tag=None):
     query = f'(`pretrain/kwargs/encoder_kind`:string = "{encoder_kind}") AND `sys/state`:experimentState = "inactive"'
     if tag is not None:
         query += f' AND`sys/tags`:stringSet CONTAINS "{tag}"'
-    runs_table_df = project.fetch_runs_table(query=query).to_pandas()
+    runs_table_df = project.fetch_runs_table(query=query,limit=500).to_pandas()
     # runs_table_df = project.fetch_runs_table(tag=tags,state='inactive').to_pandas()
 
     #drop the failed runs
