@@ -656,7 +656,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
                     plot_title = f'{setup_id} Latent Space of {eval_name} (N={Z_count_sum})'
                     # choose the marker size based on the number of nonnan values
-                    marker_sz = 10/(1+np.log(Z_count_sum))
+                    # marker_sz = 10/(1+np.log(Z_count_sum))
+                    marker_sz = 100/np.sqrt(Z_count_sum)
 
                     ## PCA ##
                     if yes_plot_pca:

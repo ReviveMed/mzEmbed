@@ -5,9 +5,11 @@ import numpy as np
 import shutil
 import os
 data_dir = get_latest_dataset()
-setup_id = 'surv_finetune_2'
+setup_id = 'surv_finetune_3'
 kwargs = {}
-run_id = 'RCC-2027'
+# run_id = 'RCC-2027'
+# run_id = 'RCC-2390'
+run_id = 'RCC-2502'
 
 
 if not os.path.exists(f'{data_dir}/X_finetune_val2.csv'):
@@ -30,20 +32,21 @@ if not os.path.exists(f'{data_dir}/X_finetune_val2.csv'):
     shutil.copy(f'{data_dir}/X_finetune_val.csv',f'{data_dir}/X_finetune_val2.csv')
 
 
-encoder_kwargs = {
-            'activation': 'leaky_relu',
-            'latent_size': 16,
-            'num_hidden_layers': 2,
-            'dropout_rate': 0,
-            'use_batch_norm': False,
-            # 'hidden_size': int(1.5*latent_size),
-            'hidden_size_mult' : 1.5
-            }
+# encoder_kwargs = {
+#             'activation': 'leaky_relu',
+#             'latent_size': 16,
+#             'num_hidden_layers': 2,
+#             'dropout_rate': 0,
+#             'use_batch_norm': False,
+#             # 'hidden_size': int(1.5*latent_size),
+#             'hidden_size_mult' : 1.5
+#             }
 
-kwargs['encoder_kind'] = 'AE'
-kwargs['encoder_kwargs'] = encoder_kwargs
+kwargs['encoder_kind'] = 'VAE'
+# kwargs['encoder_kwargs'] = encoder_kwargs
 kwargs['overwrite_existing_kwargs'] = True
-kwargs['load_encoder_loc'] = False
+# kwargs['load_encoder_loc'] = False
+kwargs['load_encoder_loc'] = 'pretrain'
 kwargs['load_model_loc'] = False
 kwargs['X_filename'] = 'X_finetune'
 kwargs['y_filename'] = 'y_finetune'
@@ -76,18 +79,19 @@ kwargs['head_kwargs_list'] = [{
     }]
 
 
-kwargs['encoder_kwargs']['dropout_rate'] = 0.2
-kwargs['adv_kwargs_list'] = [{
-    'kind': 'Cox',
-    'name': 'OS',
-    'weight': 1,
-    'y_idx': [0,1],
-    'hidden_size': 4,
-    'num_hidden_layers': 0,
-    'dropout_rate': 0,
-    'activation': 'leakyrelu',
-    'use_batch_norm': False
-    }]
+# kwargs['encoder_kwargs']['dropout_rate'] = 0.2
+kwargs['adv_kwargs_list'] = []
+# kwargs['adv_kwargs_list'] = [{
+#     'kind': 'Cox',
+#     'name': 'OS',
+#     'weight': 1,
+#     'y_idx': [0,1],
+#     'hidden_size': 4,
+#     'num_hidden_layers': 0,
+#     'dropout_rate': 0,
+#     'activation': 'leakyrelu',
+#     'use_batch_norm': False
+#     }]
 
 kwargs['train_kwargs'] = {}
 kwargs['train_kwargs']['num_epochs'] = 30

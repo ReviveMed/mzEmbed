@@ -42,7 +42,7 @@ else:
 # encoder_kind = 'TGEM_Encoder'
 
 STUDY_DICT = {
-    'study_name': 'Multi Obj Apr12',
+    'study_name': 'Multi Obj Apr15',
     'encoder_kind': encoder_kind,
     'objectives': {
         'reconstruction_loss':{
@@ -61,11 +61,11 @@ STUDY_DICT = {
             'name': 'Cohort Label Prediction',
             'direction': 'maximize'
         },
-        'MultiClass_Adv StudyID':{
-            'weight': 1,
-            'name': 'Adv StudyID Prediction',
-            'direction': 'minimize'
-        },
+        # 'MultiClass_Adv StudyID':{
+        #     'weight': 1,
+        #     'name': 'Adv StudyID Prediction',
+        #     'direction': 'minimize'
+        # },
         'Binary_isFemale':{
             'weight': 1,
             'name': 'Gender Prediction',
