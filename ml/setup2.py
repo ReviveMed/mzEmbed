@@ -379,6 +379,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                         adv_list.append(MultiClass_Head(**adv_kwargs))
                     elif adv_kind == 'Regression':
                         adv_list.append(Regression_Head(**adv_kwargs))
+                    elif adv_kind == 'Cox':
+                        adv_list.append(Cox_Head(**adv_kwargs))
                     elif adv_kind == 'NA':
                         adv_list.append(Dummy_Head())
                     else:

@@ -148,6 +148,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         head_name = 'MSKCC'
         head_kind = 'Binary'
         num_classes = 2
+        y_idx = 0
         plot_latent_space_cols = ['MSKCC']
         metric_string_dct[f'MSKCC {train_name} AUROC'] = f'eval/{train_name}/Binary_MSKCC/AUROC (micro)'
         metric_string_dct[f'MSKCC {eval_name} AUROC'] = f'eval/{eval_name}/Binary_MSKCC/AUROC (micro)'
@@ -159,9 +160,32 @@ def compute_finetune(run_id,plot_latent_space=False,
         head_name = 'IMDC'
         head_kind = 'Binary'
         num_classes = 2
+        y_idx = 0
         plot_latent_space_cols = ['IMDC']
         metric_string_dct[f'IMDC {train_name} AUROC'] = f'eval/{train_name}/Binary_IMDC/AUROC (micro)'
         metric_string_dct[f'IMDC {eval_name} AUROC'] = f'eval/{eval_name}/Binary_IMDC/AUROC (micro)'
+
+    elif 'both-os' in desc_str.lower():
+        metric_string_dct = {}
+        y_head_cols = ['OS','OS_Event']
+        head_name = 'OS'
+        head_kind = 'Cox'
+        num_classes = 1
+        y_idx = [0,1]
+        plot_latent_space_cols = ['OS']   
+        train_name = train_name+'2'
+        eval_name = eval_name+'2'
+
+    elif 'both-pfs' in desc_str.lower():
+        metric_string_dct = {}
+        y_head_cols = ['PFS','PFS_Event']
+        head_name = 'PFS'
+        head_kind = 'Cox'
+        num_classes = 1
+        y_idx = [0,1]
+        plot_latent_space_cols = ['OS']        
+        train_name = train_name+'2'
+        eval_name = eval_name+'2'
     else:
         raise ValueError('Unknown desc_str:',desc_str)
 
@@ -207,7 +231,7 @@ def compute_finetune(run_id,plot_latent_space=False,
             'kind': head_kind,
             'name': head_name,
             'weight': 1,
-            'y_idx': 0,
+            'y_idx': y_idx,
             'hidden_size': 4,
             'num_hidden_layers': 0,
             'dropout_rate': 0,
