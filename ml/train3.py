@@ -234,7 +234,8 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
             head_optimizer = None
         
         if adversary_weight > 0:
-            adversary_optimizer = torch.optim.AdamW(adversary.parameters(), lr=learning_rate, weight_decay=weight_decay)
+            # adversary_optimizer = torch.optim.AdamW(adversary.parameters(), lr=10*learning_rate, weight_decay=weight_decay)
+            adversary_optimizer = torch.optim.SGD(adversary.parameters(), lr=10*learning_rate)
         else:
             adversary_optimizer = None
 
@@ -314,6 +315,35 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                 # noise injection for training to make model more robust
                 if (noise_factor>0) and (phase == f'{train_name}'):
                     X = X + noise_factor * torch.randn_like(X)
+
+
+                # Train the Adversarial Head First
+                # This is a change from the original implementation, implemented end of day April 16th
+                #TODO: this is a little messy, should probably be refactored
+                # Currently transform the data twice with the encoder, this probably only needs to be done once
+                # but if we do change it, we need to be careful to zero the gradients properly
+                if adversary_weight > 0:
+                    with torch.set_grad_enabled(phase == f'{train_name}'):
+                        z = encoder.transform(X).detach()
+                        z.requires_grad = True
+                        adversary_optimizer.zero_grad()
+                        y_adversary_output = adversary(z)
+                        # adversary_loss = adversary.loss(y_adversary_output, y_adversary)
+                        multi_loss = adversary.loss(y_adversary_output, y_adversary)
+                        if isinstance(multi_loss, dict):
+                            for key, loss_val in multi_loss.items():
+                                run[f'{prefix}/{phase}/adversary_loss/{key}'].append(loss_val)
+                            adversary_loss = sum([h.weight * multi_loss[f'{h.kind}_{h.name}'] for h in adversary.heads])
+                        else:
+                            adversary_loss = multi_loss
+
+                        run[f'{prefix}/{phase}/multi_adversary_loss'].append(adversary_loss)
+                    
+                        if phase == f'{train_name}':
+                            adversary_loss.backward()
+                            adversary_optimizer.step()
+
+
 
                 encoder_optimizer.zero_grad()
                 if head_weight > 0:

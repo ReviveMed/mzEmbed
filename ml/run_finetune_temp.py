@@ -253,14 +253,13 @@ def compute_finetune(run_id,plot_latent_space=False,
     # if n_trials==0:
     #     print('skip finetune')
     #     return run_id
-    
     if sweep_kwargs is None:
         sweep_kwargs = default_sweep_kwargs
     
     for key in default_sweep_kwargs.keys():
         if key not in sweep_kwargs.keys():
             sweep_kwargs[key] = default_sweep_kwargs[key]
-    
+
     if desc_str is None:
         print('No desc_str')
         return
@@ -537,7 +536,22 @@ if __name__ == '__main__':
     already_run = []
     print('Number of runs to finetune:',len(run_id_list))
 
+
     sweep_kwargs = None
+    sweep_kwargs = {
+            'holdout_frac': 0,
+            'encoder_kwargs__dropout_rate': 0.2,
+            'train_kwargs__num_epochs': 100,
+            'train_kwargs__early_stopping_patience': 0,
+            'train_kwargs__learning_rate': 0.0001,
+            'train_kwargs__l2_reg_weight': 0,
+            'train_kwargs__l1_reg_weight': 0,
+            'train_kwargs__noise_factor': 0.1,
+            'train_kwargs__weight_decay': 0.001,
+            'train_kwargs__adversarial_mini_epochs': 1,
+            'train_kwargs__adversary_weight': 100,
+        }
+
 
     # run_id_list = ['RCC-1735']
     for run_id in run_id_list:
