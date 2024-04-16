@@ -423,7 +423,8 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         cohort_label_weight = FloatDistribution(0,10,step=0.1) #10
         isfemale_weight = FloatDistribution(0,20,step=0.1) #20
         ispediatric_weight = FloatDistribution(0,10,step=0.1) #10
-        head_weight = FloatDistribution(0,10,step=0.1) # 10
+        # head_weight = FloatDistribution(0,10,step=0.1) # 10
+        head_weight = 1
         adv_weight = FloatDistribution(0,10,step=0.1) #50
         age_weight = FloatDistribution(0,10,step=0.1) #10
     

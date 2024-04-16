@@ -140,7 +140,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
     scheduler_kind = kwargs.get('scheduler_kind', None)
     scheduler_kwargs = kwargs.get('scheduler_kwargs', {})
     verbose = kwargs.get('verbose', True)
-    adversarial_mini_epochs = kwargs.get('adversarial_mini_epochs', 20)
+    adversarial_mini_epochs = kwargs.get('adversarial_mini_epochs', 5)
     prefix = kwargs.get('prefix', 'train')
     train_name = kwargs.get(f'train_name', 'train')
     optimizer_name = kwargs.get('optimizer_name', 'adam')

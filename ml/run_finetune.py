@@ -34,6 +34,7 @@ default_sweep_kwargs = {
     'train_kwargs__l1_reg_weight': 0.005,
     'train_kwargs__noise_factor': 0.1,
     'train_kwargs__weight_decay': 0,
+    'train_kwargs__adversarial_mini_epochs': 2,
 }
 
 
@@ -350,6 +351,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['train_kwargs']['l1_reg_weight'] = sweep_kwargs.get('train_kwargs__l1_reg_weight')
         kwargs['train_kwargs']['noise_factor'] = sweep_kwargs.get('train_kwargs__noise_factor')
         kwargs['train_kwargs']['weight_decay'] = sweep_kwargs.get('train_kwargs__weight_decay')
+        kwargs['train_kwargs']['adversarial_mini_epochs'] = sweep_kwargs.get('train_kwargs__adversarial_mini_epochs')
         kwargs['run_evaluation'] = True
         kwargs['eval_kwargs'] = {}
         kwargs['eval_kwargs']['sklearn_models'] = {}
