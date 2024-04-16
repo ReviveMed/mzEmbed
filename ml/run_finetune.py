@@ -64,7 +64,7 @@ def update_finetune_data(file_suffix,redo=False):
 
     return
 
-def get_head_kwargs_by_desc(desc_str):
+def get_head_kwargs_by_desc(desc_str,weight=1):
     if (desc_str is None) or (desc_str == ''):
         return None, [], []
     
@@ -140,7 +140,7 @@ def get_head_kwargs_by_desc(desc_str):
     head_kwargs = {
             'kind': head_kind,
             'name': head_name,
-            'weight': 1,
+            'weight': weight,
             'y_idx': y_idx,
             'hidden_size': 4,
             'num_hidden_layers': 0,
@@ -293,7 +293,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         adv_desc_str_list = [adv_desc_str]
 
     for a_desc in adv_desc_str_list:
-        adv_kwargs, adv_cols, plot_latent_space_adv_cols = get_head_kwargs_by_desc(a_desc)
+        adv_kwargs, adv_cols, plot_latent_space_adv_cols = get_head_kwargs_by_desc(a_desc,weight=2)
         if adv_kwargs is None:
             continue
         adv_kwargs_list.append(adv_kwargs)

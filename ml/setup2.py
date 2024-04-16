@@ -73,8 +73,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         load_encoder_loc = kwargs.get('load_encoder_loc', load_model_loc)
         load_head_loc = kwargs.get('load_head_loc', load_model_loc)
         load_adv_loc = kwargs.get('load_adv_loc', load_model_loc)
-        y_head_cols = kwargs.get('y_head_cols', ['is Pediatric'])
-        y_adv_cols = kwargs.get('y_adv_cols', ['Study ID ENC'])
+        y_head_cols = kwargs.get('y_head_cols', [])
+        y_adv_cols = kwargs.get('y_adv_cols', [])
         
         if isinstance(y_head_cols, dict):
             y_head_cols = y_head_cols.values()
@@ -206,6 +206,45 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             train_loader_dct = create_dataloaders_old(train_dataset, batch_size, holdout_frac, set_name=train_name)
             eval_loader_dct = create_dataloaders(eval_dataset, batch_size, set_name = eval_name)
             eval_loader_dct.update(train_loader_dct)
+
+            ########################################
+            ##### Custom Evaluation for OS predictions
+            #Eval on the EVER OS data when 
+            #the model is trained on the NEVER OS data
+            if len(y_head_cols) == len(y_adv_cols):
+
+                head_kwargs_dict = kwargs.get('head_kwargs_dict', {})
+                if head_kwargs_dict:
+                    head_kwargs_list = [head_kwargs_dict[k] for k in head_kwargs_dict.keys()]
+                else:
+                    head_kwargs_list = kwargs.get('head_kwargs_list', [])
+
+                adv_kwargs_dict = kwargs.get('adv_kwargs_dict', {})
+                if adv_kwargs_dict:
+                    adv_kwargs_list = [adv_kwargs_dict[k] for k in adv_kwargs_dict.keys()]
+                else:
+                    adv_kwargs_list = kwargs.get('adv_kwargs_list', [])
+
+                if len(head_kwargs_list) == len(adv_kwargs_list):
+                    
+                    head_kinds = [h['kind'] for h in head_kwargs_list]
+                    adv_kinds = [a['kind'] for a in adv_kwargs_list]
+                    adv_names = [a['name'] for a in adv_kwargs_list]
+                    
+                    for h_kind,a_kind,adv_name in zip(head_kinds,adv_kinds,adv_names):
+                        if h_kind == a_kind:
+                            print(f'Creating custom evaluation for {h_kind} on {adv_name}')
+                            # y_head_cols_temp = y_head_cols.copy()
+                            #TODO replace the y_head columns that correspond to h with the y_adv columns that correspond to a
+                            
+                            train_dataset2 = CompoundDataset(X_data_train,y_data_train[y_adv_cols], y_data_train[y_adv_cols])
+                            eval_dataset2 = CompoundDataset(X_data_eval,y_data_eval[y_adv_cols], y_data_eval[y_adv_cols])
+                            train_loader_dct2 = create_dataloaders_old(train_dataset2, batch_size, set_name=train_name+'_'+adv_name)
+                            eval_loader_dct2 = create_dataloaders(eval_dataset2, batch_size, set_name = eval_name+'_'+adv_name)
+                            eval_loader_dct.update(train_loader_dct2)
+                            eval_loader_dct.update(eval_loader_dct2)
+
+            ########################################
 
     except Exception as e:
         run['sys/tags'].add('data-load failed')

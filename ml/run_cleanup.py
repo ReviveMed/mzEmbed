@@ -4,11 +4,12 @@ from utils_neptune import get_run_id_list, get_run_id_list_from_query
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
 
-run_id_list = get_run_id_list(encoder_kind='VAE')
+run_id_list = get_run_id_list(encoder_kind='VAE',tag='april15_leila')
+run_id_list = get_run_id_list(encoder_kind='VAE',tag='april15_pareto')
 
-
-rem_fields = ['both-OS_randinit','both-OS_finetune','both-PFS_randinit','both-PFS_finetune']
-
+rem_fields = []
+# rem_fields = ['both-OS_randinit','both-OS_finetune','both-PFS_randinit','both-PFS_finetune']
+# rem_fields = ['nivo-OS ADV ever-OS_finetune','nivo-OS ADV ever-OS_randinit']
 
 for run_id in run_id_list:
     print(run_id)
