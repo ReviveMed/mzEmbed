@@ -40,7 +40,7 @@ def update_finetune_data(file_suffix,redo=False):
 
     return
 
-redo = True
+redo = False
 update_finetune_data('finetune_val',redo=redo)
 update_finetune_data('finetune_train',redo=redo)
 update_finetune_data('finetune_test',redo=redo)
