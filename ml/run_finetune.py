@@ -36,9 +36,103 @@ default_sweep_kwargs = {
     'train_kwargs__weight_decay': 0,
 }
 
+
+def get_head_kwargs_by_desc(desc_str):
+    if (desc_str is None) or (desc_str == ''):
+        return {}, [], []
+    
+
+    if 'mskcc' in desc_str.lower():
+        y_head_cols = ['MSKCC BINARY']
+        head_name = 'MSKCC'
+        head_kind = 'Binary'
+        num_classes = 2
+        y_idx = 0
+        plot_latent_space_cols = ['MSKCC']
+
+    elif 'imdc' in desc_str.lower():
+        y_head_cols = ['IMDC BINARY']
+        head_name = 'IMDC'
+        head_kind = 'Binary'
+        num_classes = 2
+        y_idx = 0
+        plot_latent_space_cols = ['IMDC']
+
+    elif 'both-os' in desc_str.lower():
+        y_head_cols = ['OS','OS_Event']
+        head_name = 'OS'
+        head_kind = 'Cox'
+        num_classes = 1
+        y_idx = [0,1]
+        plot_latent_space_cols = ['OS']   
+
+    elif 'both-pfs' in desc_str.lower():
+        y_head_cols = ['PFS','PFS_Event']
+        head_name = 'PFS'
+        head_kind = 'Cox'
+        num_classes = 1
+        y_idx = [0,1]
+        plot_latent_space_cols = ['PFS']        
+
+    elif 'nivo-os' in desc_str.lower():
+        y_head_cols = ['NIVO OS','OS_Event']
+        head_name = 'OS'
+        head_kind = 'Cox'
+        num_classes = 1
+        y_idx = [0,1]
+        plot_latent_space_cols = ['NIVO OS']   
+
+    elif 'nivo-pfs' in desc_str.lower():
+        y_head_cols = ['NIVO PFS','PFS_Event']
+        head_name = 'PFS'
+        head_kind = 'Cox'
+        num_classes = 1
+        y_idx = [0,1]
+        plot_latent_space_cols = ['NIVO PFS']         
+
+    elif 'ever-os' in desc_str.lower():
+        y_head_cols = ['EVER OS','OS_Event']
+        head_name = 'OS'
+        head_kind = 'Cox'
+        num_classes = 1
+        y_idx = [0,1]
+        plot_latent_space_cols = ['EVER OS']   
+
+    elif 'ever-pfs' in desc_str.lower():
+        y_head_cols = ['EVER PFS','PFS_Event']
+        head_name = 'PFS'
+        head_kind = 'Cox'
+        num_classes = 1
+        y_idx = [0,1]
+        plot_latent_space_cols = ['EVER OS']            
+    else:
+        raise ValueError('Unknown desc_str:',desc_str)
+
+
+
+    head_kwargs = {
+            'kind': head_kind,
+            'name': head_name,
+            'weight': 1,
+            'y_idx': y_idx,
+            'hidden_size': 4,
+            'num_hidden_layers': 0,
+            'dropout_rate': 0,
+            'activation': 'leakyrelu',
+            'use_batch_norm': False,
+            'num_classes': num_classes,
+            }
+
+    return head_kwargs, y_head_cols, plot_latent_space_cols
+
+
+############################################################
+# Compute Finetune
+############################################################
+
 def compute_finetune(run_id,plot_latent_space=False,
                            n_trials=5,desc_str=None,
-                           sweep_kwargs=None,eval_name='val',
+                           sweep_kwargs=None,eval_name='val2',
                            recompute_plot=False):
 
     run = neptune.init_run(project='revivemed/RCC',
@@ -135,59 +229,65 @@ def compute_finetune(run_id,plot_latent_space=False,
         print('No desc_str')
         return
 
+    if 'ADV' in desc_str:
+        adv_desc_str = desc_str.split('ADV')[1]
+        head_desc_str = desc_str.split('ADV')[0]
+        adversary_weight = 1
+    else:
+        adv_desc_str = ''
+        head_desc_str = desc_str
+        adversary_weight = 0
+
+    y_head_cols = []
+    head_kwargs_list = []
+    plot_latent_space_cols = []
+    
+    if 'AND' in head_desc_str:
+        head_desc_str_list = head_desc_str.split('AND')
+    else:
+        head_desc_str_list = [head_desc_str]
+
+
+    for h_desc in head_desc_str_list:
+        head_kwargs, head_cols, plot_latent_space_head_cols = get_head_kwargs_by_desc(h_desc)
+        head_kwargs_list.append(head_kwargs)
+        y_head_cols += head_cols
+        plot_latent_space_cols += plot_latent_space_head_cols
+
+
+    y_adv_cols = []
+    adv_kwargs_list = []
+
+    if 'AND' in adv_desc_str:
+        adv_desc_str_list = adv_desc_str.split('AND')
+    else:
+        adv_desc_str_list = [adv_desc_str]
+
+    for a_desc in adv_desc_str_list:
+        adv_kwargs, adv_cols, plot_latent_space_adv_cols = get_head_kwargs_by_desc(a_desc)
+        adv_kwargs_list.append(adv_kwargs)
+        y_adv_cols += adv_cols
+        plot_latent_space_cols += plot_latent_space_adv_cols
+
+
+    # head_kwargs, head_cols, plot_latent_space_head_cols = get_head_kwargs_by_desc(head_desc_str)
+    # y_head_cols = head_cols
+    # head_kwargs_list = [head_kwargs]
+
+    # adv_kwargs, adv_cols, plot_latent_space_adv_cols = get_head_kwargs_by_desc(adv_desc_str)
+    # adv_kwargs_list = [adv_kwargs]
+    # y_adv_cols = adv_cols
+
+    # plot_latent_space_cols = plot_latent_space_head_cols + plot_latent_space_adv_cols
+
 
     if eval_name.lower() == 'val':
         train_name = 'train'
+    elif eval_name.lower() == 'val2':
+        train_name = 'train2'
     elif eval_name.lower() == 'test':
         train_name = 'trainval'
 
-    if 'mskcc' in desc_str.lower():
-        metric_string_dct = {}
-        count_check_name = f'MSKCC {train_name} AUROC count'
-        y_head_cols = ['MSKCC BINARY']
-        head_name = 'MSKCC'
-        head_kind = 'Binary'
-        num_classes = 2
-        y_idx = 0
-        plot_latent_space_cols = ['MSKCC']
-        metric_string_dct[f'MSKCC {train_name} AUROC'] = f'eval/{train_name}/Binary_MSKCC/AUROC (micro)'
-        metric_string_dct[f'MSKCC {eval_name} AUROC'] = f'eval/{eval_name}/Binary_MSKCC/AUROC (micro)'
-
-    elif 'imdc' in desc_str.lower():
-        metric_string_dct = {}
-        count_check_name = f'IMDC {train_name} AUROC count'
-        y_head_cols = ['IMDC BINARY']
-        head_name = 'IMDC'
-        head_kind = 'Binary'
-        num_classes = 2
-        y_idx = 0
-        plot_latent_space_cols = ['IMDC']
-        metric_string_dct[f'IMDC {train_name} AUROC'] = f'eval/{train_name}/Binary_IMDC/AUROC (micro)'
-        metric_string_dct[f'IMDC {eval_name} AUROC'] = f'eval/{eval_name}/Binary_IMDC/AUROC (micro)'
-
-    elif 'both-os' in desc_str.lower():
-        metric_string_dct = {}
-        y_head_cols = ['OS','OS_Event']
-        head_name = 'OS'
-        head_kind = 'Cox'
-        num_classes = 1
-        y_idx = [0,1]
-        plot_latent_space_cols = ['OS']   
-        train_name = train_name+'2'
-        eval_name = eval_name+'2'
-
-    elif 'both-pfs' in desc_str.lower():
-        metric_string_dct = {}
-        y_head_cols = ['PFS','PFS_Event']
-        head_name = 'PFS'
-        head_kind = 'Cox'
-        num_classes = 1
-        y_idx = [0,1]
-        plot_latent_space_cols = ['OS']        
-        train_name = train_name+'2'
-        eval_name = eval_name+'2'
-    else:
-        raise ValueError('Unknown desc_str:',desc_str)
 
     if sweep_kwargs is None:
         sweep_kwargs = default_sweep_kwargs
@@ -202,6 +302,10 @@ def compute_finetune(run_id,plot_latent_space=False,
         if match:
             num_epochs = int(match.group(1))
         
+
+    
+
+
     if n_trials>0:    
         kwargs = {}
         kwargs['train_kwargs'] = {}
@@ -220,28 +324,18 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['plot_latent_space'] = ''
         kwargs['plot_latent_space_cols'] = plot_latent_space_cols
         kwargs['y_head_cols'] = y_head_cols
-        kwargs['y_adv_cols'] = []
+        kwargs['y_adv_cols'] = y_adv_cols
         kwargs['upload_models_to_neptune'] = False
         kwargs['num_repeats'] = n_trials
 
 
         kwargs['head_kwargs_dict'] = {}
         kwargs['adv_kwargs_dict'] = {}
-        kwargs['head_kwargs_list'] = [{
-            'kind': head_kind,
-            'name': head_name,
-            'weight': 1,
-            'y_idx': y_idx,
-            'hidden_size': 4,
-            'num_hidden_layers': 0,
-            'dropout_rate': 0,
-            'activation': 'leakyrelu',
-            'use_batch_norm': False,
-            'num_classes': num_classes,
-            }]
-        
+        kwargs['head_kwargs_list'] = head_kwargs_list
+        kwargs['adv_kwargs_list'] = adv_kwargs_list
+
         kwargs['encoder_kwargs']['dropout_rate'] = sweep_kwargs.get('encoder_kwargs__dropout_rate')
-        kwargs['adv_kwargs_list'] = []
+
 
         # kwargs['train_kwargs']['num_epochs'] = 20
         kwargs['train_kwargs']['early_stopping_patience'] = sweep_kwargs.get('train_kwargs__early_stopping_patience')
@@ -249,7 +343,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['train_kwargs']['head_weight'] = 1
         kwargs['train_kwargs']['clip_grads_with_norm'] = False
         kwargs['train_kwargs']['encoder_weight'] = 0
-        kwargs['train_kwargs']['adversary_weight'] = 0
+        kwargs['train_kwargs']['adversary_weight'] = adversary_weight
         kwargs['train_kwargs']['learning_rate'] = sweep_kwargs.get('train_kwargs__learning_rate')
         # kwargs['train_kwargs']['learning_rate'] = 0.0001
         kwargs['train_kwargs']['l2_reg_weight'] = sweep_kwargs.get('train_kwargs__l2_reg_weight')
@@ -317,6 +411,9 @@ def compute_finetune(run_id,plot_latent_space=False,
     return run_id
 
 # def main():
+###########################################################################
+# MAIN
+###########################################################################
 
 if __name__ == '__main__':
 
@@ -350,7 +447,7 @@ if __name__ == '__main__':
     if len(sys.argv)>5:
         eval_name = sys.argv[5]
     else:
-        eval_name = 'val'
+        eval_name = 'val2'
 
 
     if chosen_id is None:

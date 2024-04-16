@@ -389,113 +389,6 @@ def objective_func3(run_id,data_dir,recompute_eval=False,objective_keys=None,obj
 
 
 
-
-def objective_func2(run_id,data_dir,recompute_eval=False,objective_info_dict_list=None):
-
-    obj_vals = []
-    for objective_info_dict in objective_info_dict_list:
-        obj_val = objective_func1(run_id,data_dir,recompute_eval=recompute_eval,objective_info_dict=objective_info_dict)
-        obj_vals.append(obj_val)
-    
-    return tuple(obj_vals)
-
-
-def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=None):
-
-    obj_val = None
-    if objective_info_dict is None:
-        recon_weight = 1
-        isPediatric_weight = 1
-        cohortLabel_weight = 1
-        advStudyID_weight = 1
-        isFemale_weight = 0
-        Age_weight = 0
-        objective_name = 'OBJ4 equal weights (v0)'
-
-    recon_weight = objective_info_dict.get('recon_weight',1)
-    isPediatric_weight = objective_info_dict.get('isPediatric_weight',1)
-    cohortLabel_weight = objective_info_dict.get('cohortLabel_weight',1)
-    advStudyID_weight = objective_info_dict.get('advStudyID_weight',1)
-    isFemale_weight = objective_info_dict.get('isFemale_weight',0)
-    Age_weight = objective_info_dict.get('Age_weight',0)
-    objective_name = objective_info_dict.get('objective_name','OBJ4 equal weights (v0)')
-
-
-    run = neptune.init_run(project='revivemed/RCC',
-                    api_token=NEPTUNE_API_TOKEN,
-                    with_id=run_id,
-                    capture_stdout=False,
-                    capture_stderr=False,
-                    capture_hardware_metrics=False)
-    try:
-        pretrain_output = run['pretrain'].fetch()
-
-        if (recompute_eval) or ('eval' not in pretrain_output):
-            
-            kwargs = convert_neptune_kwargs(pretrain_output['kwargs'])
-            kwargs['overwrite_existing_kwargs'] = True
-            kwargs['load_model_loc'] = 'pretrain'
-            kwargs['run_training'] = False
-            kwargs['run_evaluation'] = True
-            kwargs['save_latent_space'] = True
-            kwargs['plot_latent_space'] = 'seaborn'
-            kwargs['eval_kwargs'] = {
-                'sklearn_models': {
-                    'Adversary Logistic Regression': LogisticRegression(max_iter=10000, C=1.0, solver='lbfgs')
-                }
-            }
-
-            setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
-            #raise NotImplementedError("Need to recompute")
-    except NeptuneException as e:
-        print(f"Error with run {run_id}: {e}")
-        run.stop()
-        raise ValueError(f"Error with run {run_id}: {e}")
-
-    
-    if 'eval' in pretrain_output:
-        eval_res = pretrain_output['eval']['val']
-
-        recon_loss = eval_res['reconstruction_loss']
-        if 'Binary_isPediatric' in eval_res:
-            isPediatric_auc = eval_res['Binary_isPediatric']['AUROC (micro)']
-        else:
-            isPediatric_auc = 0.5
-
-        if 'MultiClass_Cohort Label' in eval_res:
-            cohortLabel_auc = eval_res['MultiClass_Cohort Label']['AUROC (ovo, macro)']
-        else:
-            cohortLabel_auc = 0.5
-
-        if 'MultiClass_Adv StudyID' in eval_res:
-            advStudyID_auc = eval_res['MultiClass_Adv StudyID']['AUROC (ovo, macro)']
-        else:
-            advStudyID_auc = 0.5
-
-        if 'Binary_isFemale' in eval_res:
-            isFemale_auc = eval_res['Binary_isFemale']['AUROC (micro)']
-        else:
-            isFemale_auc = 0.5
-
-        obj_val = -1*(recon_weight)*recon_loss \
-            + (isPediatric_weight)*isPediatric_auc \
-            + (cohortLabel_weight)*cohortLabel_auc \
-            + -1*(advStudyID_weight)*advStudyID_auc \
-            + (isFemale_weight)*isFemale_auc
-
-        run[f'objectives/{objective_name}'] = obj_val 
-
-        run.stop()
-    else:
-        # run the evaluation!?
-        # add tags to the run
-        run["sys/tags"].add("no eval") 
-        run.stop()
-        raise ValueError("No eval results")
-        
-    return obj_val
-
-
 ########################################################################################
 
 def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
@@ -525,7 +418,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
 
     if choose_from_distribution:
         if encoder_kind in ['AE','VAE']:
-            latent_size = IntDistribution(4, 64, step=1)
+            latent_size = IntDistribution(4, 128, step=1)
 
         cohort_label_weight = FloatDistribution(0,10,step=0.1) #10
         isfemale_weight = FloatDistribution(0,20,step=0.1) #20
