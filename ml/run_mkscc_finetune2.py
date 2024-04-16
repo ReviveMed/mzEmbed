@@ -9,7 +9,7 @@ import numpy as np
 import optuna
 import json
 from prep_study import add_runs_to_study, reuse_run, convert_neptune_kwargs, \
-    objective_func1, make_kwargs, convert_distributions_to_suggestion, convert_model_kwargs_list_to_dict,\
+    make_kwargs, convert_distributions_to_suggestion, convert_model_kwargs_list_to_dict,\
     round_kwargs_to_sig
 from setup2 import setup_neptune_run
 from misc import download_data_dir
