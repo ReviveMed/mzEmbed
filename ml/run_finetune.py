@@ -5,6 +5,7 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 
 import neptune
 import os
+import pandas as pd
 import numpy as np
 import optuna
 import json
