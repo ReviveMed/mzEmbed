@@ -133,7 +133,7 @@ def reuse_run(run_id,study_kwargs=None,objective_func=None,ignore_keys_list=None
                         mode='read-only')
     setup_id = 'pretrain'
     print(run_id)
-    pretrain_kwargs = run[f'{setup_id}/kwargs'].fetch()
+    pretrain_kwargs = run[f'{setup_id}/original_kwargs'].fetch()
     run.stop()
 
     pretrain_kwargs = convert_neptune_kwargs(pretrain_kwargs)
@@ -804,7 +804,7 @@ def dict_diff_cleanup(diff,ignore_keys_list=None):
     if ignore_keys_list is None:
         ignore_keys_list = ['run_evaluation','save_latent_space','plot_latent_space_cols','plot_latent_space',\
                     'eval_kwargs','train_kwargs__eval_funcs','run_training','encoder_kwargs__hidden_size','overwrite_existing_kwargs',\
-                    'load_model_loc']
+                    'load_model_loc','study_info_dict']
         new_ignore_keys_list = ['y_head_cols','head_kwargs_dict__Binary_isFemale','eval_name','train_name',
                                 'head_kwargs_dict__Regression_Age']
                                 # 'head_kwargs_dict__MultiClass_Cohort','head_kwargs_dict__Binary_isPediatric',\
