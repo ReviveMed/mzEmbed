@@ -673,6 +673,8 @@ class Binary_Head(Head):
         #TODO: make sure the fix for this issue is more correct
         # if y_data.shape[1] < self.y_idx:
             # return {k: 0 for k, v in self.score_func_dict.items()}
+        if self.weight == 0:
+            return {k: 0 for k, v in self.score_func_dict.items()}            
         try:
             y_true = y_data[:,self.y_idx]        
             logits, targets = _nan_cleaner(y_logits.detach(), y_true.detach(), ignore_nan)
@@ -768,6 +770,9 @@ class MultiClass_Head(Head):
         return torch.argmax(self.predict_proba(x), dim=1)
     
     def score(self, y_logits, y_data,ignore_nan=True):
+        if self.weight == 0:
+            return {k: 0 for k, v in self.score_func_dict.items()}
+        
         #TODO: make sure the fix for this issue is more correct
         # if y_data.shape[1] < self.y_idx:
             # return {k: 0 for k, v in self.score_func_dict.items()}
@@ -824,6 +829,8 @@ class Regression_Head(Head):
         return self.loss_func(y0.squeeze(), y1.squeeze())
 
     def score(self, y_output, y_data, ignore_nan=True):
+        if self.weight == 0:
+            return {k: 0 for k, v in self.score_func_dict.items()}
         try:
             y_true = y_data[:,self.y_idx]
             y0, y1 = _nan_cleaner(y_output.detach(), y_true.detach(), ignore_nan)
@@ -883,6 +890,8 @@ class Cox_Head(Head):
         return torch.exp(self.network(x))
 
     def score(self, y_output, y_data, ignore_nan=True):
+        if self.weight == 0:
+            return {k: 0 for k, v in self.score_func_dict.items()}
         try:
             y_true = y_data[:,self.y_idx[0]]
             y_event = y_data[:,self.y_idx[1]]

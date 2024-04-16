@@ -92,7 +92,7 @@ def get_run_id_list(encoder_kind='AE',tag=None):
         api_token=NEPTUNE_API_TOKEN
     )
 
-    query = f'(`pretrain/kwargs/encoder_kind`:string = "{encoder_kind}") AND `sys/state`:experimentState = "inactive"'
+    query = f'(`pretrain/original_kwargs/encoder_kind`:string = "{encoder_kind}") AND `sys/state`:experimentState = "inactive"'
     if tag is not None:
         query += f' AND`sys/tags`:stringSet CONTAINS "{tag}"'
     runs_table_df = project.fetch_runs_table(query=query,limit=2000).to_pandas()
@@ -102,7 +102,7 @@ def get_run_id_list(encoder_kind='AE',tag=None):
     runs_table_df = runs_table_df[~runs_table_df['sys/failed']].copy()
 
     #filter by encoder_kind
-    # runs_table_df = runs_table_df[runs_table_df['pretrain/kwargs/encoder_kind'] == encoder_kind].copy()
+    # runs_table_df = runs_table_df[runs_table_df['pretrain/original_kwargs/encoder_kind'] == encoder_kind].copy()
 
     run_id_list = runs_table_df['sys/id'].tolist()
     project.stop()
@@ -140,7 +140,7 @@ def start_neptune_run(with_run_id=None,tags=['v3.3'],yes_logging=False,neptune_m
             run["sys/tags"].add(tags[0])
 
             #check if 'setup_id' exists in the run, current code doesnt work
-            # if f'{setup_id}/kwargs' in run:
+            # if f'{setup_id}/original_kwargs' in run:
                 # print(f'{setup_id} already exists in run:', with_run_id)
                 # return with_run_id
 

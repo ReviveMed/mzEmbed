@@ -520,8 +520,10 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                 #TODO more efficient to aggregate the scores in the batch loop, see documentation for torchmetrics
                 # but unclear how this will work with other metrics
                 
-                eval_scores = head.score(epoch_head_outputs, epoch_head_targets)
-                eval_scores.update(adversary.score(epoch_adversary_outputs, epoch_adversary_targets))
+                if head_weight > 0:
+                    eval_scores = head.score(epoch_head_outputs, epoch_head_targets)
+                if adversary_weight > 0:
+                    eval_scores.update(adversary.score(epoch_adversary_outputs, epoch_adversary_targets))
                 
                 for eval_name, eval_val in eval_scores.items():
                     if isinstance(eval_val, dict):
@@ -668,7 +670,6 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
                 }
             
             end_state_eval[phase] = {}
-
             end_state_eval[phase] = head.score(head_ouputs, head_targets)
             end_state_eval[phase].update(adversary.score(adversary_outputs, adversary_targets))
             

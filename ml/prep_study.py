@@ -18,6 +18,8 @@ from neptune.exceptions import NeptuneException #, NeptuneServerError
 
 
 def cleanup_runs(run_id_list=None):
+    raise NotImplementedError("This function needs to be updated, replacing kwargs with original_kwargs")
+
     if run_id_list is None:
         run_id_list = get_run_id_list()
 
@@ -68,30 +70,60 @@ def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=No
         # objective_func = lambda x: objective_func1(x,data_dir='/DATA2')
         raise ValueError("Objective function is None")
 
-    
+    num_runs_to_check = len(run_id_list)
+    print('number of runs attempt to add to study: ', num_runs_to_check)
     # shuffle the run_id_list
     np.random.shuffle(run_id_list)
+
+    already_in_study = 0
+    newely_added_to_study = 0
+    skipped_due_to_missing_eval = 0
+    skipped_due_to_distribution_mismatch = 0
+    skipped_due_to_neptune_error = 0
 
     for run_id in run_id_list:
         #TODO test this code
         #check if the trial is already in the study by looking at the user attributes
         if run_id in [t.user_attrs['run_id'] for t in study.trials if 'run_id' in t.user_attrs]:
             print(f"Run {run_id} is already in the study")
+            already_in_study += 1
             continue
 
         print('adding {} to study'.format(run_id))
         try:
             trial = reuse_run(run_id, study_kwargs=study_kwargs, objective_func=objective_func)
             study.add_trial(trial)
+            newely_added_to_study += 1
         except ValueError as e:
             print(f"Error with run {run_id}: {e}")
+            error_text = e.args[0]
+            if 'no eval output' in error_text:
+                skipped_due_to_missing_eval += 1
+            elif 'Some values are not distributions' in error_text:
+                skipped_due_to_distribution_mismatch += 1
             continue
         except NeptuneException as e:
             print(f"Error with run {run_id}: {e}")
+            skipped_due_to_neptune_error += 1
             continue
         # except NeptuneServerError as e:
         #     print(f"Error with run {run_id}: {e}")
         #     continue
+
+
+    print('###################')
+    print('###################')
+    print('Number of runs attempted to add to study: ', num_runs_to_check)
+    print(f"Number of runs already in study: {already_in_study}")
+    print(f"Number of runs newly added to study: {newely_added_to_study}")
+    print(f"Number of runs skipped due to missing eval: {skipped_due_to_missing_eval}")
+    print(f"Number of runs skipped due to distribution mismatch: {skipped_due_to_distribution_mismatch}")
+    print(f"Number of runs skipped due to neptune error: {skipped_due_to_neptune_error}")
+
+    tot_num_trials_in_study = len(study.trials)
+    print(f"Total number of trials in study: {tot_num_trials_in_study}")
+    print('###################')
+
 
     return
 
@@ -113,7 +145,8 @@ def get_default_kwarg_val_dict():
 
 
 
-def reuse_run(run_id,study_kwargs=None,objective_func=None,ignore_keys_list=None,default_kwarg_val_dict=None):
+def reuse_run(run_id,study_kwargs=None,objective_func=None,ignore_keys_list=None,
+              default_kwarg_val_dict=None,verbose=1):
     if study_kwargs is None:
         study_kwargs = make_kwargs()
 
@@ -155,20 +188,23 @@ def reuse_run(run_id,study_kwargs=None,objective_func=None,ignore_keys_list=None
 
             for ignore_key in ignore_keys_list:
                 if k.startswith(ignore_key):
-                    print(f"Ignoring key {k}")
+                    if verbose>1:
+                        print(f"Ignoring key {k}")
                     yes_ignore = True
                     break
             
             if (not yes_ignore):
                 yes_raise = True
-                print(f"Value {v} for key {k} is not a distribution")
+                if verbose > 0:
+                    print(f"Value {v} for key {k} is not a distribution")
 
         else:
             if v[1] is None:
                 if k in default_kwarg_val_dict:
                     diff_clean[k] = (v[0], default_kwarg_val_dict[k])
                 else:
-                    print(f"Value {v} for key {k} is None")
+                    if verbose>0:
+                        print(f"Value {v} for key {k} is None")
                     yes_raise = True
                     diff_clean[k] = v
             else:
@@ -462,68 +498,105 @@ def objective_func1(run_id,data_dir,recompute_eval=False,objective_info_dict=Non
 
 ########################################################################################
 
-def make_kwargs(sig_figs=2,encoder_kind='AE'):
+def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
     activation = 'leakyrelu'
 
-    if encoder_kind in ['AE','VAE']:
-        latent_size = IntDistribution(4, 64, step=1)
+    # these are the defaults if you don't want to choose from a distribution
+    if not choose_from_distribution:
+        latent_size = 16
+        num_hidden_layers = 2
+        dropout_rate = 0.2
+        encoder_weight = 1
+        head_weight = 0
+        adv_weight = 0
+        cohort_label_weight = 0
+        isfemale_weight = 0
+        ispediatric_weight = 0
+        age_weight = 0
+        l2_reg_weight = 0
+        l1_reg_weight = 0
+        num_epochs = 100
+        lr = 0.001
+        optimizer_name = 'adamw'
+        early_stopping_patience = 0
+        weight_decay = 0.00001
+        adversarial_mini_epochs = 2
 
-    cohort_label_weight = FloatDistribution(0,10,step=0.1) #10
-    isfemale_weight = FloatDistribution(0,20,step=0.1) #20
-    ispediatric_weight = FloatDistribution(0,10,step=0.1) #10
-    head_weight = FloatDistribution(0,10,step=0.1) # 10
-    adv_weight = FloatDistribution(0,50,step=0.1) #50
-    age_weight = FloatDistribution(0,10,step=0.1) #10
+
+    if choose_from_distribution:
+        if encoder_kind in ['AE','VAE']:
+            latent_size = IntDistribution(4, 64, step=1)
+
+        cohort_label_weight = FloatDistribution(0,10,step=0.1) #10
+        isfemale_weight = FloatDistribution(0,20,step=0.1) #20
+        ispediatric_weight = FloatDistribution(0,10,step=0.1) #10
+        head_weight = FloatDistribution(0,10,step=0.1) # 10
+        adv_weight = FloatDistribution(0,50,step=0.1) #50
+        age_weight = FloatDistribution(0,10,step=0.1) #10
     
+
     if encoder_kind in ['AE']:
-        num_hidden_layers = IntDistribution(1, 10)
+        if choose_from_distribution:
+            num_hidden_layers = IntDistribution(1, 10)
+            dropout_rate = FloatDistribution(0, 0.5, step=0.1)
+            encoder_weight = FloatDistribution(0,5,step=0.1)
+            l2_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
+            l1_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
+
         encoder_kwargs = {
                     'activation': activation,
                     'latent_size': latent_size,
                     'num_hidden_layers': num_hidden_layers,
-                    'dropout_rate': FloatDistribution(0, 0.5, step=0.1),
+                    'dropout_rate': dropout_rate,
                     'use_batch_norm': False,
                     # 'hidden_size': int(1.5*latent_size),
                     'hidden_size_mult' : 1.5
                     }
-        encoder_weight = FloatDistribution(0,5,step=0.1)
         num_epochs_min = 50
         num_epochs_max = 300
         num_epochs_step = 10
         adversarial_mini_epochs = 2
         early_stopping_patience_step = 10
         early_stopping_patience_max = 50
-        l2_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
-        l1_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
 
     elif encoder_kind == 'VAE':       
-        num_hidden_layers = IntDistribution(1, 5) 
+        if choose_from_distribution:
+            num_hidden_layers = IntDistribution(1, 5) 
+            dropout_rate = FloatDistribution(0, 0.3, step=0.15)
+            adversarial_mini_epochs = IntDistribution(2, 6, step=1)
+            encoder_weight = FloatDistribution(0,5,step=0.1)
+
+
         encoder_kwargs = {
                     'activation': activation,
                     'latent_size': latent_size,
                     'num_hidden_layers': num_hidden_layers,
-                    'dropout_rate': FloatDistribution(0, 0.3, step=0.15),
+                    'dropout_rate': dropout_rate,
                     'use_batch_norm': False,
                     # 'hidden_size': int(1.5*latent_size),
                     'hidden_size_mult' : 1.5
                     }
-        encoder_weight = FloatDistribution(0,5,step=0.1)
         num_epochs_min = 50
         num_epochs_max = 300
         num_epochs_step = 10
-        adversarial_mini_epochs = IntDistribution(2, 6, step=2)
         early_stopping_patience_step = 10
         early_stopping_patience_max = 50
         l2_reg_weight = 0 # loss explodes if not 0
         l1_reg_weight = 0
 
     elif encoder_kind == 'TGEM_Encoder':
+        if choose_from_distribution:
+            n_head = IntDistribution(2, 5, step=1)
+            n_layers = IntDistribution(2, 3, step=1)
+            dropout_rate = FloatDistribution(0, 0.5, step=0.1)
+        
         encoder_kwargs = {
                     'activation': 'linear',
-                    'n_head': IntDistribution(2, 5, step=1),
-                    'n_layers': IntDistribution(2, 3, step=1),
-                    'dropout_rate': FloatDistribution(0, 0.5, step=0.1),
+                    'n_head': n_head,
+                    'n_layers': n_layers,
+                    'dropout_rate': dropout_rate,
                     }
+        
         encoder_weight = 0
         num_epochs_min = 10
         num_epochs_max = 50
@@ -533,6 +606,17 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
         early_stopping_patience_max = 20
         l2_reg_weight = 0
         l1_reg_weight = 0
+
+
+    if choose_from_distribution:
+        num_epochs = IntDistribution(num_epochs_min, num_epochs_max, step=num_epochs_step)
+        lr = FloatDistribution(0.0001, 0.05, log=True)
+        optimizer_name = CategoricalDistribution(['adam','adamw'])
+        weight_decay = FloatDistribution(0, 0.0005, step=0.00001)
+        early_stopping_patience = IntDistribution(0, early_stopping_patience_max, step=early_stopping_patience_step)
+
+
+
 
     kwargs = {
                 ################
@@ -616,20 +700,19 @@ def make_kwargs(sig_figs=2,encoder_kind='AE'):
                     },
                 ],
 
+
                 'train_kwargs': {
-                    'optimizer_name': CategoricalDistribution(['adam','adamw']),
-                    'num_epochs': IntDistribution(num_epochs_min, num_epochs_max, step=num_epochs_step),
-                    'lr': FloatDistribution(0.0001, 0.05, log=True),
-                    # 'lr': 0.01,
-                    'weight_decay': FloatDistribution(0, 0.0005, step=0.00001),
+                    'optimizer_name': optimizer_name,
+                    'num_epochs': num_epochs,
+                    'lr': lr,
+                    'weight_decay': weight_decay,
                     'l1_reg_weight': l1_reg_weight,
-                    # 'l2_reg_weight': 0.001,
                     'l2_reg_weight': l2_reg_weight,
                     'encoder_weight': encoder_weight,
                     'head_weight': head_weight,
                     'adversary_weight': adv_weight,
                     'noise_factor': 0.1,
-                    'early_stopping_patience': IntDistribution(0, early_stopping_patience_max, step=early_stopping_patience_step),
+                    'early_stopping_patience': early_stopping_patience,
                     'adversarial_mini_epochs': adversarial_mini_epochs,
                 },
 

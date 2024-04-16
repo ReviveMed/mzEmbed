@@ -28,10 +28,16 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 
 
 def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
-                      neptune_mode='async',save_kwargs_to_neptune=False,**kwargs):
+                      neptune_mode='async',
+                      yes_logging = False,
+                      save_kwargs_to_neptune=False,
+                      tags=['v3.3'],**kwargs):
     print(setup_id)
     if run is None:
-        run, is_run_new = start_neptune_run(with_run_id=with_run_id,neptune_mode=neptune_mode)
+        run, is_run_new = start_neptune_run(with_run_id=with_run_id,
+                                            neptune_mode=neptune_mode,
+                                            tags=tags,
+                                            yes_logging=yes_logging)
         ret_run_id = True
     else:
         is_run_new = False
