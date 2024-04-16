@@ -66,7 +66,7 @@ def convert_neptune_kwargs(kwargs):
         return kwargs    
 
 
-def get_run_id_list_from_query(query,limit=100):
+def get_run_id_list_from_query(query,limit=2000):
     project = neptune.init_project(
         project='revivemed/RCC',
         mode="read-only",
