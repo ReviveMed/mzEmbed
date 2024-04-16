@@ -34,7 +34,7 @@ default_sweep_kwargs = {
     'train_kwargs__l1_reg_weight': 0.005,
     'train_kwargs__noise_factor': 0.1,
     'train_kwargs__weight_decay': 0,
-    'train_kwargs__adversarial_mini_epochs': 2,
+    'train_kwargs__adversarial_mini_epochs': 5,
 }
 
 
