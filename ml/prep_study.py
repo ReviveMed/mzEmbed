@@ -424,7 +424,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         isfemale_weight = FloatDistribution(0,20,step=0.1) #20
         ispediatric_weight = FloatDistribution(0,10,step=0.1) #10
         head_weight = FloatDistribution(0,10,step=0.1) # 10
-        adv_weight = FloatDistribution(0,50,step=0.1) #50
+        adv_weight = FloatDistribution(0,10,step=0.1) #50
         age_weight = FloatDistribution(0,10,step=0.1) #10
     
 
@@ -457,7 +457,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
             num_hidden_layers = IntDistribution(1, 5) 
             dropout_rate = FloatDistribution(0, 0.3, step=0.15)
             adversarial_mini_epochs = IntDistribution(2, 6, step=1)
-            encoder_weight = FloatDistribution(0,5,step=0.1)
+            encoder_weight = FloatDistribution(0,10,step=0.1)
 
 
         encoder_kwargs = {
