@@ -66,7 +66,7 @@ def update_finetune_data(file_suffix,redo=False):
 
 def get_head_kwargs_by_desc(desc_str):
     if (desc_str is None) or (desc_str == ''):
-        return {}, [], []
+        return None, [], []
     
 
     if 'mskcc' in desc_str.lower():
@@ -103,7 +103,7 @@ def get_head_kwargs_by_desc(desc_str):
 
     elif 'nivo-os' in desc_str.lower():
         y_head_cols = ['NIVO OS','OS_Event']
-        head_name = 'OS'
+        head_name = 'NIVO OS'
         head_kind = 'Cox'
         num_classes = 1
         y_idx = [0,1]
@@ -111,7 +111,7 @@ def get_head_kwargs_by_desc(desc_str):
 
     elif 'nivo-pfs' in desc_str.lower():
         y_head_cols = ['NIVO PFS','PFS_Event']
-        head_name = 'PFS'
+        head_name = 'NIVO PFS'
         head_kind = 'Cox'
         num_classes = 1
         y_idx = [0,1]
@@ -119,7 +119,7 @@ def get_head_kwargs_by_desc(desc_str):
 
     elif 'ever-os' in desc_str.lower():
         y_head_cols = ['EVER OS','OS_Event']
-        head_name = 'OS'
+        head_name = 'EVER OS'
         head_kind = 'Cox'
         num_classes = 1
         y_idx = [0,1]
@@ -127,7 +127,7 @@ def get_head_kwargs_by_desc(desc_str):
 
     elif 'ever-pfs' in desc_str.lower():
         y_head_cols = ['EVER PFS','PFS_Event']
-        head_name = 'PFS'
+        head_name = 'EVER PFS'
         head_kind = 'Cox'
         num_classes = 1
         y_idx = [0,1]
@@ -277,6 +277,8 @@ def compute_finetune(run_id,plot_latent_space=False,
 
     for h_desc in head_desc_str_list:
         head_kwargs, head_cols, plot_latent_space_head_cols = get_head_kwargs_by_desc(h_desc)
+        if head_kwargs is None:
+            continue
         head_kwargs_list.append(head_kwargs)
         y_head_cols += head_cols
         plot_latent_space_cols += plot_latent_space_head_cols
@@ -292,6 +294,8 @@ def compute_finetune(run_id,plot_latent_space=False,
 
     for a_desc in adv_desc_str_list:
         adv_kwargs, adv_cols, plot_latent_space_adv_cols = get_head_kwargs_by_desc(a_desc)
+        if adv_kwargs is None:
+            continue
         adv_kwargs_list.append(adv_kwargs)
         y_adv_cols += adv_cols
         plot_latent_space_cols += plot_latent_space_adv_cols
