@@ -37,6 +37,7 @@ default_sweep_kwargs = {
     'train_kwargs__weight_decay': 0,
     'train_kwargs__adversarial_mini_epochs': 5,
     'train_kwargs__adversary_weight': 5,
+    'train_kwargs__adversarial_start_epoch': 0,
 }
 
 
@@ -384,6 +385,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['train_kwargs']['noise_factor'] = sweep_kwargs.get('train_kwargs__noise_factor')
         kwargs['train_kwargs']['weight_decay'] = sweep_kwargs.get('train_kwargs__weight_decay')
         kwargs['train_kwargs']['adversarial_mini_epochs'] = sweep_kwargs.get('train_kwargs__adversarial_mini_epochs')
+        kwargs['train_kwargs']['adversarial_start_epoch'] = sweep_kwargs.get('train_kwargs__adversarial_start_epoch')
         kwargs['run_evaluation'] = True
         kwargs['eval_kwargs'] = {}
         kwargs['eval_kwargs']['sklearn_models'] = {}
@@ -497,7 +499,7 @@ if __name__ == '__main__':
         # run_id_list = get_run_id_list(tags=tags,encoder_kind='AE')
 
         query = chosen_id
-        run_id_list = get_run_id_list_from_query(query=query,limit=1000)
+        run_id_list = get_run_id_list_from_query(query=query,limit=3000)
 
         # run_id_list = get_run_id_list(tags=tags)
     else:
