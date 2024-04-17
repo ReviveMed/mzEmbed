@@ -172,11 +172,13 @@ def compute_finetune(run_id,plot_latent_space=False,
             capture_hardware_metrics=False,
             mode='read-only')
 
-    if run['info/state'].fetch() == 'Active':
-        print('Run is already active')
-        return
     
     run_struc= run.get_structure()
+    if 'info/state' in run_struc.keys():
+        if run['info/state'].fetch() == 'Active':
+            print('Run is already active')
+            return
+
     if 'pretrain' not in run_struc:
         print('No pretrain in run:',run_id)
         run.stop()
