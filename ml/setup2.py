@@ -42,6 +42,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     else:
         is_run_new = False
         ret_run_id = False
+    run["info/state"] = 'Active'
 
     if not is_run_new:
         # setup_is_new = not check_neptune_existance(run,f'{setup_id}/kwargs')
@@ -139,6 +140,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
     except Exception as e:
         run['sys/tags'].add('init failed')
+        run["info/state"] = 'Inactive'
         run.stop()
         raise e
 
@@ -248,6 +250,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
     except Exception as e:
         run['sys/tags'].add('data-load failed')
+        run["info/state"] = 'Inactive'
         run.stop()
         raise e
 
@@ -454,6 +457,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                 
         except Exception as e:
             run['sys/tags'].add('model-creation failed')
+            run["info/state"] = 'Inactive'
             run.stop()
             raise e
 
@@ -539,6 +543,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
             except Exception as e:
                 run['sys/tags'].add('training failed')
+                run["info/state"] = 'Inactive'
                 run.stop()
                 raise e
 
@@ -564,6 +569,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
             except Exception as e:
                 run['sys/tags'].add('evaluation failed')
+                run["info/state"] = 'Inactive'
                 run.stop()
                 raise e
 
@@ -793,11 +799,13 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
     except Exception as e:
         run['sys/tags'].add('plotting failed')
+        run["info/state"] = 'Inactive'
         run.stop()
         raise e
 
     run['sys/failed'] = False
     if ret_run_id:
+        run["info/state"] = 'Inactive'
         run.stop()
         return run_id
     else:

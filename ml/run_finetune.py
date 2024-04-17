@@ -172,6 +172,10 @@ def compute_finetune(run_id,plot_latent_space=False,
             capture_hardware_metrics=False,
             mode='read-only')
 
+    if run['info/state'].fetch() == 'Active':
+        print('Run is already active')
+        return
+    
     run_struc= run.get_structure()
     if 'pretrain' not in run_struc:
         print('No pretrain in run:',run_id)
@@ -246,6 +250,7 @@ def compute_finetune(run_id,plot_latent_space=False,
             print('Already plotted val')
 
         run['sys/failed'] = False
+        run["info/state"] = 'Inactive'
         run.stop()
 
     ############################################################
