@@ -138,7 +138,8 @@ def get_default_kwarg_val_dict():
         'head_kwargs_dict__Regression_Age__weight': 0,
         'head_kwargs_dict__Binary_isFemale__weight': 0,
         'train_kwargs__l1_reg_weight': 0,
-        'train_kwargs__optimizer_name': 'adam'
+        'train_kwargs__optimizer_name': 'adam',
+        'train_kwargs__adversarial_start_epoch': -1,
     }
 
     return default_val_dict
@@ -414,6 +415,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         early_stopping_patience = 0
         weight_decay = 0.00001
         adversarial_mini_epochs = 2
+        adversarial_start_epoch = 0
 
 
     if choose_from_distribution:
@@ -509,7 +511,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         optimizer_name = CategoricalDistribution(['adam','adamw'])
         weight_decay = FloatDistribution(0, 0.0005, step=0.00001)
         early_stopping_patience = IntDistribution(0, early_stopping_patience_max, step=early_stopping_patience_step)
-
+        adversarial_start_epoch = IntDistribution(-1, 10, step=2)
 
 
 
@@ -609,6 +611,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
                     'noise_factor': 0.1,
                     'early_stopping_patience': early_stopping_patience,
                     'adversarial_mini_epochs': adversarial_mini_epochs,
+                    'adversarial_start_epoch': adversarial_start_epoch
                 },
 
         }

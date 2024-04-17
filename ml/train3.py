@@ -140,7 +140,8 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
     scheduler_kind = kwargs.get('scheduler_kind', None)
     scheduler_kwargs = kwargs.get('scheduler_kwargs', {})
     verbose = kwargs.get('verbose', True)
-    adversarial_mini_epochs = kwargs.get('adversarial_mini_epochs', 5)
+    adversarial_mini_epochs = kwargs.get('adversarial_mini_epochs', 1)
+    adversarial_start_epoch = kwargs.get('adversarial_start_epoch', -1)
     prefix = kwargs.get('prefix', 'train')
     train_name = kwargs.get(f'train_name', 'train')
     optimizer_name = kwargs.get('optimizer_name', 'adam')
@@ -201,6 +202,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
         'phase_sizes': dataset_size_dct,
         'batch_sizes': batch_size_dct,
         'adversarial_mini_epochs': adversarial_mini_epochs,
+        'adversarial_start_epoch': adversarial_start_epoch,
     }
     #TODO add a run prefix to all the keys
     run[f'{prefix}/learning_parameters'] = stringify_unsupported(learning_parameters)
@@ -322,7 +324,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                 #TODO: this is a little messy, should probably be refactored
                 # Currently transform the data twice with the encoder, this probably only needs to be done once
                 # but if we do change it, we need to be careful to zero the gradients properly
-                if adversary_weight > 0:
+                if (adversary_weight > 0) and (epoch > adversarial_start_epoch):
                     with torch.set_grad_enabled(phase == f'{train_name}'):
                         z = encoder.transform(X).detach()
                         z.requires_grad = True
@@ -348,7 +350,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                 encoder_optimizer.zero_grad()
                 if head_weight > 0:
                     head_optimizer.zero_grad()
-                if adversary_weight > 0:
+                if (adversary_weight > 0) and (epoch > adversarial_start_epoch):
                     adversary_optimizer.zero_grad()
                 with torch.set_grad_enabled(phase == f'{train_name}'):
                     if encoder_weight > 0:
@@ -377,7 +379,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         head_loss = torch.tensor(0)
                 
 
-                    if adversary_weight > 0:
+                    if (adversary_weight > 0) and (epoch > adversarial_start_epoch):
                         z2 = z.detach()
                         z2.requires_grad = True
 
@@ -423,19 +425,19 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                             epoch_head_outputs = y_head_output
                     else:
                         epoch_head_outputs = torch.cat((epoch_head_outputs, y_head_output), 0)
-                    
-                    if isinstance(y_adversary_output, dict):
-                        if isinstance(epoch_adversary_outputs, dict):
-                            for k in y_adversary_output.keys():
-                                epoch_adversary_outputs[k] = torch.cat((epoch_adversary_outputs[k], y_adversary_output[k]), 0)
-                        else:
-                            epoch_adversary_outputs = y_adversary_output
-                    else:
-                        epoch_adversary_outputs = torch.cat((epoch_adversary_outputs, y_adversary_output), 0)
-
-
                     epoch_head_targets = torch.cat((epoch_head_targets, y_head), 0)
-                    epoch_adversary_targets = torch.cat((epoch_adversary_targets, y_adversary), 0)
+
+                    if adversarial_start_epoch > 0:
+                        if isinstance(y_adversary_output, dict):
+                            if isinstance(epoch_adversary_outputs, dict):
+                                for k in y_adversary_output.keys():
+                                    epoch_adversary_outputs[k] = torch.cat((epoch_adversary_outputs[k], y_adversary_output[k]), 0)
+                            else:
+                                epoch_adversary_outputs = y_adversary_output
+                        else:
+                            epoch_adversary_outputs = torch.cat((epoch_adversary_outputs, y_adversary_output), 0)
+
+                        epoch_adversary_targets = torch.cat((epoch_adversary_targets, y_adversary), 0)
                     
                     joint_loss = (encoder_weight*encoder_loss + \
                         head_weight*head_loss - \
@@ -469,7 +471,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         if head_weight > 0:
                             head_optimizer.step()
 
-                        if adversary_weight > 0:
+                        if (adversary_weight > 0) and (epoch > adversarial_start_epoch):
                             # zero the adversarial optimizer again
                             adversary_optimizer.zero_grad()
 
@@ -488,7 +490,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
 
 
             ########  Train the adversary on the fixed latent space for a few epochs
-            if (adversary_weight > 0) and (phase == f'{train_name}'):
+            if (adversary_weight > 0) and (phase == f'{train_name}') and (epoch > adversarial_start_epoch):
                 encoder.eval()
                 head.eval()
                 for mini_epoch in range(adversarial_mini_epochs):       
@@ -552,7 +554,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                 
                 if head_weight > 0:
                     eval_scores = head.score(epoch_head_outputs, epoch_head_targets)
-                if adversary_weight > 0:
+                if (adversary_weight > 0) and (epoch > adversarial_start_epoch):
                     eval_scores.update(adversary.score(epoch_adversary_outputs, epoch_adversary_targets))
                 
                 for eval_name, eval_val in eval_scores.items():
