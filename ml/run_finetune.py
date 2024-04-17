@@ -179,9 +179,9 @@ def compute_finetune(run_id,plot_latent_space=False,
             print('Run is already active')
             return
         
-        # temporary
-        print('temporarily skip runs that have info/state')
-        return
+        # # temporary
+        # print('temporarily skip runs that have info/state')
+        # return
     
 
     if 'pretrain' not in run_struc:
@@ -572,6 +572,6 @@ if __name__ == '__main__':
             except NeptuneException as e:
                 print('NeptuneException:',e)
                 continue
-            # except ValueError as e:
-            #     print('ValueError:',e)
-            #     continue
+            except ValueError as e:
+                print('ValueError:',e)
+                continue
