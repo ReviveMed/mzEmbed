@@ -560,3 +560,6 @@ if __name__ == '__main__':
             except NeptuneException as e:
                 print('NeptuneException:',e)
                 continue
+            except ValueError as e:
+                print('ValueError:',e)
+                continue
