@@ -6,6 +6,7 @@ import requests
 import zipfile
 import json
 import matplotlib.pyplot as plt
+from paretoset import paretoset
 
 ###################
 ## Basic File I/O Functions
@@ -118,6 +119,64 @@ def encode_df_col(df, col, val_mapper=None, suffix='_encoded'):
         val_mapper = {val: i for i, val in enumerate(sorted_vals)}
     df[col + suffix] = df[col].map(val_mapper)
     return df, val_mapper
+
+####################################################################################
+## Pareto Front and basic outlier removal
+####################################################################################
+
+def pareto_reduction(df, sense_list=None, current_set=None, desired_num=None, objective_cols=None,
+                    decimal_precision=5):
+    """
+    Reduces the size of a dataframe by selecting a subset of rows that represent the Pareto front.
+
+    Parameters:
+    - df: pandas DataFrame
+        The input dataframe.
+    - sense_list: list, optional
+        A list of strings indicating the sense of optimization for each objective column.
+        If not provided, 'max' is assumed for all columns.
+    - current_set: pandas DataFrame, optional
+        The current set of rows that represent the Pareto front.
+        This parameter is used for recursive calls and should not be provided when calling the function.
+    - desired_num: int, optional
+        The desired number of rows in the reduced dataframe.
+        If not provided, 20% of the original dataframe size is used.
+    - objective_cols: list, optional
+        A list of column names representing the objective columns.
+        If not provided, all columns of the dataframe are considered as objective columns.
+    - decimal_precision: int, optional
+        The number of decimal places to consider when comparing objective values.
+        If not provided, 5 decimal places are considered. Lower values will result in a smaller pareto front.
+    Returns:
+    - pandas DataFrame
+        The reduced dataframe containing a subset of rows that represent the Pareto front.
+    """
+
+    if desired_num is None:
+        desired_num = np.floor(0.2*df.shape[0])
+    if objective_cols is None:
+        objective_cols = df.columns
+    if sense_list is None:
+        sense_list = ['max' for _ in objective_cols]
+    if df.shape[0] < desired_num*1.5:
+        return df
+
+    mask = paretoset(df[objective_cols].round(decimal_precision), sense=sense_list)
+    current_set = pd.concat([current_set, df[mask]])
+    if current_set.shape[0] < desired_num:
+        return pareto_reduction(df[~mask], sense_list, current_set, desired_num, objective_cols)
+    else:
+        return current_set
+    
+
+def remove_outliers(df, column):
+    Q1 = df[column].quantile(0.1)
+    Q3 = df[column].quantile(0.9)
+    IQR = Q3 - Q1
+
+    df_out = df[~((df[column] < (Q1 - 1.5 * IQR)) | (df[column] > (Q3 + 1.5 * IQR)))]
+    
+    return df_out
 
 
 ####################################################################################
