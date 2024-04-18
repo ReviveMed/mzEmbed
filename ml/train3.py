@@ -450,9 +450,14 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         
                         joint_loss_w_penalty = joint_loss
                         # right now we are also penalizing the weights in the decoder, do we want to do that?
-                        joint_loss_w_penalty += get_reg_penalty(encoder, l1_reg_weight, l2_reg_weight)
-                        # if 'encoder' in encoder._modules:
-                            # joint_loss_w_penalty += get_reg_penalty(encoder.encoder, l1_reg_weight, l2_reg_weight)
+                        # joint_loss_w_penalty += get_reg_penalty(encoder, l1_reg_weight, l2_reg_weight)
+                        if 'encoder' in encoder._modules:
+                            joint_loss_w_penalty += get_reg_penalty(encoder.encoder, l1_reg_weight, l2_reg_weight)
+                            if encoder_weight > 0:
+                                joint_loss_w_penalty += get_reg_penalty(encoder.decoder, l1_reg_weight, l2_reg_weight)
+                        else:
+                            joint_loss_w_penalty += get_reg_penalty(encoder, l1_reg_weight, l2_reg_weight)
+                            
                         joint_loss_w_penalty += get_reg_penalty(head, l1_reg_weight, l2_reg_weight)
 
                         # we probably don't care about the adversary weights
