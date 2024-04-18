@@ -27,6 +27,7 @@ data_dir = get_latest_dataset()
 
 default_sweep_kwargs = {
     'holdout_frac': 0,
+    'head_hidden_layers': 0,
     'encoder_kwargs__dropout_rate': 0.2,
     'train_kwargs__num_epochs': 30,
     'train_kwargs__early_stopping_patience': 0,
@@ -66,7 +67,7 @@ def update_finetune_data(file_suffix,redo=False):
 
     return
 
-def get_head_kwargs_by_desc(desc_str,weight=1):
+def get_head_kwargs_by_desc(desc_str,weight=1,num_hidden_layers=0):
     if (desc_str is None) or (desc_str == ''):
         return None, [], []
     
@@ -145,7 +146,7 @@ def get_head_kwargs_by_desc(desc_str,weight=1):
             'weight': weight,
             'y_idx': y_idx,
             'hidden_size': 4,
-            'num_hidden_layers': 0,
+            'num_hidden_layers': num_hidden_layers,
             'dropout_rate': 0,
             'activation': 'leakyrelu',
             'use_batch_norm': False,
@@ -297,8 +298,10 @@ def compute_finetune(run_id,plot_latent_space=False,
         head_desc_str_list = [head_desc_str]
 
 
+    head_hidden_layers = sweep_kwargs.get('head_hidden_layers',0)
+
     for h_desc in head_desc_str_list:
-        head_kwargs, head_cols, plot_latent_space_head_cols = get_head_kwargs_by_desc(h_desc)
+        head_kwargs, head_cols, plot_latent_space_head_cols = get_head_kwargs_by_desc(h_desc,num_hidden_layers=head_hidden_layers)
         if head_kwargs is None:
             continue
         head_kwargs_list.append(head_kwargs)
@@ -315,7 +318,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         adv_desc_str_list = [adv_desc_str]
 
     for a_desc in adv_desc_str_list:
-        adv_kwargs, adv_cols, plot_latent_space_adv_cols = get_head_kwargs_by_desc(a_desc,weight=2)
+        adv_kwargs, adv_cols, plot_latent_space_adv_cols = get_head_kwargs_by_desc(a_desc,weight=2,num_hidden_layers=head_hidden_layers)
         if adv_kwargs is None:
             continue
         adv_kwargs_list.append(adv_kwargs)
@@ -345,10 +348,10 @@ def compute_finetune(run_id,plot_latent_space=False,
 
 
     num_epochs = None
-    if 'epoch_' in desc_str.lower():
-        match = re.search(r'epoch_(\d+)', desc_str.lower())
-        if match:
-            num_epochs = int(match.group(1))
+    # if 'epoch_' in desc_str.lower():
+    #     match = re.search(r'epoch_(\d+)', desc_str.lower())
+    #     if match:
+    #         num_epochs = int(match.group(1))
         
 
     
@@ -555,6 +558,8 @@ if __name__ == '__main__':
 
     sweep_kwargs = None
 
+
+
     # run_id_list = ['RCC-1735']
     for run_id in run_id_list:
         if run_id in already_run:
@@ -562,6 +567,41 @@ if __name__ == '__main__':
         print('run_id:',run_id)
         plot_latent_space0 = plot_latent_space
         for desc_str in desc_str_list:
+            sweep_kwargs = {}
+
+            # customize the sweep kwargs based on the desc_str
+            if 'hhl' in desc_str:
+                sweep_kwargs['head_hidden_layers'] = 1
+
+            if 'epc_' in desc_str:
+                match = re.search(r'epc_(\d+)', desc_str.lower())
+                if match:
+                    sweep_kwargs['train_kwargs__num_epochs'] = int(match.group(1))  
+
+            if 'regl1_' in desc_str:
+                match = re.search(r'regl1_(\d+)', desc_str.lower())
+                if match:
+                    sweep_kwargs['train_kwargs__l1_reg_weight'] = float(match.group(1))
+
+            if 'regl2_' in desc_str:
+                match = re.search(r'regl2_(\d+)', desc_str.lower())
+                if match:
+                    sweep_kwargs['train_kwargs__l2_reg_weight'] = float(match.group(1))
+
+            if 'lr_' in desc_str:
+                match = re.search(r'lr_(\d+)', desc_str.lower())
+                if match:
+                    lr = float(match.group(1))/1000
+                    print('lr:',lr)
+                    sweep_kwargs['train_kwargs__learning_rate'] = lr
+
+            if 'noi_' in desc_str:
+                match = re.search(r'noi_(\d+)', desc_str.lower())
+                if match:
+                    noi_factor = float(match.group(1))/10
+                    print('noi_factor:',noi_factor)
+                    sweep_kwargs['train_kwargs__noise_factor'] = noi_factor
+
             try:
                 run_id = compute_finetune(run_id,n_trials=n_trials,
                                         plot_latent_space=plot_latent_space0,
