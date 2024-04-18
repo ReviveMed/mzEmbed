@@ -340,6 +340,8 @@ def compute_finetune(run_id,plot_latent_space=False,
         train_name = 'train2'
     elif eval_name.lower() == 'test':
         train_name = 'trainval'
+    elif eval_name.lower() == 'test2':
+        train_name = 'trainval2'
 
 
     num_epochs = None
