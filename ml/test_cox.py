@@ -81,7 +81,7 @@ kwargs['plot_latent_space_cols'] = ['OS']
 # kwargs['y_head_cols'] = ['PFS','PFS_Event']
 # kwargs['y_adv_cols'] = []
 kwargs['y_head_cols'] = ['NIVO OS','OS_Event']
-# kwargs['y_adv_cols'] = ['EVER OS','OS_Event']
+kwargs['y_adv_cols'] = ['EVER OS','OS_Event']
 kwargs['upload_models_to_neptune'] = True
 
 
@@ -89,7 +89,7 @@ kwargs['head_kwargs_dict'] = {}
 kwargs['adv_kwargs_dict'] = {}
 kwargs['head_kwargs_list'] = [{
     'kind': 'Cox',
-    'name': 'OS',
+    'name': 'NIVO OS',
     'weight': 1,
     'y_idx': [0,1],
     'hidden_size': 4,
@@ -101,17 +101,17 @@ kwargs['head_kwargs_list'] = [{
 
 
 kwargs['adv_kwargs_list'] = []
-# kwargs['adv_kwargs_list'] = [{
-#     'kind': 'Cox',
-#     'name': 'OS',
-#     'weight': 1,
-#     'y_idx': [0,1],
-#     'hidden_size': 4,
-#     'num_hidden_layers': 1,
-#     'dropout_rate': 0,
-#     'activation': 'leakyrelu',
-#     'use_batch_norm': False
-#     }]
+kwargs['adv_kwargs_list'] = [{
+    'kind': 'Cox',
+    'name': 'EVER OS',
+    'weight': 1,
+    'y_idx': [0,1],
+    'hidden_size': 4,
+    'num_hidden_layers': 1,
+    'dropout_rate': 0,
+    'activation': 'leakyrelu',
+    'use_batch_norm': False
+    }]
 
 kwargs['train_kwargs'] = {}
 kwargs['train_kwargs']['num_epochs'] = 30
@@ -119,7 +119,7 @@ kwargs['train_kwargs']['early_stopping_patience'] = 0
 kwargs['holdout_frac'] = 0
 kwargs['train_kwargs']['head_weight'] = 1
 kwargs['train_kwargs']['encoder_weight'] = 0
-kwargs['train_kwargs']['adversary_weight'] = 0
+kwargs['train_kwargs']['adversary_weight'] = 1
 kwargs['train_kwargs']['learning_rate'] = 0.001
 # kwargs['train_kwargs']['learning_rate'] = 0.0001
 kwargs['train_kwargs']['l2_reg_weight'] = 0.005
@@ -141,7 +141,7 @@ setup_neptune_run(data_dir,
                   with_run_id=run_id,
                   save_kwargs_to_neptune=True,
                   setup_id=setup_id,
-                   #neptune_mode='debug',
+                   neptune_mode='debug',
                   **kwargs)
 # run_id = setup_neptune_run(data_dir,setup_id=setup_id,**kwargs)
 # print(run_id)

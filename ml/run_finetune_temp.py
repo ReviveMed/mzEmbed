@@ -37,6 +37,7 @@ default_sweep_kwargs = {
     'train_kwargs__weight_decay': 0,
     'train_kwargs__adversarial_mini_epochs': 5,
     'train_kwargs__adversary_weight': 5,
+    'train_kwargs__adversarial_start_epoch': 0,
 }
 
 
@@ -144,7 +145,7 @@ def get_head_kwargs_by_desc(desc_str,weight=1):
             'weight': weight,
             'y_idx': y_idx,
             'hidden_size': 4,
-            'num_hidden_layers': 0,
+            'num_hidden_layers': 1,
             'dropout_rate': 0,
             'activation': 'leakyrelu',
             'use_batch_norm': False,
@@ -170,6 +171,7 @@ def compute_finetune(run_id,plot_latent_space=False,
             capture_stderr=False,
             capture_hardware_metrics=False,
             mode='read-only')
+            # mode='debug')
 
     run_struc= run.get_structure()
     if 'pretrain' not in run_struc:
@@ -383,6 +385,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['train_kwargs']['noise_factor'] = sweep_kwargs.get('train_kwargs__noise_factor')
         kwargs['train_kwargs']['weight_decay'] = sweep_kwargs.get('train_kwargs__weight_decay')
         kwargs['train_kwargs']['adversarial_mini_epochs'] = sweep_kwargs.get('train_kwargs__adversarial_mini_epochs')
+        kwargs['train_kwargs']['adversarial_start_epoch'] = sweep_kwargs.get('train_kwargs__adversarial_start_epoch')
         kwargs['run_evaluation'] = True
         kwargs['eval_kwargs'] = {}
         kwargs['eval_kwargs']['sklearn_models'] = {}
@@ -468,13 +471,16 @@ if __name__ == '__main__':
     if len(sys.argv)>3:
         chosen_id = sys.argv[3]
     else:
-        chosen_id = None
+        # chosen_id = 
+        chosen_id = 'RCC-2787'
 
     # description string of the finetuning task
     if len(sys.argv)>4:
         chosen_finetune_desc = sys.argv[4]
     else:
-        chosen_finetune_desc = None
+        # chosen_finetune_desc = None
+        time_str = time.strftime("%Y%m%d-%H%M%S")
+        chosen_finetune_desc = f'nivo-OS ADV ever-OS {time_str}'
 
     # which dataset is used for evaluation
     if len(sys.argv)>5:
@@ -543,13 +549,14 @@ if __name__ == '__main__':
             'encoder_kwargs__dropout_rate': 0.2,
             'train_kwargs__num_epochs': 100,
             'train_kwargs__early_stopping_patience': 0,
-            'train_kwargs__learning_rate': 0.0001,
+            'train_kwargs__learning_rate': 0.0005,
             'train_kwargs__l2_reg_weight': 0,
             'train_kwargs__l1_reg_weight': 0,
             'train_kwargs__noise_factor': 0.1,
             'train_kwargs__weight_decay': 0.001,
-            'train_kwargs__adversarial_mini_epochs': 1,
-            'train_kwargs__adversary_weight': 100,
+            'train_kwargs__adversarial_mini_epochs': 0,
+            'train_kwargs__adversary_weight': 10,
+            'train_kwargs__adversarial_start_epoch': -1,
         }
 
 
