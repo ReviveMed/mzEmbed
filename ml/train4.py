@@ -60,6 +60,7 @@ class CompoundDataset(Dataset):
 
 
 
+
 def stratified_split(dataset : torch.utils.data.Dataset, labels, fraction, random_state=None):
     # Code from Alvtron on Github
     #  a simple function for conducting a stratified split with random shuffling, 
@@ -120,14 +121,23 @@ def create_dataloaders(torch_dataset, batch_size, holdout_frac=0, shuffle=True, 
             f'{set_name}_holdout': DataLoader(torch_dataset, batch_size=batch_size, sampler=holdout_sampler)}
 
 
+def get_optimizer(optimizer_name, model, learning_rate=0.001, weight_decay=0,betas=(0.9, 0.999)):
+    if optimizer_name.lower() == 'adam':
+        return torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay,betas=betas)
+    elif optimizer_name.lower() == 'adamw':
+        return torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay,betas=betas)
+    elif optimizer_name.lower() == 'sgd':
+        return torch.optim.SGD(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    else:
+        raise NotImplementedError('Optimizer not yet implemented')
+
+
 ##################################################################################
 ##################################################################################
 
 def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
 
     # run should be a neptune run object
-    learning_rate = kwargs.get('learning_rate', kwargs.get('lr', 0.001))
-    weight_decay = kwargs.get('weight_decay', 0)
     num_epochs = kwargs.get('num_epochs', 10)
     encoder_weight = kwargs.get('encoder_weight', 1)
     head_weight = kwargs.get('head_weight', 1)
@@ -144,7 +154,19 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
     adversarial_start_epoch = kwargs.get('adversarial_start_epoch', -1)
     prefix = kwargs.get('prefix', 'train')
     train_name = kwargs.get(f'train_name', 'train')
-    optimizer_name = kwargs.get('optimizer_name', 'adam')
+    
+    optimizer_name = kwargs.get('optimizer_name', 'adamw')
+    head_optimizer_name = kwargs.get('head_optimizer_name', optimizer_name)
+    adversarial_optimizer_name = kwargs.get('adversarial_optimizer_name', 'sgd')
+
+    learning_rate = kwargs.get('learning_rate', kwargs.get('lr', 0.001))
+    head_learning_rate = kwargs.get('head_learning_rate', learning_rate)
+    adversarial_learning_rate = kwargs.get('adversarial_learning_rate', 10*learning_rate)
+
+    weight_decay = kwargs.get('weight_decay', 0)
+    head_weight_decay = kwargs.get('head_weight_decay', weight_decay)
+    adversary_weight_decay = kwargs.get('adversary_weight_decay', 0.1*weight_decay)
+
     
     clip_grads_with_norm = kwargs.get('clip_grads_with_norm', True)
     clip_grads_with_value = kwargs.get('clip_grads_with_value', False)
@@ -217,33 +239,18 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
     head.to(device)
     adversary.to(device)
 
-    if optimizer_name.lower()=='adam':
-        encoder_optimizer = torch.optim.Adam(encoder.parameters(), lr=learning_rate, weight_decay=weight_decay)
-        if head_weight > 0:
-            head_optimizer = torch.optim.Adam(head.parameters(), lr=learning_rate, weight_decay=weight_decay)
-        else:
-            head_optimizer = None
-        
-        # if adversary_weight > 0:
-        #     adversary_optimizer = torch.optim.Adam(adversary.parameters(), lr=learning_rate, weight_decay=weight_decay)
-        # else:
-        #     adversary_optimizer = None
-    elif optimizer_name.lower()=='adamw':
-        encoder_optimizer = torch.optim.AdamW(encoder.parameters(), lr=learning_rate, weight_decay=weight_decay)
-        if head_weight > 0:
-            head_optimizer = torch.optim.AdamW(head.parameters(), lr=learning_rate, weight_decay=weight_decay)
-        else:
-            head_optimizer = None
-        
-        # if adversary_weight > 0:
-        #     adversary_optimizer = torch.optim.AdamW(adversary.parameters(), lr=learning_rate, weight_decay=weight_decay)
-        # else:
-        #     adversary_optimizer = None
+    encoder_optimizer = get_optimizer(optimizer_name, encoder, learning_rate, weight_decay)
+    
+    if head_weight > 0:
+        head_optimizer = get_optimizer(head_optimizer_name, head, head_learning_rate, head_weight_decay)
+    else: 
+        head_optimizer = None
 
     if adversary_weight > 0:
-        adversary_optimizer = torch.optim.SGD(adversary.parameters(), lr=10*learning_rate)
+        adversary_optimizer = get_optimizer(adversarial_optimizer_name, adversary, adversarial_learning_rate, adversary_weight_decay)
     else:
         adversary_optimizer = None
+
 
     scheduler = None
     if scheduler_kind is not None:
@@ -431,7 +438,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         epoch_head_outputs = torch.cat((epoch_head_outputs, y_head_output), 0)
                     epoch_head_targets = torch.cat((epoch_head_targets, y_head), 0)
 
-                    if adversarial_start_epoch > 0:
+                    if epoch > adversarial_start_epoch:
                         if isinstance(y_adversary_output, dict):
                             if isinstance(epoch_adversary_outputs, dict):
                                 for k in y_adversary_output.keys():
@@ -557,7 +564,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                 # but unclear how this will work with other metrics
                 
                 if head_weight > 0:
-                    eval_scores = head.score(epoch_head_outputs, epoch_head_targets)
+                    eval_scores.update(head.score(epoch_head_outputs, epoch_head_targets))
                 if (adversary_weight > 0) and (epoch > adversarial_start_epoch):
                     eval_scores.update(adversary.score(epoch_adversary_outputs, epoch_adversary_targets))
                 

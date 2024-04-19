@@ -1,5 +1,7 @@
-from setup2 import setup_neptune_run
-from utils_neptune import  get_run_id_list, check_neptune_existance, get_latest_dataset
+# from setup2 import setup_neptune_run
+from setup2_temp import setup_neptune_run
+
+from utils_neptune import  get_run_id_list, check_neptune_existance, get_latest_dataset, start_neptune_run
 import pandas as pd
 import numpy as np
 import shutil
@@ -7,7 +9,7 @@ import os
 data_dir = get_latest_dataset()
 # setup_id = 'both-OS_finetune_v1'
 
-setup_id = 'both-OS_finetune_AE_v2'
+setup_id = 'adversary-OS_finetune_v14'
 
 kwargs = {}
 # run_id = 'RCC-2027'
@@ -50,7 +52,7 @@ update_finetune_data('finetune_trainval',redo=redo)
 ## use a fresh model architecture
 encoder_kwargs = {
             'activation': 'leaky_relu',
-            'latent_size': 16,
+            'latent_size': 32,
             'num_hidden_layers': 2,
             'dropout_rate': 0.2,
             'use_batch_norm': False,
@@ -104,28 +106,30 @@ kwargs['adv_kwargs_list'] = []
 kwargs['adv_kwargs_list'] = [{
     'kind': 'Cox',
     'name': 'EVER OS',
-    'weight': 1,
+    'weight': 50,
     'y_idx': [0,1],
     'hidden_size': 4,
-    'num_hidden_layers': 1,
+    'num_hidden_layers': 0,
     'dropout_rate': 0,
     'activation': 'leakyrelu',
     'use_batch_norm': False
     }]
 
 kwargs['train_kwargs'] = {}
-kwargs['train_kwargs']['num_epochs'] = 30
+kwargs['train_kwargs']['num_epochs'] = 150
 kwargs['train_kwargs']['early_stopping_patience'] = 0
 kwargs['holdout_frac'] = 0
 kwargs['train_kwargs']['head_weight'] = 1
 kwargs['train_kwargs']['encoder_weight'] = 0
 kwargs['train_kwargs']['adversary_weight'] = 1
-kwargs['train_kwargs']['learning_rate'] = 0.001
-# kwargs['train_kwargs']['learning_rate'] = 0.0001
-kwargs['train_kwargs']['l2_reg_weight'] = 0.005
-kwargs['train_kwargs']['l1_reg_weight'] = 0.0005
+# kwargs['train_kwargs']['learning_rate'] = 0.001
+kwargs['train_kwargs']['adversarial_learning_rate'] = 0.0001
+kwargs['train_kwargs']['learning_rate'] = 0.0001
+kwargs['train_kwargs']['l2_reg_weight'] = 0
+kwargs['train_kwargs']['l1_reg_weight'] = 0.001
 kwargs['train_kwargs']['noise_factor'] = 0.05
-kwargs['train_kwargs']['weight_decay'] = 0
+kwargs['train_kwargs']['weight_decay'] = 0.01
+kwargs['train_kwargs']['adversarial_start_epoch'] = 30
 kwargs['run_evaluation'] = True
 kwargs['eval_kwargs'] = {}
 kwargs['eval_kwargs']['sklearn_models'] = {}
@@ -138,10 +142,34 @@ kwargs['num_repeats'] = 1
 # kwargs['save_latent_space'] = False
 
 setup_neptune_run(data_dir,
-                  with_run_id=run_id,
+                  with_run_id='RCC-3032',
                   save_kwargs_to_neptune=True,
                   setup_id=setup_id,
-                   neptune_mode='debug',
+                  restart_run = True,
                   **kwargs)
 # run_id = setup_neptune_run(data_dir,setup_id=setup_id,**kwargs)
 # print(run_id)
+
+# import neptune
+# NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
+
+
+# run = neptune.init_run(project='revivemed/RCC',
+#                         api_token=NEPTUNE_API_TOKEN,
+#                         mode='debug')
+
+
+# # run, is_run_new = start_neptune_run(neptune_mode='debug')
+
+
+# run = setup_neptune_run(data_dir,
+#                   run=run,
+#                   setup_id=setup_id,
+#                   **kwargs)
+
+# run.stop()
+
+
+# run['both-OS_finetune_AE_v2/eval/val2']
+
+# done with RCC-3032

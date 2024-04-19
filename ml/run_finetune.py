@@ -67,10 +67,16 @@ def update_finetune_data(file_suffix,redo=False):
 
     return
 
-def get_head_kwargs_by_desc(desc_str,weight=1,num_hidden_layers=0):
+def get_head_kwargs_by_desc(desc_str,num_hidden_layers=0):
     if (desc_str is None) or (desc_str == ''):
         return None, [], []
     
+    weight = 1
+    if 'weight-' in desc_str:
+        match = re.search(r'weight-(\d+)', desc_str)
+        if match:
+            weight = int(match.group(1))
+            desc_str = desc_str.replace(match.group(0),'')
 
     if 'mskcc' in desc_str.lower():
         y_head_cols = ['MSKCC BINARY']
@@ -318,7 +324,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         adv_desc_str_list = [adv_desc_str]
 
     for a_desc in adv_desc_str_list:
-        adv_kwargs, adv_cols, plot_latent_space_adv_cols = get_head_kwargs_by_desc(a_desc,weight=2,num_hidden_layers=head_hidden_layers)
+        adv_kwargs, adv_cols, plot_latent_space_adv_cols = get_head_kwargs_by_desc(a_desc,num_hidden_layers=head_hidden_layers)
         if adv_kwargs is None:
             continue
         adv_kwargs_list.append(adv_kwargs)

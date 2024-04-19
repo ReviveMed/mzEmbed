@@ -924,7 +924,7 @@ class Cox_Head(Head):
         except IndexError as e:
             print(f'when calculate score get IndexError: {e}')
             traceback.print_exc()
-            return {k: 0 for k, v in self.score_func}
+            return {k: 0 for k, v in self.score_func_dict.items()}
 
 
 #########################################################
