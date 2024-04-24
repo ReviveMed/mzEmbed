@@ -38,7 +38,7 @@ default_sweep_kwargs = {
     'train_kwargs__weight_decay': 0,
     'train_kwargs__adversarial_mini_epochs': 5,
     'train_kwargs__adversary_weight': 5,
-    'train_kwargs__adversarial_start_epoch': 0,
+    'train_kwargs__adversarial_start_epoch': 10,
 }
 
 
