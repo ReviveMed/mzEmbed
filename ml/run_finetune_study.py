@@ -1,7 +1,7 @@
 import optuna
 import neptune
 from utils_neptune import get_latest_dataset
-from train3 import train_compound_model, evaluate_compound_model, CompoundDataset, create_dataloaders, create_dataloaders_old
+from train4 import train_compound_model, evaluate_compound_model, CompoundDataset, create_dataloaders, create_dataloaders_old
 import pandas as pd
 from run_finetune import compute_finetune
 

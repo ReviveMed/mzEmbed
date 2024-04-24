@@ -9,7 +9,7 @@ import json
 from prep_study import add_runs_to_study, get_run_id_list, \
     make_kwargs, convert_distributions_to_suggestion, convert_model_kwargs_list_to_dict,\
     round_kwargs_to_sig, flatten_dict, unflatten_dict, objective_func3, get_study_objective_directions, get_study_objective_keys
-from setup2 import setup_neptune_run
+from setup3 import setup_neptune_run
 from utils_neptune import get_latest_dataset
 from sklearn.linear_model import LogisticRegression
 # from sklearn.neighbors import KNeighborsClassifier

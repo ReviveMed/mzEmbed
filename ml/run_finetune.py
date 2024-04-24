@@ -12,7 +12,7 @@ import json
 from prep_study import add_runs_to_study, reuse_run, convert_neptune_kwargs, \
     make_kwargs, convert_distributions_to_suggestion, convert_model_kwargs_list_to_dict,\
     round_kwargs_to_sig
-from setup2 import setup_neptune_run
+from setup3 import setup_neptune_run
 from misc import download_data_dir
 from utils_neptune import  get_run_id_list, check_neptune_existance, get_latest_dataset, get_run_id_list_from_query
 from sklearn.linear_model import LogisticRegression
