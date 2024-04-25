@@ -691,13 +691,16 @@ def evaluate(model: nn.Module, loader: DataLoader) -> float:
 
                 masked_positions = input_values.eq(mask_value)
                 loss = criterion(output_values, target_values, masked_positions)
-                loss_dab = criterion_dab(output_dict["dab_output"], batch_labels)
+                if config.DAB:
+                    loss_dab = criterion_dab(output_dict["dab_output"], batch_labels)
+                    total_dab += loss_dab.item() * len(input_gene_ids)
+                else:
+                    loss_dab = 0.0
 
             total_loss += loss.item() * len(input_gene_ids)
             total_error += masked_relative_error(
                 output_values, target_values, masked_positions
             ).item() * len(input_gene_ids)
-            total_dab += loss_dab.item() * len(input_gene_ids)
             total_num += len(input_gene_ids)
     
     if USE_WANDB:
