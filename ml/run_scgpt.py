@@ -27,6 +27,7 @@ from torchtext.vocab import Vocab
 from torchtext._torchtext import (
     Vocab as VocabPybind,
 )
+# %%
 
 # sys.path.append("../")
 sys.path.insert(0, "../")
@@ -102,6 +103,7 @@ hyperparameter_defaults = dict(
 # If using WandB
 
 if USE_WANDB:
+    print('using WandB')
     run = wandb.init(
         config=hyperparameter_defaults,
         project="scGPT",
@@ -136,7 +138,7 @@ n_input_bins = config.n_bins
 n_hvg = False  # number of highly variable genes
 max_seq_len = 1200
 
-per_seq_batch_sample = True
+per_seq_batch_sample = False #NOTE: when True, this crashes the code
 DSBN = True  # Domain-spec batchnorm
 explicit_zero_prob = True  # whether explicit bernoulli for zeros
 
@@ -169,6 +171,7 @@ if dataset_name == "metabolomics_apr24":
     load_dir.mkdir(parents=True, exist_ok=True)
     load_path = load_dir / "data.h5ad"
     if not os.path.exists(load_path):
+        print('downloading data')
         download_data_file(data_url, save_dir=load_dir)
     adata = read_h5ad(load_path)
     # adata = scvi.data.pbmc_dataset()  # 11990 × 3346
@@ -239,11 +242,12 @@ else:
 
 # %%
 # set up the preprocessor, use the args to config the workflow
+print('Preprocess data')
 preprocessor = Preprocessor(
     use_key="X",  # the key in adata.layers to use as raw data
     filter_gene_by_counts=3,  # step 1
     filter_cell_by_counts=False,  # step 2
-    normalize_total=1e4,  # 3. whether to normalize the raw data and to what sum
+    normalize_total=False,  # 3. whether to normalize the raw data and to what sum
     result_normed_key="X_normed",  # the key in adata.layers to store the normalized data
     log1p=data_is_raw,  # 4. whether to log1p the normalized data
     result_log1p_key="X_log1p",
@@ -261,6 +265,7 @@ if per_seq_batch_sample:
 
 # %% [markdown]
 # ## Tokenize input
+print('Tokenize input')
 
 # %%
 input_layer_key = "X_binned"
