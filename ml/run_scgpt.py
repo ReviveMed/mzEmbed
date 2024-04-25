@@ -594,9 +594,11 @@ def train(model: nn.Module, loader: DataLoader) -> None:
                 loss_ecs = 10 * output_dict["loss_ecs"]
                 loss = loss + loss_ecs
                 metrics_to_log.update({"train/ecs": loss_ecs.item()})
-            loss_dab = criterion_dab(output_dict["dab_output"], batch_labels)
-            loss = loss + config.dab_weight * loss_dab
-            metrics_to_log.update({"train/dab": loss_dab.item()})
+
+            if config.DAB:  # domain adversarial loss                
+                loss_dab = criterion_dab(output_dict["dab_output"], batch_labels)
+                loss = loss + config.dab_weight * loss_dab
+                metrics_to_log.update({"train/dab": loss_dab.item()})
 
         model.zero_grad()
         scaler.scale(loss).backward()
