@@ -54,6 +54,8 @@ from misc import download_data_file
 
 # %%
 
+warnings.filterwarnings('ignore', category=UserWarning, message='^User provided device_type of \'cuda\', but CUDA is not available')
+
 # create a class that takes a dictionary and creates class variables for each of the key and values in the input dictionary
 class Config:
     def __init__(self, dictionary):
@@ -93,9 +95,15 @@ hyperparameter_defaults = dict(
     schedule_ratio=0.9,  # ratio of epochs for learning rate schedule
     save_eval_interval=5,
     log_interval=100,
-    fast_transformer=True,
+    fast_transformer=False, #need CUDA for this
     pre_norm=False,
     amp=True,  # Automatic Mixed Precision
+    n_hvg=False, # number of highly variable genes
+    max_seq_len=1200, #1200 was the amount specified in the paper
+    per_seq_batch_sample = False, #NOTE: when True, this crashes the code
+    DSBN = False, # Domain-spec batchnorm
+    explicit_zero_prob = True, # whether explicit bernoulli for zeros
+    normalize_total = False, # 3. whether to normalize the raw data and to what sum
 )              
 
 
@@ -137,12 +145,12 @@ n_input_bins = config.n_bins
 # n_hvg = 2500  # number of highly variable genes
 # max_seq_len = n_hvg + 1
 
-n_hvg = False  # number of highly variable genes
-max_seq_len = 1200
+n_hvg = config.n_hvg  # number of highly variable genes
+max_seq_len = config.max_seq_len
 
-per_seq_batch_sample = False #NOTE: when True, this crashes the code
-DSBN = True  # Domain-spec batchnorm
-explicit_zero_prob = True  # whether explicit bernoulli for zeros
+per_seq_batch_sample = config.per_seq_batch_sample  # whether to sort samples by batch_id
+DSBN = config.DSBN  # Domain-spec batchnorm
+explicit_zero_prob = config.explicit_zero_prob  # whether explicit bernoulli for zeros
 
 # %%
 dataset_name = config.dataset_name
@@ -249,7 +257,7 @@ preprocessor = Preprocessor(
     use_key="X",  # the key in adata.layers to use as raw data
     filter_gene_by_counts=3,  # step 1
     filter_cell_by_counts=False,  # step 2
-    normalize_total=False,  # 3. whether to normalize the raw data and to what sum
+    normalize_total=config.normalize_total,  # 3. whether to normalize the raw data and to what sum
     result_normed_key="X_normed",  # the key in adata.layers to store the normalized data
     log1p=data_is_raw,  # 4. whether to log1p the normalized data
     result_log1p_key="X_log1p",
@@ -471,6 +479,7 @@ def prepare_dataloader(
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ntokens = len(vocab)  # size of vocabulary
+print(f"vocab size: {ntokens}")
 model = TransformerModel(
     ntokens,
     embsize,
