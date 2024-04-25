@@ -347,7 +347,6 @@ logger.info(
     f"\n\t feature length: {tokenized_valid['genes'].shape[1]}"
 )
 
-exit()
 
 # %%
 def prepare_data(sort_seq_batch=False) -> Tuple[Dict[str, torch.Tensor]]:
@@ -512,7 +511,8 @@ if config.load_model is not None:
         model.load_state_dict(model_dict)
 
 model.to(device)
-wandb.watch(model)
+if USE_WANDB:
+    wandb.watch(model)
 
 
 criterion = masked_mse_loss
@@ -641,11 +641,12 @@ def train(model: nn.Module, loader: DataLoader) -> None:
 
 
 def define_wandb_metrcis():
-    wandb.define_metric("valid/mse", summary="min", step_metric="epoch")
-    wandb.define_metric("valid/mre", summary="min", step_metric="epoch")
-    wandb.define_metric("valid/dab", summary="min", step_metric="epoch")
-    wandb.define_metric("valid/sum_mse_dab", summary="min", step_metric="epoch")
-    wandb.define_metric("test/avg_bio", summary="max")
+    if USE_WANDB:
+        wandb.define_metric("valid/mse", summary="min", step_metric="epoch")
+        wandb.define_metric("valid/mre", summary="min", step_metric="epoch")
+        wandb.define_metric("valid/dab", summary="min", step_metric="epoch")
+        wandb.define_metric("valid/sum_mse_dab", summary="min", step_metric="epoch")
+        wandb.define_metric("test/avg_bio", summary="max")
 
 
 def evaluate(model: nn.Module, loader: DataLoader) -> float:
