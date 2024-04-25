@@ -41,6 +41,7 @@ RUN apt-get install -y screen htop
 RUN apt-get install -y build-essential
 RUN apt-get install -y pkg-config
 RUN apt-get install -y libmariadb-dev-compat
+RUN apt-get install wget
 RUN apt-get update && apt-get install -y vim
 
 RUN pip install --upgrade pip
