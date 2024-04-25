@@ -83,7 +83,7 @@ hyperparameter_defaults = dict(
     epochs=30,
     n_bins=51, #counts/intensity bins, default was 51
     GEPC=True,  # Masked value prediction for cell embedding
-    ecs_thres=0.0,  # Elastic cell similarity objective, 0.0 to 1.0, 0.0 to disable. default was 0. in the paper it was 0.6
+    ecs_thres=0.0,  # Elastic cell similarity objective, 0.0 to 1.0, 0.0 to disable. default was 0.8 in the paper it was 0.6
     dab_weight=1.0, # weight for domain adversarial loss
     lr=1e-4,
     batch_size=32, #default was 64
@@ -104,6 +104,9 @@ hyperparameter_defaults = dict(
     DSBN = False, # Domain-spec batchnorm
     explicit_zero_prob = True, # whether explicit bernoulli for zeros
     normalize_total = False, # 3. whether to normalize the raw data and to what sum
+    use_batch_labels = False, # whether to use batch labels, default was True
+    DAB = False, # whether to use domain adversarial loss
+
 )              
 
 
@@ -491,8 +494,8 @@ model = TransformerModel(
     pad_token=pad_token,
     pad_value=pad_value,
     do_mvc=config.GEPC,
-    do_dab=True,
-    use_batch_labels=True,
+    do_dab=config.DAB,
+    use_batch_labels=config.use_batch_labels,
     num_batch_labels=num_batch_types,
     domain_spec_batchnorm=DSBN,
     n_input_bins=n_input_bins,
