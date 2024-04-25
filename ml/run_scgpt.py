@@ -70,7 +70,7 @@ class Config:
 
 
 # %%
-USE_WANDB = False
+USE_WANDB = True
 
 
 hyperparameter_defaults = dict(
@@ -79,14 +79,14 @@ hyperparameter_defaults = dict(
     do_train=True,
     # load_model="save/scGPT_bc",
     load_model = None,
-    mask_ratio=0.4,
+    mask_ratio=0.25, # ratio of masked values, default was 0.4
     epochs=30,
-    n_bins=51,
+    n_bins=51, #counts/intensity bins, default was 51
     GEPC=True,  # Masked value prediction for cell embedding
-    ecs_thres=0.8,  # Elastic cell similarity objective, 0.0 to 1.0, 0.0 to disable
-    dab_weight=1.0,
+    ecs_thres=0.0,  # Elastic cell similarity objective, 0.0 to 1.0, 0.0 to disable. default was 0. in the paper it was 0.6
+    dab_weight=1.0, # weight for domain adversarial loss
     lr=1e-4,
-    batch_size=64,
+    batch_size=32, #default was 64
     layer_size=128,
     nlayers=4,
     nhead=4,
