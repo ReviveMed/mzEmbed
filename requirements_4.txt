@@ -39,3 +39,14 @@ lifelines
 scikit-survival # scikit-learn for survival analysis, they suggest using conda to install
 torchtext # needed for scGPT
 anndata #annotated data, needed for scGPT, but should be used for future work too
+datasets
+leidenalg
+llvmlite
+networkx
+numba
+scanpy
+scvi-tools
+scikit-misc #used for loess regression, but I don't think it is used
+scib
+tqdm
+wandb
