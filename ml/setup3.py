@@ -48,6 +48,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     else:
         is_run_new = False
         ret_run_id = False
+    run['sys/failed'] = False
     run["info/state"] = 'Active'
 
     if not is_run_new:

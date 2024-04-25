@@ -75,7 +75,7 @@ def get_run_id_list_from_query(query,limit=2000):
     runs_table_df = project.fetch_runs_table(query=query,limit=limit).to_pandas()
     
     #drop the failed runs
-    runs_table_df = runs_table_df[~runs_table_df['sys/failed']].copy()
+    # runs_table_df = runs_table_df[~runs_table_df['sys/failed']].copy()
     # select only the inactive runs
     runs_table_df = runs_table_df[runs_table_df['sys/state']== 'Inactive'].copy()
     

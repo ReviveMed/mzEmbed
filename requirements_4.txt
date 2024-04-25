@@ -37,3 +37,5 @@ neptune-pytorch
 plotly
 lifelines
 scikit-survival # scikit-learn for survival analysis, they suggest using conda to install
+torchtext # needed for scGPT
+anndata #annotated data, needed for scGPT, but should be used for future work too
