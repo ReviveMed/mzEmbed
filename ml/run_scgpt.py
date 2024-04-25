@@ -31,6 +31,8 @@ from torchtext._torchtext import (
 
 # sys.path.append("../")
 sys.path.insert(0, "../")
+#You may need to add scGPT to the python path
+# export PYTHONPATH="${PYTHONPATH}:/app/mz_embed_engine/scgpt"
 
 import scgpt as scg
 from scgpt.tokenizer.gene_tokenizer import GeneVocab
@@ -345,6 +347,7 @@ logger.info(
     f"\n\t feature length: {tokenized_valid['genes'].shape[1]}"
 )
 
+exit()
 
 # %%
 def prepare_data(sort_seq_batch=False) -> Tuple[Dict[str, torch.Tensor]]:
