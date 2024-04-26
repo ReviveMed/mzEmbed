@@ -159,7 +159,8 @@ explicit_zero_prob = config.explicit_zero_prob  # whether explicit bernoulli for
 dataset_name = config.dataset_name
 
 # get current working directory
-data_dir = '/DATA2'
+home_dir = os.path.expanduser("~")
+data_dir = os.path.join(home_dir, "DATA2")
 if not os.path.exists(data_dir):
     os.makedirs(data_dir)
 
