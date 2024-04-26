@@ -27,3 +27,5 @@ dependencies:
       - nbsphinx
       - nbsphinx-link
       - myst_nb
+      - louvain
+      - wandb
