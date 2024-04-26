@@ -80,7 +80,7 @@ hyperparameter_defaults = dict(
     # load_model="save/scGPT_bc",
     load_model = None,
     mask_ratio=0.25, # ratio of masked values, default was 0.4
-    epochs=30,
+    epochs=5, #original was 30
     n_bins=101, #counts/intensity bins, default was 51
     GEPC=True,  # Masked value prediction for cell embedding
     ecs_thres=0.0,  # Elastic cell similarity objective, 0.0 to 1.0, 0.0 to disable. default was 0.8 in the paper it was 0.6
@@ -93,7 +93,7 @@ hyperparameter_defaults = dict(
     # if load model, batch_size, layer_size, nlayers, nhead will be ignored
     dropout=0.2,
     schedule_ratio=0.9,  # ratio of epochs for learning rate schedule
-    save_eval_interval=5,
+    save_eval_interval=1, #original was 5
     log_interval=100,
     fast_transformer=False, #need CUDA for this
     pre_norm=False,
@@ -159,7 +159,7 @@ explicit_zero_prob = config.explicit_zero_prob  # whether explicit bernoulli for
 dataset_name = config.dataset_name
 
 # get current working directory
-data_dir = '/DATA'
+data_dir = '/DATA2'
 if not os.path.exists(data_dir):
     os.makedirs(data_dir)
 
@@ -756,7 +756,9 @@ def eval_testdata(
         )
         all_gene_ids, all_values = tokenized_all["genes"], tokenized_all["values"]
         src_key_padding_mask = all_gene_ids.eq(vocab[pad_token])
-        with torch.no_grad(), torch.cuda.amp.autocast(enabled=config.amp):
+        # with torch.no_grad(), torch.cuda.amp.autocast(enabled=config.amp): #No CUDA
+        with torch.no_grad():  
+            print('encode batch')  
             cell_embeddings = model.encode_batch(
                 all_gene_ids,
                 all_values.float(),
@@ -774,11 +776,13 @@ def eval_testdata(
 
         results = {}
         try:
+            print('eval scib metrics')
             results = eval_scib_metrics(adata_t)
         except Exception as e:
             traceback.print_exc()
             logger.error(e)
 
+        print('sc.pp.neighbors')
         sc.pp.neighbors(adata_t, use_rep="X_scGPT")
         sc.tl.umap(adata_t, min_dist=0.3)
         fig = sc.pl.umap(

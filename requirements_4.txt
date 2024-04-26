@@ -50,3 +50,4 @@ scikit-misc #used for loess regression, but I don't think it is used
 scib
 tqdm
 wandb
+louvain
