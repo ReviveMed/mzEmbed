@@ -251,13 +251,11 @@ if config.load_model is not None:
         model_configs["nheads"] = config.nhead
         model_configs["d_hid"] = config.layer_size
         model_configs["nlayers"] = config.nlayers
-        model_configs["n_layers_cls"] = config.n_layers_cls
 
     embsize = model_configs["embsize"]
     nhead = model_configs["nheads"]
     d_hid = model_configs["d_hid"]
     nlayers = model_configs["nlayers"]
-    n_layers_cls = model_configs["n_layers_cls"]
 else:
     embsize = config.layer_size 
     nhead = config.nhead
@@ -272,7 +270,6 @@ else:
     model_configs["nheads"] = config.nhead
     model_configs["d_hid"] = config.layer_size
     model_configs["nlayers"] = config.nlayers
-    model_configs["n_layers_cls"] = config.n_layers_cls
     with open(model_config_file, "w") as f:
         # json.dump(config.__dict__, f, indent=2)
         json.dump(model_configs, f, indent=2)
