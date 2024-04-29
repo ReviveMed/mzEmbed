@@ -83,7 +83,7 @@ hyperparameter_defaults = dict(
     seed=42,
     dataset_name="metabolomics_apr24",
     do_train=True,
-    load_model = f"{data_dir}/save/dev_metabolomics_apr24-Apr27-03-37"
+    load_model = f"{data_dir}/save/dev_metabolomics_apr24-Apr27-03-37",
     # load_model="save/scGPT_bc",
     # load_model = None,
     mask_ratio=0.25, # ratio of masked values, default was 0.4
@@ -107,8 +107,8 @@ hyperparameter_defaults = dict(
     amp=True,  # Automatic Mixed Precision
     n_hvg=False, # number of highly variable genes
     max_seq_len=1200, #1200 was the amount specified in the paper
-    per_seq_batch_sample = False, #NOTE: when True, this crashes the code
-    DSBN = False, # Domain-spec batchnorm
+    per_seq_batch_sample = True, #NOTE: when True, this crashes the code
+    DSBN = True, # Domain-spec batchnorm
     explicit_zero_prob = True, # whether explicit bernoulli for zeros
     normalize_total = False, # 3. whether to normalize the raw data and to what sum
     use_batch_labels = True, # whether to use batch labels, default was True
@@ -238,12 +238,21 @@ if config.load_model is not None:
     adata = adata[:, adata.var["id_in_vocab"] >= 0]
 
     # model
-    with open(model_config_file, "r") as f:
-        model_configs = json.load(f)
-    logger.info(
-        f"Resume model from {model_file}, the model args will be overriden by the "
-        f"config {model_config_file}."
-    )
+    if os.path.exists(model_config_file):
+        with open(model_config_file, "r") as f:
+            model_configs = json.load(f)
+        logger.info(
+            f"Resume model from {model_file}, the model args will be overriden by the "
+            f"config {model_config_file}."
+        )
+    else:
+        model_configs = {}
+        model_configs["embsize"] = config.layer_size
+        model_configs["nheads"] = config.nhead
+        model_configs["d_hid"] = config.layer_size
+        model_configs["nlayers"] = config.nlayers
+        model_configs["n_layers_cls"] = config.n_layers_cls
+
     embsize = model_configs["embsize"]
     nhead = model_configs["nheads"]
     d_hid = model_configs["d_hid"]
@@ -254,6 +263,19 @@ else:
     nhead = config.nhead
     nlayers = config.nlayers  
     d_hid = config.layer_size
+    vocab_file = save_dir / "vocab.json"
+    model_config_file = save_dir / "args.json"
+    # save the config to json
+
+    model_configs = {}
+    model_configs["embsize"] = config.layer_size
+    model_configs["nheads"] = config.nhead
+    model_configs["d_hid"] = config.layer_size
+    model_configs["nlayers"] = config.nlayers
+    model_configs["n_layers_cls"] = config.n_layers_cls
+    with open(model_config_file, "w") as f:
+        # json.dump(config.__dict__, f, indent=2)
+        json.dump(model_configs, f, indent=2)
 
 
 # %%
@@ -275,9 +297,10 @@ preprocessor = Preprocessor(
 preprocessor(adata, batch_key="str_batch" if dataset_name != "heart_cell" else None)
 
 # %%
-if per_seq_batch_sample:
-    # sort the adata by batch_id in advance
-    adata_sorted = adata[adata.obs["batch_id"].argsort()].copy()
+# This sorting caused crashed in earlier attempts, need to check if it still crashes
+# if per_seq_batch_sample:
+#     # sort the adata by batch_id in advance
+#     adata_sorted = adata[adata.obs["batch_id"].argsort()].copy()
 
 # %% [markdown]
 # ## Tokenize input
@@ -325,9 +348,16 @@ else:
 
 # %%
 if config.load_model is None:
-    vocab = Vocab(
-        VocabPybind(genes + special_tokens, None)
-    )  # bidirectional lookup [gene <-> int]
+    vocab = GeneVocab(
+        genes,
+        special_tokens,
+    )
+    vocab.save_json(vocab_file)
+
+    # vocab = Vocab(
+    #     VocabPybind(genes + special_tokens, None)
+    # )  # bidirectional lookup [gene <-> int]
+
 vocab.set_default_index(vocab["<pad>"])
 gene_ids = np.array(vocab(genes), dtype=int)
 
@@ -874,7 +904,8 @@ for epoch in range(1, config.epochs + 1):
         # eval on testdata
         results = eval_testdata(
             best_model,
-            adata_t=adata_sorted if per_seq_batch_sample else adata,
+            adata_t=adata,
+            # adata_t=adata_sorted if per_seq_batch_sample else adata,
             include_types=["cls"],
         )
         results["batch_umap"].savefig(
