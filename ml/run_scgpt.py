@@ -72,18 +72,25 @@ class Config:
 # %%
 USE_WANDB = True
 
+# get current working directory
+home_dir = os.path.expanduser("~")
+data_dir = os.path.join(home_dir, "DATA2")
+if not os.path.exists(data_dir):
+    os.makedirs(data_dir)
+
 
 hyperparameter_defaults = dict(
     seed=42,
     dataset_name="metabolomics_apr24",
     do_train=True,
+    load_model = f"{data_dir}/save/dev_metabolomics_apr24-Apr27-03-37"
     # load_model="save/scGPT_bc",
-    load_model = None,
+    # load_model = None,
     mask_ratio=0.25, # ratio of masked values, default was 0.4
-    epochs=30, #original was 30
+    epochs=10, #original was 30
     n_bins=101, #counts/intensity bins, default was 51
     GEPC=True,  # Masked value prediction for cell embedding
-    ecs_thres=0.0,  # Elastic cell similarity objective, 0.0 to 1.0, 0.0 to disable. default was 0.8 in the paper it was 0.6
+    ecs_thres=0.6,  # Elastic cell similarity objective, 0.0 to 1.0, 0.0 to disable. default was 0.8 in the paper it was 0.6
     dab_weight=1.0, # weight for domain adversarial loss
     lr=1e-4,
     batch_size=32, #default was 64
@@ -104,8 +111,8 @@ hyperparameter_defaults = dict(
     DSBN = False, # Domain-spec batchnorm
     explicit_zero_prob = True, # whether explicit bernoulli for zeros
     normalize_total = False, # 3. whether to normalize the raw data and to what sum
-    use_batch_labels = False, # whether to use batch labels, default was True
-    DAB = False, # whether to use domain adversarial loss
+    use_batch_labels = True, # whether to use batch labels, default was True
+    DAB = True, # whether to use domain adversarial loss
 
 )              
 
@@ -158,11 +165,6 @@ explicit_zero_prob = config.explicit_zero_prob  # whether explicit bernoulli for
 # %%
 dataset_name = config.dataset_name
 
-# get current working directory
-home_dir = os.path.expanduser("~")
-data_dir = os.path.join(home_dir, "DATA2")
-if not os.path.exists(data_dir):
-    os.makedirs(data_dir)
 
 
 save_dir = Path(f"{data_dir}/save/dev_{dataset_name}-{time.strftime('%b%d-%H-%M')}/")
