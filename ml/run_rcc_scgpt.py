@@ -116,7 +116,11 @@ hyperparameter_defaults = dict(
     # celltype_label="Cohort Label",
     # datasubset_label = 'pretrain_set'
     celltype_label="MSKCC_binary_id",
-    datasubset_label = 'finetune_set'
+    datasubset_label = 'finetune_set',
+    trainsubset_label = 'Finetune',
+    valsubset_label = 'Validation',
+    # trainsubset_label = 'Train',
+    # valsubset_label = 'Val',
     # celltype_label="sex",
     # datasubset_label = 'pretrain_set'
 
@@ -328,13 +332,17 @@ batch_ids = np.array(batch_ids)
 datasubset_label = config.datasubset_label
 
 if datasubset_label in adata.obs:
-    print('use pretrain_set for train/val split')
-    train_data = all_counts[adata.obs[datasubset_label] == "Train"]
-    valid_data = all_counts[adata.obs[datasubset_label] == "Val"]
-    train_celltype_labels = celltypes_labels[adata.obs[datasubset_label] == "Train"]
-    valid_celltype_labels = celltypes_labels[adata.obs[datasubset_label] == "Val"]
-    train_batch_labels = batch_ids[adata.obs[datasubset_label] == "Train"]
-    valid_batch_labels = batch_ids[adata.obs[datasubset_label] == "Val"]
+    trainsubset_label = config.trainsubset_label
+    valsubset_label = config.valsubset_label
+
+    print(f'use {datasubset_label} for train ({trainsubset_label}) /val ({valsubset_label}) split')
+    train_data = all_counts[adata.obs[datasubset_label] == trainsubset_label]
+    valid_data = all_counts[adata.obs[datasubset_label] == valsubset_label]
+    train_celltype_labels = celltypes_labels[adata.obs[datasubset_label] == trainsubset_label]
+    valid_celltype_labels = celltypes_labels[adata.obs[datasubset_label] == valsubset_label]
+    train_batch_labels = batch_ids[adata.obs[datasubset_label] == trainsubset_label]
+    valid_batch_labels = batch_ids[adata.obs[datasubset_label] == valsubset_label]
+    print('train/val split: ', len(train_data), len(valid_data))
 
 else:
     print('use random split for train/val split')
