@@ -189,12 +189,14 @@ if __name__ == '__main__':
 
     # %%
     ## Get the latest dataset
+    print('Getting the latest dataset')
     data_dir = get_latest_dataset(data_dir=data_dir,project=PROJECT_ID)
 
     # %%
     # Import the data
     # os_col = 'OS'
     for os_col in ['OS','NIVO OS','EVER OS']:
+        print(f'Running survival analysis for {os_col}')
 
         event_col = 'OS_Event'
 
@@ -222,6 +224,7 @@ if __name__ == '__main__':
 
         # %%
         # running L1-Cox
+        print('Running L1-Cox')
         l1_cox_param_grid = {
             "l1_ratio": [1],
             "fit_baseline_model": [True],
@@ -234,6 +237,7 @@ if __name__ == '__main__':
 
 
         # %% running random survival forest
+        print('Running Random Survival Forest')
         random_forest_param_grid = {
                         'n_estimators': [100, 200, 300, 400],
                         'max_depth': [3, 5, 10, None],
@@ -251,7 +255,7 @@ if __name__ == '__main__':
 
 
         # %% running survival SVM
-
+        print('Running Survival SVM')
 
         svm_param_grid = {
                         "rank_ratio": [0.1, 0.2, 0.5, 1],
@@ -266,7 +270,7 @@ if __name__ == '__main__':
 
 
         # %% GBSA
-
+        print('Running GBSA')
         gs_model = GradientBoostingSurvivalAnalysis()
 
         gbsa_param_grid = {
@@ -281,7 +285,7 @@ if __name__ == '__main__':
 
 
         # %% L2-Cox
-
+        print('Running L2-Cox')
         l2_cph_param_grid = {
             "alpha": 10.0 ** np.linspace(-4, 4, 100)
         }
