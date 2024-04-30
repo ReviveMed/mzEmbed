@@ -11,10 +11,11 @@ import copy
 import tqdm
 import itertools
 
-from misc import get_latest_dataset, update_finetune_data
 
 import neptune
 from neptune.utils import stringify_unsupported
+
+from utils_neptune import get_latest_dataset
 
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
@@ -31,7 +32,8 @@ def prep_surv_y(survival_column, event_column):
         survival_column: list of survival times
         event_column: list of event indicators (0 for censored, 1 for event)
     """
-    surv_y = np.array([(event_column[i], survival_column[i]) for i in range(len(survival_column))], dtype=[('status', bool), ('time', float)])
+    surv_y = np.array([(event_column.iloc[i], survival_column.iloc[i]) for i in range(len(survival_column))], dtype=[('status', bool), ('time', float)])
+    # surv_y = np.array([(event_column[i], survival_column[i]) for i in range(len(survival_column))], dtype=[('status', bool), ('time', float)])
     return surv_y
 
 def create_data_dict(data_dir,set_name,os_col,event_col,data_dict=None):
@@ -48,6 +50,13 @@ def create_data_dict(data_dir,set_name,os_col,event_col,data_dict=None):
                            'X_file':X_path,
                            'y_file':y_path}
     return data_dict
+
+
+def clean_param(param):
+    if isinstance(param,list):
+        return param[0]
+    else:
+        return param
 
 
 def survival_grid_search(base_model, param_grid, data_dict, eval_times=None,base_model_name=None,use_neptune=True):
@@ -80,7 +89,8 @@ def survival_grid_search(base_model, param_grid, data_dict, eval_times=None,base
                 api_token=NEPTUNE_API_TOKEN,
             ) 
 
-            run['parameters']=gs
+            gs_clean = {k: clean_param(v) for k,v in gs.items()}
+            run['parameters']=stringify_unsupported(gs_clean)
             run['model']=base_model_name
             if 'os_col' in data_dict['train']:
                 run['datasets/os_col']=data_dict['train']['os_col']
@@ -105,8 +115,8 @@ def survival_grid_search(base_model, param_grid, data_dict, eval_times=None,base
             if use_neptune:
                 run['metrics/eval_times'] = eval_times
                 for k in data_dict.keys():
-                    run['metrics/'+k+'/c_score'] = model_stats[0][k, "c_score"]
-                    run['metrics/'+k+'/ibs'] = model_stats[1][k, "ibs"]
+                    run['metrics/'+k+'/c_score'] = stringify_unsupported(model_stats[0][k, "c_score"])
+                    run['metrics/'+k+'/ibs'] = stringify_unsupported(model_stats[1][k, "ibs"])
                     for t in eval_times + [eval_times[0:2]]:
                         run['metrics/'+k+'/dauc'].append(model_stats[2][k, "dauc_"+str(t)])
 
@@ -124,11 +134,11 @@ def survival_grid_search(base_model, param_grid, data_dict, eval_times=None,base
         i_df['params'] = [gs]
         if hasattr(model, 'coef_'):
             i_df['n_nonzero'] = np.sum(model.coef_!=0)
+            run['n_nonzero'] = i_df['n_nonzero']
         else:
             i_df['n_nonzero'] = np.nan
         
         if use_neptune:
-            run['n_nonzero'] = stringify_unsupported(i_df['n_nonzero'])
             run.stop()
 
         hp_summary[i] = i_df
@@ -192,13 +202,13 @@ if __name__ == '__main__':
     data_dict = create_data_dict(data_dir,'val',os_col,event_col,data_dict)
     data_dict = create_data_dict(data_dir,'test',os_col,event_col,data_dict)
 
-    # X_train = pd.read_csv(f'{data_dir}/X_finetune_train2.csv', index_col=0)
-    # X_val = pd.read_csv(f'{data_dir}/X_finetune_val2.csv', index_col=0)
-    # X_test = pd.read_csv(f'{data_dir}/X_finetune_test2.csv', index_col=0)
+    # X_train = pd.read_csv(f'{data_dir}/X_finetune_train.csv', index_col=0)
+    # X_val = pd.read_csv(f'{data_dir}/X_finetune_val.csv', index_col=0)
+    # X_test = pd.read_csv(f'{data_dir}/X_finetune_test.csv', index_col=0)
 
-    # y_train = pd.read_csv(f'{data_dir}/y_finetune_train2.csv', index_col=0)
-    # y_val = pd.read_csv(f'{data_dir}/y_finetune_val2.csv', index_col=0)
-    # y_test = pd.read_csv(f'{data_dir}/y_finetune_test2.csv', index_col=0)
+    # y_train = pd.read_csv(f'{data_dir}/y_finetune_train.csv', index_col=0)
+    # y_val = pd.read_csv(f'{data_dir}/y_finetune_val.csv', index_col=0)
+    # y_test = pd.read_csv(f'{data_dir}/y_finetune_test.csv', index_col=0)
 
     # data_dict = {
     #     "train": {"X": X_train, "y": prep_surv_y(y_train[os_col], y_train[event_col])},
@@ -210,11 +220,11 @@ if __name__ == '__main__':
     # %%
     # running L1-Cox
     l1_cox_param_grid = {
-    "l1_ratio": [1],
-    "fit_baseline_model": [True],
-    "alphas": [0.0001]
-    # "alphas": [[i] for i in 10.0 ** np.linspace(-4, 4, 100)]
-}
+        "l1_ratio": [1],
+        "fit_baseline_model": [True],
+        "alphas": [[0.0006428073117284319]]
+        # "alphas": [[i] for i in 10.0 ** np.linspace(-4, 4, 100)]
+    }
 
     gs_model = CoxnetSurvivalAnalysis()
     grid_res_df = survival_grid_search(gs_model, l1_cox_param_grid, data_dict)
