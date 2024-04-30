@@ -7,6 +7,7 @@ import zipfile
 import json
 import matplotlib.pyplot as plt
 from paretoset import paretoset
+import shutil
 
 ###################
 ## Basic File I/O Functions
@@ -119,6 +120,33 @@ def encode_df_col(df, col, val_mapper=None, suffix='_encoded'):
         val_mapper = {val: i for i, val in enumerate(sorted_vals)}
     df[col + suffix] = df[col].map(val_mapper)
     return df, val_mapper
+
+
+def update_finetune_data(file_suffix,data_dir,redo=False):
+    vnum = 2
+    y_savefile = f'{data_dir}/y_{file_suffix}{vnum:.0f}.csv'
+    if redo and os.path.exists(y_savefile):
+        os.remove(y_savefile)
+
+    if not os.path.exists(y_savefile):
+        y_val_data = pd.read_csv(f'{data_dir}/y_{file_suffix}.csv')
+        y_val_data['NIVO OS'] = np.nan
+        y_val_data.loc[y_val_data['Treatment']=='NIVOLUMAB', 'NIVO OS'] = y_val_data.loc[y_val_data['Treatment']=='NIVOLUMAB', 'OS']
+        y_val_data['EVER OS'] = np.nan
+        y_val_data.loc[y_val_data['Treatment']=='EVEROLIMUS', 'EVER OS'] = y_val_data.loc[y_val_data['Treatment']=='EVEROLIMUS', 'OS']
+        
+        y_val_data['NIVO PFS'] = np.nan
+        y_val_data.loc[y_val_data['Treatment']=='NIVOLUMAB', 'NIVO PFS'] = y_val_data.loc[y_val_data['Treatment']=='NIVOLUMAB', 'PFS']
+        y_val_data['EVER PFS'] = np.nan
+        y_val_data.loc[y_val_data['Treatment']=='EVEROLIMUS', 'EVER PFS'] = y_val_data.loc[y_val_data['Treatment']=='EVEROLIMUS', 'PFS']
+        
+        y_val_data['Treatment is NIVO'] = 0
+        y_val_data.loc[y_val_data['Treatment']=='NIVOLUMAB', 'Treatment is NIVO'] = 1
+        y_val_data.to_csv(y_savefile,index=False)
+        shutil.copy(f'{data_dir}/X_{file_suffix}.csv',f'{data_dir}/X_{file_suffix}{vnum:.0f}.csv')
+
+    return
+
 
 ####################################################################################
 ## Pareto Front and basic outlier removal

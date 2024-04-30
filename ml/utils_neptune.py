@@ -9,8 +9,8 @@ from misc import unravel_dict, download_data_dir
 import os
 import shutil
 
-def get_latest_dataset(data_dir='/DATA'):
-    project = neptune.init_project(project="revivemed/RCC", api_token=NEPTUNE_API_TOKEN)
+def get_latest_dataset(data_dir='/DATA',project='revivemed/RCC'):
+    project = neptune.init_project(project=project, api_token=NEPTUNE_API_TOKEN)
     data_url = project["dataset/latest_link"].fetch()
     latest_hash = project["dataset/latest"].fetch_hash()
     need_to_download = False
