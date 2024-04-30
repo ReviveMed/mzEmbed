@@ -91,7 +91,7 @@ hyperparameter_defaults = dict(
     n_bins=101, #counts/intensity bins, default was 51
     GEPC=True,  # Masked value prediction for cell embedding
     ecs_thres=0.8,  # Elastic cell similarity objective, 0.0 to 1.0, 0.0 to disable. default was 0.8 in the paper it was 0.6
-    dab_weight=1.0, # weight for domain adversarial loss
+    dab_weight=0.0, # weight for domain adversarial loss
     lr=1e-4,
     batch_size=32, #default was 64
     layer_size=128,
@@ -108,11 +108,17 @@ hyperparameter_defaults = dict(
     n_hvg=False, # number of highly variable genes
     max_seq_len=1200, #1200 was the amount specified in the paper
     per_seq_batch_sample = True, #NOTE: when True, this crashes the code
-    DSBN = True, # Domain-spec batchnorm
+    DSBN = False, # Domain-spec batchnorm
     explicit_zero_prob = True, # whether explicit bernoulli for zeros
     normalize_total = False, # 3. whether to normalize the raw data and to what sum
-    use_batch_labels = True, # whether to use batch labels, default was True
-    DAB = True, # whether to use domain adversarial loss
+    use_batch_labels = False, # whether to use batch labels, default was True
+    DAB = False, # whether to use domain adversarial loss
+    # celltype_label="Cohort Label",
+    # datasubset_label = 'pretrain_set'
+    celltype_label="MSKCC_binary_id",
+    datasubset_label = 'finetune_set'
+    # celltype_label="sex",
+    # datasubset_label = 'pretrain_set'
 
 )              
 
@@ -192,9 +198,8 @@ if dataset_name == "metabolomics_apr24":
     adata = read_h5ad(load_path)
     # adata = scvi.data.pbmc_dataset()  # 11990 × 3346
     ori_batch_col = "Study ID"
-    adata.obs["celltype"] = adata.obs["Cohort Label"].astype("category")
+    adata.obs["celltype"] = adata.obs[config.celltype_label].astype("category")
     data_is_raw = True
-
 
 
 
@@ -320,15 +325,16 @@ batch_ids = adata.obs["batch_id"].tolist()
 num_batch_types = len(set(batch_ids))
 batch_ids = np.array(batch_ids)
 
+datasubset_label = config.datasubset_label
 
-if "pretrain_set" in adata.obs:
+if datasubset_label in adata.obs:
     print('use pretrain_set for train/val split')
-    train_data = all_counts[adata.obs["pretrain_set"] == "Train"]
-    valid_data = all_counts[adata.obs["pretrain_set"] == "Val"]
-    train_celltype_labels = celltypes_labels[adata.obs["pretrain_set"] == "Train"]
-    valid_celltype_labels = celltypes_labels[adata.obs["pretrain_set"] == "Val"]
-    train_batch_labels = batch_ids[adata.obs["pretrain_set"] == "Train"]
-    valid_batch_labels = batch_ids[adata.obs["pretrain_set"] == "Val"]
+    train_data = all_counts[adata.obs[datasubset_label] == "Train"]
+    valid_data = all_counts[adata.obs[datasubset_label] == "Val"]
+    train_celltype_labels = celltypes_labels[adata.obs[datasubset_label] == "Train"]
+    valid_celltype_labels = celltypes_labels[adata.obs[datasubset_label] == "Val"]
+    train_batch_labels = batch_ids[adata.obs[datasubset_label] == "Train"]
+    valid_batch_labels = batch_ids[adata.obs[datasubset_label] == "Val"]
 
 else:
     print('use random split for train/val split')
