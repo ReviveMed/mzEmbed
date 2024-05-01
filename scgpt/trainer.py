@@ -184,11 +184,13 @@ def train(
     config,
     logger,
     epoch,
+    use_wandb: bool=True,
 ) -> None:
     """
     Train the model for one epoch.
     """
-    import wandb
+    if use_wandb:
+        import wandb
 
     model.train()
     total_loss, total_gep, total_cls, total_gepc, total_ecs, total_dab = (
@@ -200,7 +202,7 @@ def train(
         0.0,
     )
     total_zero_log_prob, total_gepc_zero_log_prob = 0.0, 0.0
-    # total_error = 0.0
+    total_error = 0.0
     log_interval = config.log_interval
     start_time = time.time()
 
@@ -278,12 +280,12 @@ def train(
                     .item()
                 ) / celltype_labels.size(0)
 
-            if config.ESC:
+            if (config.ESC) and (config.ecs_thres > 0):
                 loss_ecs = 10 * output_dict["loss_ecs"]
                 loss = loss + loss_ecs
                 metrics_to_log.update({"train/ecs": loss_ecs.item()})
 
-            if config.DAR:
+            if config.DAR: # domain adversarial loss   
                 # try weighting and separate optimizer
                 loss_dab = criterion_dab(output_dict["dab_output"], batch_labels)
                 loss = loss + config.dab_weight * loss_dab
@@ -309,12 +311,22 @@ def train(
         scaler.step(optimizer)
         scaler.update()
 
-        wandb.log(metrics_to_log)
+        if use_wandb:
+            wandb.log(metrics_to_log)
+
+        if config.GEP:
+            with torch.no_grad():
+                mre = masked_relative_error(
+                    output_dict["mlm_output"], target_values, masked_positions
+                )
+                metrics_to_log.update({"train/mre": mre.item()})
+
 
         total_loss += loss.item()
         total_gep += loss_gep.item() if config.GEP else 0.0
         total_cls += loss_cls.item() if config.CLS else 0.0
         total_gepc += loss_gepc.item() if config.GEPC else 0.0
+        total_error += mre.item() if config.GEP else 0.0
         total_ecs += loss_ecs.item() if config.ESC else 0.0
         total_dab += loss_dab.item() if config.DAR else 0.0
         total_zero_log_prob += (
@@ -334,6 +346,7 @@ def train(
             cur_gep = total_gep / log_interval if config.GEP else 0.0
             cur_cls = total_cls / log_interval if config.CLS else 0.0
             cur_gepc = total_gepc / log_interval if config.GEPC else 0.0
+            cur_error = total_error / log_interval if config.GEP else 0.0
             cur_ecs = total_ecs / log_interval if config.ESC else 0.0
             cur_dab = total_dab / log_interval if config.DAR else 0.0
             cur_zero_log_prob = (
@@ -352,7 +365,7 @@ def train(
                 f"loss {cur_loss:5.2f} | "
                 + (f"gep {cur_gep:5.2f} |" if config.GEP else "")
                 + (f"cls {cur_cls:5.2f} | " if config.CLS else "")
-                # + (f"err {cur_error:5.2f} | " if config.CLS else "")
+                + (f"err {cur_error:5.2f} | " if config.GEP else "")
                 + (f"gepc {cur_gepc:5.2f} |" if config.GEPC else "")
                 + (f"ecs {cur_ecs:5.2f} |" if config.ESC else "")
                 + (f"dar {cur_dab:5.2f} |" if config.DAR else "")
@@ -365,15 +378,19 @@ def train(
             total_dab = 0
             total_zero_log_prob = 0
             total_gepc_zero_log_prob = 0
-            # total_error = 0
+            total_error = 0
             start_time = time.time()
 
 
-def define_wandb_metrcis():
-    import wandb
-
-    wandb.define_metric("valid/loss", summary="min", step_metric="epoch")
-    wandb.define_metric("test/avg_bio", summary="max")
+def define_wandb_metrcis(use_wandb=True):
+    if use_wandb:
+        import wandb
+        wandb.define_metric("valid/mse", summary="min", step_metric="epoch")
+        wandb.define_metric("valid/mre", summary="min", step_metric="epoch")
+        wandb.define_metric("valid/dab", summary="min", step_metric="epoch")
+        wandb.define_metric("valid/sum_mse_dab", summary="min", step_metric="epoch")
+        wandb.define_metric("valid/loss", summary="min", step_metric="epoch")
+        wandb.define_metric("test/avg_bio", summary="max")
 
 
 def evaluate(
@@ -386,15 +403,17 @@ def evaluate(
     device,
     config,
     epoch,
+    use_wandb: bool =True,
 ) -> float:
     """
     Evaluate the model on the evaluation data.
     """
-    import wandb
+    if use_wandb:
+        import wandb
 
     model.eval()
     total_loss = 0.0
-    # total_error = 0.0
+    total_error = 0.0
     total_dab = 0.0
     total_num = 0
     with torch.no_grad():
@@ -440,7 +459,10 @@ def evaluate(
                     loss_dab = criterion_dab(output_dict["dab_output"], batch_labels)
 
             total_loss += loss.item() * len(input_gene_ids)
-
+            total_error += masked_relative_error(
+                output_values, target_values, masked_positions
+            ).item() * len(input_gene_ids)
+            
             if config.DAR:
                 total_dab += (
                     loss_dab.item() * len(input_gene_ids) if config.DAR else 0.0
@@ -450,12 +472,18 @@ def evaluate(
 
             total_num += len(input_gene_ids)
 
-    wandb.log(
-        {
-            "valid/loss": (total_loss + config.dab_weight * total_dab) / total_num,
-            "epoch": epoch,
-        },
-    )
+    if use_wandb:
+        wandb.log(
+            {
+                "valid/loss": (total_loss + config.dab_weight * total_dab) / total_num,
+                "valid/mse": total_loss / total_num,
+                "valid/mre": total_error / total_num,
+                "valid/dab": total_dab / total_num,
+                "valid/sum_mse_dab": (total_loss + config.dab_weight * total_dab)
+                    / total_num,
+                "epoch": epoch,
+            },
+        )
 
     return total_loss / total_num
 
@@ -648,11 +676,13 @@ def eval_testdata(
 
         results = {}
         try:
+            print('eval scib metrics')
             results = eval_scib_metrics(adata_t)
         except Exception as e:
             traceback.print_exc()
             logger.error(e)
 
+        print('sc.pp.neighbors')
         sc.pp.neighbors(adata_t, use_rep="X_scGPT")
         sc.tl.umap(adata_t, min_dist=0.3)
         fig = sc.pl.umap(

@@ -1,0 +1,611 @@
+# Based on the 
+# %%
+import copy
+import gc
+import json
+import os
+from pathlib import Path
+import sys
+import time
+import traceback
+from typing import List, Tuple, Dict, Union, Optional
+import warnings
+
+import torch
+from anndata import AnnData, read_h5ad
+import scanpy as sc
+import scvi
+import numpy as np
+import wandb
+from scipy.sparse import issparse
+import matplotlib.pyplot as plt
+from torch import nn
+from torch.nn import functional as F
+from torch.utils.data import Dataset, DataLoader
+from sklearn.model_selection import train_test_split
+from torchtext.vocab import Vocab
+from torchtext._torchtext import (
+    Vocab as VocabPybind,
+)
+# %%
+
+# sys.path.append("../")
+sys.path.insert(0, "../")
+#You may need to add scGPT to the python path
+# export PYTHONPATH="${PYTHONPATH}:/app/mz_embed_engine/scgpt"
+
+import scgpt as scg
+from scgpt.tokenizer.gene_tokenizer import GeneVocab
+from scgpt import prepare_data, prepare_dataloader, define_wandb_metrcis, evaluate, eval_testdata, train
+
+from scgpt.model import TransformerModel, AdversarialDiscriminator
+from scgpt.tokenizer import tokenize_and_pad_batch, random_mask_value
+from scgpt.loss import (
+    masked_mse_loss,
+    masked_relative_error,
+    criterion_neg_log_bernoulli,
+)
+from scgpt.preprocess import Preprocessor
+from scgpt import SubsetsBatchSampler
+from scgpt.utils import set_seed, category_str2int, eval_scib_metrics
+
+sc.set_figure_params(figsize=(4, 4))
+os.environ["KMP_WARNINGS"] = "off"
+warnings.filterwarnings('ignore')
+
+from misc import download_data_file
+
+
+# %%
+
+warnings.filterwarnings('ignore', category=UserWarning, message='^User provided device_type of \'cuda\', but CUDA is not available')
+
+# create a class that takes a dictionary and creates class variables for each of the key and values in the input dictionary
+class Config:
+    def __init__(self, dictionary):
+        for key, value in dictionary.items():
+            setattr(self, key, value)
+
+    def show(self):
+        for attr, value in self.__dict__.items():
+            print(f"{attr}: {value}")
+              
+
+
+
+# %%
+USE_WANDB = True
+
+# get current working directory
+home_dir = os.path.expanduser("~")
+data_dir = os.path.join(home_dir, "DATA2")
+if not os.path.exists(data_dir):
+    os.makedirs(data_dir)
+
+
+hyperparameter_defaults = dict(
+    task="annotation",
+    seed=42,
+    dataset_name="metab_v0",
+    do_train=True,
+    # load_model = f"{data_dir}/save/dev_metabolomics_apr24-Apr27-03-37",
+    # load_model="save/scGPT_bc",
+    load_model = None,
+    mask_value=-1,
+    pad_value=-2,
+    include_zero_gene=True,
+    pad_token="<pad>",
+    mask_ratio=0.25, # ratio of masked values, default was 0.4
+    epochs=10, #original was 30
+    n_bins=101, #counts/intensity bins, default was 51
+    GEP=True,  # Gene expression prediction, Gene expression modelling
+    GEPC=True,  # Masked value prediction for cell embedding, Gene expression modelling for cell objective
+    CLS=False,  # Classification?
+    ESC=False,  # Elastic similarity constraint
+    ecs_thres=0,  # Elastic cell similarity objective, 0.0 to 1.0, 0.0 to disable. default was 0.8 in the paper it was 0.6
+    DAR=False,  # Domain adversarial loss
+    DSBN = False, # Domain-spec batchnorm
+    dab_weight=0.0, # weight for domain adversarial loss
+    lr=1e-4,
+    batch_size=32, #default was 64
+    layer_size=128,
+    nlayers=4,
+    nhead=4,
+    # if load model, batch_size, layer_size, nlayers, nhead will be ignored
+    dropout=0.2,
+    schedule_ratio=0.9,  # ratio of epochs for learning rate schedule
+    save_eval_interval=3, #original was 5
+    log_interval=100,
+    fast_transformer=False, #need CUDA for this
+    pre_norm=False,
+    amp=True,  # Automatic Mixed Precision
+    n_hvg=False, # number of highly variable genes
+    # n_hvg = 1200,  # Default number of highly variable genes
+    n_hvp = 4000, # number of highly variable proteins
+    # max_seq_len = 4001, # # Default n_hvg+1
+    max_seq_len=1201, #1200 was the amount specified in the paper
+    per_seq_batch_sample = True, #NOTE: when True, this crashes the code
+    explicit_zero_prob = True, # whether explicit bernoulli for zeros
+    normalize_total = False, # 3. whether to normalize the raw data and to what sum
+    use_batch_labels = False, # whether to use batch labels, default was True
+    celltype_label="Cohort Label",
+    datasubset_label = 'pretrain_set',
+    trainsubset_label = 'Train',
+    valsubset_label = 'Val',
+    # celltype_label="MSKCC_binary_id",
+    # datasubset_label = 'finetune_set',
+    # trainsubset_label = 'Finetune',
+    # valsubset_label = 'Validation',
+    # celltype_label="sex",
+    # datasubset_label = 'pretrain_set'
+
+)              
+
+
+# %%
+
+# %%
+# If using WandB
+
+if USE_WANDB:
+    print('using WandB')
+    run = wandb.init(
+        config=hyperparameter_defaults,
+        project="scGPT",
+        reinit=True,
+        settings=wandb.Settings(start_method="fork"),
+    )
+    config = wandb.config
+    print(config)
+
+    set_seed(config.seed)
+else:
+    config = Config(hyperparameter_defaults)
+    config.show()
+    run = {}
+
+
+set_seed(config.seed)
+
+
+
+# settings for input and preprocessing
+pad_token = config.pad_token
+special_tokens = [pad_token, "<cls>", "<eoc>"]
+mask_ratio = config.mask_ratio
+mask_value = config.mask_value
+pad_value = config.pad_value
+n_input_bins = config.n_bins
+
+
+per_seq_batch_sample = config.per_seq_batch_sample  # whether to sort samples by batch_id
+DSBN = config.DSBN  # Domain-spec batchnorm
+explicit_zero_prob = config.explicit_zero_prob  # whether explicit bernoulli for zeros
+
+# %%
+dataset_name = config.dataset_name
+
+
+
+save_dir = Path(f"{data_dir}/save/dev_{dataset_name}-{time.strftime('%b%d-%H-%M')}/")
+save_dir.mkdir(parents=True, exist_ok=True)
+print(f"save to {save_dir}")
+# save the whole script to the dir
+# os.system(f"cp {__file__} {save_dir}")
+
+logger = scg.logger
+scg.utils.add_file_handler(logger, save_dir / "run.log")
+
+
+
+# %%
+# ## Loading and preparing data
+if dataset_name == "metab_v0":
+    # /Users/jonaheaton/Desktop/scGPT-main/data/metabolomics_apr24/data.h5ad
+    data_url = 'https://www.dropbox.com/scl/fi/5g4ml5qio2ptumj8m3yjo/data.h5ad?rlkey=nlsrmacl5vzx9wxvci59vdj5p&dl=1'
+    load_dir = Path(f"{data_dir}/{dataset_name}")
+    load_dir.mkdir(parents=True, exist_ok=True)
+    load_path = load_dir / "data.h5ad"
+    if not os.path.exists(load_path):
+        print('downloading data')
+        download_data_file(data_url, save_dir=load_dir)
+    adata = read_h5ad(load_path)
+    # adata = scvi.data.pbmc_dataset()  # 11990 × 3346
+    ori_batch_col = "Study ID"
+    adata.obs["celltype"] = adata.obs[config.celltype_label].astype("category")
+    data_is_raw = True
+
+
+
+
+# %%
+# make the batch category column
+adata.obs["str_batch"] = adata.obs[ori_batch_col].astype(str)
+batch_id_labels = adata.obs["str_batch"].astype("category").cat.codes.values
+adata.obs["batch_id"] = batch_id_labels
+
+adata.var["gene_name"] = adata.var.index.tolist()
+
+
+# %%
+# make the batch category column
+adata.obs["str_batch"] = adata.obs[ori_batch_col].astype(str)
+batch_id_labels = adata.obs["str_batch"].astype("category").cat.codes.values
+adata.obs["batch_id"] = batch_id_labels
+
+adata.var["gene_name"] = adata.var.index.tolist()
+
+if config.load_model is not None:
+    model_dir = Path(config.load_model)
+    model_config_file = model_dir / "args.json"
+    model_file = model_dir / "best_model.pt"
+    vocab_file = model_dir / "vocab.json"
+
+    vocab = GeneVocab.from_file(vocab_file)
+    for s in special_tokens:
+        if s not in vocab:
+            vocab.append_token(s)
+
+    adata.var["id_in_vocab"] = [
+        1 if gene in vocab else -1 for gene in adata.var["gene_name"]
+    ]
+    gene_ids_in_vocab = np.array(adata.var["id_in_vocab"])
+    logger.info(
+        f"match {np.sum(gene_ids_in_vocab >= 0)}/{len(gene_ids_in_vocab)} genes "
+        f"in vocabulary of size {len(vocab)}."
+    )
+    adata = adata[:, adata.var["id_in_vocab"] >= 0]
+
+    # model
+    if os.path.exists(model_config_file):
+        with open(model_config_file, "r") as f:
+            model_configs = json.load(f)
+        logger.info(
+            f"Resume model from {model_file}, the model args will be overriden by the "
+            f"config {model_config_file}."
+        )
+    else:
+        model_configs = {}
+        model_configs["embsize"] = config.layer_size
+        model_configs["nheads"] = config.nhead
+        model_configs["d_hid"] = config.layer_size
+        model_configs["nlayers"] = config.nlayers
+
+    embsize = model_configs["embsize"]
+    nhead = model_configs["nheads"]
+    d_hid = model_configs["d_hid"]
+    nlayers = model_configs["nlayers"]
+else:
+    embsize = config.layer_size 
+    nhead = config.nhead
+    nlayers = config.nlayers  
+    d_hid = config.layer_size
+    vocab_file = save_dir / "vocab.json"
+    model_config_file = save_dir / "args.json"
+    # save the config to json
+
+    model_configs = {}
+    model_configs["embsize"] = config.layer_size
+    model_configs["nheads"] = config.nhead
+    model_configs["d_hid"] = config.layer_size
+    model_configs["nlayers"] = config.nlayers
+    with open(model_config_file, "w") as f:
+        # json.dump(config.__dict__, f, indent=2)
+        json.dump(model_configs, f, indent=2)
+
+
+# %%
+# set up the preprocessor, use the args to config the workflow
+print('Preprocess data')
+preprocessor = Preprocessor(
+    use_key="X",  # the key in adata.layers to use as raw data
+    filter_gene_by_counts=3,  # step 1
+    filter_cell_by_counts=False,  # step 2
+    normalize_total=config.normalize_total,  # 3. whether to normalize the raw data and to what sum
+    result_normed_key="X_normed",  # the key in adata.layers to store the normalized data
+    log1p=data_is_raw,  # 4. whether to log1p the normalized data
+    result_log1p_key="X_log1p",
+    subset_hvg=config.n_hvg,  # 5. whether to subset the raw data to highly variable genes
+    hvg_flavor="seurat_v3" if data_is_raw else "cell_ranger",
+    binning=config.n_bins,  # 6. whether to bin the raw data and to what number of bins
+    result_binned_key="X_binned",  # the key in adata.layers to store the binned data
+)
+preprocessor(adata, batch_key="str_batch" if dataset_name != "heart_cell" else None)
+
+# %%
+# This sorting caused crashed in earlier attempts, need to check if it still crashes
+if config.per_seq_batch_sample:
+    # sort the adata by batch_id in advance
+    adata_sorted = adata[adata.obs["batch_id"].argsort()].copy()
+
+# %% [markdown]
+# ## Tokenize input
+print('Tokenize input')
+
+# %%
+input_layer_key = "X_binned"
+all_counts = (
+    adata.layers[input_layer_key].A
+    if issparse(adata.layers[input_layer_key])
+    else adata.layers[input_layer_key]
+)
+genes = adata.var["gene_name"].tolist()
+
+celltypes_labels = adata.obs["celltype"].tolist()  # make sure count from 0
+num_types = len(set(celltypes_labels))
+celltypes_labels = np.array(celltypes_labels)
+
+batch_ids = adata.obs["batch_id"].tolist()
+num_batch_types = len(set(batch_ids))
+batch_ids = np.array(batch_ids)
+
+datasubset_label = config.datasubset_label
+
+if datasubset_label in adata.obs:
+    trainsubset_label = config.trainsubset_label
+    valsubset_label = config.valsubset_label
+
+    print(f'use {datasubset_label} for train ({trainsubset_label}) /val ({valsubset_label}) split')
+    train_data = all_counts[adata.obs[datasubset_label] == trainsubset_label]
+    valid_data = all_counts[adata.obs[datasubset_label] == valsubset_label]
+    train_celltype_labels = celltypes_labels[adata.obs[datasubset_label] == trainsubset_label]
+    valid_celltype_labels = celltypes_labels[adata.obs[datasubset_label] == valsubset_label]
+    train_batch_labels = batch_ids[adata.obs[datasubset_label] == trainsubset_label]
+    valid_batch_labels = batch_ids[adata.obs[datasubset_label] == valsubset_label]
+    print('train/val split: ', len(train_data), len(valid_data))
+
+else:
+    print('use random split for train/val split')
+    (
+        train_data,
+        valid_data,
+        train_celltype_labels,
+        valid_celltype_labels,
+        train_batch_labels,
+        valid_batch_labels,
+    ) = train_test_split(
+        all_counts, celltypes_labels, batch_ids, test_size=0.1, shuffle=True
+    )
+
+# %%
+if config.load_model is None:
+    vocab = GeneVocab(
+        genes,
+        special_tokens,
+    )
+    vocab.save_json(vocab_file)
+
+    # vocab = Vocab(
+    #     VocabPybind(genes + special_tokens, None)
+    # )  # bidirectional lookup [gene <-> int]
+
+vocab.set_default_index(vocab["<pad>"])
+gene_ids = np.array(vocab(genes), dtype=int)
+
+# %%
+tokenized_train = tokenize_and_pad_batch(
+    train_data,
+    gene_ids,
+    max_len=config.max_seq_len,
+    vocab=vocab,
+    pad_token=config.pad_token,
+    pad_value=pad_value,
+    append_cls=True,  # append <cls> token at the beginning
+    include_zero_gene=config.include_zero_gene,
+)
+tokenized_valid = tokenize_and_pad_batch(
+    valid_data,
+    gene_ids,
+    max_len=config.max_seq_len,
+    vocab=vocab,
+    pad_token=config.pad_token,
+    pad_value=pad_value,
+    append_cls=True,
+    include_zero_gene=config.include_zero_gene,
+)
+logger.info(
+    f"train set number of samples: {tokenized_train['genes'].shape[0]}, "
+    f"\n\t feature length: {tokenized_train['genes'].shape[1]}"
+)
+logger.info(
+    f"valid set number of samples: {tokenized_valid['genes'].shape[0]}, "
+    f"\n\t feature length: {tokenized_valid['genes'].shape[1]}"
+)
+
+
+
+
+# %% [markdown]
+# # Create and finetune scGPT
+
+# %%
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+ntokens = len(vocab)  # size of vocabulary
+print(f"vocab size: {ntokens}")
+model = TransformerModel(
+    ntokens,
+    embsize,
+    nhead,
+    d_hid,
+    nlayers,
+    vocab=vocab,
+    dropout=config.dropout,
+    pad_token=config.pad_token,
+    pad_value=config.pad_value,
+    do_mvc=config.GEPC,
+    do_dab=config.DAR,
+    use_batch_labels=config.use_batch_labels,
+    num_batch_labels=num_batch_types,
+    domain_spec_batchnorm=config.DSBN,
+    n_input_bins=config.n_input_bins,
+    ecs_threshold=config.ecs_thres,
+    explicit_zero_prob=config.explicit_zero_prob,
+    use_fast_transformer=config.fast_transformer,
+    pre_norm=config.pre_norm,
+)
+if config.load_model is not None:
+    try:
+        model.load_state_dict(torch.load(model_file))
+        logger.info(f"Loading all model params from {model_file}")
+    except:
+        # only load params that are in the model and match the size
+        model_dict = model.state_dict()
+        pretrained_dict = torch.load(model_file)
+        pretrained_dict = {
+            k: v
+            for k, v in pretrained_dict.items()
+            if k in model_dict and v.shape == model_dict[k].shape
+        }
+        for k, v in pretrained_dict.items():
+            logger.info(f"Loading params {k} with shape {v.shape}")
+        model_dict.update(pretrained_dict)
+        model.load_state_dict(model_dict)
+
+model.to(device)
+if USE_WANDB:
+    wandb.watch(model)
+
+
+criterion_gep_gepc = masked_mse_loss
+criterion_dab = nn.CrossEntropyLoss()
+criterion_cls = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(
+    model.parameters(), lr=config.lr, eps=1e-4 if config.amp else 1e-8
+)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1, gamma=config.schedule_ratio)
+
+scaler = torch.cuda.amp.GradScaler(enabled=config.amp)
+
+
+
+# %%
+best_val_loss = float("inf")
+best_avg_bio = 0.0
+best_model = None
+
+if USE_WANDB:
+    define_wandb_metrcis()
+
+for epoch in range(1, config.epochs + 1):
+    epoch_start_time = time.time()
+    train_data_pt, valid_data_pt = prepare_data(sort_seq_batch=per_seq_batch_sample)
+    train_loader = prepare_dataloader(
+        train_data_pt,
+        batch_size=config.batch_size,
+        shuffle=False,
+        intra_domain_shuffle=True,
+        drop_last=False,
+        per_seq_batch_sample=per_seq_batch_sample,
+    )
+    valid_loader = prepare_dataloader(
+        valid_data_pt,
+        batch_size=config.batch_size,
+        shuffle=False,
+        intra_domain_shuffle=False,
+        drop_last=False,
+        per_seq_batch_sample=per_seq_batch_sample,
+    )
+
+    if config.do_train:
+        train(
+            model = model,
+            loader=train_loader,
+            vocab=vocab,
+            criterion_gep_gepc=criterion_gep_gepc if config.GEP and config.GEPC else None,
+            criterion_dab=criterion_dab if config.DAR else None,
+            criterion_cls=criterion_cls if config.CLS else None,
+            scaler=scaler,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            device=device,
+            config=config,
+            logger=logger,
+            epoch=epoch,
+            use_wandb=USE_WANDB,
+        )
+    # val_loss, val_mre = evaluate(
+    val_loss = evaluate(
+        model,
+        loader=valid_loader,
+        vocab=vocab,
+        criterion_gep_gepc=criterion_gep_gepc if config.GEP and config.GEPC else None,
+        criterion_dab=criterion_dab if config.DAR else None,
+        criterion_cls=criterion_cls if config.CLS else None,
+        device=device,
+        config=config,
+        epoch=epoch
+    )
+    elapsed = time.time() - epoch_start_time
+    logger.info("-" * 89)
+    logger.info(
+        f"| end of epoch {epoch:3d} | time: {elapsed:5.2f}s | "
+        # f"valid loss/mse {val_loss:5.4f} | mre {val_mre:5.4f}"
+        f"valid loss/mse {val_loss:5.4f} |"
+    )
+    logger.info("-" * 89)
+
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        best_model = copy.deepcopy(model)
+        best_model_epoch = epoch
+        logger.info(f"Best model with score {best_val_loss:5.4f}")
+
+    if epoch % config.save_eval_interval == 0 or epoch == config.epochs:
+        logger.info(f"Saving model to {save_dir}")
+        torch.save(best_model.state_dict(), save_dir / f"model_e{best_model_epoch}.pt")
+
+        # eval on testdata
+        results = eval_testdata(
+            best_model,
+            adata_t = adata_sorted if config.per_seq_batch_sample else adata,
+            # adata_t=adata,
+            gene_ids=gene_ids,
+            vocab=vocab,
+            config=config,
+            logger=logger,
+            include_types=["cls"],
+        )
+        results["batch_umap"].savefig(
+            save_dir / f"embeddings_batch_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
+        )
+
+        results["celltype_umap"].savefig(
+            save_dir / f"embeddings_celltype_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
+        )
+        metrics_to_log = {"test/" + k: v for k, v in results.items()}
+        
+        if USE_WANDB:
+            metrics_to_log["test/batch_umap"] = wandb.Image(
+                str(save_dir / f"embeddings_batch_umap[cls]_e{best_model_epoch}.png"),
+                caption=f"celltype avg_bio epoch {best_model_epoch}",
+            )
+
+            metrics_to_log["test/celltype_umap"] = wandb.Image(
+                str(save_dir / f"embeddings_celltype_umap[cls]_e{best_model_epoch}.png"),
+                caption=f"celltype avg_bio epoch {best_model_epoch}",
+            )
+            metrics_to_log["test/best_model_epoch"] = best_model_epoch
+            wandb.log(metrics_to_log)
+            wandb.log({"avg_bio": results.get("avg_bio", 0.0)})
+
+    scheduler.step()
+
+
+# %%
+# save the best model
+torch.save(best_model.state_dict(), save_dir / "best_model.pt")
+
+# %% [markdown]
+# ## Gene embeddings
+
+# %%
+if USE_WANDB:
+    artifact = wandb.Artifact(f"best_model", type="model")
+    glob_str = os.path.join(save_dir, "best_model.pt")
+    artifact.add_file(glob_str)
+    run.log_artifact(artifact)
+
+    run.finish()
+    wandb.finish()
+gc.collect()
