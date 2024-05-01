@@ -177,6 +177,6 @@ def neptunize_dict_keys(eval_res,prefix='/'):
 
 ######
 if __name__ == '__main__':
-    run_id = 'RCC-1603'
+    run_id = 'RCC-3011'
     num_fields = get_num_fields_in_run(run_id)
     print(num_fields)

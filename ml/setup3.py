@@ -83,7 +83,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     run_id = run["sys/id"].fetch()
     try:
         print(f'initalize run {run_id}')
-
+        load_model_from_run_id = kwargs.get('load_model_from_run_id', None)
         load_model_loc = kwargs.get('load_model_loc', False)
         load_encoder_loc = kwargs.get('load_encoder_loc', load_model_loc)
         load_head_loc = kwargs.get('load_head_loc', load_model_loc)
@@ -91,6 +91,17 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         y_head_cols = kwargs.get('y_head_cols', [])
         y_adv_cols = kwargs.get('y_adv_cols', [])
         
+        if load_model_from_run_id:
+            pretrained_run = neptune.init_run(project='revivemed/RCC',
+                                            api_token=NEPTUNE_API_TOKEN,
+                                            with_id=load_model_from_run_id,
+                                            capture_stdout=False,
+                                            capture_stderr=False,
+                                            capture_hardware_metrics=False,
+                                            mode='read-only')
+        else:
+            pretrained_run = run
+
         if isinstance(y_head_cols, dict):
             y_head_cols = y_head_cols.values()
         if isinstance(y_adv_cols, dict):
@@ -104,7 +115,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         
         if load_encoder_loc:
             print('loading pretrained encoder info, overwriting encoder_kwargs')
-            load_kwargs = run[f'{load_encoder_loc}/original_kwargs'].fetch()
+            load_kwargs = pretrained_run[f'{load_encoder_loc}/original_kwargs'].fetch()
             load_kwargs = convert_neptune_kwargs(load_kwargs)
             # kwargs['encoder_kwargs'].update(load_kwargs['encoder_kwargs'])
             if 'encoder_kind' in kwargs:
@@ -120,14 +131,14 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
         if load_head_loc:
             print('loading pretrained heads, overwriting head_kwargs_list')
-            load_kwargs = run[f'{load_head_loc}/original_kwargs'].fetch()
+            load_kwargs = pretrained_run[f'{load_head_loc}/original_kwargs'].fetch()
             kwargs['head_kwargs_dict'] = load_kwargs.get('head_kwargs_dict', {})
             kwargs['head_kwargs_list'] = eval(load_kwargs.get('head_kwargs_list', '[]'))
             # assert len(kwargs['head_kwargs_list']) <= len(y_head_cols)
 
         if load_adv_loc:
             print('loading pretrained advs, overwriting adv_kwargs_list')
-            load_kwargs = run[f'{load_adv_loc}/original_kwargs'].fetch()
+            load_kwargs = pretrained_run[f'{load_adv_loc}/original_kwargs'].fetch()
             kwargs['adv_kwargs_dict'] = load_kwargs.get('adv_kwargs_dict', {})
             kwargs['adv_kwargs_list'] = eval(load_kwargs.get('adv_kwargs_list', '[]'))
             # assert len(kwargs['adv_kwargs_list']) <= len(y_adv_cols)
@@ -151,6 +162,19 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         local_dir = os.path.expanduser(local_dir)
         save_dir = f'{local_dir}/{run_id}'
         os.makedirs(save_dir, exist_ok=True)
+
+        if load_model_from_run_id:
+            pretrain_save_dir = f'{local_dir}/{load_model_from_run_id}'
+            os.makedirs(pretrain_save_dir, exist_ok=True)
+            os.makedirs(os.path.join(pretrain_save_dir,load_encoder_loc), exist_ok=True)
+            
+            pretrain_local_path = f'{pretrain_save_dir}/{load_encoder_loc}/encoder_state_dict.pth'
+            if not os.path.exists(pretrain_local_path):
+                pretrained_run[f'{load_encoder_loc}/models/encoder_state_dict'].download(pretrain_local_path)
+            pretrained_run.stop()
+        else:
+            pretrain_save_dir = f'{local_dir}/{run_id}'
+
 
     except Exception as e:
         run['sys/tags'].add('init failed')
@@ -353,8 +377,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
 
                 if (load_encoder_loc) and (load_model_weights):
-                    os.makedirs(os.path.join(save_dir,load_encoder_loc), exist_ok=True)
-                    local_path = f'{save_dir}/{load_encoder_loc}/encoder_state_dict.pth'
+                    os.makedirs(os.path.join(pretrain_save_dir,load_encoder_loc), exist_ok=True)
+                    local_path = f'{pretrain_save_dir}/{load_encoder_loc}/encoder_state_dict.pth'
                     if not os.path.exists(local_path):
                         run[f'{load_encoder_loc}/models/encoder_state_dict'].download(local_path)
                     encoder_state_dict = torch.load(local_path)
@@ -412,12 +436,13 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                 if load_head_loc and load_model_weights:
                     head_file_ids = head.get_file_ids()
                     for head_file_id in head_file_ids:
-                        local_path = f'{save_dir}/{load_head_loc}/{head_file_id}_state.pt'
+                        # local_path = f'{save_dir}/{load_head_loc}/{head_file_id}_state.pt'
+                        local_path = f'{pretrain_save_dir}/{load_head_loc}/{head_file_id}_state.pt'
                         if not os.path.exists(local_path):
-                            run[f'{load_head_loc}/models/{head_file_id}_state'].download(f'{save_dir}/{load_head_loc}/{head_file_id}_state.pt')
-                            run[f'{load_head_loc}/models/{head_file_id}_info'].download(f'{save_dir}/{load_head_loc}/{head_file_id}_info.json')
+                            run[f'{load_head_loc}/models/{head_file_id}_state'].download(f'{pretrain_save_dir}/{load_head_loc}/{head_file_id}_state.pt')
+                            run[f'{load_head_loc}/models/{head_file_id}_info'].download(f'{pretrain_save_dir}/{load_head_loc}/{head_file_id}_info.json')
                         # head_state_dict = torch.load(f'{save_dir}/{load_head_loc}/{head_file_id}_state.pt')
-                    head.load_state_from_path(f'{save_dir}/{load_head_loc}')
+                    head.load_state_from_path(f'{pretrain_save_dir}/{load_head_loc}')
 
                 ####################################
                 ###### Create the Adversarial Models ######
@@ -462,12 +487,13 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                 if load_adv_loc and load_model_weights:
                     adv_file_ids = adv.get_file_ids()
                     for adv_file_id in adv_file_ids:
-                        local_path = f'{save_dir}/{load_adv_loc}/{adv_file_id}_state.pt'
+                        # local_path = f'{save_dir}/{load_adv_loc}/{adv_file_id}_state.pt'
+                        local_path = f'{pretrain_save_dir}/{load_adv_loc}/{adv_file_id}_state.pt'
                         if not os.path.exists(local_path):
-                            run[f'{load_adv_loc}/models/{adv_file_id}_state'].download(f'{save_dir}/{load_adv_loc}/{adv_file_id}_state.pt')
-                            run[f'{load_adv_loc}/models/{adv_file_id}_info'].download(f'{save_dir}/{load_adv_loc}/{adv_file_id}_info.json')
+                            run[f'{load_adv_loc}/models/{adv_file_id}_state'].download(f'{pretrain_save_dir}/{load_adv_loc}/{adv_file_id}_state.pt')
+                            run[f'{load_adv_loc}/models/{adv_file_id}_info'].download(f'{pretrain_save_dir}/{load_adv_loc}/{adv_file_id}_info.json')
                         # adv_state_dict = torch.load(f'{save_dir}/{load_adv_loc}/{adv_file_id}_state.pt')
-                    adv.load_state_from_path(f'{save_dir}/{load_adv_loc}')
+                    adv.load_state_from_path(f'{pretrain_save_dir}/{load_adv_loc}')
                 
         except Exception as e:
             run['sys/tags'].add('model-creation failed')

@@ -39,6 +39,7 @@ default_sweep_kwargs = {
     'train_kwargs__adversarial_mini_epochs': 5,
     'train_kwargs__adversary_weight': 5,
     'train_kwargs__adversarial_start_epoch': 10,
+    'train_kwargs__encoder_weight': 0,
 }
 
 
@@ -170,7 +171,8 @@ def compute_finetune(run_id,plot_latent_space=False,
                            n_trials=5,desc_str='skip',
                            sweep_kwargs=None,eval_name='val2',
                            recompute_plot=False,
-                           eval_on_test=False):
+                           eval_on_test=False,
+                           skip_random_init=False):
 
     run = neptune.init_run(project='revivemed/RCC',
             api_token=NEPTUNE_API_TOKEN,
@@ -428,7 +430,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['holdout_frac'] = sweep_kwargs.get('holdout_frac')
         kwargs['train_kwargs']['head_weight'] = 1
         kwargs['train_kwargs']['clip_grads_with_norm'] = False
-        kwargs['train_kwargs']['encoder_weight'] = 0
+        kwargs['train_kwargs']['encoder_weight'] = sweep_kwargs.get('train_kwargs__encoder_weight')
         kwargs['train_kwargs']['adversary_weight'] = adversary_weight
         kwargs['train_kwargs']['learning_rate'] = sweep_kwargs.get('train_kwargs__learning_rate')
         # kwargs['train_kwargs']['learning_rate'] = 0.0001
@@ -457,14 +459,14 @@ def compute_finetune(run_id,plot_latent_space=False,
         _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
 
 
-
-        # either one of these settings should run a model with random initialized weights, but do both just in case
-        kwargs['run_random_init'] = True
-        kwargs['load_model_weights'] = False
-        kwargs['save_latent_space'] = False
-        
-        setup_id = f'{desc_str}_randinit'
-        _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
+        if not skip_random_init:
+            # either one of these settings should run a model with random initialized weights, but do both just in case
+            kwargs['run_random_init'] = True
+            kwargs['load_model_weights'] = False
+            kwargs['save_latent_space'] = False
+            
+            setup_id = f'{desc_str}_randinit'
+            _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
 
 
     # ############################################################
