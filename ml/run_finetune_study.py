@@ -94,10 +94,12 @@ def objective(trial):
             capture_stdout=False,
             capture_stderr=False,
             capture_hardware_metrics=False)
-        del run[f'{sweep_id}_finetune']
-        if not skip_random_init:
-            del run[f'{sweep_id}_randinit']
-
+        run.wait()
+        run_struc= run.get_structure()
+        if f'{sweep_id}_finetune' in run_struc:
+            del run[f'{sweep_id}_finetune']
+            if not skip_random_init:
+                del run[f'{sweep_id}_randinit']
         run.stop()
         raise optuna.TrialPruned()
     
