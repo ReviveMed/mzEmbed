@@ -322,6 +322,7 @@ class TransformerModel(nn.Module):
         MVC: bool = False,
         ECS: bool = False,
         do_sample: bool = False,
+        mod_types: Optional[Tensor] = None,
     ) -> Mapping[str, Tensor]:
         """
         Args:
