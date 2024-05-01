@@ -33,8 +33,20 @@ SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 if sweep_desc == 'both-OS':
-    key1_loc = 'eval/val/Cox_OS__Concordance Index'
-    key2_loc = 'eval/train/Cox_OS__Concordance Index'
+    key1_loc = 'eval/val2/Cox_OS__Concordance Index'
+    key2_loc = 'eval/train2/Cox_OS__Concordance Index'
+elif sweep_desc == 'NIVO-OS':
+    key1_loc = 'eval/val2/Cox_NIVO OS__Concordance Index'
+    key2_loc = 'eval/train2/Cox_NIVO OS__Concordance Index'
+elif sweep_desc == 'EVER-OS':
+    key1_loc = 'eval/val2/Cox_EVER OS__Concordance Index'
+    key2_loc = 'eval/train2/Cox_EVER OS__Concordance Index'
+elif sweep_desc == 'IMDC':
+    key1_loc = 'eval/val2/Binary_IMDC__AUROC (micro)'
+    key2_loc = 'eval/train2/Binary_IMDC__AUROC (micro)'
+elif sweep_desc == 'MSKCC':
+    key1_loc = 'eval/val2/Binary_MSKCC__AUROC (micro)'
+    key2_loc = 'eval/train2/Binary_MSKCC__AUROC (micro)'
 else:
     raise ValueError('sweep_desc not recognized')
 
@@ -42,7 +54,7 @@ def objective(trial):
 
     sweep_id = f'optuna_{sweep_desc}__{trial.number}'
     holdout_frac = 0
-    num_epochs = trial.suggest_int('num_epochs', 1, 50, step=1)
+    num_epochs = trial.suggest_int('num_epochs', 1, 100, step=1)
     early_stopping_patience = 0
     if num_epochs > 20:
         early_stopping_patience = trial.suggest_int('early_stopping_patience', 0, 10, step=5)
@@ -93,7 +105,7 @@ def objective(trial):
                             desc_str=sweep_id,
                             sweep_kwargs=sweep_kwargs,
                             skip_random_init=skip_random_init,
-                            eval_name='val')
+                            eval_name='val2')
     
     except ValueError as e:
         print('ValueError:', e)
@@ -142,6 +154,7 @@ def objective(trial):
     run.stop()
 
     return result1
+    # return result1/result2
 
 
 
