@@ -8,9 +8,20 @@ import numpy as np
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
 
+import sys
+if len(sys.argv)>1:
+    n_optuna_trials = int(sys.argv[1])
+else:
+    n_optuna_trials = 200
+
+if len(sys.argv)>2:
+    run_id = sys.argv[2]
+else:
+    run_id = 'RCC-3011'
+
+
 data_dir = get_latest_dataset()
 
-run_id = 'RCC-3011'
 sweep_desc = 'both-OS'
 storage_name = 'optuna'
 USE_WEBAPP_DB = True
@@ -101,11 +112,7 @@ def objective(trial):
     return result1
 
 
-import sys
-if len(sys.argv)>1:
-    n_optuna_trials = int(sys.argv[1])
-else:
-    n_optuna_trials = 100
+
 
 if USE_WEBAPP_DB:
     print('using webapp database')
