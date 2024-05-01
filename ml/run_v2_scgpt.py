@@ -114,7 +114,7 @@ hyperparameter_defaults = dict(
     # if load model, batch_size, layer_size, nlayers, nhead will be ignored
     dropout=0.2,
     schedule_ratio=0.9,  # ratio of epochs for learning rate schedule
-    save_eval_interval=3, #original was 5
+    save_eval_interval=2, #original was 5
     log_interval=100,
     fast_transformer=False, #need CUDA for this
     pre_norm=False,
@@ -124,7 +124,7 @@ hyperparameter_defaults = dict(
     n_hvp = 4000, # number of highly variable proteins
     # max_seq_len = 4001, # # Default n_hvg+1
     max_seq_len=1201, #1200 was the amount specified in the paper
-    per_seq_batch_sample = True, #NOTE: when True, this crashes the code
+    per_seq_batch_sample = True, # whether to sort samples by batch_id
     explicit_zero_prob = True, # whether explicit bernoulli for zeros
     normalize_total = False, # 3. whether to normalize the raw data and to what sum
     use_batch_labels = False, # whether to use batch labels, default was True
@@ -170,17 +170,7 @@ set_seed(config.seed)
 
 
 # settings for input and preprocessing
-pad_token = config.pad_token
-special_tokens = [pad_token, "<cls>", "<eoc>"]
-mask_ratio = config.mask_ratio
-mask_value = config.mask_value
-pad_value = config.pad_value
-n_input_bins = config.n_bins
-
-
-per_seq_batch_sample = config.per_seq_batch_sample  # whether to sort samples by batch_id
-DSBN = config.DSBN  # Domain-spec batchnorm
-explicit_zero_prob = config.explicit_zero_prob  # whether explicit bernoulli for zeros
+special_tokens = [config.pad_token, "<cls>", "<eoc>"]
 
 # %%
 dataset_name = config.dataset_name
@@ -389,7 +379,7 @@ tokenized_train = tokenize_and_pad_batch(
     max_len=config.max_seq_len,
     vocab=vocab,
     pad_token=config.pad_token,
-    pad_value=pad_value,
+    pad_value=config.pad_value,
     append_cls=True,  # append <cls> token at the beginning
     include_zero_gene=config.include_zero_gene,
 )
@@ -399,7 +389,7 @@ tokenized_valid = tokenize_and_pad_batch(
     max_len=config.max_seq_len,
     vocab=vocab,
     pad_token=config.pad_token,
-    pad_value=pad_value,
+    pad_value=config.pad_value,
     append_cls=True,
     include_zero_gene=config.include_zero_gene,
 )
@@ -438,7 +428,7 @@ model = TransformerModel(
     use_batch_labels=config.use_batch_labels,
     num_batch_labels=num_batch_types,
     domain_spec_batchnorm=config.DSBN,
-    n_input_bins=config.n_input_bins,
+    n_input_bins=config.n_bins,
     ecs_threshold=config.ecs_thres,
     explicit_zero_prob=config.explicit_zero_prob,
     use_fast_transformer=config.fast_transformer,
@@ -489,14 +479,14 @@ if USE_WANDB:
 
 for epoch in range(1, config.epochs + 1):
     epoch_start_time = time.time()
-    train_data_pt, valid_data_pt = prepare_data(sort_seq_batch=per_seq_batch_sample)
+    train_data_pt, valid_data_pt = prepare_data(sort_seq_batch=config.per_seq_batch_sample)
     train_loader = prepare_dataloader(
         train_data_pt,
         batch_size=config.batch_size,
         shuffle=False,
         intra_domain_shuffle=True,
         drop_last=False,
-        per_seq_batch_sample=per_seq_batch_sample,
+        per_seq_batch_sample=config.per_seq_batch_sample,
     )
     valid_loader = prepare_dataloader(
         valid_data_pt,
@@ -504,7 +494,7 @@ for epoch in range(1, config.epochs + 1):
         shuffle=False,
         intra_domain_shuffle=False,
         drop_last=False,
-        per_seq_batch_sample=per_seq_batch_sample,
+        per_seq_batch_sample=config.per_seq_batch_sample,
     )
 
     if config.do_train:
