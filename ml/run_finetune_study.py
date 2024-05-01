@@ -19,17 +19,24 @@ if len(sys.argv)>2:
 else:
     run_id = 'RCC-3011'
 
+if len(sys.argv)>3:
+    sweep_desc = sys.argv[3]
+else:
+    sweep_desc = 'both-OS'
+
 
 data_dir = get_latest_dataset()
 
-sweep_desc = 'both-OS'
 storage_name = 'optuna'
 USE_WEBAPP_DB = True
 SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
-key1_loc = 'eval/val/Cox_OS__Concordance Index'
-key2_loc = 'eval/train/Cox_OS__Concordance Index'
+if sweep_desc == 'both-OS':
+    key1_loc = 'eval/val/Cox_OS__Concordance Index'
+    key2_loc = 'eval/train/Cox_OS__Concordance Index'
+else:
+    raise ValueError('sweep_desc not recognized')
 
 def objective(trial):
 
@@ -66,6 +73,7 @@ def objective(trial):
 
     sweep_kwargs = {
         'holdout_frac': holdout_frac,
+        'head_hidden_layers': trial.suggest_int('head_hidden_layers', 0, 1, step=1),
         'encoder_kwargs__dropout_rate': trial.suggest_float('encoder_kwargs__dropout_rate', 0, 0.5,step=0.1),
         'train_kwargs__num_epochs': num_epochs,
         'train_kwargs__early_stopping_patience': early_stopping_patience,
@@ -75,7 +83,7 @@ def objective(trial):
         'train_kwargs__noise_factor': trial.suggest_float('train_kwargs__noise_factor', 0, 0.25, step=0.05),
         'train_kwargs__weight_decay': train_kwargs__weight_decay,
         'train_kwargs__adversary_weight': 0,
-        # 'train_kwargs__encoder_weight': trial.suggest_float('train_kwargs__encoder_weight', 0, 1, step=0.5),
+        'train_kwargs__encoder_weight': trial.suggest_float('train_kwargs__encoder_weight', 0, 1, step=0.25),
         }
 
 
@@ -142,7 +150,7 @@ if USE_WEBAPP_DB:
     print('using webapp database')
     storage_name = WEBAPP_DB_LOC
 
-study_name = f'finetune_{sweep_desc}_{run_id}'
+study_name = f'finetune_{sweep_desc}_{run_id}_May01'
  
 redo = False
 update_finetune_data('finetune_val',redo=redo)
