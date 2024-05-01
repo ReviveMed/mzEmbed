@@ -29,6 +29,7 @@ SAVE_TRIALS = True
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 key1_loc = 'eval/val/Cox_OS__Concordance Index'
+key2_loc = 'eval/train/Cox_OS__Concordance Index'
 
 def objective(trial):
 
@@ -80,7 +81,7 @@ def objective(trial):
 
     try:
         compute_finetune(run_id,plot_latent_space=False,
-                            n_trials=5,
+                            n_trials=10,
                             desc_str=sweep_id,
                             sweep_kwargs=sweep_kwargs,
                             skip_random_init=skip_random_init,
@@ -114,6 +115,11 @@ def objective(trial):
     result1_array = run[f'{sweep_id}_finetune/{key1_loc}'].fetch_values()
 
     result1 = np.mean(result1_array['value'])
+
+    result2_array = run[f'{sweep_id}_finetune/{key2_loc}'].fetch_values()
+    result2 = np.mean(result2_array['value'])
+    trial.set_user_attr('val score',result1)
+    trial.set_user_attr('train score',result2)
 
     run.wait()
     del run[f'{sweep_id}_finetune']
