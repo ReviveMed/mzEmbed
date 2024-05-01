@@ -133,6 +133,7 @@ hyperparameter_defaults = dict(
     explicit_zero_prob = True, # whether explicit bernoulli for zeros
     normalize_total = False, # 3. whether to normalize the raw data and to what sum
     use_batch_labels = False, # whether to use batch labels, default was True
+    use_mod = False, #modality aware? set to True for multi-omics
     celltype_label="Cohort Label",
     datasubset_label = 'pretrain_set',
     trainsubset_label = 'Train',
@@ -211,8 +212,18 @@ if dataset_name == "metab_v0":
     adata.obs["celltype"] = adata.obs[config.celltype_label].astype("category")
     data_is_raw = True
     filter_gene_by_counts = False
+    adata_protein = None
 
+if (config.use_mod) and (adata_protein is not None):
+    gene_rna_df = pd.DataFrame(index = adata.var.index.tolist())
+    gene_rna_df['mod'] = 'RNA'
+    gene_protein_df = pd.DataFrame(index = adata_protein.var.index.tolist())
+    gene_protein_df['mod'] = 'Protein'
+    gene_loc_df = pd.concat([gene_rna_df, gene_protein_df])
+    gene_loc_df['mod'] = gene_loc_df['mod'].astype('category')
 
+elif (config.use_mod) and (adata_protein is None):
+    raise ValueError('adata_protein is None')
 
 
 # %%
@@ -393,6 +404,8 @@ tokenized_train = tokenize_and_pad_batch(
     pad_value=config.pad_value,
     append_cls=True,  # append <cls> token at the beginning
     include_zero_gene=config.include_zero_gene,
+    # mod_type=mod_type if config.use_mod else None,
+    # vocab_mod=vocab_mod if config.use_mod else None,
 )
 tokenized_valid = tokenize_and_pad_batch(
     valid_data,
@@ -403,6 +416,8 @@ tokenized_valid = tokenize_and_pad_batch(
     pad_value=config.pad_value,
     append_cls=True,
     include_zero_gene=config.include_zero_gene,
+    # mod_type=mod_type if config.use_mod else None,
+    # vocab_mod=vocab_mod if config.use_mod else None,
 )
 logger.info(
     f"train set number of samples: {tokenized_train['genes'].shape[0]}, "
@@ -444,6 +459,9 @@ model = TransformerModel(
     explicit_zero_prob=config.explicit_zero_prob,
     use_fast_transformer=config.fast_transformer,
     pre_norm=config.pre_norm,
+    # use_mod=config.use_mod,
+    # ntokens_mod=ntokens_mod if config.use_mod else None,
+    # vocab_mod=vocab_mod if config.use_mod else None,
 )
 if config.load_model is not None:
     try:
