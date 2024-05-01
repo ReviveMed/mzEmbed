@@ -184,7 +184,11 @@ def train(
     config,
     logger,
     epoch,
-    use_wandb: bool=True,
+    use_wandb: Optional[bool]=True,
+    discriminator: Optional[nn.Module] = None,
+    criterion_adv: Optional[nn.Module] = None,
+    optimizer_E: Optional[torch.optim.Optimizer] = None,
+    optimizer_D: Optional[torch.optim.Optimizer] = None,
 ) -> None:
     """
     Train the model for one epoch.
@@ -193,15 +197,20 @@ def train(
         import wandb
 
     model.train()
-    total_loss, total_gep, total_cls, total_gepc, total_ecs, total_dab = (
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-    )
-    total_zero_log_prob, total_gepc_zero_log_prob = 0.0, 0.0
+    (
+        total_loss,
+        total_gep,
+        total_cls,
+        total_cce,
+        total_gepc,
+        total_ecs,
+        total_dab,
+        total_adv_E,
+        total_adv_D,
+        total_zero_log_prob,
+        total_gepc_zero_log_prob,
+    ) = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
     total_error = 0.0
     log_interval = config.log_interval
     start_time = time.time()
@@ -224,14 +233,13 @@ def train(
                 input_gene_ids,
                 input_values,
                 src_key_padding_mask=src_key_padding_mask,
-                batch_labels=batch_labels
-                if config.use_batch_labels or config.DSBN
-                else None,
+                batch_labels=batch_labels if config.use_batch_labels or config.DSBN else None,
                 CLS=config.CLS,
                 MVC=config.GEPC,
+                CCE=config.CCE,
                 ECS=config.ESC,
                 mod_types=mod_types if config.use_mod else None,
-                # do_sample=do_sample_in_train,
+                do_sample=config.do_sample_in_train if config.explicit_zero_prob else False,
                 # generative_training=False
             )
 
@@ -246,6 +254,7 @@ def train(
                 )
                 loss = loss + loss_gep
                 metrics_to_log = {"train/gep": loss_gep.item()}
+            
             if config.GEP and config.explicit_zero_prob:
                 loss_zero_log_prob = criterion_neg_log_bernoulli(
                     output_dict["mlm_zero_probs"], target_values, masked_positions
@@ -279,6 +288,11 @@ def train(
                     .sum()
                     .item()
                 ) / celltype_labels.size(0)
+            
+            if config.CCE:
+                loss_cce = 10 * output_dict["loss_cce"]
+                loss = loss + loss_cce
+                metrics_to_log.update({"train/cce": loss_cce.item()})
 
             if (config.ESC) and (config.ecs_thres > 0):
                 loss_ecs = 10 * output_dict["loss_ecs"]
@@ -311,6 +325,43 @@ def train(
         scaler.step(optimizer)
         scaler.update()
 
+        if config.ADV:
+            # rerun the model for adversarial training
+            output_dict = model(
+                input_gene_ids,
+                input_values,
+                src_key_padding_mask=src_key_padding_mask,
+                batch_labels=batch_labels if config.use_batch_labels or config.DSBN else None,
+                CLS=config.CLS,
+                MVC=config.GEPC,
+                CCE=config.CCE,
+                ECS=config.ESC,
+                do_sample=config.do_sample_in_train,
+                #generative_training=False
+            )
+
+            # TRAINING DISCRIMINATOR
+            loss_adv_D = criterion_adv(
+                discriminator(output_dict["cell_emb"].detach()), batch_labels
+            )
+            if epoch > config.adv_D_delay_epochs:
+                discriminator.zero_grad()
+                loss_adv_D.backward()
+                optimizer_D.step()
+
+            # TRAINING ENCODER
+            loss_adv_E = -criterion_adv(
+                discriminator(output_dict["cell_emb"]), batch_labels
+            )
+            # NOTE: the loss is negative here because we want to maximize
+            # the cross_entropy_loss, in other words, disguise against the discriminator
+            if epoch > config.adv_E_delay_epochs:
+                model.zero_grad()
+                discriminator.zero_grad()
+                loss_adv_E.backward()
+                optimizer_E.step()
+
+
         if use_wandb:
             wandb.log(metrics_to_log)
 
@@ -325,10 +376,13 @@ def train(
         total_loss += loss.item()
         total_gep += loss_gep.item() if config.GEP else 0.0
         total_cls += loss_cls.item() if config.CLS else 0.0
+        total_cce += loss_cce.item() if config.CCE else 0.0
         total_gepc += loss_gepc.item() if config.GEPC else 0.0
         total_error += mre.item() if config.GEP else 0.0
         total_ecs += loss_ecs.item() if config.ESC else 0.0
         total_dab += loss_dab.item() if config.DAR else 0.0
+        total_adv_E += loss_adv_E.item() if config.ADV else 0.0
+        total_adv_D += loss_adv_D.item() if config.ADV else 0.0
         total_zero_log_prob += (
             loss_zero_log_prob.item()
             if config.GEP and config.explicit_zero_prob
@@ -345,10 +399,13 @@ def train(
             cur_loss = total_loss / log_interval
             cur_gep = total_gep / log_interval if config.GEP else 0.0
             cur_cls = total_cls / log_interval if config.CLS else 0.0
+            cur_cce = total_cce / log_interval if config.CCE else 0.0
             cur_gepc = total_gepc / log_interval if config.GEPC else 0.0
             cur_error = total_error / log_interval if config.GEP else 0.0
             cur_ecs = total_ecs / log_interval if config.ESC else 0.0
             cur_dab = total_dab / log_interval if config.DAR else 0.0
+            cur_adv_E = total_adv_E / log_interval if config.ADV else 0.0
+            cur_adv_D = total_adv_D / log_interval if config.ADV else 0.0
             cur_zero_log_prob = (
                 total_zero_log_prob / log_interval if config.explicit_zero_prob else 0.0
             )
@@ -365,17 +422,29 @@ def train(
                 f"loss {cur_loss:5.2f} | "
                 + (f"gep {cur_gep:5.2f} |" if config.GEP else "")
                 + (f"cls {cur_cls:5.2f} | " if config.CLS else "")
+                + (f"cce {cur_cce:5.2f} | " if config.CCE else "")
                 + (f"err {cur_error:5.2f} | " if config.GEP else "")
                 + (f"gepc {cur_gepc:5.2f} |" if config.GEPC else "")
                 + (f"ecs {cur_ecs:5.2f} |" if config.ESC else "")
                 + (f"dar {cur_dab:5.2f} |" if config.DAR else "")
+                + (f"adv_E {cur_adv_E:5.2f} |" if config.ADV else "")
+                + (f"adv_D {cur_adv_D:5.2f} |" if config.ADV else "")
+                + (f"nzlp {cur_zero_log_prob:5.2f} |" if config.explicit_zero_prob else "")
+                + (
+                    f"mvc_nzlp {cur_gepc_zero_log_prob:5.2f} |"
+                    if config.GEPC and config.explicit_zero_prob
+                    else ""
+                )
             )
             total_loss = 0
             total_gep = 0
             total_cls = 0
+            total_cce = 0
             total_gepc = 0
             total_ecs = 0
             total_dab = 0
+            total_adv_E = 0
+            total_adv_D = 0
             total_zero_log_prob = 0
             total_gepc_zero_log_prob = 0
             total_error = 0
@@ -437,9 +506,9 @@ def evaluate(
                     batch_labels=batch_labels
                     if config.use_batch_labels or config.DSBN
                     else None,
-                    CLS=config.CLS,  # evaluation does not need CLS or CCE
-                    MVC=False,
-                    ECS=False,
+                    CLS=config.CLS,
+                    MVC=config.GEPC,
+                    ECS=config.ESC,
                     mod_types=mod_types if config.use_mod else None,
                     # do_sample=do_sample_in_train,
                     # generative_training = False,

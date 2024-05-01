@@ -88,6 +88,8 @@ if not os.path.exists(data_dir):
     os.makedirs(data_dir)
 
 
+#TODO: Trainer and this script need to be updated for Annotation Task Tutorial, e.g. with adversarial learning
+
 hyperparameter_defaults = dict(
     task="annotation",
     seed=42,
@@ -103,22 +105,32 @@ hyperparameter_defaults = dict(
     mask_ratio=0.25, # ratio of masked values, default was 0.4
     epochs=10, #original was 30
     n_bins=101, #counts/intensity bins, default was 51
-    GEP=True,  # Gene expression prediction, Gene expression modelling
-    GEPC=True,  # Masked value prediction for cell embedding, Gene expression modelling for cell objective
-    CLS=False,  # Classification?
-    ESC=False,  # Elastic similarity constraint
+    GEP=True,  # (MLM) Gene expression prediction, Gene expression modelling
+    GEPC=True,  #(MVC) Masked value prediction for cell embedding, Gene expression modelling for cell objective
+    CLS=False,  # celltype classification objective
+    CCE =False,  # Contrastive cell embedding objective
+    ESC=False,  # (ECS) Elastic similarity constraint, require ecs_thres>0
     ecs_thres=0,  # Elastic cell similarity objective, 0.0 to 1.0, 0.0 to disable. default was 0.8 in the paper it was 0.6
-    DAR=False,  # Domain adversarial loss
+    DAR=False,  # (DAB) Domain adversarial loss
     DSBN = False, # Domain-spec batchnorm
+    ADV = False,  # Adversarial training for batch correction
+    input_style = "binned",  # "normed_raw", "log1p", or "binned"
+    output_style = "binned",  # "normed_raw", "log1p", or "binned"
+    input_emb_style = "continuous",  # "category" or "continuous" or "scaling"
     dab_weight=0.0, # weight for domain adversarial loss
+    cell_emb_style = "cls",  # "avg-pool" or "w-pool" or "cls"
+    adv_E_delay_epochs=0,  # delay adversarial training on encoder for a few epochs
+    adv_D_delay_epochs=0,  # delay epochs for domain adversarial loss
     lr=1e-4,
     batch_size=32, #default was 64
     layer_size=128,
     nlayers=4,
     nhead=4,
+    lr_ADV = 1e-3,  # learning rate for discriminator, used when ADV is True
     # if load model, batch_size, layer_size, nlayers, nhead will be ignored
     dropout=0.2,
     schedule_ratio=0.9,  # ratio of epochs for learning rate schedule
+    schedule_interval=1, # interval of epochs for learning rate schedule
     save_eval_interval=2, #original was 5
     log_interval=100,
     fast_transformer=False, #need CUDA for this
@@ -129,11 +141,13 @@ hyperparameter_defaults = dict(
     n_hvp = 4000, # number of highly variable proteins
     # max_seq_len = 4001, # # Default n_hvg+1
     max_seq_len=1201, #1200 was the amount specified in the paper
+    freeze = False, #freeze
     per_seq_batch_sample = True, # whether to sort samples by batch_id
     explicit_zero_prob = True, # whether explicit bernoulli for zeros
     normalize_total = False, # 3. whether to normalize the raw data and to what sum
     use_batch_labels = False, # whether to use batch labels, default was True
     use_mod = False, #modality aware? set to True for multi-omics
+    do_sample_in_train = False, # sample the bernoulli in training, 
     celltype_label="Cohort Label",
     datasubset_label = 'pretrain_set',
     trainsubset_label = 'Train',
@@ -492,11 +506,31 @@ criterion_cls = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(
     model.parameters(), lr=config.lr, eps=1e-4 if config.amp else 1e-8
 )
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1, gamma=config.schedule_ratio)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 
+                                            step_size=config.schedule_interval, 
+                                            gamma=config.schedule_ratio)
 
 scaler = torch.cuda.amp.GradScaler(enabled=config.amp)
 
+if config.ADV:
+    discriminator = AdversarialDiscriminator(
+        d_model=embsize,
+        n_cls=num_batch_types,
+    ).to(device)
 
+    criterion_adv = nn.CrossEntropyLoss()  # consider using label smoothing
+    optimizer_E = torch.optim.Adam(model.parameters(), lr=config.lr_ADV)
+    scheduler_E = torch.optim.lr_scheduler.StepLR(
+        optimizer_E, 
+        step_size=config.schedule_interval, 
+        gamma=config.schedule_ratio
+    )
+    optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=config.lr_ADV)
+    scheduler_D = torch.optim.lr_scheduler.StepLR(
+        optimizer_D, 
+        step_size=config.schedule_interval,
+        gamma=config.schedule_ratio
+    )
 
 # %%
 best_val_loss = float("inf")
@@ -619,7 +653,9 @@ for epoch in range(1, config.epochs + 1):
             wandb.log({"avg_bio": results.get("avg_bio", 0.0)})
 
     scheduler.step()
-
+    if config.ADV:
+        scheduler_D.step()
+        scheduler_E.step()
 
 # %%
 # save the best model
