@@ -78,13 +78,28 @@ def objective(trial):
         }
 
 
+    try:
+        compute_finetune(run_id,plot_latent_space=False,
+                            n_trials=5,
+                            desc_str=sweep_id,
+                            sweep_kwargs=sweep_kwargs,
+                            skip_random_init=skip_random_init,
+                            eval_name='val')
+    
+    except ValueError as e:
+        print('ValueError:', e)
+        run = neptune.init_run(project='revivemed/RCC',
+            api_token=NEPTUNE_API_TOKEN,
+            with_id=run_id,
+            capture_stdout=False,
+            capture_stderr=False,
+            capture_hardware_metrics=False)
+        del run[f'{sweep_id}_finetune']
+        if not skip_random_init:
+            del run[f'{sweep_id}_randinit']
 
-    compute_finetune(run_id,plot_latent_space=False,
-                           n_trials=5,
-                           desc_str=sweep_id,
-                           sweep_kwargs=sweep_kwargs,
-                           skip_random_init=skip_random_init,
-                           eval_name='val')
+        run.stop()
+        raise optuna.TrialPruned()
     
 
     run = neptune.init_run(project='revivemed/RCC',
@@ -108,6 +123,7 @@ def objective(trial):
 
     # if key1_randinit_val > key1_finetune_val:
         # raise optuna.TrialPruned()
+    run.stop()
 
     return result1
 
