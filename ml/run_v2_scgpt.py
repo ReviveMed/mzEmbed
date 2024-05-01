@@ -11,11 +11,15 @@ import traceback
 from typing import List, Tuple, Dict, Union, Optional
 import warnings
 
+import pickle
+
 import torch
 from anndata import AnnData, read_h5ad
 import scanpy as sc
 import scvi
 import numpy as np
+import pandas as pd
+import seaborn as sns
 import wandb
 from scipy.sparse import issparse
 import matplotlib.pyplot as plt
@@ -36,7 +40,7 @@ sys.path.insert(0, "../")
 
 import scgpt as scg
 from scgpt.tokenizer.gene_tokenizer import GeneVocab
-from scgpt import prepare_data, prepare_dataloader, define_wandb_metrcis, evaluate, eval_testdata, train
+from scgpt import prepare_data, prepare_dataloader, define_wandb_metrcis, evaluate, eval_testdata, train, test
 
 from scgpt.model import TransformerModel, AdversarialDiscriminator
 from scgpt.tokenizer import tokenize_and_pad_batch, random_mask_value
@@ -54,6 +58,7 @@ os.environ["KMP_WARNINGS"] = "off"
 warnings.filterwarnings('ignore')
 
 from misc import download_data_file
+from sklearn.metrics import confusion_matrix
 
 
 # %%
@@ -132,6 +137,7 @@ hyperparameter_defaults = dict(
     datasubset_label = 'pretrain_set',
     trainsubset_label = 'Train',
     valsubset_label = 'Val',
+    testsubset_label = 'Test',
     # celltype_label="MSKCC_binary_id",
     # datasubset_label = 'finetune_set',
     # trainsubset_label = 'Finetune',
@@ -204,6 +210,7 @@ if dataset_name == "metab_v0":
     ori_batch_col = "Study ID"
     adata.obs["celltype"] = adata.obs[config.celltype_label].astype("category")
     data_is_raw = True
+    filter_gene_by_counts = False
 
 
 
@@ -212,18 +219,20 @@ if dataset_name == "metab_v0":
 # make the batch category column
 adata.obs["str_batch"] = adata.obs[ori_batch_col].astype(str)
 batch_id_labels = adata.obs["str_batch"].astype("category").cat.codes.values
+num_batch_types = len(set(batch_id_labels))
+print(f"number of batch types: {num_batch_types}")
 adata.obs["batch_id"] = batch_id_labels
 
+celltype_id_labels = adata.obs["celltype"].astype("category").cat.codes.values
+celltypes = adata.obs["celltype"].unique()
+num_types = len(np.unique(celltype_id_labels))
+print(f"number of cell types: {num_types}")
+id2type = dict(enumerate(adata.obs["celltype"].astype("category").cat.categories))
+adata.obs["celltype_id"] = celltype_id_labels
+
+
 adata.var["gene_name"] = adata.var.index.tolist()
-
-
 # %%
-# make the batch category column
-adata.obs["str_batch"] = adata.obs[ori_batch_col].astype(str)
-batch_id_labels = adata.obs["str_batch"].astype("category").cat.codes.values
-adata.obs["batch_id"] = batch_id_labels
-
-adata.var["gene_name"] = adata.var.index.tolist()
 
 if config.load_model is not None:
     model_dir = Path(config.load_model)
@@ -289,7 +298,7 @@ else:
 print('Preprocess data')
 preprocessor = Preprocessor(
     use_key="X",  # the key in adata.layers to use as raw data
-    filter_gene_by_counts=3,  # step 1
+    filter_gene_by_counts=filter_gene_by_counts,  # step 1
     filter_cell_by_counts=False,  # step 2
     normalize_total=config.normalize_total,  # 3. whether to normalize the raw data and to what sum
     result_normed_key="X_normed",  # the key in adata.layers to store the normalized data
@@ -321,12 +330,10 @@ all_counts = (
 )
 genes = adata.var["gene_name"].tolist()
 
-celltypes_labels = adata.obs["celltype"].tolist()  # make sure count from 0
-num_types = len(set(celltypes_labels))
+celltypes_labels = adata.obs["celltype_id"].tolist()  # make sure count from 0
 celltypes_labels = np.array(celltypes_labels)
 
 batch_ids = adata.obs["batch_id"].tolist()
-num_batch_types = len(set(batch_ids))
 batch_ids = np.array(batch_ids)
 
 datasubset_label = config.datasubset_label
@@ -334,6 +341,7 @@ datasubset_label = config.datasubset_label
 if datasubset_label in adata.obs:
     trainsubset_label = config.trainsubset_label
     valsubset_label = config.valsubset_label
+    testsubset_label = config.testsubset_label
 
     print(f'use {datasubset_label} for train ({trainsubset_label}) /val ({valsubset_label}) split')
     train_data = all_counts[adata.obs[datasubset_label] == trainsubset_label]
@@ -343,6 +351,8 @@ if datasubset_label in adata.obs:
     train_batch_labels = batch_ids[adata.obs[datasubset_label] == trainsubset_label]
     valid_batch_labels = batch_ids[adata.obs[datasubset_label] == valsubset_label]
     print('train/val split: ', len(train_data), len(valid_data))
+
+    adata_test = adata[adata.obs[datasubset_label] == testsubset_label].copy()
 
 else:
     print('use random split for train/val split')
@@ -357,6 +367,7 @@ else:
         all_counts, celltypes_labels, batch_ids, test_size=0.1, shuffle=True
     )
 
+    adata_test = None
 # %%
 if config.load_model is None:
     vocab = GeneVocab(
@@ -598,6 +609,64 @@ torch.save(best_model.state_dict(), save_dir / "best_model.pt")
 
 # %% [markdown]
 # ## Gene embeddings
+
+
+# %% Annotation of CellType Results
+if (config.task == "annotation") and (adata_test is not None):
+
+    predictions, labels, results = test(best_model, adata_test)
+    # adata_test_raw.obs["predictions"] = [id2type[p] for p in predictions]
+    adata_test.obs["predictions"] = [id2type[p] for p in predictions]
+
+    # plot
+    palette_ = plt.rcParams["axes.prop_cycle"].by_key()["color"] 
+    palette_ = plt.rcParams["axes.prop_cycle"].by_key()["color"] + plt.rcParams["axes.prop_cycle"].by_key()["color"] + plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    palette_ = {c: palette_[i] for i, c in enumerate(celltypes)}
+
+    with plt.rc_context({"figure.figsize": (6, 4), "figure.dpi": (300)}):
+        sc.pl.umap(
+            adata_test,
+            # adata_test_raw,
+            color=["celltype", "predictions"],
+            palette=palette_,
+            show=False,
+        )
+        plt.savefig(save_dir / "results.png", dpi=300)
+
+    save_dict = {
+        "predictions": predictions,
+        "labels": labels,
+        "results": results,
+        "id_maps": id2type
+    }
+    with open(save_dir / "results.pkl", "wb") as f:
+        pickle.dump(save_dict, f)
+
+    results["test/cell_umap"] = wandb.Image(
+        str(save_dir / "results.png"),
+        caption=f"predictions macro f1 {results['test/macro_f1']:.3f}",
+    )
+    wandb.log(results)
+
+
+    # %%
+
+    celltypes = list(celltypes)
+    for i in set([id2type[p] for p in predictions]):
+        if i not in celltypes:
+            celltypes.remove(i)
+    cm = confusion_matrix(labels, predictions)
+    cm = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
+    cm = pd.DataFrame(cm, index=celltypes[:cm.shape[0]], columns=celltypes[:cm.shape[1]])
+    plt.figure(figsize=(10, 10))
+    sns.heatmap(cm, annot=True, fmt=".1f", cmap="Blues")
+    plt.savefig(save_dir / "confusion_matrix.png", dpi=300)
+
+    results["test/confusion_matrix"] = wandb.Image(
+        str(save_dir / "confusion_matrix.png"),
+        caption=f"confusion matrix",
+    )
+
 
 # %%
 if USE_WANDB:
