@@ -3,7 +3,7 @@ import neptune
 from utils_neptune import get_latest_dataset
 from train4 import train_compound_model, evaluate_compound_model, CompoundDataset, create_dataloaders, create_dataloaders_old
 import pandas as pd
-from run_finetune import compute_finetune
+from run_finetune import compute_finetune, update_finetune_data
 import numpy as np
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
@@ -111,7 +111,7 @@ def objective(trial):
     
     result1_array = run[f'{sweep_id}_finetune/{key1_loc}'].fetch_values()
 
-    result1 = np.mean(result1_array)
+    result1 = np.mean(result1_array['value'])
 
     run.wait()
     del run[f'{sweep_id}_finetune']
@@ -136,6 +136,11 @@ if USE_WEBAPP_DB:
 
 study_name = f'finetune_{sweep_desc}_{run_id}'
  
+redo = False
+update_finetune_data('finetune_val',redo=redo)
+update_finetune_data('finetune_train',redo=redo)
+update_finetune_data('finetune_test',redo=redo)
+update_finetune_data('finetune_trainval',redo=redo)
 
 
 
