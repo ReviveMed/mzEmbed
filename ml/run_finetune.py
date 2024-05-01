@@ -167,9 +167,10 @@ def get_head_kwargs_by_desc(desc_str,num_hidden_layers=0):
 ############################################################
 
 def compute_finetune(run_id,plot_latent_space=False,
-                           n_trials=5,desc_str=None,
+                           n_trials=5,desc_str='skip',
                            sweep_kwargs=None,eval_name='val2',
-                           recompute_plot=False):
+                           recompute_plot=False,
+                           eval_on_test=False):
 
     run = neptune.init_run(project='revivemed/RCC',
             api_token=NEPTUNE_API_TOKEN,
@@ -267,6 +268,30 @@ def compute_finetune(run_id,plot_latent_space=False,
         run["info/state"] = 'Inactive'
         run.stop()
 
+    if eval_on_test:
+
+        run = neptune.init_run(project='revivemed/RCC',
+                api_token=NEPTUNE_API_TOKEN,
+                with_id=run_id,
+                capture_stdout=False,
+                capture_stderr=False,
+                capture_hardware_metrics=False)
+
+        kwargs['overwrite_existing_kwargs'] = True
+        # kwargs['encoder_kind'] = 'AE'
+        kwargs['load_model_loc'] = 'pretrain'
+        kwargs['run_evaluation'] = True
+        kwargs['run_training'] = False
+        kwargs['save_latent_space'] = False
+        # kwargs['save_latent_space'] = False
+        kwargs['eval_name'] = 'test'
+        # run_id = setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,**kwargs)
+        setup_neptune_run(data_dir,setup_id='pretrain',with_run_id=run_id,run=run,**kwargs)
+
+        run['sys/failed'] = False
+        run["info/state"] = 'Inactive'
+        run.stop()
+
     ############################################################
     ## Finetune
     ############################################################
@@ -281,6 +306,10 @@ def compute_finetune(run_id,plot_latent_space=False,
         if key not in sweep_kwargs.keys():
             sweep_kwargs[key] = default_sweep_kwargs[key]
     
+    if desc_str == 'skip':
+        print('skip finetune')
+        return
+
     if desc_str is None:
         print('No desc_str')
         return
@@ -500,9 +529,9 @@ if __name__ == '__main__':
     if len(sys.argv)>4:
         chosen_finetune_desc = sys.argv[4]
     else:
-        chosen_finetune_desc = None
+        chosen_finetune_desc = ''
 
-    # which dataset is used for evaluation
+    # which dataset is used for finetune evaluation
     if len(sys.argv)>5:
         eval_name = sys.argv[5]
     else:
@@ -532,13 +561,13 @@ if __name__ == '__main__':
             run_id_list =  [chosen_id]
 
 
-    if chosen_finetune_desc is not None:
+    if len(chosen_finetune_desc)>0:
         if ',' in chosen_finetune_desc:
             desc_str_list = chosen_finetune_desc.split(',')
         else:
             desc_str_list = [chosen_finetune_desc]
     else:
-        desc_str_list = [None]
+        desc_str_list = ['skip']
 
 
     if plot_latent_space<2:
@@ -563,7 +592,7 @@ if __name__ == '__main__':
     print('Number of runs to finetune:',len(run_id_list))
 
     sweep_kwargs = None
-
+    eval_on_test = True
 
 
     # run_id_list = ['RCC-1735']
@@ -614,7 +643,8 @@ if __name__ == '__main__':
                                         desc_str=desc_str,
                                         eval_name=eval_name,
                                         recompute_plot=recompute_plot,
-                                        sweep_kwargs=sweep_kwargs)
+                                        sweep_kwargs=sweep_kwargs,
+                                        eval_on_test=eval_on_test)
                 # do not bother attempting to plot the latent space again
                 plot_latent_space0 = False
             except NeptuneException as e:
