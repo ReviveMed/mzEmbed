@@ -479,7 +479,17 @@ if USE_WANDB:
 
 for epoch in range(1, config.epochs + 1):
     epoch_start_time = time.time()
-    train_data_pt, valid_data_pt = prepare_data(sort_seq_batch=config.per_seq_batch_sample)
+    train_data_pt, valid_data_pt = prepare_data(
+        tokenized_train= tokenized_train,
+        tokenized_valid= tokenized_valid,
+        train_batch_labels=train_batch_labels,
+        valid_batch_labels=valid_batch_labels,
+        config = config,
+        epoch = epoch,
+        train_celltype_labels=train_celltype_labels,
+        valid_celltype_labels=valid_celltype_labels,
+        sort_seq_batch=config.per_seq_batch_sample)
+    
     train_loader = prepare_dataloader(
         train_data_pt,
         batch_size=config.batch_size,
