@@ -566,6 +566,19 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                     if upload_models_to_gcp:
                         raise NotImplementedError('upload_models_to_gcp not implemented')
 
+                    # New method for saving the heads and advs
+                    #TODO need to test
+                    # head.save_state_to_path(f'{save_dir}/{setup_id}',save_name='head')
+                    # adv.save_state_to_path(f'{save_dir}/{setup_id}',save_name='adv')
+                    # head.save_info(f'{save_dir}/{setup_id}',save_name='head')
+                    # adv.save_info(f'{save_dir}/{setup_id}',save_name='adv')
+                    # if upload_models_to_neptune:
+                    #     run[f'{setup_id}/models/head_state'].upload(f'{save_dir}/{setup_id}/head_state.pt')
+                    #     run[f'{setup_id}/models/adv_state'].upload(f'{save_dir}/{setup_id}/adv_state.pt')
+                    #     run[f'{setup_id}/models/head_info'].upload(f'{save_dir}/{setup_id}/head_info.json')
+                    #     run[f'{setup_id}/models/adv_info'].upload(f'{save_dir}/{setup_id}/adv_info.json')
+                    
+
                     head.save_state_to_path(f'{save_dir}/{setup_id}')
                     adv.save_state_to_path(f'{save_dir}/{setup_id}')
                     head.save_info(f'{save_dir}/{setup_id}')

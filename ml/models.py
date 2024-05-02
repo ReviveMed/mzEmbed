@@ -625,19 +625,34 @@ class MultiHead(nn.Module):
     def loss(self, outputs, y_true):
         return self.multi_loss(outputs, y_true)
     
-    def save_state_to_path(self, save_path):
-        for head in self.heads:
-            head.save_state_to_path(save_path)
+    def save_state_to_path(self, save_path, save_name=None):
+        if save_name is None:
+            for head in self.heads:
+                head.save_state_to_path(save_path)
+        else:
+            torch.save(self.state_dict(), os.path.join(save_path, save_name))
         pass
 
-    def load_state_from_path(self, load_path):
-        for head in self.heads:
-            head.load_state_from_path(load_path)
+    def load_state_from_path(self, load_path, multihead=False):
+        if multihead:
+            self.load_state_dict(torch.load(load_path))
+        else:
+            for head in self.heads:
+                head.load_state_from_path(load_path)
         pass
 
-    def save_info(self, save_path):
+    def get_info(self):
+        info = {}
         for head in self.heads:
-            head.save_info(save_path)
+            info[f'{head.kind}_{head.name}'] = head.get_info()
+        return info
+
+    def save_info(self, save_path, save_name=None):
+        if save_name is None:
+            for head in self.heads:
+                head.save_info(save_path)
+        else:
+            save_json(self.get_info(), os.path.join(save_path, save_name))
         pass
 
     def get_file_ids(self):
@@ -767,23 +782,26 @@ class Dummy_Head(Head):
 #########################################################
     
 class Binary_Head(Head):
-    def __init__(self, name='Binary', y_idx=0, weight=1.0, kind='Binary', **kwargs):
+    def __init__(self, **kwargs):
+    # def __init__(self, name='Binary', y_idx=0, weight=1.0, kind='Binary', **kwargs):
         super(Binary_Head, self).__init__()
         self.goal = 'classify'
         self.kind = 'Binary'
-        assert self.kind == kind
-        self.name = name
-        self.y_idx = y_idx
-        self.weight = weight
+        assert self.kind == kwargs.get('kind', 'Binary')
+        self.name = kwargs.get('name', 'Binary')
+        self.y_idx = kwargs.get('y_idx', 0)
+        self.weight = kwargs.get('weight', 1.0)
         self.num_examples_per_class = None
         self.class_weight = None
         self.pos_class_weight = None
-        self.architecture = kwargs
+        self.architecture = kwargs.get('architecture', kwargs)
         self.loss_reduction = 'mean'
         # self.network = nn.Identity()
-        self.network = Dense_Layers(**kwargs)
-        self.input_size = kwargs.get('input_size', 1)
-        self.output_size = kwargs.get('output_size', 1)
+        
+        self.network = Dense_Layers(**self.architecture)
+        self.input_size = self.architecture.get('input_size', 1)
+        self.output_size = self.architecture.get('output_size', 1)
+        
         self.file_id = self.kind + '_' + self.name
 
         self.loss_func = nn.BCEWithLogitsLoss(reduction=self.loss_reduction,
@@ -860,31 +878,32 @@ class Binary_Head(Head):
 #########################################################
 
 class MultiClass_Head(Head):
-    def __init__(self, name='MultiClass', y_idx=0, weight=1.0, num_classes=3, kind='MultiClass', **kwargs):
+    def __init__(self, **kwargs):
+    # def __init__(self, name='MultiClass', y_idx=0, weight=1.0, num_classes=3, kind='MultiClass', **kwargs):
         super(MultiClass_Head, self).__init__()
         self.goal = 'classify'
         self.kind = 'MultiClass'
-        assert self.kind == kind
-        self.name = name
-        self.y_idx = y_idx
-        self.weight = weight
-        self.num_classes = num_classes
+        assert self.kind == kwargs.get('kind', 'MultiClass')
+        self.name = kwargs.get('name', 'MultiClass')
+        self.y_idx = kwargs.get('y_idx', 0)
+        self.weight = kwargs.get('weight', 1.0)
+        self.num_classes = kwargs.get('num_classes', 3)
+        self.architecture = kwargs.get('architecture', kwargs)
         
-        if 'output_size' in kwargs:
-            if kwargs['output_size'] != self.num_classes:
+        if 'output_size' in self.architecture:
+            if self.architecture['output_size'] != self.num_classes:
                 raise ValueError(f'Output layer has {kwargs["output_size"]} features, but should have {self.num_classes} features')
         else:
-            kwargs['output_size'] = num_classes
+            self.architecture['output_size'] = self.num_classes
         
         self.file_id = self.kind + '_' + self.name
-        self.input_size = kwargs.get('input_size', 1)
-        self.output_size = kwargs.get('output_size', self.num_classes)
+        self.input_size = self.architecture.get('input_size', 1)
+        self.output_size = self.architecture.get('output_size', self.num_classes)
         self.class_weight = None
-        self.architecture = kwargs
         self.loss_reduction = 'mean'
         self.label_smoothing = 0
         # self.network = nn.Identity()
-        self.network = Dense_Layers(**kwargs)
+        self.network = Dense_Layers(**self.architecture)
         
 
         self.loss_func = nn.CrossEntropyLoss(reduction=self.loss_reduction, 
@@ -962,19 +981,20 @@ class MultiClass_Head(Head):
 
 
 class Regression_Head(Head):
-    def __init__(self, name='Regression', y_idx=0, weight=1.0, kind='Regression', **kwargs):
+    # def __init__(self, name='Regression', y_idx=0, weight=1.0, kind='Regression', **kwargs):
+    def __init__(self, **kwargs):
         super(Regression_Head, self).__init__()
         self.goal = 'regress'
         self.kind = 'Regression'
-        assert self.kind == kind
-        self.name = name
-        self.y_idx = y_idx
-        self.weight = weight
-        self.architecture = kwargs
+        assert self.kind == kwargs.get('kind', 'Regression')
+        self.name = kwargs.get('name', 'Regression')
+        self.y_idx = kwargs.get('y_idx', 0)
+        self.weight = kwargs.get('weight', 1.0)
+        self.architecture = kwargs.get('architecture', kwargs)
         self.loss_reduction = 'mean'
-        self.network = Dense_Layers(**kwargs)
-        self.input_size = kwargs.get('input_size', 1)
-        self.output_size = kwargs.get('output_size', 1)
+        self.network = Dense_Layers(**self.architecture)
+        self.input_size = self.architecture.get('input_size', 1)
+        self.output_size = self.architecture.get('output_size', 1)
         self.file_id = self.kind + '_' + self.name
         self.loss_func = nn.MSELoss(reduction=self.loss_reduction)
         self.score_func_dict = {'MSE': lambda y_score, y_true: F.mse_loss(y_score, y_true),
@@ -1017,20 +1037,20 @@ class Regression_Head(Head):
 
 
 class Cox_Head(Head):
-    def __init__(self, name='Cox', y_idx=[0,1], weight=1.0, kind='Cox', **kwargs):
+    def __init__(self, **kwargs):
         super(Cox_Head, self).__init__()
         self.goal = 'survival'
         self.kind = 'Cox'
-        assert self.kind == kind
-        self.name = name
-        self.y_idx = y_idx
-        assert len(y_idx) == 2
-        self.weight = weight
-        self.architecture = kwargs
+        assert self.kind == kwargs.get('kind', 'Cox')
+        self.name = kwargs.get('name', 'Cox')
+        self.y_idx = kwargs.get('y_idx', [0,1])
+        assert len(self.y_idx) == 2
+        self.weight = kwargs.get('weight', 1.0)
+        self.architecture = kwargs.get('architecture', kwargs)
         self.loss_reduction = 'mean'
-        self.network = Dense_Layers(**kwargs)
-        self.input_size = kwargs.get('input_size', 1)
-        self.output_size = kwargs.get('output_size', 1)
+        self.network = Dense_Layers(**self.architecture)
+        self.input_size = self.architecture.get('input_size', 1)
+        self.output_size = self.architecture.get('output_size', 1)
         self.file_id = self.kind + '_' + self.name
         self.loss_func = CoxPHLoss()
         self.score_func_dict = {'Concordance Index': lambda y_score, y_true, y_event: concordance_index(y_true, y_score, y_event)}
@@ -1063,7 +1083,8 @@ class Cox_Head(Head):
         return torch.exp(self.network(x))
 
     def predict(self, x):
-        return self.predict_risk(x)
+        # return self.predict_risk(x)
+        return self.network(x)
 
     def score(self, y_output, y_data, ignore_nan=True):
         if self.weight == 0:
@@ -1146,7 +1167,8 @@ class Decoder_Head(Head):
 #########################################################
 #########################################################
 
-def get_encoder(kind, **kwargs):
+def get_encoder(**kwargs):
+    kind = kwargs.get('kind','UNKOWN')
     if kind == 'AE':
         encoder = AE(**kwargs)
     elif kind == 'VAE':
@@ -1156,8 +1178,8 @@ def get_encoder(kind, **kwargs):
     return encoder
 
 
-def get_head(kind, **kwargs):
-
+def get_head(**kwargs):
+    kind = kwargs.get('kind','UNKOWN')
     if kind == 'NA' or kind == 'Dummy':
         head = Dummy_Head()
     elif kind == 'Binary':
@@ -1182,6 +1204,7 @@ class CompoundModel(nn.Module):
         super(CompoundModel, self).__init__()
         self.encoder = encoder
         self.head = head
+        self.file_id = self.encoder.file_id + '__' +self.head.file_id
     #TODO: check that output of encoder matches input of head, accounting for other_vars
 
     def forward(self, x, other_vars=None):
@@ -1240,16 +1263,16 @@ def create_compound_model_from_info(
             head_info = model_info['head']
 
     encoder = get_encoder(
-        kind = encoder_info['kind'],
         **encoder_info
     )
 
     head = get_head(
-        kind = head_info['kind'],
         **head_info
     )
 
     if model_state_dict is not None:
+        # if head.kind != 'MultiHead':
+            # head = MultiHead([head])
         model = CompoundModel(encoder,head)
         model.load_state_dict(model_state_dict)
     else:
@@ -1257,7 +1280,10 @@ def create_compound_model_from_info(
             encoder.load_state_dict(encoder_state_dict)
         if head_state_dict is not None:
             head.load_state_dict(head_state_dict)
-        
+
+        # if head.kind != 'MultiHead':
+            # head = MultiHead([head])
+
         model = CompoundModel(encoder,head)
 
     return model
