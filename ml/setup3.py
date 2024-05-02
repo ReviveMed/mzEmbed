@@ -549,10 +549,12 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
                     # alternative way to log models
                     torch.save(encoder.state_dict(), f'{save_dir}/{setup_id}_encoder_state_dict.pth')
+                    encoder.save_info(f'{save_dir}/{setup_id}')
                     # torch.save(head.state_dict(), f'{save_dir}/{setup_id}_head_state_dict.pth')
                     # torch.save(adv.state_dict(), f'{save_dir}/{setup_id}_adv_state_dict.pth')
                     if upload_models_to_neptune:
                         run[f'{setup_id}/models/encoder_state_dict'].upload(f'{save_dir}/{setup_id}_encoder_state_dict.pth')
+                        run[f'{setup_id}/models/encoder_info'].upload(f'{save_dir}/{setup_id}_encoder_info.json')
                     # run[f'{setup_id}/models/head_state_dict'].upload(f'{save_dir}/{setup_id}_head_state_dict.pth')
                     # run[f'{setup_id}/models/adv_state_dict'].upload(f'{save_dir}/{setup_id}_adv_state_dict.pth')
                         run.wait()

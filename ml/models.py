@@ -11,6 +11,7 @@ import numpy as np
 
 # from torchmetrics import AUROC
 from sklearn.metrics import roc_auc_score
+from sklearn.base import BaseEstimator
 import traceback
 
 from lifelines.utils import concordance_index
@@ -222,12 +223,29 @@ def grad_reverse(x: torch.Tensor, lambd: float = 1.0) -> torch.Tensor:
 
 ############ Autoencoder Models ############
 
+
+
 ### Variational Autoencoder
 class VAE(nn.Module):
-    def __init__(self, input_size, hidden_size, latent_size,
-                 num_hidden_layers=1, dropout_rate=0,
-                 activation='leaky_relu', use_batch_norm=False, act_on_latent_layer=False):
+    # def __init__(self, input_size, hidden_size, latent_size,
+    #              num_hidden_layers=1, dropout_rate=0,
+    #              activation='leaky_relu', use_batch_norm=False, act_on_latent_layer=False):
+    def __init__(self, **kwargs):
         super(VAE, self).__init__()
+
+        input_size = kwargs.get('input_size', 1)
+        hidden_size = kwargs.get('hidden_size', 1)
+        latent_size = kwargs.get('latent_size', 1)
+        num_hidden_layers = kwargs.get('num_hidden_layers', 1)
+        dropout_rate = kwargs.get('dropout_rate', 0.2)
+        activation = kwargs.get('activation', 'leakyrelu')
+        use_batch_norm = kwargs.get('use_batch_norm', False)
+        act_on_latent_layer = kwargs.get('act_on_latent_layer', False)
+        # print the unusued kwargs
+        for key, value in kwargs.items():
+            if key not in ['input_size', 'hidden_size', 'latent_size', 'num_hidden_layers', 'dropout_rate', 'activation', 'use_batch_norm', 'act_on_latent_layer']:
+                print(f'Warning: {key} is not a valid argument for VAE')
+
         self.goal = 'encode'
         self.kind = 'VAE'
         self.latent_size = latent_size
@@ -331,24 +349,88 @@ class VAE(nn.Module):
     def reset_params(self):
         _reset_params(self)
 
+    # def get_hyperparameters(self):
+    #     return {'input_size': self.input_size,
+    #             'hidden_size': self.hidden_size,
+    #             'latent_size': self.latent_size,
+    #             'num_hidden_layers': self.num_hidden_layers,
+    #             'dropout_rate': self.dropout_rate,
+    #             'activation': self.activation,
+    #             'use_batch_norm': self.use_batch_norm,
+    #             'act_on_latent_layer': self.act_on_latent_layer,
+    #             'model_kind': 'VAE'}
+    def save_state_to_path(self, save_path, save_name=None):
+        if save_name is None:
+            if os.path.isfile(save_path):
+                save_name = os.path.basename(save_path)
+                save_path = os.path.dirname(save_path)
+            else:
+                save_name = self.file_id + '_state.pt'
+        torch.save(self.state_dict(), os.path.join(save_path, save_name))
+        pass
+
+    def load_state_from_path(self, load_path, load_name=None):
+        if load_name is None:
+            # check if the load_path is to a file
+            if os.path.isfile(load_path):
+                load_name = os.path.basename(load_path)
+                load_path = os.path.dirname(load_path)
+            else:
+                load_name = self.file_id + '_state.pt'
+        self.load_state_dict(torch.load(os.path.join(load_path, load_name)))
+        pass
+
+
     def get_hyperparameters(self):
-        return {'input_size': self.input_size,
-                'hidden_size': self.hidden_size,
-                'latent_size': self.latent_size,
-                'num_hidden_layers': self.num_hidden_layers,
-                'dropout_rate': self.dropout_rate,
-                'activation': self.activation,
-                'use_batch_norm': self.use_batch_norm,
-                'act_on_latent_layer': self.act_on_latent_layer,
-                'model_kind': 'VAE'}
+        # cycle through all the attributes of the class and save them
+        hyperparameters = {}
+        for key, value in self.__dict__.items():
+            # skip if it is a private attribute
+            if key[0] == '_':
+                continue
+            
+            # skip if it is a method
+            if callable(value):
+                continue
+            hyperparameters[key] = value
+        return hyperparameters
+
+    def get_info(self):
+        return self.get_hyperparameters()
+
+    def save_info(self, save_path, save_name=None):
+        # save_json(self.get_hyperparameters(), save_path)
+        # pass
+        if save_name is None:
+            if os.path.isfile(save_path):
+                save_name = os.path.basename(save_path)
+                save_path = os.path.dirname(save_path)
+            else:
+                save_name = self.file_id + '_info.json'
+        save_json(self.get_info(), os.path.join(save_path, save_name))   
     
     
 ### Autoencoder
 class AE(nn.Module):
-    def __init__(self, input_size, hidden_size, latent_size,
-                 num_hidden_layers=1, dropout_rate=0,
-                 activation='leaky_relu', use_batch_norm=False, act_on_latent_layer=False):
+    # def __init__(self, input_size, hidden_size, latent_size,
+    #              num_hidden_layers=1, dropout_rate=0,
+    #              activation='leaky_relu', use_batch_norm=False, act_on_latent_layer=False):
+    def __init__(self, **kwargs):
         super(AE, self).__init__()
+
+        input_size = kwargs.get('input_size')
+        hidden_size = kwargs.get('hidden_size')
+        latent_size = kwargs.get('latent_size')
+        num_hidden_layers = kwargs.get('num_hidden_layers', 1)
+        dropout_rate = kwargs.get('dropout_rate', 0.2)
+        activation = kwargs.get('activation', 'leakyrelu')
+        use_batch_norm = kwargs.get('use_batch_norm', False)
+        act_on_latent_layer = kwargs.get('act_on_latent_layer', False)
+        # print the unusued kwargs
+        for key, value in kwargs.items():
+            if key not in ['input_size', 'hidden_size', 'latent_size', 'num_hidden_layers', 'dropout_rate', 'activation', 'use_batch_norm', 'act_on_latent_layer']:
+                print(f'Warning: {key} is not a valid argument for AE')
+
         self.goal = 'encode'
         self.kind = 'AE'
         self.latent_size = latent_size
@@ -414,16 +496,67 @@ class AE(nn.Module):
     def reset_params(self):
         _reset_params(self)
 
+    # def get_hyperparameters(self):
+    #     return {'input_size': self.input_size,
+    #             'hidden_size': self.hidden_size,
+    #             'latent_size': self.latent_size,
+    #             'num_hidden_layers': self.num_hidden_layers,
+    #             'dropout_rate': self.dropout_rate,
+    #             'activation': self.activation,
+    #             'use_batch_norm': self.use_batch_norm,
+    #             'act_on_latent_layer': self.act_on_latent_layer,
+    #             'model_kind': 'AE'}
+
+    def save_state_to_path(self, save_path, save_name=None):
+        if save_name is None:
+            if os.path.isfile(save_path):
+                save_name = os.path.basename(save_path)
+                save_path = os.path.dirname(save_path)
+            else:
+                save_name = self.file_id + '_state.pt'
+        torch.save(self.state_dict(), os.path.join(save_path, save_name))
+        pass
+
+    def load_state_from_path(self, load_path, load_name=None):
+        if load_name is None:
+            # check if the load_path is to a file
+            if os.path.isfile(load_path):
+                load_name = os.path.basename(load_path)
+                load_path = os.path.dirname(load_path)
+            else:
+                load_name = self.file_id + '_state.pt'
+        self.load_state_dict(torch.load(os.path.join(load_path, load_name)))
+        pass
+
+
     def get_hyperparameters(self):
-        return {'input_size': self.input_size,
-                'hidden_size': self.hidden_size,
-                'latent_size': self.latent_size,
-                'num_hidden_layers': self.num_hidden_layers,
-                'dropout_rate': self.dropout_rate,
-                'activation': self.activation,
-                'use_batch_norm': self.use_batch_norm,
-                'act_on_latent_layer': self.act_on_latent_layer,
-                'model_kind': 'AE'}
+        # cycle through all the attributes of the class and save them
+        hyperparameters = {}
+        for key, value in self.__dict__.items():
+            # skip if it is a private attribute
+            if key[0] == '_':
+                continue
+            
+            # skip if it is a method
+            if callable(value):
+                continue
+            hyperparameters[key] = value
+        return hyperparameters
+
+    def get_info(self):
+        return self.get_hyperparameters()
+
+    def save_info(self, save_path, save_name=None):
+        # save_json(self.get_hyperparameters(), save_path)
+        # pass
+        if save_name is None:
+            if os.path.isfile(save_path):
+                save_name = os.path.basename(save_path)
+                save_path = os.path.dirname(save_path)
+            else:
+                save_name = self.file_id + '_info.json'
+        save_json(self.get_info(), os.path.join(save_path, save_name))   
+    
 
 
 #########################################################
@@ -435,6 +568,7 @@ class MultiHead(nn.Module):
         super().__init__()
         self.heads = nn.ModuleList([h for h in heads if h.weight > 0])
         self.heads_names = [head.name for head in self.heads]
+        self.kind = 'MultiHead'
 
         # check that all heads have unique names
         if len(set(self.heads_names)) != len(self.heads_names):
@@ -927,10 +1061,217 @@ class Cox_Head(Head):
             return {k: 0 for k, v in self.score_func_dict.items()}
 
 
+class Decoder_Head(Head):
+    def __init__(self, name='Decoder', y_idx=0, weight=1.0, kind='Decoder', **kwargs):
+        super(Decoder_Head, self).__init__()
+        self.goal = 'decode'
+        self.kind = 'Decoder'
+        assert self.kind == kind
+        self.name = name
+        self.y_idx = y_idx
+        self.weight = weight
+        self.architecture = kwargs
+        self.loss_reduction = 'mean'
+        self.network = Dense_Layers(**kwargs)
+        self.input_size = kwargs.get('input_size', 1)
+        self.output_size = kwargs.get('output_size', 1)
+        self.file_id = self.kind + '_' + self.name
+        self.loss_func = nn.MSELoss(reduction=self.loss_reduction)
+        self.score_func_dict = {'MSE': lambda y_score, y_true: F.mse_loss(y_score, y_true),
+                                'MAE': lambda y_score, y_true: F.l1_loss(y_score, y_true)}
+        # self.network = nn.Identity()
+        # self.network = Dense_Layers(**kwargs)
+
+    def define_architecture(self, **kwargs):
+        self.architecture = kwargs
+        self.input_size = kwargs.get('input_size', 1)
+        self.output_size = kwargs.get('output_size', 1)
+        self.network = Dense_Layers(**kwargs)
+        pass
+
+    def forward(self, x):
+        return self.network(x)
+
+    def loss(self, y_output, y_data, ignore_nan=True):
+        if self.weight == 0:
+            return torch.tensor(0, dtype=torch.float32)
+        y_true = y_data[:,self.y_idx]
+        y0, y1 = _nan_cleaner(y_output, y_true, ignore_nan)
+        if y0 is None:
+            return torch.tensor(0, dtype=torch.float32)
+        return self.loss_func(y0.squeeze(), y1.squeeze())
+
+    def score(self, y_output, y_data, ignore_nan=True):
+        if self.weight == 0:
+            return {k: 0 for k, v in self.score_func_dict.items()}
+        try:
+            y_true = y_data[:,self.y_idx]
+            y0, y1 = _nan_cleaner(y_output.detach(), y_true.detach(), ignore_nan)
+            if y0 is None:
+                return torch.tensor(0, dtype=torch.float32)
+            return {k: v(y0.squeeze(), y1.squeeze()) for k,
+                    v in self.score_func_dict.items()}
+        except IndexError as e:
+            print(f'when calculate score get IndexError: {e}')
+            traceback.print_exc()
+            return {k: 0 for k, v in self.score_func_dict.items()}
+
 #########################################################
 #########################################################
 
+def get_encoder(kind, **kwargs):
+    if kind == 'AE':
+        encoder = AE(**kwargs)
+    elif kind == 'VAE':
+        encoder = VAE(**kwargs)
+    else:
+        raise ValueError(f'Encoder kind {kind} not recognized')
+    return encoder
 
+
+def get_head(kind, **kwargs):
+
+    if kind == 'NA' or kind == 'Dummy':
+        head = Dummy_Head()
+    elif kind == 'Binary':
+        head = Binary_Head(**kwargs)
+    elif kind == 'MultiClass':
+        head = MultiClass_Head(**kwargs)
+    elif kind == 'MultiHead':
+        head = MultiHead(**kwargs)
+    elif kind == 'Regression':
+        head = Regression_Head(**kwargs)
+    elif kind == 'Cox':
+        head = Cox_Head(**kwargs)
+    elif kind == 'Decoder':
+        raise NotImplementedError('Decoder head not tested')
+        head = Decoder_Head(**kwargs)
+    else:
+        raise ValueError(f'Head kind {kind} not recognized')
+    return head
+
+class CompoundModel(nn.Module):
+    def __init__(self, encoder, head):
+        super(CompoundModel, self).__init__()
+        self.encoder = encoder
+        self.head = head
+
+    def forward(self, x, other_vars=None):
+        if other_vars is None:
+            other_vars = torch.zeros(x.shape[0], 1)
+        else:
+            other_vars = torch.tensor(other_vars, dtype=torch.float32)
+        z = self.encoder.transform(x)
+        return self.head(torch.cat((z, other_vars), 1))
+    
+    def get_info(self):
+        model_info = {}
+        model_info['encoder'] = self.encoder.get_info()
+        model_info['head'] = self.head.get_info()
+        return model_info
+    
+    def save_info(self, save_path, save_name=None):
+        if save_name is None:
+            if os.path.isfile(save_path):
+                save_name = os.path.basename(save_path)
+                save_path = os.path.dirname(save_path)
+            else:
+                save_name = self.file_id + '_info.json'
+        save_json(self.get_info(), os.path.join(save_path, save_name))
+
+    def save_state_to_path(self, save_path, save_name=None):
+        if save_name is None:
+            if os.path.isfile(save_path):
+                save_name = os.path.basename(save_path)
+                save_path = os.path.dirname(save_path)
+            else:
+                save_name = self.file_id + '_state.pt'
+        torch.save(self.state_dict(), os.path.join(save_path, save_name))
+        pass
+
+def create_compound_model_from_info(
+        model_info=None,
+        encoder_info=None,
+        head_info=None,
+        model_state_dict = None,
+        encoder_state_dict=None,
+        head_state_dict=None):
+    
+    if (model_info is not None):
+        if 'encoder' in model_info:
+            encoder_info = model_info['encoder']
+        if 'head' in model_info:
+            head_info = model_info['head']
+
+    encoder = get_encoder(
+        kind = encoder_info['kind'],
+        **encoder_info
+    )
+
+    head = get_head(
+        kind = head_info['kind'],
+        **head_info
+    )
+
+    if model_state_dict is not None:
+        model = CompoundModel(encoder,head)
+        model.load_state_dict(model_state_dict)
+    else:
+        if encoder_state_dict is not None:
+            encoder.load_state_dict(encoder_state_dict)
+        if head_state_dict is not None:
+            head.load_state_dict(head_state_dict)
+        
+        model = CompoundModel(encoder,head)
+
+    return model
+
+#########################################################
+#########################################################
+# Pytorch Sklearn Model
+
+
+class PytorchModel(BaseEstimator):
+
+    def __init__(self, model, **kwargs):
+        self.model = model
+        self.kwargs = kwargs
+
+    def fit(self, X, y, other_vars=None, **kwargs):
+        raise NotImplementedError('fit method not implemented')
+        pass
+
+    def predict(self, X, other_vars=None,batch_size=64):
+        if other_vars is None:
+            other_vars = torch.zeros(X.shape[0], 1)
+        else:
+            other_vars = torch.tensor(other_vars, dtype=torch.float32)
+        X = torch.tensor(X, dtype=torch.float32)
+        y_outputs = None
+        self.model.eval()
+        with torch.inference_mode():
+    
+            for i in range(0, X.shape[0], batch_size):
+                y_out = self.model(X[i:i+batch_size], other_vars[i:i+batch_size])
+                
+                if isinstance(y_out, dict):
+                    if y_outputs is None:
+                        y_outputs = {}
+                        for k in y_out.keys():
+                            y_outputs[k] = y_out[k].detach().numpy()
+                    else:
+                        for k in y_out.keys():
+                            y_outputs[k] = np.concatenate(
+                                (y_outputs[k], y_out[k].detach().numpy()), axis=0)
+                else:
+                    if y_outputs is None:
+                        y_outputs = y_out.detach().numpy()
+                    else:
+                        y_outputs = np.concatenate(
+                            (y_outputs, y_out.detach().numpy()), axis=0)
+
+
+        return y_outputs
 
 #########################################################
 #########################################################
@@ -1269,3 +1610,6 @@ class CoxPHLoss(torch.nn.Module):
     """
     def forward(self, log_h: Tensor, durations: Tensor, events: Tensor) -> Tensor:
         return cox_ph_loss(log_h, durations, events)
+
+# %%
+
