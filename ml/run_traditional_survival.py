@@ -77,13 +77,20 @@ def fit_model(model_name, params, data_dict, set_name='train'):
         model = FastSurvivalSVM()
     elif model_name == 'GradientBoostingSurvivalAnalysis':
         model = GradientBoostingSurvivalAnalysis()
+    elif model_name == 'CoxnetSurvivalAnalysis':
+        model = CoxnetSurvivalAnalysis()
+        alpha = params['alpha']
+        if not isinstance(alpha,list):
+            params['alpha'] = [alpha]
+    else:
+        raise ValueError(f'Unknown model {model_name}')
 
     model.set_params(**params)
 
     model.fit(data_dict[set_name]["X"], data_dict[set_name]["y"])
     return model
 
-def eval_model(model, data_dict, eval_times=None):
+def eval_model(model, data_dict, eval_times=None, set_name='train'):
     """
     Function for evaluating survival models using the sklearn api. There is some hardcoding of objective function that will need revising.
     Args:
@@ -94,13 +101,13 @@ def eval_model(model, data_dict, eval_times=None):
         df of full model stats
     """
     if eval_times is None:
-        pct_lim = np.percentile([i[1] for i in data_dict["train"]["y"]], [20, 80])
+        pct_lim = np.percentile([i[1] for i in data_dict[set_name]["y"]], [20, 80])
         eval_times = [i for i in np.arange(pct_lim[0], pct_lim[1], 1)]
 
     model_stats = [
         {(k, "c_score"): model.score(v["X"], v["y"]) for k,v in data_dict.items()},
-        {(k, "ibs"): get_ibrier(model, data_dict["train"]["y"], v["X"], v["y"], eval_times) for k,v in data_dict.items()},
-        {(k, "dauc"): {(k, "dauc_"+str(t)): cumulative_dynamic_auc(data_dict["train"]["y"], v["y"], model.predict(v["X"]), times=[t])[1] for t in eval_times + [eval_times[0:2]]} for k,v in data_dict.items()} 
+        {(k, "ibs"): get_ibrier(model, data_dict[set_name]["y"], v["X"], v["y"], eval_times) for k,v in data_dict.items()},
+        {(k, "dauc"): {(k, "dauc_"+str(t)): cumulative_dynamic_auc(data_dict[set_name]["y"], v["y"], model.predict(v["X"]), times=[t])[1] for t in eval_times + [eval_times[0:2]]} for k,v in data_dict.items()} 
     ]
 
     return model_stats
@@ -368,7 +375,7 @@ if __name__ == '__main__':
             params = run['parameters'].fetch()
             model = fit_model(model_name, params, data_dict, set_name='trainval')
 
-            model_stats = eval_model(model, data_dict)
+            model_stats = eval_model(model, data_dict, set_name='trainval')
             run['metrics/trainval/c_score'] = model_stats[0]['trainval', 'c_score']
             # 
             run['metrics/test2/c_score'] = model_stats[0]['test', 'c_score']
