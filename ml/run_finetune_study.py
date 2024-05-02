@@ -18,9 +18,42 @@ def retrieve_best_trial_num(study):
 def retrieve_trial_params(study,trial_num):
     trial = study.trials[trial_num]
     params = trial.params
+    if ('train_kwargs__num_epochs' not in params):
+        if 'num_epochs' in params:
+            params['train_kwargs__num_epochs'] = params['num_epochs']
+            # del params['num_epochs']
+
+    if ('train_kwargs__l2_reg_weight' not in params):
+        if 'l2_reg_weight' in params:
+            params['train_kwargs__l2_reg_weight'] = params['l2_reg_weight']
+            # del params['l2_reg_weight']
+        else:
+            params['train_kwargs__l2_reg_weight'] = 0
+
+    if ('train_kwargs__l1_reg_weight' not in params):
+        if 'l1_reg_weight' in params:
+            params['train_kwargs__l1_reg_weight'] = params['l1_reg_weight']
+            # del params['l1_reg_weight']
+        else:
+            params['train_kwargs__l1_reg_weight'] = 0
+
+    if ('train_kwargs__weight_decay' not in params):
+        if 'weight_decay' in params:
+            params['train_kwargs__weight_decay'] = params['weight_decay']
+            # del params['weight_decay']
+        else:
+            params['train_kwargs__weight_decay'] = 0
+
+    if ('train_kwargs__early_stopping_patience' not in params):
+        if 'early_stopping_patience' in params:
+            params['train_kwargs__early_stopping_patience'] = params['early_stopping_patience']
+            # del params['early_stopping_patience']
+        else:
+            params['train_kwargs__early_stopping_patience'] = 0
+
     return params
 
-def cleanup_neptune_run(run_id,sweep_desc=None,debug=False):
+def cleanup_neptune_run(run_id,sweep_desc=None,debug=False,remove_optimized=False):
     run = neptune.init_run(project='revivemed/RCC',
             api_token=NEPTUNE_API_TOKEN,
             with_id=run_id,
@@ -42,6 +75,20 @@ def cleanup_neptune_run(run_id,sweep_desc=None,debug=False):
             if debug:
                 continue
             del run[key]
+    
+    if remove_optimized:
+        if (sweep_desc is None) or (sweep_desc == ''):
+            match_str = 'optimized_'
+        else:
+            match_str = f'optimized_{sweep_desc}'
+
+        for key in run_struc.keys():
+            if match_str in key:
+                print('deleting:',key)
+                if debug:
+                    continue
+                del run[key]
+    
     run.stop()
     return
 
@@ -277,6 +324,10 @@ if __name__ == '__main__':
                 'best trial score': best_trial_value,
                 'number of total trials': number_of_trials,
                 'number of completed trials': number_of_completed_trials,}
+
+            if True:
+                cleanup_neptune_run(run_id,sweep_desc=sweep_desc,remove_optimized=True)
+
 
             compute_finetune(run_id,
                              plot_latent_space=False,
