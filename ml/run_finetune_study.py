@@ -346,11 +346,10 @@ if __name__ == '__main__':
             compute_finetune(run_id,
                             plot_latent_space=False,
                             n_trials=10,
-                            desc_str=f'optimized_{sweep_desc}',
+                            desc_str=f'optimized2_{sweep_desc}',
                             sweep_kwargs=params,
                             skip_random_init=False,
                             eval_name='test2',
-                            train_name='train2',
                             other_kwargs={
                                 'optimized_study_info': optimized_study_info
                             })
