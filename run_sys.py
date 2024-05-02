@@ -11,7 +11,7 @@ else:
     run_id = 'RCC-3011'
 
 
-# os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'both-OS'")
+os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'both-OS'")
 os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'NIVO-OS'")
 os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'EVER-OS'")
 os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'IMDC'")

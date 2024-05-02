@@ -89,6 +89,7 @@ def cleanup_neptune_run(run_id,sweep_desc=None,debug=False,remove_optimized=Fals
                     continue
                 del run[key]
     
+    run['sys/failed'] = False
     run.stop()
     return
 
