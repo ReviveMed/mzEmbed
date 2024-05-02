@@ -248,6 +248,7 @@ class VAE(nn.Module):
 
         self.goal = 'encode'
         self.kind = 'VAE'
+        self.file_id = 'VAE'
         self.latent_size = latent_size
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -349,6 +350,9 @@ class VAE(nn.Module):
     def reset_params(self):
         _reset_params(self)
 
+    def get_file_ids(self):
+        return [self.file_id]
+
     # def get_hyperparameters(self):
     #     return {'input_size': self.input_size,
     #             'hidden_size': self.hidden_size,
@@ -438,6 +442,7 @@ class AE(nn.Module):
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
         self.dropout_rate = dropout_rate
+        self.file_id = 'AE'
         if activation == 'leakyrelu':
             self.activation = 'leaky_relu'
         else:
@@ -495,6 +500,9 @@ class AE(nn.Module):
 
     def reset_params(self):
         _reset_params(self)
+    
+    def get_file_ids(self):
+        return [self.file_id]
 
     # def get_hyperparameters(self):
     #     return {'input_size': self.input_size,
@@ -583,6 +591,10 @@ class MultiHead(nn.Module):
         outputs = {f'{head.kind}_{head.name}': head(x) for head in self.heads}
         return outputs
 
+    def predict(self, x):
+        outputs = {f'{head.kind}_{head.name}': head.predict(x) for head in self.heads}
+        return outputs
+
     def update_class_weights(self, y_data):
         for head in self.heads:
             if head.goal == 'classify':
@@ -664,6 +676,9 @@ class Head(nn.Module):
     def forward(self, x):
         return self.network(x)
     
+    def predict(self, x):
+        return self.forward(x)
+
     # def define_loss(self):
     #     pass
 
@@ -721,6 +736,9 @@ class Head(nn.Module):
     
     def get_kwargs(self):
         return self.architecture
+
+    def get_file_ids(self):
+        return [self.file_id]
 
     def save_info(self, save_path, save_name=None):
         if save_name is None:
@@ -971,6 +989,9 @@ class Regression_Head(Head):
         self.network = Dense_Layers(**kwargs)
         pass
 
+    def predict(self, x):
+        return self.network(x)
+
     def loss(self, y_output, y_data, ignore_nan=True):
         if self.weight == 0:
             return torch.tensor(0, dtype=torch.float32)
@@ -1041,6 +1062,9 @@ class Cox_Head(Head):
         # return F.sigmoid(self.network(x))
         return torch.exp(self.network(x))
 
+    def predict(self, x):
+        return self.predict_risk(x)
+
     def score(self, y_output, y_data, ignore_nan=True):
         if self.weight == 0:
             return {k: 0 for k, v in self.score_func_dict.items()}
@@ -1090,6 +1114,9 @@ class Decoder_Head(Head):
         pass
 
     def forward(self, x):
+        return self.network(x)
+    
+    def predict(self, x):
         return self.network(x)
 
     def loss(self, y_output, y_data, ignore_nan=True):
@@ -1155,6 +1182,7 @@ class CompoundModel(nn.Module):
         super(CompoundModel, self).__init__()
         self.encoder = encoder
         self.head = head
+    #TODO: check that output of encoder matches input of head, accounting for other_vars
 
     def forward(self, x, other_vars=None):
         if other_vars is None:
@@ -1164,6 +1192,14 @@ class CompoundModel(nn.Module):
         z = self.encoder.transform(x)
         return self.head(torch.cat((z, other_vars), 1))
     
+    def predict(self, x, other_vars=None):
+        if other_vars is None:
+            other_vars = torch.zeros(x.shape[0], 1)
+        else:
+            other_vars = torch.tensor(other_vars, dtype=torch.float32)
+        z = self.encoder.transform(x)
+        return self.head.predict(torch.cat((z, other_vars), 1))
+
     def get_info(self):
         model_info = {}
         model_info['encoder'] = self.encoder.get_info()
@@ -1252,7 +1288,7 @@ class PytorchModel(BaseEstimator):
         with torch.inference_mode():
     
             for i in range(0, X.shape[0], batch_size):
-                y_out = self.model(X[i:i+batch_size], other_vars[i:i+batch_size])
+                y_out = self.model.predict(X[i:i+batch_size], other_vars[i:i+batch_size])
                 
                 if isinstance(y_out, dict):
                     if y_outputs is None:
@@ -1272,6 +1308,16 @@ class PytorchModel(BaseEstimator):
 
 
         return y_outputs
+
+def create_pytorch_model_from_info(
+        model_info=None,
+        model_state=None):
+    model = create_compound_model_from_info(
+        model_info=model_info,
+        model_state_dict=model_state
+    )
+    return PytorchModel(model)
+
 
 #########################################################
 #########################################################

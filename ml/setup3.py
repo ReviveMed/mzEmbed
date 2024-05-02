@@ -546,15 +546,19 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                     # run[f'{setup_id}/encoder'] = npt_logger.log_model('encoder')
                     # run[f'{setup_id}/head'] = npt_logger.log_model(head)
                     # run[f'{setup_id}/adv'] = npt_logger.log_model(adv)
+                    os.makedirs(os.path.join(save_dir,setup_id), exist_ok=True)
 
                     # alternative way to log models
                     torch.save(encoder.state_dict(), f'{save_dir}/{setup_id}_encoder_state_dict.pth')
+                    encoder.save_state_to_path(f'{save_dir}/{setup_id}')
                     encoder.save_info(f'{save_dir}/{setup_id}')
                     # torch.save(head.state_dict(), f'{save_dir}/{setup_id}_head_state_dict.pth')
                     # torch.save(adv.state_dict(), f'{save_dir}/{setup_id}_adv_state_dict.pth')
                     if upload_models_to_neptune:
+                        encoder_file_id = encoder.get_file_ids()[0]
                         run[f'{setup_id}/models/encoder_state_dict'].upload(f'{save_dir}/{setup_id}_encoder_state_dict.pth')
-                        run[f'{setup_id}/models/encoder_info'].upload(f'{save_dir}/{setup_id}_encoder_info.json')
+                        run[f'{setup_id}/models/encoder_state'].upload(f'{save_dir}/{setup_id}/{encoder_file_id}_state.pt')
+                        run[f'{setup_id}/models/encoder_info'].upload(f'{save_dir}/{setup_id}/{encoder_file_id}_info.json')
                     # run[f'{setup_id}/models/head_state_dict'].upload(f'{save_dir}/{setup_id}_head_state_dict.pth')
                     # run[f'{setup_id}/models/adv_state_dict'].upload(f'{save_dir}/{setup_id}_adv_state_dict.pth')
                         run.wait()
@@ -562,7 +566,6 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                     if upload_models_to_gcp:
                         raise NotImplementedError('upload_models_to_gcp not implemented')
 
-                    os.makedirs(os.path.join(save_dir,setup_id), exist_ok=True)
                     head.save_state_to_path(f'{save_dir}/{setup_id}')
                     adv.save_state_to_path(f'{save_dir}/{setup_id}')
                     head.save_info(f'{save_dir}/{setup_id}')
