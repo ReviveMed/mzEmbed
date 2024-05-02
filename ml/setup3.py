@@ -557,7 +557,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                     if upload_models_to_neptune:
                         encoder_file_id = encoder.get_file_ids()[0]
                         run[f'{setup_id}/models/encoder_state_dict'].upload(f'{save_dir}/{setup_id}_encoder_state_dict.pth')
-                        run[f'{setup_id}/models/encoder_state'].upload(f'{save_dir}/{setup_id}/{encoder_file_id}_state.pt')
+                        # run[f'{setup_id}/models/encoder_state'].upload(f'{save_dir}/{setup_id}/{encoder_file_id}_state.pt')
                         run[f'{setup_id}/models/encoder_info'].upload(f'{save_dir}/{setup_id}/{encoder_file_id}_info.json')
                     # run[f'{setup_id}/models/head_state_dict'].upload(f'{save_dir}/{setup_id}_head_state_dict.pth')
                     # run[f'{setup_id}/models/adv_state_dict'].upload(f'{save_dir}/{setup_id}_adv_state_dict.pth')

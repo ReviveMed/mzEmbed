@@ -60,6 +60,52 @@ def clean_param(param):
         return param
 
 
+def fit_model(model_name, params, data_dict, set_name='train'):
+    """
+    Function for fitting survival models using the sklearn api. There is some hardcoding of objective function that will need revising.
+    Args:
+        model: sklearn model object
+        data_dict: dictionary of data sets to use (must have at least "train")
+    Returns:
+        trained model
+    """
+    if model_name == 'CoxPHSurvivalAnalysis':
+        model = CoxPHSurvivalAnalysis()
+    elif model_name == 'RandomSurvivalForest':
+        model = RandomSurvivalForest()
+    elif model_name == 'FastSurvivalSVM':
+        model = FastSurvivalSVM()
+    elif model_name == 'GradientBoostingSurvivalAnalysis':
+        model = GradientBoostingSurvivalAnalysis()
+
+    model.set_params(**params)
+
+    model.fit(data_dict[set_name]["X"], data_dict[set_name]["y"])
+    return model
+
+def eval_model(model, data_dict, eval_times=None):
+    """
+    Function for evaluating survival models using the sklearn api. There is some hardcoding of objective function that will need revising.
+    Args:
+        model: sklearn model object
+        data_dict: dictionary of data sets to use (must have at least "train")
+        eval_times: list of times to evaluate (if None, uses the 20th to 80th percentile of survival data)
+    Returns:
+        df of full model stats
+    """
+    if eval_times is None:
+        pct_lim = np.percentile([i[1] for i in data_dict["train"]["y"]], [20, 80])
+        eval_times = [i for i in np.arange(pct_lim[0], pct_lim[1], 1)]
+
+    model_stats = [
+        {(k, "c_score"): model.score(v["X"], v["y"]) for k,v in data_dict.items()},
+        {(k, "ibs"): get_ibrier(model, data_dict["train"]["y"], v["X"], v["y"], eval_times) for k,v in data_dict.items()},
+        {(k, "dauc"): {(k, "dauc_"+str(t)): cumulative_dynamic_auc(data_dict["train"]["y"], v["y"], model.predict(v["X"]), times=[t])[1] for t in eval_times + [eval_times[0:2]]} for k,v in data_dict.items()} 
+    ]
+
+    return model_stats
+
+
 def survival_grid_search(base_model, param_grid, data_dict, eval_times=None,base_model_name=None,use_neptune=True):
     """
     Function for grid search of survival models using the sklearn api. There is some hardcoding of objective function that will need revising.
@@ -181,10 +227,11 @@ def get_ibrier(cph_trained, input_y, apply_x, apply_y, eval_times=None):
 
 if __name__ == '__main__':
 
-
+    RUN_GRID_SEARCH = False
+    EVAL_ON_TEST= True
     # get the home directory
     home_dir = os.path.expanduser("~")
-    data_dir = f'{home_dir}/DATA'
+    data_dir = f'{home_dir}/DATA3'
     output_dir = f'{home_dir}/OUTPUT'
 
     # %%
@@ -195,102 +242,140 @@ if __name__ == '__main__':
     # %%
     # Import the data
     # os_col = 'OS'
-    for os_col in ['OS','NIVO OS','EVER OS']:
-        print(f'Running survival analysis for {os_col}')
 
-        event_col = 'OS_Event'
+    if RUN_GRID_SEARCH:
 
-        output_dir = f'{output_dir}/survival_results/{os_col}'
-        os.makedirs(output_dir, exist_ok=True)
+        for os_col in ['OS','NIVO OS','EVER OS']:
+            print(f'Running survival analysis for {os_col}')
 
-        data_dict = create_data_dict(data_dir,'train',os_col,event_col)
-        data_dict = create_data_dict(data_dir,'val',os_col,event_col,data_dict)
-        data_dict = create_data_dict(data_dir,'test',os_col,event_col,data_dict)
+            event_col = 'OS_Event'
 
-        # X_train = pd.read_csv(f'{data_dir}/X_finetune_train.csv', index_col=0)
-        # X_val = pd.read_csv(f'{data_dir}/X_finetune_val.csv', index_col=0)
-        # X_test = pd.read_csv(f'{data_dir}/X_finetune_test.csv', index_col=0)
+            output_dir = f'{output_dir}/survival_results/{os_col}'
+            os.makedirs(output_dir, exist_ok=True)
 
-        # y_train = pd.read_csv(f'{data_dir}/y_finetune_train.csv', index_col=0)
-        # y_val = pd.read_csv(f'{data_dir}/y_finetune_val.csv', index_col=0)
-        # y_test = pd.read_csv(f'{data_dir}/y_finetune_test.csv', index_col=0)
+            data_dict = create_data_dict(data_dir,'train',os_col,event_col)
+            data_dict = create_data_dict(data_dir,'val',os_col,event_col,data_dict)
+            data_dict = create_data_dict(data_dir,'test',os_col,event_col,data_dict)
 
-        # data_dict = {
-        #     "train": {"X": X_train, "y": prep_surv_y(y_train[os_col], y_train[event_col])},
-        #     "val": {"X": X_val, "y": prep_surv_y(y_val[os_col], y_val[event_col])},
-        #     "test": {"X": X_test, "y": prep_surv_y(y_test[os_col], y_test[event_col])}
-        # }
+            # X_train = pd.read_csv(f'{data_dir}/X_finetune_train.csv', index_col=0)
+            # X_val = pd.read_csv(f'{data_dir}/X_finetune_val.csv', index_col=0)
+            # X_test = pd.read_csv(f'{data_dir}/X_finetune_test.csv', index_col=0)
 
+            # y_train = pd.read_csv(f'{data_dir}/y_finetune_train.csv', index_col=0)
+            # y_val = pd.read_csv(f'{data_dir}/y_finetune_val.csv', index_col=0)
+            # y_test = pd.read_csv(f'{data_dir}/y_finetune_test.csv', index_col=0)
 
-        # %%
-        # running L1-Cox
-        print('Running L1-Cox')
-        l1_cox_param_grid = {
-            "l1_ratio": [1],
-            "fit_baseline_model": [True],
-            "alphas": [[i] for i in 10.0 ** np.linspace(-4, 4, 100)]
-        }
-
-        gs_model = CoxnetSurvivalAnalysis()
-        grid_res_df = survival_grid_search(gs_model, l1_cox_param_grid, data_dict)
-        grid_res_df.to_csv(f'{output_dir}/l1_cox_grid_search_results.csv')
+            # data_dict = {
+            #     "train": {"X": X_train, "y": prep_surv_y(y_train[os_col], y_train[event_col])},
+            #     "val": {"X": X_val, "y": prep_surv_y(y_val[os_col], y_val[event_col])},
+            #     "test": {"X": X_test, "y": prep_surv_y(y_test[os_col], y_test[event_col])}
+            # }
 
 
-        # %% running random survival forest
-        print('Running Random Survival Forest')
-        random_forest_param_grid = {
-                        'n_estimators': [100, 200, 300, 400],
-                        'max_depth': [3, 5, 10, None],
-                        'min_samples_split': [2, 5, 10],
-                        'min_samples_leaf': [1, 2, 4, 8],
-                        'bootstrap': [True, False],
-                        'n_jobs': [-1],
-                        'random_state': [8]
-        }
+            # %%
+            # running L1-Cox
+            print('Running L1-Cox')
+            l1_cox_param_grid = {
+                "l1_ratio": [1],
+                "fit_baseline_model": [True],
+                "alphas": [[i] for i in 10.0 ** np.linspace(-4, 4, 100)]
+            }
 
-        gs_model = RandomSurvivalForest()
-
-        grid_res_df = survival_grid_search(gs_model, random_forest_param_grid, data_dict)
-        grid_res_df.to_csv(f'{output_dir}/random_forest_grid_search_results.csv')   
+            gs_model = CoxnetSurvivalAnalysis()
+            grid_res_df = survival_grid_search(gs_model, l1_cox_param_grid, data_dict)
+            grid_res_df.to_csv(f'{output_dir}/l1_cox_grid_search_results.csv')
 
 
-        # %% running survival SVM
-        print('Running Survival SVM')
+            # %% running random survival forest
+            print('Running Random Survival Forest')
+            random_forest_param_grid = {
+                            'n_estimators': [100, 200, 300, 400],
+                            'max_depth': [3, 5, 10, None],
+                            'min_samples_split': [2, 5, 10],
+                            'min_samples_leaf': [1, 2, 4, 8],
+                            'bootstrap': [True, False],
+                            'n_jobs': [-1],
+                            'random_state': [8]
+            }
 
-        svm_param_grid = {
-                        "rank_ratio": [0.1, 0.2, 0.5, 1],
-                        "alpha": 2.0 ** np.arange(-12, 13, 2),
-                        "fit_intercept": [True, False],
-                        'random_state': [8]
-        }
-        gs_model = FastSurvivalSVM()
+            gs_model = RandomSurvivalForest()
 
-        grid_res_df = survival_grid_search(gs_model, svm_param_grid, data_dict)
-        grid_res_df.to_csv(f'{output_dir}/svm_grid_search_results.csv')
-
-
-        # %% GBSA
-        print('Running GBSA')
-        gs_model = GradientBoostingSurvivalAnalysis()
-
-        gbsa_param_grid = {
-            'learning_rate': [0.01, 0.1, 1],
-            'n_estimators': [50, 100, 200],
-            'max_depth': [3, 5, 10],
-            'random_state': [8]
-        }
-
-        grid_res_df = survival_grid_search(gs_model, gbsa_param_grid, data_dict)
-        grid_res_df.to_csv(f'{output_dir}/gbsa_grid_search_results.csv')
+            grid_res_df = survival_grid_search(gs_model, random_forest_param_grid, data_dict)
+            grid_res_df.to_csv(f'{output_dir}/random_forest_grid_search_results.csv')   
 
 
-        # %% L2-Cox
-        print('Running L2-Cox')
-        l2_cph_param_grid = {
-            "alpha": 10.0 ** np.linspace(-4, 4, 100)
-        }
+            # %% running survival SVM
+            print('Running Survival SVM')
 
-        gs_model = CoxPHSurvivalAnalysis()
+            svm_param_grid = {
+                            "rank_ratio": [0.1, 0.2, 0.5, 1],
+                            "alpha": 2.0 ** np.arange(-12, 13, 2),
+                            "fit_intercept": [True, False],
+                            'random_state': [8]
+            }
+            gs_model = FastSurvivalSVM()
 
-        grid_res_df = survival_grid_search(gs_model, l2_cph_param_grid, data_dict)
-        grid_res_df.to_csv(f'{output_dir}/l2_cox_grid_search_results.csv')
+            grid_res_df = survival_grid_search(gs_model, svm_param_grid, data_dict)
+            grid_res_df.to_csv(f'{output_dir}/svm_grid_search_results.csv')
+
+
+            # %% GBSA
+            print('Running GBSA')
+            gs_model = GradientBoostingSurvivalAnalysis()
+
+            gbsa_param_grid = {
+                'learning_rate': [0.01, 0.1, 1],
+                'n_estimators': [50, 100, 200],
+                'max_depth': [3, 5, 10],
+                'random_state': [8]
+            }
+
+            grid_res_df = survival_grid_search(gs_model, gbsa_param_grid, data_dict)
+            grid_res_df.to_csv(f'{output_dir}/gbsa_grid_search_results.csv')
+
+
+            # %% L2-Cox
+            print('Running L2-Cox')
+            l2_cph_param_grid = {
+                "alpha": 10.0 ** np.linspace(-4, 4, 100)
+            }
+
+            gs_model = CoxPHSurvivalAnalysis()
+
+            grid_res_df = survival_grid_search(gs_model, l2_cph_param_grid, data_dict)
+            grid_res_df.to_csv(f'{output_dir}/l2_cox_grid_search_results.csv')
+
+
+
+    if EVAL_ON_TEST:
+
+        run_id_list = ['SUR-623','SUR-173','SUR-722','SUR-46']
+        for run_id in run_id_list:
+
+            print(f'Running test evaluation for {run_id}')
+            run = neptune.init_run(
+                project=PROJECT_ID,
+                api_token=NEPTUNE_API_TOKEN,
+                with_id=run_id)
+            
+            os_col = run['datasets/os_col'].fetch()
+            event_col = run['datasets/event_col'].fetch()
+
+            data_dict = create_data_dict(data_dir,'trainval',os_col,event_col)
+            data_dict = create_data_dict(data_dir,'test',os_col,event_col,data_dict)
+
+            model_name = run['model'].fetch()
+            params = run['parameters'].fetch()
+            model = fit_model(model_name, params, data_dict, set_name='trainval')
+
+            model_stats = eval_model(model, data_dict)
+            run['metrics/trainval/c_score'] = model_stats[0]['trainval', 'c_score']
+            # 
+            run['metrics/test2/c_score'] = model_stats[0]['test', 'c_score']
+
+            run.stop()
+
+
+
+
+    # %%
