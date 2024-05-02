@@ -1,9 +1,9 @@
 import os
 import sys
 if len(sys.argv)>1:
-    n_optuna_trials = int(sys.argv[1])
+    n_trials = int(sys.argv[1])
 else:
-    n_trials = 200
+    n_trials = 10
 
 if len(sys.argv)>2:
     run_id = sys.argv[2]
