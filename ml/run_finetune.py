@@ -21,8 +21,7 @@ from neptune.exceptions import NeptuneException
 from collections import defaultdict
 import shutil
 import re
-
-data_dir = get_latest_dataset()
+from misc import update_finetune_data
 
 
 default_sweep_kwargs = {
@@ -43,30 +42,6 @@ default_sweep_kwargs = {
 }
 
 
-def update_finetune_data(file_suffix,redo=False):
-    vnum = 2
-    y_savefile = f'{data_dir}/y_{file_suffix}{vnum:.0f}.csv'
-    if redo and os.path.exists(y_savefile):
-        os.remove(y_savefile)
-
-    if not os.path.exists(y_savefile):
-        y_val_data = pd.read_csv(f'{data_dir}/y_{file_suffix}.csv')
-        y_val_data['NIVO OS'] = np.nan
-        y_val_data.loc[y_val_data['Treatment']=='NIVOLUMAB', 'NIVO OS'] = y_val_data.loc[y_val_data['Treatment']=='NIVOLUMAB', 'OS']
-        y_val_data['EVER OS'] = np.nan
-        y_val_data.loc[y_val_data['Treatment']=='EVEROLIMUS', 'EVER OS'] = y_val_data.loc[y_val_data['Treatment']=='EVEROLIMUS', 'OS']
-        
-        y_val_data['NIVO PFS'] = np.nan
-        y_val_data.loc[y_val_data['Treatment']=='NIVOLUMAB', 'NIVO PFS'] = y_val_data.loc[y_val_data['Treatment']=='NIVOLUMAB', 'PFS']
-        y_val_data['EVER PFS'] = np.nan
-        y_val_data.loc[y_val_data['Treatment']=='EVEROLIMUS', 'EVER PFS'] = y_val_data.loc[y_val_data['Treatment']=='EVEROLIMUS', 'PFS']
-        
-        y_val_data['Treatment is NIVO'] = 0
-        y_val_data.loc[y_val_data['Treatment']=='NIVOLUMAB', 'Treatment is NIVO'] = 1
-        y_val_data.to_csv(y_savefile,index=False)
-        shutil.copy(f'{data_dir}/X_{file_suffix}.csv',f'{data_dir}/X_{file_suffix}{vnum:.0f}.csv')
-
-    return
 
 def get_head_kwargs_by_desc(desc_str,num_hidden_layers=0):
     if (desc_str is None) or (desc_str == ''):
@@ -169,10 +144,14 @@ def get_head_kwargs_by_desc(desc_str,num_hidden_layers=0):
 
 def compute_finetune(run_id,plot_latent_space=False,
                            n_trials=5,desc_str='skip',
-                           sweep_kwargs=None,eval_name='val2',
+                           sweep_kwargs=None,
+                           eval_name='val2',
+                           train_name = None,
                            recompute_plot=False,
-                           eval_on_test=False,
-                           skip_random_init=False):
+                           pretrain_eval_on_test=False,
+                           finetune_eval_on_test=False,
+                           skip_random_init=False,
+                           other_kwargs=None):
 
     run = neptune.init_run(project='revivemed/RCC',
             api_token=NEPTUNE_API_TOKEN,
@@ -270,7 +249,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         run["info/state"] = 'Inactive'
         run.stop()
 
-    if eval_on_test:
+    if pretrain_eval_on_test:
 
         run = neptune.init_run(project='revivemed/RCC',
                 api_token=NEPTUNE_API_TOKEN,
@@ -375,13 +354,17 @@ def compute_finetune(run_id,plot_latent_space=False,
 
 
     if eval_name.lower() == 'val':
-        train_name = 'train'
+        if train_name is None:
+            train_name = 'train'
     elif eval_name.lower() == 'val2':
-        train_name = 'train2'
+        if train_name is None:
+            train_name = 'train2'
     elif eval_name.lower() == 'test':
-        train_name = 'trainval'
+        if train_name is None:
+            train_name = 'trainval'
     elif eval_name.lower() == 'test2':
-        train_name = 'trainval2'
+        if train_name is None:
+            train_name = 'trainval2'
 
 
     num_epochs = None
@@ -454,6 +437,16 @@ def compute_finetune(run_id,plot_latent_space=False,
         print('num_epochs:',num_epochs)
 
         kwargs = convert_model_kwargs_list_to_dict(kwargs)
+
+        if (other_kwargs is not None) and (len(other_kwargs)>0):
+            if isinstance(other_kwargs,dict):
+                existing_kwargs = kwargs.keys()
+                print('add other_kwargs to kwargs')
+                for key in other_kwargs.keys():
+                    if key in existing_kwargs:
+                        print(f'WARNING: key {key} already exists in kwargs')
+                        continue
+                    kwargs[key] = other_kwargs[key]
 
         setup_id = f'{desc_str}_finetune'
         _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
@@ -583,12 +576,12 @@ if __name__ == '__main__':
         print('more than one desc_str, do not waste time recomputing plots')
         recompute_plot = False
 
-
+    data_dir = get_latest_dataset()
     redo = False
-    update_finetune_data('finetune_val',redo=redo)
-    update_finetune_data('finetune_train',redo=redo)
-    update_finetune_data('finetune_test',redo=redo)
-    update_finetune_data('finetune_trainval',redo=redo)
+    update_finetune_data('finetune_val',data_dir,redo=redo)
+    update_finetune_data('finetune_train',data_dir,redo=redo)
+    update_finetune_data('finetune_test',data_dir,redo=redo)
+    update_finetune_data('finetune_trainval',data_dir,redo=redo)
 
     already_run = []
     print('Number of runs to finetune:',len(run_id_list))
