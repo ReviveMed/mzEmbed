@@ -8,6 +8,8 @@ import numpy as np
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
 
+DATE_STR = 'May01'
+
 def retrieve_best_trial_num(study):
     best_trial = study.best_trial
     trial_num = best_trial.number
@@ -208,10 +210,10 @@ if __name__ == '__main__':
 
     ## Clean up the data files
     redo = False
-    update_finetune_data('finetune_val',redo=redo)
-    update_finetune_data('finetune_train',redo=redo)
-    update_finetune_data('finetune_test',redo=redo)
-    update_finetune_data('finetune_trainval',redo=redo)
+    update_finetune_data('finetune_val',data_dir,redo=redo)
+    update_finetune_data('finetune_train',data_dir,redo=redo)
+    update_finetune_data('finetune_test',data_dir,redo=redo)
+    update_finetune_data('finetune_trainval',data_dir,redo=redo)
 
     num_run_fields = get_num_fields_in_run(run_id)
     print(f'Number of fields in run {run_id}:', num_run_fields)
@@ -235,7 +237,7 @@ if __name__ == '__main__':
             print('using webapp database')
             storage_name = WEBAPP_DB_LOC
 
-        study_name = f'finetune_{sweep_desc}_{run_id}_May01'
+        study_name = f'finetune_{sweep_desc}_{run_id}_{DATE_STR}'
     
         study = optuna.create_study(directions=['maximize'],
                         study_name=study_name, 
