@@ -109,7 +109,7 @@ if __name__ == '__main__':
     if len(sys.argv)>3:
         sweep_desc = sys.argv[3]
     else:
-        sweep_desc = 'both-OS'
+        sweep_desc = None
 
 
     data_dir = get_latest_dataset()
@@ -323,7 +323,8 @@ if __name__ == '__main__':
                 'best trial': best_trial_num,
                 'best trial score': best_trial_value,
                 'number of total trials': number_of_trials,
-                'number of completed trials': number_of_completed_trials,}
+                'number of completed trials': number_of_completed_trials}
+                # 'best trial params': params}
 
             if True:
                 cleanup_neptune_run(run_id,sweep_desc=sweep_desc,remove_optimized=True)
