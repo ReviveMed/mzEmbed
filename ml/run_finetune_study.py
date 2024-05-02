@@ -178,6 +178,9 @@ study = optuna.create_study(directions=['maximize'],
                 storage=storage_name, 
                 load_if_exists=True)
 
+print('############################################')
+print('Run {} with {} trials'.format(study_name,n_optuna_trials))
+print('############################################')
 
 
 study.optimize(objective, n_trials=n_optuna_trials)
