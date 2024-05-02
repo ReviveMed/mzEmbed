@@ -143,7 +143,9 @@ def get_head_kwargs_by_desc(desc_str,num_hidden_layers=0):
 ############################################################
 
 def compute_finetune(run_id,plot_latent_space=False,
-                           n_trials=5,desc_str='skip',
+                           n_trials=5,
+                           desc_str='skip',
+                           data_dir=None,
                            sweep_kwargs=None,
                            eval_name='val2',
                            train_name = None,
@@ -152,6 +154,9 @@ def compute_finetune(run_id,plot_latent_space=False,
                            finetune_eval_on_test=False,
                            skip_random_init=False,
                            other_kwargs=None):
+
+    if data_dir is None:
+        data_dir = get_latest_dataset()
 
     run = neptune.init_run(project='revivemed/RCC',
             api_token=NEPTUNE_API_TOKEN,
@@ -635,6 +640,7 @@ if __name__ == '__main__':
             try:
                 run_id = compute_finetune(run_id,n_trials=n_trials,
                                         plot_latent_space=plot_latent_space0,
+                                        data_dir=data_dir,
                                         desc_str=desc_str,
                                         eval_name=eval_name,
                                         recompute_plot=recompute_plot,

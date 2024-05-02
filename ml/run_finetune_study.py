@@ -93,13 +93,6 @@ if __name__ == '__main__':
         raise ValueError('sweep_desc not recognized')
 
 
-    def retrieve_trial_params(study,trial_num):
-        trial = study.trials[trial_num]
-        params = trial.params
-        return params
-
-
-
     def objective(trial):
 
         sweep_id = f'optuna_{sweep_desc}__{trial.number}'
@@ -152,6 +145,7 @@ if __name__ == '__main__':
         try:
             compute_finetune(run_id,plot_latent_space=False,
                                 n_trials=10,
+                                data_dir=data_dir,
                                 desc_str=sweep_id,
                                 sweep_kwargs=sweep_kwargs,
                                 skip_random_init=skip_random_init,
@@ -287,6 +281,7 @@ if __name__ == '__main__':
             compute_finetune(run_id,
                              plot_latent_space=False,
                             n_trials=10,
+                            data_dir=data_dir,
                             desc_str=f'optimized_{sweep_desc}',
                             sweep_kwargs=params,
                             skip_random_init=False,
