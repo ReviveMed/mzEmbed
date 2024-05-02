@@ -327,8 +327,8 @@ if __name__ == '__main__':
                 'number of completed trials': number_of_completed_trials}
                 # 'best trial params': params}
 
-            if True:
-                cleanup_neptune_run(run_id,sweep_desc=sweep_desc,remove_optimized=True)
+            # if True:
+                # cleanup_neptune_run(run_id,sweep_desc=sweep_desc,remove_optimized=True)
 
 
             compute_finetune(run_id,
@@ -343,14 +343,14 @@ if __name__ == '__main__':
                                 'optimized_study_info': optimized_study_info
                             })
 
-            # compute_finetune(run_id,
-            #                 plot_latent_space=False,
-            #                 n_trials=10,
-            #                 desc_str=f'optimized_{sweep_desc}',
-            #                 sweep_kwargs=params,
-            #                 skip_random_init=False,
-            #                 eval_name='test2',
-            #                 train_name='train2',
-            #                 other_kwargs={
-            #                     'optimized_study_info': optimized_study_info
-            #                 })
+            compute_finetune(run_id,
+                            plot_latent_space=False,
+                            n_trials=10,
+                            desc_str=f'optimized_{sweep_desc}',
+                            sweep_kwargs=params,
+                            skip_random_init=False,
+                            eval_name='test2',
+                            train_name='train2',
+                            other_kwargs={
+                                'optimized_study_info': optimized_study_info
+                            })
