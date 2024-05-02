@@ -351,5 +351,6 @@ if __name__ == '__main__':
                             skip_random_init=False,
                             eval_name='test2',
                             other_kwargs={
+                                'upload_models_to_neptune': True,
                                 'optimized_study_info': optimized_study_info
                             })

@@ -379,8 +379,6 @@ def compute_finetune(run_id,plot_latent_space=False,
     #         num_epochs = int(match.group(1))
         
 
-    
-
 
     if n_trials>0:    
         kwargs = {}
@@ -450,7 +448,7 @@ def compute_finetune(run_id,plot_latent_space=False,
                 for key in other_kwargs.keys():
                     if key in existing_kwargs:
                         print(f'WARNING: key {key} already exists in kwargs')
-                        continue
+                        # continue
                     kwargs[key] = other_kwargs[key]
 
         setup_id = f'{desc_str}_finetune'
