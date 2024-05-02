@@ -345,7 +345,7 @@ if __name__ == '__main__':
 
             compute_finetune(run_id,
                             plot_latent_space=False,
-                            n_trials=10,
+                            n_trials=11,
                             desc_str=f'Optimized_{sweep_desc}',
                             sweep_kwargs=params,
                             skip_random_init=False,
