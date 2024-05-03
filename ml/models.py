@@ -1072,10 +1072,16 @@ class Cox_Head(Head):
             return torch.tensor(0, dtype=torch.float32)
         y_true = y_data[:,self.y_idx[0]]
         y_event = y_data[:,self.y_idx[1]]
-        mask = ~torch.isnan(y_true)
-        if mask.sum().item() == 0:
-            return torch.tensor(0, dtype=torch.float32)
-        return self.loss_func(y_output[mask].squeeze(), y_true[mask].squeeze(), y_event[mask].squeeze())
+        
+        if ignore_nan:
+            mask = ~torch.isnan(y_true)
+            if mask.sum().item() == 0:
+                return torch.tensor(0, dtype=torch.float32)
+            y_true = y_true[mask]
+            y_event = y_event[mask]
+            y_output = y_output[mask]
+        # return self.loss_func(y_output.squeeze(), y_true.squeeze(), y_event.squeeze())
+        return self.loss_func(y_output, y_true, y_event)
 
     def predict_risk(self, x):
         # which is the correct output layer?

@@ -39,6 +39,7 @@ default_sweep_kwargs = {
     'train_kwargs__adversary_weight': 5,
     'train_kwargs__adversarial_start_epoch': 10,
     'train_kwargs__encoder_weight': 0,
+    'train_kwargs__clip_grads_with_norm': False,
 }
 
 
@@ -415,7 +416,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['train_kwargs']['early_stopping_patience'] = sweep_kwargs.get('train_kwargs__early_stopping_patience')
         kwargs['holdout_frac'] = sweep_kwargs.get('holdout_frac')
         kwargs['train_kwargs']['head_weight'] = 1
-        kwargs['train_kwargs']['clip_grads_with_norm'] = False
+        kwargs['train_kwargs']['clip_grads_with_norm'] = sweep_kwargs.get('train_kwargs__clip_grads_with_norm')
         kwargs['train_kwargs']['encoder_weight'] = sweep_kwargs.get('train_kwargs__encoder_weight')
         kwargs['train_kwargs']['adversary_weight'] = adversary_weight
         kwargs['train_kwargs']['learning_rate'] = sweep_kwargs.get('train_kwargs__learning_rate')

@@ -457,7 +457,28 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                     if not torch.isnan(joint_loss) or torch.isinf(joint_loss):
                         run[f'{prefix}/{phase}/batch/joint_loss'].append(joint_loss)
                     
-                    if phase == f'{train_name}':
+                    #TODO: there is an argument for not recording the losses when there is no gradient
+                    # since they are not being used for optimization
+                    # but for now we will record them
+                    if not torch.isnan(encoder_loss) or torch.isinf(encoder_loss):
+                        running_losses['encoder'] += encoder_loss.item()
+                    if not torch.isnan(head_loss) or torch.isinf(head_loss):
+                        running_losses['head'] += head_loss.item()
+                    if not torch.isnan(adversary_loss) or torch.isinf(adversary_loss):
+                        running_losses['adversary'] += adversary_loss.item()
+                    if not torch.isnan(joint_loss) or torch.isinf(joint_loss):
+                        running_losses['joint'] += joint_loss.item()
+
+                    if (not joint_loss.requires_grad) and (phase == f'{train_name}'):
+                        print('Joint loss has no gradient! skip backward pass')
+                        # this occurs when all of the targets are nan for the heads and adversary, and no encoder loss
+                        continue
+
+                    # if (joint_loss.item() == 0):
+                    #     print('Joint loss is 0! skip backward pass')
+                    #     continue
+
+                    if (phase == f'{train_name}'):
                         
                         joint_loss_w_penalty = joint_loss
                         # right now we are also penalizing the weights in the decoder, do we want to do that?
@@ -489,50 +510,8 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                             # Backward pass and optimize the adversarial classifiers
                             # adversary_loss.backward()
                             adversary_optimizer.step()
-                    
-                    if not torch.isnan(encoder_loss) or torch.isinf(encoder_loss):
-                        running_losses['encoder'] += encoder_loss.item()
-                    if not torch.isnan(head_loss) or torch.isinf(head_loss):
-                        running_losses['head'] += head_loss.item()
-                    if not torch.isnan(adversary_loss) or torch.isinf(adversary_loss):
-                        running_losses['adversary'] += adversary_loss.item()
-                    if not torch.isnan(joint_loss) or torch.isinf(joint_loss):
-                        running_losses['joint'] += joint_loss.item()
 
 
-            ########  Train the adversary on the fixed latent space for a few epochs
-            # if (adversary_weight > 0) and (phase == f'{train_name}') and (epoch > adversarial_start_epoch):
-            #     encoder.eval()
-            #     head.eval()
-            #     for mini_epoch in range(adversarial_mini_epochs):       
-            #         for batch_idx, data in enumerate(dataloaders[phase]):
-            #             X, y_head, y_adversary, clin_vars = data
-            #             X = X.to(device)
-            #             y_adversary = y_adversary.to(device)
-
-            #             # noise injection for training to make model more robust
-            #             if (noise_factor>0):
-            #                 X = X + noise_factor * torch.randn_like(X)
-
-            #             with torch.set_grad_enabled(phase == f'{train_name}'):
-            #                 z = encoder.transform(X).detach()
-            #                 z.requires_grad = True
-            #                 adversary_optimizer.zero_grad()
-            #                 y_adversary_output = adversary(z)
-            #                 # adversary_loss = adversary.loss(y_adversary_output, y_adversary)
-            #                 multi_loss = adversary.loss(y_adversary_output, y_adversary)
-            #                 if isinstance(multi_loss, dict):
-            #                     for key, loss_val in multi_loss.items():
-            #                         run[f'{prefix}/{phase}/adversary_loss/{key}'].append(loss_val)
-            #                     adversary_loss = sum([h.weight * multi_loss[f'{h.kind}_{h.name}'] for h in adversary.heads])
-            #                 else:
-            #                     adversary_loss = multi_loss
-
-            #                 run[f'{prefix}/{phase}/multi_adversary_loss'].append(adversary_loss)
-                        
-            #                 if phase == f'{train_name}':
-            #                     adversary_loss.backward()
-            #                     adversary_optimizer.step()
             
             ############ end of training adversary on fixed latent space
             #turn on inference mode
