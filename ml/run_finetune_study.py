@@ -78,9 +78,11 @@ def cleanup_neptune_run(run_id,sweep_desc=None,debug=False,remove_optimized=Fals
     
     if remove_optimized:
         if (sweep_desc is None) or (sweep_desc == ''):
-            match_str = 'optimized_'
+            match_str = 'Optimized_'
+            # match_str = 'optimized_'
         else:
-            match_str = f'optimized_{sweep_desc}'
+            # match_str = f'optimized_{sweep_desc}'
+            match_str = f'Optimized_{sweep_desc}'
 
         for key in run_struc.keys():
             if match_str in key:
@@ -112,6 +114,10 @@ if __name__ == '__main__':
     else:
         sweep_desc = None
 
+    if len(sys.argv)>4:
+        reset_optimized_run = sys.argv[4]
+    else:
+        reset_optimized_run = False
 
     data_dir = get_latest_dataset()
 
@@ -296,46 +302,69 @@ if __name__ == '__main__':
 
 
         elif n_optuna_trials < 1:
-            print('############################################')
-            print('Choose the best trial from study {} and finetune using those parameters'.format(study_name))
-            print('############################################')
+            
+            run = neptune.init_run(project='revivemed/RCC',
+                api_token= NEPTUNE_API_TOKEN,
+                with_id=run_id,
+                mode="read-only")   
+            run_struc= run.get_structure()
 
-            number_of_trials = len(study.trials)
-            if number_of_trials < 1:
-                print('No trials in study:', study_name)
-                sys.exit(0)
-            print('Number of total trials:', number_of_trials)
+            if f'Optimized_{sweep_desc}' in run_struc:
+                print('Optimized run already exists')
+                optimized_study_info = run[f'Optimized_{sweep_desc}/original_kwargs/optimized_study_info'].fetch()
+                optimized_study_info = convert_neptune_kwargs(optimized_study_info)
+                
+                if 'best trial params' in optimized_study_info:
+                    params = optimized_study_info['best trial params']
+                else:
+                    best_trial_num = optimized_study_info['best trial']
+                    params = retrieve_trial_params(study,best_trial_num)
+            else:
+                reset_optimized_run = True
 
-            number_of_completed_trials = len([trial for trial in study.trials if trial.state == optuna.trial.TrialState.COMPLETE])
-            if number_of_completed_trials < 1:
-                print('No completed trials in study:', study_name)
-                sys.exit(0)
-            print('Number of completed trials:', number_of_completed_trials)
 
-            best_trial_num = retrieve_best_trial_num(study)
-            best_trial_value = study.best_value
-            params = retrieve_trial_params(study,best_trial_num)
+            if reset_optimized_run:
+                print('Resetting optimized run')
+                cleanup_neptune_run(run_id,sweep_desc=sweep_desc,remove_optimized=True)
 
-            print(f'Best trial is {best_trial_num} with value {best_trial_value}')
-            print('Best params:', params)
+                print('############################################')
+                print('Choose the best trial from study {} and finetune using those parameters'.format(study_name))
+                print('############################################')
 
-            optimized_study_info = {
-                'study name': study_name,
-                'best trial': best_trial_num,
-                'best trial score': best_trial_value,
-                'number of total trials': number_of_trials,
-                'number of completed trials': number_of_completed_trials}
-                # 'best trial params': params}
+                number_of_trials = len(study.trials)
+                if number_of_trials < 1:
+                    print('No trials in study:', study_name)
+                    sys.exit(0)
+                print('Number of total trials:', number_of_trials)
 
-            # if True:
-                # cleanup_neptune_run(run_id,sweep_desc=sweep_desc,remove_optimized=True)
+                number_of_completed_trials = len([trial for trial in study.trials if trial.state == optuna.trial.TrialState.COMPLETE])
+                if number_of_completed_trials < 1:
+                    print('No completed trials in study:', study_name)
+                    sys.exit(0)
+                print('Number of completed trials:', number_of_completed_trials)
+
+                best_trial_num = retrieve_best_trial_num(study)
+                best_trial_value = study.best_value
+                params = retrieve_trial_params(study,best_trial_num)
+
+                print(f'Best trial is {best_trial_num} with value {best_trial_value}')
+                print('Best params:', params)
+
+                optimized_study_info = {
+                    'study name': study_name,
+                    'best trial': best_trial_num,
+                    'best trial score': best_trial_value,
+                    'number of total trials': number_of_trials,
+                    'number of completed trials': number_of_completed_trials}
+                    # 'best trial params': params}
+
 
 
             compute_finetune(run_id,
-                             plot_latent_space=False,
-                            n_trials=10,
+                            plot_latent_space=False,
+                            n_trials=15,
                             data_dir=data_dir,
-                            desc_str=f'optimized_{sweep_desc}',
+                            desc_str=f'Optimized_{sweep_desc}',
                             sweep_kwargs=params,
                             skip_random_init=False,
                             eval_name='val2',
@@ -345,7 +374,7 @@ if __name__ == '__main__':
 
             compute_finetune(run_id,
                             plot_latent_space=False,
-                            n_trials=11,
+                            n_trials=15,
                             desc_str=f'Optimized_{sweep_desc}',
                             sweep_kwargs=params,
                             skip_random_init=False,
