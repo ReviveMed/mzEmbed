@@ -362,7 +362,7 @@ if __name__ == '__main__':
 
             compute_finetune(run_id,
                             plot_latent_space=False,
-                            n_trials=15,
+                            n_trials=10,
                             data_dir=data_dir,
                             desc_str=f'Optimized_{sweep_desc}',
                             sweep_kwargs=params,
@@ -374,7 +374,7 @@ if __name__ == '__main__':
 
             compute_finetune(run_id,
                             plot_latent_space=False,
-                            n_trials=15,
+                            n_trials=10,
                             data_dir=data_dir,
                             desc_str=f'Optimized_{sweep_desc}',
                             sweep_kwargs=params,
