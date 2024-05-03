@@ -79,9 +79,9 @@ def fit_model(model_name, params, data_dict, set_name='train'):
         model = GradientBoostingSurvivalAnalysis()
     elif model_name == 'CoxnetSurvivalAnalysis':
         model = CoxnetSurvivalAnalysis()
-        alpha = params['alpha']
-        if not isinstance(alpha,list):
-            params['alpha'] = [alpha]
+        alphas = params['alphas']
+        if not isinstance(alphas,list):
+            params['alphas'] = [alphas]
     else:
         raise ValueError(f'Unknown model {model_name}')
 
@@ -357,6 +357,7 @@ if __name__ == '__main__':
     if EVAL_ON_TEST:
 
         run_id_list = ['SUR-623','SUR-173','SUR-722','SUR-46','SUR-494']
+        run_id_list = ['SUR-46','SUR-494']
         for run_id in run_id_list:
 
             print(f'Running test evaluation for {run_id}')
