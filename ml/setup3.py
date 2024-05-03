@@ -381,6 +381,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                     local_path = f'{pretrain_save_dir}/{load_encoder_loc}/encoder_state_dict.pth'
                     if not os.path.exists(local_path):
                         run[f'{load_encoder_loc}/models/encoder_state_dict'].download(local_path)
+                    print('load encoder weights from ',local_path)
                     encoder_state_dict = torch.load(local_path)
                     encoder.load_state_dict(encoder_state_dict)
                 else:

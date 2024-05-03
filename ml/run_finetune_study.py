@@ -375,6 +375,7 @@ if __name__ == '__main__':
             compute_finetune(run_id,
                             plot_latent_space=False,
                             n_trials=15,
+                            data_dir=data_dir,
                             desc_str=f'Optimized_{sweep_desc}',
                             sweep_kwargs=params,
                             skip_random_init=False,
