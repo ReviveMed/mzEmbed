@@ -387,16 +387,16 @@ if __name__ == '__main__':
             
 
 
-            compute_finetune(run_id,
-                            plot_latent_space=False,
-                            n_trials=10,
-                            data_dir=data_dir,
-                            desc_str=f'OptimizedAlt_{sweep_desc}',
-                            sweep_kwargs=params,
-                            skip_random_init=False,
-                            eval_name='test2',
-                            train_name='train2',
-                            other_kwargs={
-                                'upload_models_to_neptune': True,
-                                'optimized_study_info': optimized_study_info
-                            })
+            # compute_finetune(run_id,
+            #                 plot_latent_space=False,
+            #                 n_trials=10,
+            #                 data_dir=data_dir,
+            #                 desc_str=f'OptimizedAlt_{sweep_desc}',
+            #                 sweep_kwargs=params,
+            #                 skip_random_init=False,
+            #                 eval_name='test2',
+            #                 train_name='train2',
+            #                 other_kwargs={
+            #                     'upload_models_to_neptune': True,
+            #                     'optimized_study_info': optimized_study_info
+            #                 })
