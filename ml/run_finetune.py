@@ -44,10 +44,13 @@ default_sweep_kwargs = {
 
 
 
-def get_head_kwargs_by_desc(desc_str,num_hidden_layers=0,weight = 1):
+def get_head_kwargs_by_desc(desc_str,num_hidden_layers=0,weight=1,y_cols=None):
     if (desc_str is None) or (desc_str == ''):
         return None, [], []
     
+    if y_cols is None:
+        y_cols = []
+
     if 'weight-' in desc_str:
         match = re.search(r'weight-(\d+)', desc_str)
         if match:
@@ -119,6 +122,15 @@ def get_head_kwargs_by_desc(desc_str,num_hidden_layers=0,weight = 1):
         plot_latent_space_cols = ['EVER OS']            
     else:
         raise ValueError('Unknown desc_str:',desc_str)
+
+    for col in y_head_cols:
+        if col not in y_cols:
+            y_cols.append(col)
+
+    if len(y_head_cols) == 1:
+        y_idx = y_cols.index(y_head_cols[0])
+    else:
+        y_idx = [y_cols.index(col) for col in y_head_cols]
 
 
 
@@ -300,13 +312,22 @@ def compute_finetune(run_id,plot_latent_space=False,
         print('No desc_str')
         return
 
-    if 'ADV' in desc_str:
-        adv_desc_str = desc_str.split('ADV')[1]
-        head_desc_str = desc_str.split('ADV')[0]
+
+    clean_desc_str = desc_str
+    if 'optuna_' in desc_str:
+        clean_desc_str = clean_desc_str.replace('optuna_','')
+    if 'Optimized_' in clean_desc_str:
+        clean_desc_str = clean_desc_str.replace('Optimized_','')
+    if '__' in clean_desc_str:
+        clean_desc_str = clean_desc_str.split('__')[0]
+
+    if 'ADV' in clean_desc_str:
+        adv_desc_str = clean_desc_str.split('ADV')[1]
+        head_desc_str = clean_desc_str.split('ADV')[0]
         adversary_weight = sweep_kwargs.get('train_kwargs__adversary_weight')
     else:
         adv_desc_str = ''
-        head_desc_str = desc_str
+        head_desc_str = clean_desc_str
         adversary_weight = 0
 
     y_head_cols = []
@@ -325,12 +346,18 @@ def compute_finetune(run_id,plot_latent_space=False,
         head_weight = sweep_kwargs.get(f'{h_desc}__weight',1)
         head_kwargs, head_cols, plot_latent_space_head_cols = get_head_kwargs_by_desc(h_desc,
                                                                                     num_hidden_layers=head_hidden_layers,
-                                                                                    weight=head_weight)
+                                                                                    weight=head_weight,y_cols=y_head_cols)
         if head_kwargs is None:
             continue
         head_kwargs_list.append(head_kwargs)
-        y_head_cols += head_cols
-        plot_latent_space_cols += plot_latent_space_head_cols
+        for col in head_cols:
+            if col not in y_head_cols:
+                y_head_cols.append(col)
+
+        for col in plot_latent_space_head_cols:
+            if col not in plot_latent_space_cols:
+                plot_latent_space_cols.append(col)
+
 
 
     y_adv_cols = []
@@ -345,12 +372,16 @@ def compute_finetune(run_id,plot_latent_space=False,
         adv_weight = sweep_kwargs.get(f'{a_desc}__weight',1)
         adv_kwargs, adv_cols, plot_latent_space_adv_cols = get_head_kwargs_by_desc(a_desc,
                                                                                    num_hidden_layers=head_hidden_layers,
-                                                                                    weight=adv_weight)
+                                                                                    weight=adv_weight,y_cols=y_adv_cols)
         if adv_kwargs is None:
             continue
         adv_kwargs_list.append(adv_kwargs)
-        y_adv_cols += adv_cols
-        plot_latent_space_cols += plot_latent_space_adv_cols
+        for col in adv_cols:
+            if col not in y_adv_cols:
+                y_adv_cols.append(col)
+        for col in plot_latent_space_adv_cols:
+            if col not in plot_latent_space_cols:
+                plot_latent_space_cols.append(col)
 
 
     # head_kwargs, head_cols, plot_latent_space_head_cols = get_head_kwargs_by_desc(head_desc_str)

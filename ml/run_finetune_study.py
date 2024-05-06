@@ -102,17 +102,18 @@ if __name__ == '__main__':
     if len(sys.argv)>1:
         n_optuna_trials = int(sys.argv[1])
     else:
-        n_optuna_trials = 200
+        n_optuna_trials = 1
 
     if len(sys.argv)>2:
         run_id = sys.argv[2]
     else:
-        run_id = 'RCC-3011'
+        run_id = 'RCC-2925'
 
     if len(sys.argv)>3:
         sweep_desc = sys.argv[3]
     else:
-        sweep_desc = None
+        # sweep_desc = None
+        sweep_desc = 'both-OS AND both-PFS'
 
     if len(sys.argv)>4:
         reset_optimized_run = sys.argv[4]
@@ -169,7 +170,7 @@ if __name__ == '__main__':
     else:
         raise ValueError('sweep_desc not recognized')
 
-
+    print(sweep_desc)
     if key_weight is None:
         key_weight = [1]*len(key1_loc)
 
@@ -212,13 +213,14 @@ if __name__ == '__main__':
             'encoder_kwargs__dropout_rate': trial.suggest_float('encoder_kwargs__dropout_rate', 0, 0.5,step=0.1),
             'train_kwargs__num_epochs': num_epochs,
             'train_kwargs__early_stopping_patience': early_stopping_patience,
-            'train_kwargs__learning_rate': round_to_sig(trial.suggest_float('train_kwargs__learning_rate', 1e-5, 1e-2, log=True),3),
+            'train_kwargs__learning_rate': trial.suggest_float('train_kwargs__learning_rate', 1e-5, 1e-3, log=True),
             'train_kwargs__l2_reg_weight': train_kwargs__l2_reg_weight,
             'train_kwargs__l1_reg_weight': train_kwargs__l1_reg_weight,
             'train_kwargs__noise_factor': trial.suggest_float('train_kwargs__noise_factor', 0, 0.25, step=0.05),
             'train_kwargs__weight_decay': train_kwargs__weight_decay,
             'train_kwargs__adversary_weight': 0,
             'train_kwargs__encoder_weight': trial.suggest_float('train_kwargs__encoder_weight', 0, 1, step=0.25),
+            'train_kwargs__clip_grads_with_norm': True,
             }
         
         if 'ADV' in sweep_desc:
@@ -268,8 +270,8 @@ if __name__ == '__main__':
 
         result1 = 0
         for key1, w in zip(key1_loc,key_weight):
-            if f'{sweep_id}_finetune/{key1}' not in run_struc.keys():
-                raise ValueError(f'{key1} not in run structure')
+            # if f'{sweep_id}_finetune/{key1}' not in run_struc.keys():
+                # raise ValueError(f'{key1} not in run structure')
             result1_array = run[f'{sweep_id}_finetune/{key1}'].fetch_values()
             result1_temp = np.mean(result1_array['value'])
             trial.set_user_attr(key1,result1_temp)
@@ -279,8 +281,8 @@ if __name__ == '__main__':
 
         result2 = 0
         for key2, w in zip(key2_loc,key_weight):
-            if f'{sweep_id}_finetune/{key2}' not in run_struc.keys():
-                raise ValueError(f'{key2} not in run structure')
+            # if f'{sweep_id}_finetune/{key2}' not in run_struc.keys():
+                # raise ValueError(f'{key2} not in run structure')
             result2_array = run[f'{sweep_id}_finetune/{key2}'].fetch_values()
             result2_temp = np.mean(result2_array['value'])
             trial.set_user_attr(key2,result2_temp)
