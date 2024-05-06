@@ -7,7 +7,7 @@ from run_finetune import compute_finetune, update_finetune_data
 import numpy as np
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
-
+from misc import round_to_sig
 DATE_STR = 'May01'
 
 def retrieve_best_trial_num(study):
@@ -126,26 +126,52 @@ if __name__ == '__main__':
     SAVE_TRIALS = True
     WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
+    key_weight = None
     if (sweep_desc is None) or (sweep_desc == ''):
         sweep_desc = ''
     elif sweep_desc == 'both-OS':
-        key1_loc = 'eval/val2/Cox_OS__Concordance Index'
-        key2_loc = 'eval/train2/Cox_OS__Concordance Index'
+        key1_loc = ['eval/val2/Cox_OS__Concordance Index']
+        key2_loc = ['eval/train2/Cox_OS__Concordance Index']
     elif sweep_desc == 'NIVO-OS':
-        key1_loc = 'eval/val2/Cox_NIVO OS__Concordance Index'
-        key2_loc = 'eval/train2/Cox_NIVO OS__Concordance Index'
+        key1_loc = ['eval/val2/Cox_NIVO OS__Concordance Index']
+        key2_loc = ['eval/train2/Cox_NIVO OS__Concordance Index']
     elif sweep_desc == 'EVER-OS':
-        key1_loc = 'eval/val2/Cox_EVER OS__Concordance Index'
-        key2_loc = 'eval/train2/Cox_EVER OS__Concordance Index'
+        key1_loc = ['eval/val2/Cox_EVER OS__Concordance Index']
+        key2_loc = ['eval/train2/Cox_EVER OS__Concordance Index']
     elif sweep_desc == 'IMDC':
-        key1_loc = 'eval/val2/Binary_IMDC__AUROC (micro)'
-        key2_loc = 'eval/train2/Binary_IMDC__AUROC (micro)'
+        key1_loc = ['eval/val2/Binary_IMDC__AUROC (micro)']
+        key2_loc = ['eval/train2/Binary_IMDC__AUROC (micro)']
     elif sweep_desc == 'MSKCC':
-        key1_loc = 'eval/val2/Binary_MSKCC__AUROC (micro)'
-        key2_loc = 'eval/train2/Binary_MSKCC__AUROC (micro)'
+        key1_loc = ['eval/val2/Binary_MSKCC__AUROC (micro)']
+        key2_loc = ['eval/train2/Binary_MSKCC__AUROC (micro)']
+    elif sweep_desc == 'both-OS AND both-PFS':
+        # raise ValueError('sweep_desc not ready')
+        key1_loc = ['eval/val2/Cox_OS__Concordance Index','eval/val2/Cox_PFS__Concordance Index']
+        key2_loc = ['eval/train2/Cox_OS__Concordance Index', 'eval/train2/Cox_PFS__Concordance Index']
+        weight_params = ['both-OS__weight, both-PFS__weight']
+    elif sweep_desc == 'NIVO-OS AND NIVO-PFS AND EVER-OS AND EVER-PFS':
+        # raise ValueError('sweep_desc not ready')
+        key1_loc = ['eval/val2/Cox_NIVO OS__Concordance Index','eval/val2/Cox_NIVO PFS__Concordance Index',
+                    'eval/val2/Cox_EVER OS__Concordance Index','eval/val2/Cox_EVER PFS__Concordance Index']
+        key2_loc = ['eval/train2/Cox_NIVO OS__Concordance Index','eval/train2/Cox_NIVO PFS__Concordance Index',
+                    'eval/train2/Cox_EVER OS__Concordance Index','eval/train2/Cox_EVER PFS__Concordance Index']
+        weight_params = ['NIVO-OS__weight','NIVO-PFS__weight','EVER-OS__weight','EVER-PFS__weight']
+    elif sweep_desc == 'NIVO-OS AND EVER-OS':
+        # raise ValueError('sweep_desc not ready')
+        key1_loc = ['eval/val2/Cox_NIVO OS__Concordance Index','eval/val2/Cox_EVER OS__Concordance Index']
+        key2_loc = ['eval/train2/Cox_NIVO OS__Concordance Index','eval/train2/Cox_EVER OS__Concordance Index']
+        weight_params = ['NIVO-OS__weight','EVER-OS__weight']
+    elif sweep_desc == 'NIVO-OS ADV EVER-OS':
+        key1_loc = ['eval/val2/Cox_NIVO OS__Concordance Index','eval/val2_EVER OS/Cox_NIVO OS__Concordance Index'],
+        key_weight = [1.5,-1]
+        weight_params = ['NIVO-OS__weight','EVER-OS__weight']
+
     else:
         raise ValueError('sweep_desc not recognized')
 
+
+    if key_weight is None:
+        key_weight = [1]*len(key1_loc)
 
     def objective(trial):
 
@@ -186,7 +212,7 @@ if __name__ == '__main__':
             'encoder_kwargs__dropout_rate': trial.suggest_float('encoder_kwargs__dropout_rate', 0, 0.5,step=0.1),
             'train_kwargs__num_epochs': num_epochs,
             'train_kwargs__early_stopping_patience': early_stopping_patience,
-            'train_kwargs__learning_rate': trial.suggest_float('train_kwargs__learning_rate', 1e-5, 1e-2, log=True),
+            'train_kwargs__learning_rate': round_to_sig(trial.suggest_float('train_kwargs__learning_rate', 1e-5, 1e-2, log=True),3),
             'train_kwargs__l2_reg_weight': train_kwargs__l2_reg_weight,
             'train_kwargs__l1_reg_weight': train_kwargs__l1_reg_weight,
             'train_kwargs__noise_factor': trial.suggest_float('train_kwargs__noise_factor', 0, 0.25, step=0.05),
@@ -194,6 +220,14 @@ if __name__ == '__main__':
             'train_kwargs__adversary_weight': 0,
             'train_kwargs__encoder_weight': trial.suggest_float('train_kwargs__encoder_weight', 0, 1, step=0.25),
             }
+        
+        if 'ADV' in sweep_desc:
+            sweep_kwargs['train_kwargs__adversary_weight'] = trial.suggest_float('train_kwargs__adversary_weight', 1, 5, step=1)
+            sweep_kwargs['train_kwargs__adversarial_start_epoch'] = trial.suggest_int('train_kwargs__adversarial_start_epoch', 0, 20, step=5)
+
+        for w_param in weight_params:
+            # sweep_kwargs[w_param] = round_to_sig(trial.suggest_float(w_param, 0.1, 10, log=True))
+            sweep_kwargs[w_param] = trial.suggest_float(w_param, 1, 10, step=0.5)
 
 
         try:
@@ -230,12 +264,34 @@ if __name__ == '__main__':
                 capture_stderr=False,
                 capture_hardware_metrics=False)
         
-        result1_array = run[f'{sweep_id}_finetune/{key1_loc}'].fetch_values()
+        run_struc = run.get_structure()
 
-        result1 = np.mean(result1_array['value'])
+        result1 = 0
+        for key1, w in zip(key1_loc,key_weight):
+            if f'{sweep_id}_finetune/{key1}' not in run_struc.keys():
+                raise ValueError(f'{key1} not in run structure')
+            result1_array = run[f'{sweep_id}_finetune/{key1}'].fetch_values()
+            result1_temp = np.mean(result1_array['value'])
+            trial.set_user_attr(key1,result1_temp)
+            result1 += w*result1_temp
+        result1 = result1#/len(key1_loc)
 
-        result2_array = run[f'{sweep_id}_finetune/{key2_loc}'].fetch_values()
-        result2 = np.mean(result2_array['value'])
+
+        result2 = 0
+        for key2, w in zip(key2_loc,key_weight):
+            if f'{sweep_id}_finetune/{key2}' not in run_struc.keys():
+                raise ValueError(f'{key2} not in run structure')
+            result2_array = run[f'{sweep_id}_finetune/{key2}'].fetch_values()
+            result2_temp = np.mean(result2_array['value'])
+            trial.set_user_attr(key2,result2_temp)
+            result2 += w*result2_temp
+        result2= result2#/len(key2_loc)
+
+        # result1_array = run[f'{sweep_id}_finetune/{key1_loc}'].fetch_values()
+        # result1 = np.mean(result1_array['value'])
+
+        # result2_array = run[f'{sweep_id}_finetune/{key2_loc}'].fetch_values()
+        # result2 = np.mean(result2_array['value'])
         trial.set_user_attr('val score',result1)
         trial.set_user_attr('train score',result2)
 

@@ -36,7 +36,7 @@ default_sweep_kwargs = {
     'train_kwargs__noise_factor': 0.1,
     'train_kwargs__weight_decay': 0,
     'train_kwargs__adversarial_mini_epochs': 5,
-    'train_kwargs__adversary_weight': 5,
+    'train_kwargs__adversary_weight': 1,
     'train_kwargs__adversarial_start_epoch': 10,
     'train_kwargs__encoder_weight': 0,
     'train_kwargs__clip_grads_with_norm': False,
@@ -44,11 +44,10 @@ default_sweep_kwargs = {
 
 
 
-def get_head_kwargs_by_desc(desc_str,num_hidden_layers=0):
+def get_head_kwargs_by_desc(desc_str,num_hidden_layers=0,weight = 1):
     if (desc_str is None) or (desc_str == ''):
         return None, [], []
     
-    weight = 1
     if 'weight-' in desc_str:
         match = re.search(r'weight-(\d+)', desc_str)
         if match:
@@ -323,7 +322,10 @@ def compute_finetune(run_id,plot_latent_space=False,
     head_hidden_layers = sweep_kwargs.get('head_hidden_layers',0)
 
     for h_desc in head_desc_str_list:
-        head_kwargs, head_cols, plot_latent_space_head_cols = get_head_kwargs_by_desc(h_desc,num_hidden_layers=head_hidden_layers)
+        head_weight = sweep_kwargs.get(f'{h_desc}__weight',1)
+        head_kwargs, head_cols, plot_latent_space_head_cols = get_head_kwargs_by_desc(h_desc,
+                                                                                    num_hidden_layers=head_hidden_layers,
+                                                                                    weight=head_weight)
         if head_kwargs is None:
             continue
         head_kwargs_list.append(head_kwargs)
@@ -340,7 +342,10 @@ def compute_finetune(run_id,plot_latent_space=False,
         adv_desc_str_list = [adv_desc_str]
 
     for a_desc in adv_desc_str_list:
-        adv_kwargs, adv_cols, plot_latent_space_adv_cols = get_head_kwargs_by_desc(a_desc,num_hidden_layers=head_hidden_layers)
+        adv_weight = sweep_kwargs.get(f'{a_desc}__weight',1)
+        adv_kwargs, adv_cols, plot_latent_space_adv_cols = get_head_kwargs_by_desc(a_desc,
+                                                                                   num_hidden_layers=head_hidden_layers,
+                                                                                    weight=adv_weight)
         if adv_kwargs is None:
             continue
         adv_kwargs_list.append(adv_kwargs)
