@@ -10,7 +10,7 @@ from misc import save_json
 import numpy as np
 
 # from torchmetrics import AUROC
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, accuracy_score, f1_score, precision_score, recall_score
 from sklearn.base import BaseEstimator
 import traceback
 
@@ -980,6 +980,95 @@ class MultiClass_Head(Head):
 #########################################################
 
 
+class Ordinal_Head(Head):
+    def __init__(self, **kwargs):
+        super(Ordinal_Head, self).__init__()
+        self.goal = 'classify'
+        self.kind = 'Ordinal'
+        assert self.kind == kwargs.get('kind', 'Ordinal')
+        self.name = kwargs.get('name', 'Ordinal')
+        self.y_idx = kwargs.get('y_idx', 0)
+        self.weight = kwargs.get('weight', 1.0)
+        self.num_classes = kwargs.get('num_classes', 3)
+        self.architecture = kwargs.get('architecture', kwargs)
+        self.loss_reduction = 'mean'
+        self.network = Dense_Layers(**self.architecture)
+        self.input_size = self.architecture.get('input_size', 1)
+        self.output_size = self.architecture.get('output_size', self.num_classes-1)
+
+        
+        # indepdent biases for each class
+        self.biases = nn.Parameter(torch.zeros(self.num_classes - 1))
+
+        self.file_id = self.kind + '_' + self.name
+        self.loss_func = nn.BCEWithLogitsLoss(reduction=self.loss_reduction)
+
+        # self.score_func_dict = {'AUROC (ovo, macro)': lambda y_score, y_true:
+        #                 roc_auc_score(y_true.numpy(), y_score.numpy(), average='macro', multi_class='ovo')}
+        self.score_func_dict = {'ACC (macro)': lambda y_score, y_true: accuracy_score(y_true.numpy(), y_score.numpy(), average='macro'),}
+
+
+    def define_architecture(self, **kwargs):
+        self.architecture = kwargs
+        self.input_size = kwargs.get('input_size', 1)
+        self.output_size = kwargs.get('output_size', 1)
+        self.network = Dense_Layers(**kwargs)
+        pass
+
+    def forward(self, x):
+        output = self.network(x)
+        output += self.biases
+        return output
+    
+    def loss(self, y_logits, y_data, ignore_nan=True):
+        if self.weight == 0:
+            return torch.tensor(0, dtype=torch.float32)
+        y_true = y_data[:,self.y_idx]
+        y0, y1 = _nan_cleaner(y_logits, y_true, ignore_nan)
+        if y0 is None:
+            return torch.tensor(0, dtype=torch.float32)
+        y1_ordinal = transform_labels_to_binary(y1, self.num_classes)
+        return self.loss_func(y0, y1_ordinal)
+    
+    def logits_to_proba(self, y_logits):
+        return F.sigmoid(y_logits)
+    
+    def predict_proba(self, x):
+        return self.logits_to_proba(self.forward(x))
+    
+    def proba_to_labels(self, probs, threshold=0.5):
+        return transform_probs_to_labels(probs, threshold)
+
+    def logits_to_labels(self, y_logits, threshold=0.5):
+        return self.proba_to_labels(self.logits_to_proba(y_logits), threshold)
+
+    def predict(self, x, threshold=0.5):
+        return self.probs_to_labels(self.predict_proba(x), threshold).float()
+
+    def score(self, y_logits, y_data,ignore_nan=True):
+        if self.weight == 0:
+            return {k: 0 for k, v in self.score_func_dict.items()}
+        
+        #TODO: make sure the fix for this issue is more correct
+        # if y_data.shape[1] < self.y_idx:
+            # return {k: 0 for k, v in self.score_func_dict.items()}
+        try:
+            y_true = y_data[:,self.y_idx]
+            logits, targets = _nan_cleaner(y_logits.detach(), y_true.detach(), ignore_nan)
+            if logits is None:
+                return torch.tensor(0, dtype=torch.float32)
+            probs = self.logits_to_proba(logits)
+            labels = self.proba_to_labels(probs)
+            return {k: v(labels, targets.long()) for k, v in self.score_func_dict.items()}
+        except IndexError as e:
+            print(f'when calculate score get IndexError: {e}')
+            traceback.print_exc()
+            return {k: 0 for k, v in self.score_func_dict.items()}
+    
+
+#########################################################
+
+
 class Regression_Head(Head):
     # def __init__(self, name='Regression', y_idx=0, weight=1.0, kind='Regression', **kwargs):
     def __init__(self, **kwargs):
@@ -1645,6 +1734,27 @@ class TGEM_Encoder(torch.nn.Module):
 #########################################################
 ## Custom Loss Functions
 #########################################################
+
+def transform_labels_to_binary(y, num_classes):    
+    '''
+    transform the original class labels into a set of C-1
+    binary labels, where each binary label indicates whether the 
+    sample belongs to a certain ordinal group or not. 
+    This transformation allows us to encode the ordinal relationships between the classes
+    '''
+    transformed_labels = torch.zeros(y.shape[0], num_classes-1)
+    
+    for idx, label in enumerate(y):
+        transformed_labels[idx, 0:label] = 1
+        
+    return transformed_labels
+
+def transform_probs_to_labels(y_probs,thresh=0.5):
+    # inverse of the "transform_labels_to_binary", applied to y_probs produced from the ordinal model
+    y_binary = (y_probs>thresh).to(int)
+    y_labels = torch.sum(y_binary, dim=1)
+    return y_labels
+
 
 def cox_ph_loss_sorted(log_h: Tensor, events: Tensor, eps: float = 1e-7) -> Tensor:
     """Requires the input to be sorted by descending duration time.
