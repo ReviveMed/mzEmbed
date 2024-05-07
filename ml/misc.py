@@ -92,11 +92,12 @@ def download_data_dir(dropbox_url, save_dir='data'):
         # Unzip the file
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(save_dir)
+        
+        # delete the zip file
+        os.remove(zip_path)
     else:
         print(f"Failed to download data from {dropbox_url}. Status code: {response.status_code}")
 
-    # delete the zip file
-    os.remove(zip_path)
     return
 
 def get_dropbox_dir():
