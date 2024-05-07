@@ -514,14 +514,15 @@ def evaluate(
                     # generative_training = False,
                 )
                 
-                loss = torch.tensor(0)
+                loss = torch.tensor(0,dtype=torch.float32)
                 if 'cls_output' in output_dict:
                     output_values = output_dict["cls_output"]
                     cls_loss = criterion_cls(output_values, celltype_labels)
                     accuracy = (output_values.argmax(1) == celltype_labels).sum().item()
+                    
                 else:
-                    cls_loss = torch.tensor(0)
-                    accuracy = 0
+                    cls_loss = torch.tensor(0, dtype=torch.float32)
+                    accuracy = torch.tensor(0, dtype=torch.float32)
 
                 if 'mlm_output' in output_dict:
                     masked_positions = input_values.eq(config.mask_value)
@@ -534,8 +535,8 @@ def evaluate(
                         output_values, target_values, masked_positions
                     )
                 else:
-                    mlm_loss = torch.tensor(0)
-                    mlm_error = torch.tensor(0)
+                    mlm_loss = torch.tensor(0,dtype=torch.float32)
+                    mlm_error = torch.tensor(0,dtype=torch.float32)
 
                 if ('dab_output' in output_dict) and config.DAR:
                     loss_dab = criterion_dab(output_dict["dab_output"], batch_labels)
@@ -543,8 +544,9 @@ def evaluate(
                 if config.task == "annotation":
                     # output_values = output_dict["cls_output"]
                     # loss = criterion_cls(output_values, celltype_labels)
-                    loss += cls_loss
-                    total_error += (1 - accuracy / len(input_gene_ids)) * len(input_gene_ids)
+                    loss = loss + cls_loss
+                    # loss += cls_loss
+                    tmp_error = (1 - accuracy / len(input_gene_ids))
 
                 elif config.task in ["integration", "multiomic"]:
                     # output_values = output_dict["mlm_output"]
@@ -552,13 +554,15 @@ def evaluate(
                     # loss = criterion_gep_gepc(
                     #     output_values, target_values, masked_positions
                     # )
-                    loss += mlm_loss
-                    total_error += mlm_error.item() * len(input_gene_ids)
+                    # loss += mlm_loss
+                    loss = loss + mlm_loss
+                    tmp_error = mlm_error
+                    
 
                 # if config.DAR:
                 #     loss_dab = criterion_dab(output_dict["dab_output"], batch_labels)
 
-
+            total_error += tmp_error.item() * len(input_gene_ids)
             total_loss += loss.item() * len(input_gene_ids)
             
             # total_error += masked_relative_error(
