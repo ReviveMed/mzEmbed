@@ -360,7 +360,8 @@ if __name__ == '__main__':
         # run_id_list = ['SUR-623','SUR-173','SUR-722','SUR-46','SUR-494']
         run_id_list = []
         # best NIVO-OS
-        run_id_list1 = ['SUR-863','SUR-1403','SUR-1302','SUR-749','SUR-1335']
+        run_id_list1 = ['SUR-749','SUR-1335']
+        # run_id_list1 = ['SUR-863','SUR-1403','SUR-1302','SUR-749','SUR-1335']
         # best EVER-OS
         run_id_list2 = ['SUR-1479','SUR-2053','SUR-2154','SUR-1583','SUR-1924']
 
