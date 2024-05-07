@@ -5,10 +5,10 @@ if len(sys.argv)>1:
 else:
     n_trials = 10
 
-# if len(sys.argv)>2:
-#     run_id = sys.argv[2]
-# else:
-#     run_id = 'RCC-2925'
+if len(sys.argv)>2:
+    run_id = sys.argv[2]
+else:
+    run_id = 'RCC-2925'
 
 
 # os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'both-OS'")
@@ -37,3 +37,11 @@ os.system(f"python3 ml/run_traditional_classifier.py --model_name 'logistic_regr
 os.system(f"python3 ml/run_traditional_classifier.py --model_name 'random_forest' --n_trials {n_trials} --y_col '{y_col}'")
 os.system(f"python3 ml/run_traditional_classifier.py --model_name 'svc' --n_trials {n_trials} --y_col '{y_col}'")
 os.system(f"python3 ml/run_traditional_classifier.py --model_name 'decision_tree' --n_trials {n_trials} --y_col '{y_col}'")
+
+os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'NIVO-OS AND NIVO-PFS AND EVER-OS AND EVER-PFS'")
+
+os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'NIVO-OS ADV EVER-OS'")
+
+os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'both-OS AND both-PFS'")
+
+os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'NIVO-OS AND EVER-OS'")

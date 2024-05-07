@@ -9,6 +9,7 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 
 from misc import round_to_sig
 DATE_STR = 'May07'
+# DATE_STR = 'May01'
 
 def retrieve_best_trial_num(study):
     best_trial = study.best_trial
