@@ -295,7 +295,7 @@ if __name__ == '__main__':
 
     def objective(trial):
         if USE_NEPTUNE:
-            run = neptune.init(project=PROJECT_ID, api_token=NEPTUNE_API_TOKEN)
+            run = neptune.init_run(project=PROJECT_ID, api_token=NEPTUNE_API_TOKEN)
             run['optuna_trial_number'] = trial.number
             run_dict = run['training_run']
             if dataset_hash:
@@ -331,7 +331,7 @@ if __name__ == '__main__':
 
         if USE_NEPTUNE:
             run_id = study.best_trial.user_attrs['neptune_id']
-            run = neptune.init(project=PROJECT_ID, api_token=NEPTUNE_API_TOKEN,
+            run = neptune.init_run(project=PROJECT_ID, api_token=NEPTUNE_API_TOKEN,
                                with_id=run_id)
             run_dict = run['testing_run']
         else:
