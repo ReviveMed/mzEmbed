@@ -63,7 +63,7 @@ def get_best_3way_threshold(model_trained, new_data,min_class_size=20):
 
     tmp = pd.DataFrame(new_data["y"]).set_axis(['Event', 'Survival'], axis=1)
 
-    predicted_surv = model_trained.predict(new_data["X"])
+    predicted_surv = model_trained.predict(new_data["X"].to_numpy()).flatten()
 
     thresh_list = np.sort(np.unique(predicted_surv))  # SUBSET FOR DEV
     # identify threshold maximizing c-index between classes where p remains significant
