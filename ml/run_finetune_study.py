@@ -121,6 +121,11 @@ if __name__ == '__main__':
     else:
         reset_optimized_run = False
 
+    if len(sys.argv)>5:
+        chosen_trial_num = int(sys.argv[5])
+    else:
+        chosen_trial_num = None
+
     data_dir = get_latest_dataset()
 
     storage_name = 'optuna'
@@ -362,7 +367,7 @@ if __name__ == '__main__':
             study.optimize(objective, n_trials=n_optuna_trials)
 
 
-        elif n_optuna_trials < 1:
+        elif (n_optuna_trials < 1) and (chosen_trial_num is None):
             
             run = neptune.init_run(project='revivemed/RCC',
                 api_token= NEPTUNE_API_TOKEN,
@@ -446,18 +451,29 @@ if __name__ == '__main__':
                                 'optimized_study_info': optimized_study_info
                             })
             
+        elif (n_optuna_trials < 1) and (chosen_trial_num is not None):
+            print('############################################')
+            print('Finetune using chosen trial number:', chosen_trial_num)
+            print('############################################')
 
-
-            # compute_finetune(run_id,
-            #                 plot_latent_space=False,
-            #                 n_trials=10,
-            #                 data_dir=data_dir,
-            #                 desc_str=f'OptimizedAlt_{sweep_desc}',
-            #                 sweep_kwargs=params,
-            #                 skip_random_init=False,
-            #                 eval_name='test2',
-            #                 train_name='train2',
-            #                 other_kwargs={
-            #                     'upload_models_to_neptune': True,
-            #                     'optimized_study_info': optimized_study_info
-            #                 })
+            params = retrieve_trial_params(study,chosen_trial_num)
+            compute_finetune(run_id,
+                            plot_latent_space=False,
+                            n_trials=10,
+                            data_dir=data_dir,
+                            desc_str=f'Optimized_{sweep_desc}__{chosen_trial_num}',
+                            sweep_kwargs=params,
+                            skip_random_init=False,
+                            eval_name='val2')
+            
+            compute_finetune(run_id,
+                            plot_latent_space=False,
+                            n_trials=10,
+                            data_dir=data_dir,
+                            desc_str=f'Optimized_{sweep_desc}__{chosen_trial_num}',
+                            sweep_kwargs=params,
+                            skip_random_init=False,
+                            eval_name='test2',
+                            other_kwargs={
+                                'upload_models_to_neptune': True
+                            })
