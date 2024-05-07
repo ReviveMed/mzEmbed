@@ -135,7 +135,7 @@ def create_data_dict(data_dir, set_name, target_col, data_dict=None):
     not_nan_idx = ~y[target_col].isna()
     data_dict[set_name] = {
         'X': X.loc[not_nan_idx],
-        'y': y.loc[not_nan_idx],
+        'y': y.loc[not_nan_idx,target_col],
         'target_col': target_col,
         'X_file': X_path,
         'y_file': y_path
@@ -195,9 +195,6 @@ def run_model(model_name, params, data_dict, train_name='train',
 
         val_auc_list.append(val_auc)
         train_auc_list.append(train_auc)
-    
-    if run_dict:
-        run_dict.stop()
 
     val_auc = np.mean(val_auc_list)
     train_auc = np.mean(train_auc_list)
@@ -249,7 +246,8 @@ if __name__ == '__main__':
 
     # get user input
     parser = argparse.ArgumentParser(description='Run traditional classifiers')
-    parser.add_argument('--model_name', type=str, default='logistic_regression', help='The name of the model to run')
+    # parser.add_argument('--model_name', type=str, default='logistic_regression', help='The name of the model to run')
+    parser.add_argument('--model_name', type=str, default='xgboost', help='The name of the model to run')
     parser.add_argument('--n_trials', type=int, default=10, help='The number of trials to run')
     parser.add_argument('--n_repeat', type=int, default=1, help='The number of times to repeat each trial')
     parser.add_argument('--y_col', type=str, default='MSKCC BINARY', help='The name of the target column')
@@ -299,16 +297,21 @@ if __name__ == '__main__':
             run['optuna_trial_number'] = trial.number
             run_dict = run['training_run']
             if dataset_hash:
-                run_dict['dataset/hash'] = dataset_hash
+                run['dataset/hash'] = dataset_hash
             trial.set_user_attr('neptune_id', run["sys/id"].fetch())
         else:
             run_dict = None
 
-        return base_objective(trial, model_name, data_dict, 
+        obj_result = base_objective(trial, model_name, data_dict, 
                               train_name='train', 
                               eval_name='val', 
                               n_repeat=n_repeat,
                               run_dict=run_dict)
+
+        if USE_NEPTUNE:
+            run.stop()
+
+        return obj_result
 
     # %%
     ## Create Optuna Study and run the optimization
@@ -344,6 +347,9 @@ if __name__ == '__main__':
                                         eval_name = 'test',
                                         n_repeat = n_repeat,
                                         run_dict = run_dict)
+
+        if USE_NEPTUNE:
+            run.stop()
 
         print(f'Test AUC: {val_auc}')
 

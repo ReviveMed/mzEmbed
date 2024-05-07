@@ -23,7 +23,7 @@ y_col = 'IMDC BINARY'
 
 
 os.system(f"python3 ml/run_traditional_classifier.py --model_name 'xgboost' --n_trials {n_trials} --y_col '{y_col}'")
-# os.system(f"python3 ml/run_traditional_classifier.py --model_name 'logistic_regression' --n_trials {n_trials} --y_col '{y_col}'")
-# os.system(f"python3 ml/run_traditional_classifier.py --model_name 'random_forest' --n_trials {n_trials} --y_col '{y_col}'")
-# os.system(f"python3 ml/run_traditional_classifier.py --model_name 'svc' --n_trials {n_trials} --y_col '{y_col}'")
-# os.system(f"python3 ml/run_traditional_classifier.py --model_name 'decision_tree' --n_trials {n_trials} --y_col '{y_col}'")
+os.system(f"python3 ml/run_traditional_classifier.py --model_name 'logistic_regression' --n_trials {n_trials} --y_col '{y_col}'")
+os.system(f"python3 ml/run_traditional_classifier.py --model_name 'random_forest' --n_trials {n_trials} --y_col '{y_col}'")
+os.system(f"python3 ml/run_traditional_classifier.py --model_name 'svc' --n_trials {n_trials} --y_col '{y_col}'")
+os.system(f"python3 ml/run_traditional_classifier.py --model_name 'decision_tree' --n_trials {n_trials} --y_col '{y_col}'")
