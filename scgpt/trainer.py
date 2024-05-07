@@ -513,24 +513,57 @@ def evaluate(
                     # do_sample=do_sample_in_train,
                     # generative_training = False,
                 )
-                if config.task == "annotation":
+                
+                loss = torch.tensor(0)
+                if 'cls_output' in output_dict:
                     output_values = output_dict["cls_output"]
-                    loss = criterion_cls(output_values, celltype_labels)
+                    cls_loss = criterion_cls(output_values, celltype_labels)
+                    accuracy = (output_values.argmax(1) == celltype_labels).sum().item()
+                else:
+                    cls_loss = torch.tensor(0)
+                    accuracy = 0
 
-                elif config.task in ["integration", "multiomic"]:
-                    output_values = output_dict["mlm_output"]
+                if 'mlm_output' in output_dict:
                     masked_positions = input_values.eq(config.mask_value)
-                    loss = criterion_gep_gepc(
+                    output_values = output_dict["mlm_output"]
+                    mlm_loss = criterion_gep_gepc(
                         output_values, target_values, masked_positions
                     )
 
-                if config.DAR:
+                    mlm_error = masked_relative_error(
+                        output_values, target_values, masked_positions
+                    )
+                else:
+                    mlm_loss = torch.tensor(0)
+                    mlm_error = torch.tensor(0)
+
+                if ('dab_output' in output_dict) and config.DAR:
                     loss_dab = criterion_dab(output_dict["dab_output"], batch_labels)
 
+                if config.task == "annotation":
+                    # output_values = output_dict["cls_output"]
+                    # loss = criterion_cls(output_values, celltype_labels)
+                    loss += cls_loss
+                    total_error += (1 - accuracy / len(input_gene_ids)) * len(input_gene_ids)
+
+                elif config.task in ["integration", "multiomic"]:
+                    # output_values = output_dict["mlm_output"]
+                    # masked_positions = input_values.eq(config.mask_value)
+                    # loss = criterion_gep_gepc(
+                    #     output_values, target_values, masked_positions
+                    # )
+                    loss += mlm_loss
+                    total_error += mlm_error.item() * len(input_gene_ids)
+
+                # if config.DAR:
+                #     loss_dab = criterion_dab(output_dict["dab_output"], batch_labels)
+
+
             total_loss += loss.item() * len(input_gene_ids)
-            total_error += masked_relative_error(
-                output_values, target_values, masked_positions
-            ).item() * len(input_gene_ids)
+            
+            # total_error += masked_relative_error(
+            #     output_values, target_values, masked_positions
+            # ).item() * len(input_gene_ids)
             
             if config.DAR:
                 total_dab += (
