@@ -128,8 +128,8 @@ def get_default_param_grid(model_kind):
 def create_data_dict(data_dir, set_name, target_col, data_dict=None):
     if data_dict is None:
         data_dict = {}
-    X_path = os.path.join(data_dir, f'X_finetune_{set_name}_X.csv')
-    y_path = os.path.join(data_dir, f'y_finetune_{set_name}_y.csv')
+    X_path = os.path.join(data_dir, f'X_finetune_{set_name}.csv')
+    y_path = os.path.join(data_dir, f'y_finetune_{set_name}.csv')
     X = pd.read_csv(X_path, index_col=0)
     y = pd.read_csv(y_path, index_col=0)
     not_nan_idx = ~y[target_col].isna()
