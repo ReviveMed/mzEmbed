@@ -375,20 +375,25 @@ if __name__ == '__main__':
                 api_token=NEPTUNE_API_TOKEN,
                 with_id=run_id)
             
-            os_col = run['datasets/os_col'].fetch()
-            event_col = run['datasets/event_col'].fetch()
+            try:
+                os_col = run['datasets/os_col'].fetch()
+                event_col = run['datasets/event_col'].fetch()
 
-            data_dict = create_data_dict(data_dir,'trainval',os_col,event_col)
-            data_dict = create_data_dict(data_dir,'test',os_col,event_col,data_dict)
+                data_dict = create_data_dict(data_dir,'trainval',os_col,event_col)
+                data_dict = create_data_dict(data_dir,'test',os_col,event_col,data_dict)
 
-            model_name = run['model'].fetch()
-            params = run['parameters'].fetch()
-            model = fit_model(model_name, params, data_dict, set_name='trainval')
+                model_name = run['model'].fetch()
+                params = run['parameters'].fetch()
+                model = fit_model(model_name, params, data_dict, set_name='trainval')
 
-            model_stats = eval_model(model, data_dict, set_name='trainval')
-            run['metrics/trainval/c_score'] = model_stats[0]['trainval', 'c_score']
-            # 
-            run['metrics/test2/c_score'] = model_stats[0]['test', 'c_score']
+                model_stats = eval_model(model, data_dict, set_name='trainval')
+                run['metrics/trainval/c_score'] = model_stats[0]['trainval', 'c_score']
+                # 
+                run['metrics/test2/c_score'] = model_stats[0]['test', 'c_score']
+            except ArithmeticError as e:
+                print(e)
+                run['metrics/trainval/c_score'] = 0
+                run['metrics/test2/c_score'] = 0
 
             run.stop()
 
