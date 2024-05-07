@@ -356,8 +356,16 @@ if __name__ == '__main__':
 
     if EVAL_ON_TEST:
 
-        run_id_list = ['SUR-623','SUR-173','SUR-722','SUR-46','SUR-494']
-        run_id_list = ['SUR-46','SUR-494']
+        # best both-OS
+        # run_id_list = ['SUR-623','SUR-173','SUR-722','SUR-46','SUR-494']
+        run_id_list = []
+        # best NIVO-OS
+        run_id_list1 = ['SUR-863','SUR-1403','SUR-1302','SUR-749','SUR-1335']
+        # best EVER-OS
+        run_id_list2 = ['SUR-1479','SUR-2053','SUR-2154','SUR-1583','SUR-1924']
+
+        run_id_list = run_id_list + run_id_list1 + run_id_list2
+
         for run_id in run_id_list:
 
             print(f'Running test evaluation for {run_id}')

@@ -51,3 +51,4 @@ scib
 tqdm
 wandb
 louvain
+xgboost
