@@ -163,7 +163,7 @@ if __name__ == '__main__':
         key2_loc = ['eval/train2/Cox_NIVO OS__Concordance Index','eval/train2/Cox_EVER OS__Concordance Index']
         weight_params = ['NIVO-OS__weight','EVER-OS__weight']
     elif sweep_desc == 'NIVO-OS ADV EVER-OS':
-        key1_loc = ['eval/val2/Cox_NIVO OS__Concordance Index','eval/val2_EVER OS/Cox_NIVO OS__Concordance Index'],
+        key1_loc = ['eval/val2/Cox_NIVO OS__Concordance Index','eval/val2_EVER OS/Cox_NIVO OS__Concordance Index']
         key_weight = [1.5,-1]
         weight_params = ['NIVO-OS__weight','EVER-OS__weight']
 

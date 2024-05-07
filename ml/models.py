@@ -1053,7 +1053,8 @@ class Cox_Head(Head):
         self.output_size = self.architecture.get('output_size', 1)
         self.file_id = self.kind + '_' + self.name
         self.loss_func = CoxPHLoss()
-        self.score_func_dict = {'Concordance Index': lambda y_score, y_true, y_event: concordance_index(y_true, y_score, y_event)}
+        self.score_func_dict = {'Concordance Index': 
+                                lambda y_score, y_true, y_event: concordance_index(y_true, y_score, y_event)}
         # self.network = nn.Identity()
         # self.network = Dense_Layers(**kwargs)
 
