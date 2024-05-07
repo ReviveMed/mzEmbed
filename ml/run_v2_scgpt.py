@@ -454,11 +454,13 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ntokens = len(vocab)  # size of vocabulary
 print(f"vocab size: {ntokens}")
 model = TransformerModel(
-    ntokens,
-    embsize,
-    nhead,
-    d_hid,
-    nlayers,
+    ntoken=ntokens,
+    d_model=embsize,
+    nhead=nhead,
+    d_hid=d_hid,
+    nlayers=nlayers,
+    # nlayers_cls: int = 3,
+    n_cls=num_types,
     vocab=vocab,
     dropout=config.dropout,
     pad_token=config.pad_token,
@@ -468,7 +470,10 @@ model = TransformerModel(
     use_batch_labels=config.use_batch_labels,
     num_batch_labels=num_batch_types,
     domain_spec_batchnorm=config.DSBN,
+    # input_emb_style: str = "continuous",
     n_input_bins=config.n_bins,
+    # cell_emb_style: str = "cls",
+    # mvc_decoder_style: str = "inner product",
     ecs_threshold=config.ecs_thres,
     explicit_zero_prob=config.explicit_zero_prob,
     use_fast_transformer=config.fast_transformer,
@@ -477,6 +482,8 @@ model = TransformerModel(
     # ntokens_mod=ntokens_mod if config.use_mod else None,
     # vocab_mod=vocab_mod if config.use_mod else None,
 )
+
+
 if config.load_model is not None:
     try:
         model.load_state_dict(torch.load(model_file))
