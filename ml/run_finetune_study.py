@@ -8,7 +8,7 @@ import numpy as np
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
 from misc import round_to_sig
-DATE_STR = 'May01'
+DATE_STR = 'May07'
 
 def retrieve_best_trial_num(study):
     best_trial = study.best_trial
@@ -166,6 +166,7 @@ if __name__ == '__main__':
         key1_loc = ['eval/val2/Cox_NIVO OS__Concordance Index','eval/val2_EVER OS/Cox_NIVO OS__Concordance Index']
         key_weight = [1.5,-1]
         weight_params = ['NIVO-OS__weight','EVER-OS__weight']
+        key2_loc = ['eval/train2/Cox_NIVO OS__Concordance Index','eval/train2_EVER OS/Cox_NIVO OS__Concordance Index']
 
     else:
         raise ValueError('sweep_desc not recognized')
