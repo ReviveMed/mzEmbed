@@ -473,15 +473,20 @@ if __name__ == '__main__':
             print('############################################')
 
             params = retrieve_trial_params(study,chosen_trial_num)
-            compute_finetune(run_id,
-                            plot_latent_space=False,
-                            n_trials=10,
-                            data_dir=data_dir,
-                            desc_str=f'Optimized_{sweep_desc}__{chosen_trial_num}',
-                            sweep_kwargs=params,
-                            skip_random_init=False,
-                            eval_name='val2')
-            
+            try:
+                compute_finetune(run_id,
+                                plot_latent_space=False,
+                                n_trials=10,
+                                data_dir=data_dir,
+                                desc_str=f'Optimized_{sweep_desc}__{chosen_trial_num}',
+                                sweep_kwargs=params,
+                                skip_random_init=False,
+                                eval_name='val2')
+
+            except ValueError as e:
+                print(e)
+
+
             compute_finetune(run_id,
                             plot_latent_space=False,
                             n_trials=10,
