@@ -40,11 +40,16 @@ if n_trials == 0:
 
 # os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'NIVO-OS AND NIVO-PFS AND EVER-OS AND EVER-PFS'")
 
+# os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'IMDC'")
+# os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'MSKCC'")
+
+# os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'EVER-OS'")
+
 # os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'NIVO-OS ADV EVER-OS'")
 
 # os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'both-OS AND both-PFS'")
 
 # os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'NIVO-OS AND EVER-OS'")
 
-# os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'both-OS AND both-PFS AND MSKCC'")
 os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'both-OS AND both-PFS AND MSKCC'")
+# os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'both-OS AND both-PFS AND MSKCC'")

@@ -357,7 +357,7 @@ if __name__ == '__main__':
             print('using webapp database')
             storage_name = WEBAPP_DB_LOC
 
-        if sweep_desc in ['both-OS','EVER-OS','NIVO-OS']:
+        if sweep_desc in ['both-OS','EVER-OS','NIVO-OS','MSKCC','IMDC']:
             print('Changed the Date String to be May01!')
             DATE_STR = 'May01'
 
