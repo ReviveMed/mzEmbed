@@ -174,7 +174,12 @@ if __name__ == '__main__':
         # key_weight = [1.1,-1]
         weight_params = ['NIVO-OS__weight','EVER-OS__weight']
         key2_loc = ['eval/train2/Cox_NIVO OS__Concordance Index','eval/train2_EVER OS/Cox_NIVO OS__Concordance Index']
-
+    elif sweep_desc == 'both-OS AND both-PFS AND MSKCC':
+        key1_loc = ['eval/val2/Cox_OS__Concordance Index','eval/val2/Cox_PFS__Concordance Index',
+                    'eval/val2/Binary_MSKCC__AUROC (micro)']
+        key2_loc = ['eval/train2/Cox_OS__Concordance Index', 'eval/train2/Cox_PFS__Concordance Index',
+                    'eval/train2/Binary_MSKCC__AUROC (micro)']
+        weight_params = ['both-OS__weight, both-PFS__weight, MSKCC__weight']
     else:
         raise ValueError('sweep_desc not recognized')
 

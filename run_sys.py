@@ -45,3 +45,6 @@ os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'NIVO-OS ADV 
 os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'both-OS AND both-PFS'")
 
 os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'NIVO-OS AND EVER-OS'")
+
+os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'both-OS AND both-PFS AND MSKCC'")
+os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'both-OS AND both-PFS AND MSKCC'")
