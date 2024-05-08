@@ -632,6 +632,16 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                 run.stop()
                 raise e
 
+    ####################################
+    ##### Create an evaluation summary that averages ######
+    run_struc = run.get_structure()
+    for key in run_struc[setup_id]['eval'][eval_name].keys():
+        val_array = run[f'{setup_id}/eval/{eval_name}/{key}'].fetch_values()
+        run[f'{setup_id}/avg/{eval_name} {key}'] = val_array['value'].mean()
+
+    for key in run_struc[setup_id]['eval'][train_name].keys():
+        val_array = run[f'{setup_id}/eval/{train_name}/{key}'].fetch_values()
+        run[f'{setup_id}/avg/{train_name} {key}'] = val_array['value'].mean()
 
     
     ####################################

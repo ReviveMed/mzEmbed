@@ -103,7 +103,7 @@ if __name__ == '__main__':
     if len(sys.argv)>1:
         n_optuna_trials = int(sys.argv[1])
     else:
-        n_optuna_trials = 1
+        n_optuna_trials = 0
 
     if len(sys.argv)>2:
         run_id = sys.argv[2]
@@ -114,7 +114,8 @@ if __name__ == '__main__':
         sweep_desc = sys.argv[3]
     else:
         # sweep_desc = None
-        sweep_desc = 'both-OS AND both-PFS'
+        # sweep_desc = 'both-OS AND both-PFS'
+        sweep_desc = 'EVER-OS'
 
     if len(sys.argv)>4:
         reset_optimized_run = sys.argv[4]
@@ -380,9 +381,9 @@ if __name__ == '__main__':
                 mode="read-only")   
             run_struc= run.get_structure()
 
-            if f'Optimized_{sweep_desc}' in run_struc:
+            if f'Optimized_{sweep_desc}_finetune' in run_struc:
                 print('Optimized run already exists')
-                optimized_study_info = run[f'Optimized_{sweep_desc}/original_kwargs/optimized_study_info'].fetch()
+                optimized_study_info = run[f'Optimized_{sweep_desc}_finetune/original_kwargs/optimized_study_info'].fetch()
                 optimized_study_info = convert_neptune_kwargs(optimized_study_info)
                 
                 if 'best trial params' in optimized_study_info:
