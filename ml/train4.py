@@ -377,6 +377,8 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         multi_loss = head.loss(y_head_output, y_head)
                         if isinstance(multi_loss, dict):
                             for key, loss_val in multi_loss.items():
+                                if torch.isnan(loss_val) or torch.isinf(loss_val):
+                                    continue
                                 run[f'{prefix}/{phase}/batch/head_loss/{key}'].append(loss_val)
                             head_loss = sum([h.weight * multi_loss[f'{h.kind}_{h.name}'] for h in head.heads])
                             # head_weight_sum = sum([h.weight for h in head.heads])
@@ -399,6 +401,8 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         multi_loss = adversary.loss(y_adversary_output, y_adversary)
                         if isinstance(multi_loss, dict):
                             for key, loss_val in multi_loss.items():
+                                if torch.isnan(loss_val) or torch.isinf(loss_val):
+                                    continue
                                 run[f'{prefix}/{phase}/batch/adversary_loss/{key}'].append(loss_val)
                             adversary_loss = sum([h.weight * multi_loss[f'{h.kind}_{h.name}'] for h in adversary.heads])
                             # adv_weight_sum = sum([h.weight for h in adversary.heads])

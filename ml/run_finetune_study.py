@@ -115,7 +115,7 @@ if __name__ == '__main__':
     else:
         # sweep_desc = None
         # sweep_desc = 'both-OS AND both-PFS'
-        sweep_desc = 'EVER-OS'
+        sweep_desc = 'NIVO-OS'
 
     if len(sys.argv)>4:
         reset_optimized_run = sys.argv[4]
@@ -356,6 +356,10 @@ if __name__ == '__main__':
         if USE_WEBAPP_DB:
             print('using webapp database')
             storage_name = WEBAPP_DB_LOC
+
+        if sweep_desc in ['both-OS','EVER-OS','NIVO-OS']:
+            print('Changed the Date String to be May01!')
+            DATE_STR = 'May01'
 
         study_name = f'finetune_{sweep_desc}_{run_id}_{DATE_STR}'
     
