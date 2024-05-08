@@ -18,7 +18,7 @@ from neptune.utils import stringify_unsupported
 from utils_neptune import check_neptune_existance, start_neptune_run, convert_neptune_kwargs, neptunize_dict_keys, get_latest_dataset
 from neptune_pytorch import NeptuneLogger
 from viz import generate_latent_space, generate_umap_embedding, generate_pca_embedding
-from misc import assign_color_map, get_color_map
+from misc import assign_color_map, get_color_map, get_clean_batch_sz
 import uuid
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -224,7 +224,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
         ####################################
         ##### Create the DataLoaders ######
-        batch_size = kwargs.get('batch_size', 32)
+        batch_size = kwargs.get('batch_size', 64)
         holdout_frac = kwargs.get('holdout_frac', 0)
         train_kwargs = kwargs.get('train_kwargs', {})
         early_stopping_patience = train_kwargs.get('early_stopping_patience', 0)
@@ -239,7 +239,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         if run_training or run_evaluation:
             train_dataset = CompoundDataset(X_data_train,y_data_train[y_head_cols], y_data_train[y_adv_cols])
             eval_dataset = CompoundDataset(X_data_eval,y_data_eval[y_head_cols], y_data_eval[y_adv_cols])
-
+            batch_size = get_clean_batch_sz(X_size, batch_size)
             # stratify on the adversarial column (stratify=2)
             # this is probably not the most memory effecient method, would be better to do stratification before creating the dataset
             # train_loader_dct = create_dataloaders(train_dataset, batch_size, holdout_frac, set_name=train_name, stratify=2)
