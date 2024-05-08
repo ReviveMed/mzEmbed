@@ -636,15 +636,17 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     ##### Create an evaluation summary that averages ######
     run_struc = run.get_structure()
     avg_iter_count = 0
-    for key in run_struc[setup_id]['eval'][eval_name].keys():
-        val_array = run[f'{setup_id}/eval/{eval_name}/{key}'].fetch_values()
-        run[f'{setup_id}/avg/{eval_name} {key}'] = round(val_array['value'].mean(),5)
-        if avg_iter_count < 0:
-            avg_iter_count = len(val_array['value'])
 
-    for key in run_struc[setup_id]['eval'][train_name].keys():
-        val_array = run[f'{setup_id}/eval/{train_name}/{key}'].fetch_values()
-        run[f'{setup_id}/avg/{train_name} {key}'] = round(val_array['value'].mean(),5)
+    for set_name in eval_loader_dct.keys():
+        for key in run_struc[setup_id]['eval'][set_name].keys():
+            val_array = run[f'{setup_id}/eval/{set_name}/{key}'].fetch_values()
+            run[f'{setup_id}/avg/{set_name} {key}'] = round(val_array['value'].mean(),5)
+            if avg_iter_count == 0:
+                avg_iter_count = len(val_array['value'])
+
+    # for key in run_struc[setup_id]['eval'][train_name].keys():
+    #     val_array = run[f'{setup_id}/eval/{train_name}/{key}'].fetch_values()
+    #     run[f'{setup_id}/avg/{train_name} {key}'] = round(val_array['value'].mean(),5)
 
     run[f'{setup_id}/avg/iter_count'] = avg_iter_count
     
