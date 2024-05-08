@@ -38,13 +38,13 @@ if n_trials == 0:
 # os.system(f"python3 ml/run_traditional_classifier.py --model_name 'svc' --n_trials {n_trials} --y_col '{y_col}'")
 # os.system(f"python3 ml/run_traditional_classifier.py --model_name 'decision_tree' --n_trials {n_trials} --y_col '{y_col}'")
 
-os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'NIVO-OS AND NIVO-PFS AND EVER-OS AND EVER-PFS'")
+# os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'NIVO-OS AND NIVO-PFS AND EVER-OS AND EVER-PFS'")
 
-os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'NIVO-OS ADV EVER-OS'")
+# os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'NIVO-OS ADV EVER-OS'")
 
-os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'both-OS AND both-PFS'")
+# os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'both-OS AND both-PFS'")
 
-os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'NIVO-OS AND EVER-OS'")
+# os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'NIVO-OS AND EVER-OS'")
 
 # os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'both-OS AND both-PFS AND MSKCC'")
-# os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'both-OS AND both-PFS AND MSKCC'")
+os.system(f"python3 ml/run_finetune_study.py {n_trials} '{run_id}' 'both-OS AND both-PFS AND MSKCC'")
