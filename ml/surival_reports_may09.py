@@ -157,7 +157,7 @@ def save_full_report(desc_str):
         score_df = pd.json_normalize(report_df['test c-index'])
         score_df.columns = [c + ' c-index' for c in score_df.columns]
 
-        final_df = pd.concat([params_df,score_df],axis=1)
+        final_df = pd.concat([score_df,params_df],axis=1)
         final_df.index = report_df.index
 
         final_df.to_csv(f'{output_dir}/surv_report/{desc_str}_survival_report.csv')
@@ -196,7 +196,7 @@ def generate_survival_umap(task_id,data_dir=None,local_dir=None,use_full_title=T
     if local_dir is None:
         local_dir = os.path.expanduser('~/saved_models')
 
-    os.makedirs(f'{output_dir}/plots')
+    os.makedirs(f'{output_dir}/plots',exist_ok=True)
 
     run = neptune.init_run(project='revivemed/RCC',
         api_token= NEPTUNE_API_TOKEN,
@@ -221,7 +221,7 @@ def generate_survival_umap(task_id,data_dir=None,local_dir=None,use_full_title=T
 
         df_org = pd.read_csv(embed_data_file,index_col=0)
 
-        for hue_col in ['OS','NIVO-OS','EVER-OS']:
+        for hue_col in ['OS','NIVO OS','EVER OS']:
             for remove_no_imdc in [True,False]:
                 df = df_org[(df_org[hue_col].notnull())]
 
@@ -254,4 +254,4 @@ desc_str_list = [
 
 for desc_str in desc_str_list:
     print(desc_str)
-    save_full_report(desc_str)                    
+    generate_survival_umap(desc_str)                    
