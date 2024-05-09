@@ -1307,17 +1307,25 @@ class CompoundModel(nn.Module):
         if other_vars is None:
             other_vars = torch.zeros(x.shape[0], 1)
         else:
-            other_vars = torch.tensor(other_vars, dtype=torch.float32)
+            # other_vars = torch.tensor(other_vars, dtype=torch.float32)
+            other_vars = other_vars.clone().detach().requires_grad_(True)
         z = self.encoder.transform(x)
         return self.head(torch.cat((z, other_vars), 1))
     
     def predict(self, x, other_vars=None):
         if other_vars is None:
-            other_vars = torch.zeros(x.shape[0], 1)
+            other_vars = torch.zeros(x.shape[0], 1).requires_grad_(False)
         else:
-            other_vars = torch.tensor(other_vars, dtype=torch.float32)
+            # other_vars = torch.tensor(other_vars, dtype=torch.float32)
+            other_vars = other_vars.clone().detach().requires_grad_(False)
         z = self.encoder.transform(x)
         return self.head.predict(torch.cat((z, other_vars), 1))
+
+    def score(self,y_output,y):
+        if hasattr(self.head,'score'):
+            return self.head.score(y_output,y)
+        else:
+            raise NotImplementedError('score method not implemented for this model')
 
     def get_info(self):
         model_info = {}
@@ -1365,6 +1373,9 @@ def create_compound_model_from_info(
     head = get_head(
         **head_info
     )
+    if hasattr(head,'y_idx'):
+        if max(head.y_idx) > len(head.y_idx)+1:
+            print('Warning the head y_idx probably needs to be fixed')
 
     if model_state_dict is not None:
         # if head.kind != 'MultiHead':
@@ -1399,7 +1410,7 @@ class PytorchModel(BaseEstimator):
         raise NotImplementedError('fit method not implemented')
         pass
 
-    def predict(self, X, other_vars=None,batch_size=64):
+    def predict(self, X, other_vars=None,batch_size=64,use_predict=True):
         if other_vars is None:
             other_vars = torch.zeros(X.shape[0], 1)
         else:
@@ -1410,7 +1421,10 @@ class PytorchModel(BaseEstimator):
         with torch.inference_mode():
     
             for i in range(0, X.shape[0], batch_size):
-                y_out = self.model.predict(X[i:i+batch_size], other_vars[i:i+batch_size])
+                if (use_predict) and hasattr(self.model,'predict'):
+                    y_out = self.model.predict(X[i:i+batch_size], other_vars[i:i+batch_size])
+                else:
+                    y_out = self.model.forward(X[i:i+batch_size], other_vars[i:i+batch_size])
                 
                 if isinstance(y_out, dict):
                     if y_outputs is None:
@@ -1428,8 +1442,20 @@ class PytorchModel(BaseEstimator):
                         y_outputs = np.concatenate(
                             (y_outputs, y_out.detach().numpy()), axis=0)
 
-
         return y_outputs
+
+    def score(self, X, y, other_vars=None, batch_size=64):
+        # check if the score method is an attribute of model
+        if hasattr(self.model, 'score'):
+            y_outputs = self.predict(X,
+                                     other_vars=other_vars,
+                                     batch_size=batch_size,
+                                     use_predict=False)
+            return self.model.score(torch.tensor(y_outputs),torch.tensor(y))
+        else:
+            raise NotImplementedError('score method not implemented')
+        
+
 
 def create_pytorch_model_from_info(
         model_info=None,
