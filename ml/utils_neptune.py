@@ -54,6 +54,27 @@ def get_num_fields_in_run(run_id):
     num_fields = count_fields(run.get_structure())
     return num_fields
 
+def check_if_path_in_struc(run_struc,target_path):
+    # check if the neptune file path is in the neptune run structure
+    target_keys = target_path.split('/')
+    for key in target_keys:
+        if key in run_struc:
+            run_struc = run_struc[key]
+        else:
+            return False
+    return True
+
+def get_sub_struc_from_path(run_struc,target_path):
+    # check if the neptune file path is in the neptune run structure
+    target_keys = target_path.split('/')
+    run_substruc = run_struc
+    for key in target_keys:
+        if key in run_substruc:
+            run_substruc = run_substruc[key]
+        else:
+            return {}
+    return run_substruc
+
 def convert_neptune_kwargs(kwargs):
     if isinstance(kwargs, dict):
         return {k: convert_neptune_kwargs(v) for k, v in kwargs.items()}
