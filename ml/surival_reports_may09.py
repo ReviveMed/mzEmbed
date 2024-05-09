@@ -11,8 +11,12 @@ from utils_neptune import check_if_path_in_struc, get_sub_struc_from_path
 from collections import defaultdict
 
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
-data_dir= '/Users/jonaheaton/ReviveMed Dropbox/Jonah Eaton/development_finetune_optimization/April_30_Finetune_Data'
-local_dir = os.path.expanduser('~/Desktop/saved_models')
+# data_dir= '/Users/jonaheaton/ReviveMed Dropbox/Jonah Eaton/development_finetune_optimization/April_30_Finetune_Data'
+# local_dir = os.path.expanduser('~/Desktop/saved_models')
+
+data_dir= '/app/finetune_data'
+output_dir = '/app/mz_embed_engine/output'
+local_dir = os.path.expanduser('~/saved_models')
 run_id = 'RCC-2925'
 
 # %%
@@ -144,28 +148,34 @@ def save_full_report(desc_str):
 
 
     for head_key in ['Cox_NIVO OS', 'Cox_EVER OS', 'Cox_OS']:
+        print(head_key)
         report_dict[head_key] = generate_survival_report(desc_str,head_key,pretrained=True,data_dir=data_dir,local_dir=local_dir)
 
+    try:
+        report_df = pd.DataFrame(report_dict).T
 
-    report_df = pd.DataFrame(report_dict).T
+        params_df = pd.json_normalize(report_df['params'])
+        score_df = pd.json_normalize(report_df['test c-index'])
+        score_df.columns = [c + ' c-index' for c in score_df.columns]
 
-    params_df = pd.json_normalize(report_df['params'])
-    score_df = pd.json_normalize(report_df['test c-index'])
-    score_df.columns = [c + ' c-index' for c in score_df.columns]
+        final_df = pd.concat([params_df,score_df],axis=1)
+        final_df.index = report_df.index
 
-    final_df = pd.concat([params_df,score_df],axis=1)
-    final_df.index = report_df.index
+        final_df.to_csv(f'{output_dir}/{desc_str}_survival_report.csv')
 
-    final_df.to_csv(f'{local_dir}/{desc_str}_survival_report.csv')
-
-    return final_df
+        return final_df
+    except: 
+        json.dump(report_dict,open(f'{output_dir}/{desc_str}_survival_report.json','w'),indent=4)
+        return
 
 
 # %%
 
-desc_str_list = ['Optimized_NIVO-OS_finetune','Optimized_NIVO-OS_randinit',
+desc_str_list = [
+            'Optimized_NIVO-OS_finetune','Optimized_NIVO-OS_randinit',
             'Optimized_EVER-OS_finetune', 'Optimized_EVER-OS_randinit',
             'Optimized_both-OS_finetune', 'Optimized_both-OS_randinit',
             'Optimized_NIVO-OS ADV EVER-OS_finetune', 'Optimized_NIVO-OS ADV EVER-OS_randinit']
 for desc_str in desc_str_list:
+    print(desc_str)
     save_full_report(desc_str)
