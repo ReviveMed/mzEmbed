@@ -1433,7 +1433,11 @@ class PytorchModel(BaseEstimator):
 
 def create_pytorch_model_from_info(
         model_info=None,
-        model_state=None):
+        model_state=None,
+        full_model=None):
+    if full_model is not None:
+        return PytorchModel(full_model)
+    
     model = create_compound_model_from_info(
         model_info=model_info,
         model_state_dict=model_state
