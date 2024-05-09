@@ -1303,23 +1303,28 @@ class CompoundModel(nn.Module):
         self.file_id = self.encoder.file_id + '__' +self.head.file_id
     #TODO: check that output of encoder matches input of head, accounting for other_vars
 
-    def forward(self, x, other_vars=None):
-        if other_vars is None:
-            other_vars = torch.zeros(x.shape[0], 1)
-        else:
-            # other_vars = torch.tensor(other_vars, dtype=torch.float32)
+        self.other_dim = self.head.input_size - self.encoder.latent_size
+
+    def concat_other_vars(self, x, other_vars=None):
+        if (self.other_dim == 0) and (other_vars is not None):
+            print('Warning: other_vars provided but not used')
+            return x
+        elif (self.other_dim > 0) and (other_vars is not None):
+            assert other_vars.shape[1] == self.other_dim
             other_vars = other_vars.clone().detach().requires_grad_(True)
+            return torch.cat((x, other_vars), 1)
+        elif (self.other_dim > 0) and (other_vars is None):
+            return torch.cat((x, torch.zeros(x.shape[0], self.other_dim)), 1)
+        else:
+            return x
+
+    def forward(self, x, other_vars=None):
         z = self.encoder.transform(x)
-        return self.head(torch.cat((z, other_vars), 1))
+        return self.head(self.concat_other_vars(z, other_vars))
     
     def predict(self, x, other_vars=None):
-        if other_vars is None:
-            other_vars = torch.zeros(x.shape[0], 1).requires_grad_(False)
-        else:
-            # other_vars = torch.tensor(other_vars, dtype=torch.float32)
-            other_vars = other_vars.clone().detach().requires_grad_(False)
         z = self.encoder.transform(x)
-        return self.head.predict(torch.cat((z, other_vars), 1))
+        return self.head.predict(self.concat_other_vars(z, other_vars))
 
     def score(self,y_output,y):
         if hasattr(self.head,'score'):
