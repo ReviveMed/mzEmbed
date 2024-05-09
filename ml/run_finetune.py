@@ -58,8 +58,8 @@ def get_head_kwargs_by_desc(desc_str,num_hidden_layers=0,weight=1,y_cols=None):
             desc_str = desc_str.replace(match.group(0),'')
 
     if 'mskcc' in desc_str.lower():
-        if 'mskcc-ord' in desc_str.lower:
-            raise NotImplementedError('not implemented yet')
+        # if 'mskcc-ord' in desc_str.lower:
+            # raise NotImplementedError('not implemented yet')
         y_head_cols = ['MSKCC BINARY']
         head_name = 'MSKCC'
         head_kind = 'Binary'

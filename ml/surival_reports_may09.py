@@ -156,6 +156,7 @@ def save_full_report(desc_str):
         params_df = pd.json_normalize(report_df['params'])
         score_df = pd.json_normalize(report_df['test c-index'])
         score_df.columns = [c + ' c-index' for c in score_df.columns]
+        score_df = score_df.round(5)
 
         final_df = pd.concat([score_df,params_df],axis=1)
         final_df.index = report_df.index
@@ -213,9 +214,12 @@ def generate_survival_umap(task_id,data_dir=None,local_dir=None,use_full_title=T
     run.stop()
 
 
-    for set_name in ['Train','TrainVal','Val','Test']:
+    for set_name in ['Train','Val','Test']:
+    # for set_name in ['Train','TrainVal','Test']:
 
-        embed_data_file = f'{embeds_dir}/Z_embed_{set_name.lower()}2.csv'
+        set_name_id = set_name.lower()
+        print(set_name_id)
+        embed_data_file = f'{embeds_dir}/Z_embed_{set_name_id}2.csv'
         if not os.path.exists(embed_data_file):
             continue
 
@@ -230,18 +234,18 @@ def generate_survival_umap(task_id,data_dir=None,local_dir=None,use_full_title=T
                     df = df[(df['IMDC'].isin(['FAVORABLE','INTERMEDIATE','POOR']))]
                     fig_name += ' reqIMDC'
 
-                    sns.scatterplot(data=df,x='UMAP1',y='UMAP2',hue='OS',style='OS_Event',style_order=[1,0],hue_norm=(0,60))
-                    # place the legend outside the plot
-                    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-                    if use_full_title:
-                        plt.title(f'{set_name} (N={len(df)})\n{task_id}')
-                    else:
-                        plt.title(f'{set_name} (N={len(df)})')
+                sns.scatterplot(data=df,x='UMAP1',y='UMAP2',hue=hue_col,style='OS_Event',style_order=[1,0],hue_norm=(0,60))
+                # place the legend outside the plot
+                plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+                if use_full_title:
+                    plt.title(f'{set_name} (N={len(df)})\n{task_id}')
+                else:
+                    plt.title(f'{set_name} (N={len(df)})')
 
-                    plt.savefig(f'{output_dir}/plots/{task_id}__{fig_name}.png',bbox_inches='tight')
-                    plt.close()
+                plt.savefig(f'{output_dir}/plots/{task_id}__{fig_name}.png',bbox_inches='tight')
+                plt.close()
 
-        return
+    return
 
 # %%
 
