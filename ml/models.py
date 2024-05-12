@@ -6,7 +6,7 @@ from torch import Tensor
 import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint as cp
 import os
-from misc import save_json
+from misc import save_json, load_json
 import numpy as np
 
 # from torchmetrics import AUROC
@@ -136,11 +136,12 @@ class Dense_Layers(nn.Module):
         activation = kwargs.get('activation', 'leakyrelu')
         use_batch_norm = kwargs.get('use_batch_norm', False)
         act_on_output_layer = kwargs.get('act_on_output_layer', False)
+        verbose = kwargs.get('verbose', False)
         
         # print the unusued kwargs
         for key, value in kwargs.items():
-            if key not in ['input_size', 'hidden_size', 'output_size', 'num_hidden_layers', 'dropout_rate', 'activation', 'use_batch_norm', 'act_on_output_layer']:
-                print(f'Warning: {key} is not a valid argument for Dense_Layers')
+            if key not in ['input_size', 'hidden_size', 'output_size', 'num_hidden_layers', 'dropout_rate', 'activation', 'use_batch_norm', 'act_on_output_layer','verbose']:
+                if verbose: print(f'Warning: {key} is not a valid argument for Dense_Layers')
 
         if activation == 'leakyrelu' or activation == 'leaky_relu':
             activation_func = nn.LeakyReLU()
@@ -577,6 +578,9 @@ class MultiHead(nn.Module):
         self.heads = nn.ModuleList([h for h in heads if h.weight > 0])
         self.heads_names = [head.name for head in self.heads]
         self.kind = 'MultiHead'
+        self.name = 'MultiHead'
+        self.file_id = 'MultiHead'
+        self.weight = 1.0
 
         # check that all heads have unique names
         if len(set(self.heads_names)) != len(self.heads_names):
@@ -586,6 +590,8 @@ class MultiHead(nn.Module):
         input_sizes = [head.input_size for head in self.heads]
         if len(set(input_sizes)) > 1:
             raise ValueError('All heads must have the same input size')
+        if len(set(input_sizes)) == 1:
+            self.input_size = input_sizes[0]
 
     def forward(self, x):
         outputs = {f'{head.kind}_{head.name}': head(x) for head in self.heads}
@@ -777,6 +783,9 @@ class Dummy_Head(Head):
         self.y_idx = y_idx
         self.weight = 0.0
         self.network = nn.Identity()
+
+    def update_class_weights(self, y_data):
+        pass
 
 
 #########################################################
@@ -1282,8 +1291,8 @@ def get_head(**kwargs):
         head = Binary_Head(**kwargs)
     elif kind == 'MultiClass':
         head = MultiClass_Head(**kwargs)
-    elif kind == 'MultiHead':
-        head = MultiHead(**kwargs)
+    # elif kind == 'MultiHead':
+    #     head = MultiHead(**kwargs)
     elif kind == 'Regression':
         head = Regression_Head(**kwargs)
     elif kind == 'Cox':
@@ -1294,6 +1303,38 @@ def get_head(**kwargs):
     else:
         raise ValueError(f'Head kind {kind} not recognized')
     return head
+
+
+def create_model_wrapper(model_info_path, model_state_path=None, is_encoder=True):
+    model_info = load_json(model_info_path)
+    
+    if is_encoder:
+        model = get_encoder(
+            **model_info)
+    else:
+        if 'kind' in model_info:
+            if model_info['kind'] == 'MultiHead':
+                model_list = []
+                for key in model_info.keys():
+                    model_list.append(get_head(
+                        **model_info[key]))
+                model = MultiHead(model_list)
+            else:
+                model = get_head(
+                    **model_info)
+        else:
+            model_list = []
+            for key in model_info.keys():
+                model_list.append(get_head(
+                    **model_info[key]))
+            model = MultiHead(model_list)
+
+    if model_state_path is not None:
+        model.load_state_dict(torch.load(model_state_path))
+    return model
+
+
+
 
 class CompoundModel(nn.Module):
     def __init__(self, encoder, head):
@@ -1456,7 +1497,11 @@ class PytorchModel(BaseEstimator):
                                      other_vars=other_vars,
                                      batch_size=batch_size,
                                      use_predict=False)
-            return self.model.score(torch.tensor(y_outputs),torch.tensor(y))
+            if isinstance(y_outputs, dict):
+                y_outputs = {k: torch.tensor(v) for k, v in y_outputs.items()}
+                return self.model.score(y_outputs, torch.tensor(y))
+            else:
+                return self.model.score(torch.tensor(y_outputs),torch.tensor(y))
         else:
             raise NotImplementedError('score method not implemented')
         
