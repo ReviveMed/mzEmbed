@@ -73,6 +73,7 @@ def main():
 
         record_train_metrics = defaultdict(list)
         record_test_metrics = defaultdict(list)
+        print('RUN with PRETRAINED INITIALIZATION')
         for iter in range(5):
             train_metrics = run_model_wrapper(data_dir,params,
                             output_dir=output_dir,
@@ -119,8 +120,10 @@ def main():
             run[f'avg_testing_finetune/metrics/{key}'] = np.mean(val)
 
         ### Repeat for Random Initialization ###
-        sweep_kwargs['random_init'] = True
+        print('RUN with RANDOM INITIALIZATION')
+        sweep_kwargs['use_rand_init'] = True
         params = get_params(desc_str,sweep_kwargs=sweep_kwargs)
+        print(sweep_kwargs)
         record_train_metrics = defaultdict(list)
         num_train_success = 0
         record_test_metrics = defaultdict(list)
