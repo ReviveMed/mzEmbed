@@ -171,7 +171,7 @@ def run_model_wrapper(data_dir, params, output_dir=None,
                     #                                                 y_head=y_head))
             except ValueError as e:
                 print(f'Error: {e}')
-                print(f'Error in {eval_name}__{y_col_name}')
+                # print(f'Error in {eval_name}__{y_col_name}')
                 # metrics[f'{eval_name}__{y_col_name}'] = None
                 
     if use_neptune:

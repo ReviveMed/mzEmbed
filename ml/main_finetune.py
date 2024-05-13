@@ -121,48 +121,16 @@ def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,pref
             print(e)
 
     for key,val in record_train_metrics.items():
+        run[f'all_training_{prefix_name}/metrics/{key}'] = val
         run[f'avg_training_{prefix_name}/metrics/{key}'] = np.mean(val)
     run[f'avg_training_{prefix_name}/num_success'] = num_train_success
 
     for key,val in record_test_metrics.items():
+        run[f'all_testing_{prefix_name}/metrics/{key}'] = val
         run[f'avg_testing_{prefix_name}/metrics/{key}'] = np.mean(val)
     run[f'avg_testing_{prefix_name}/num_success'] = num_test_success
 
     return run
-
-def main0():
-
-    home_dir = os.path.expanduser("~")
-    data_dir = f'{home_dir}/DATA3'
-    output_save_dir = f'{home_dir}/OUTPUT'
-    print('Getting the latest dataset')
-    data_dir = get_latest_dataset(data_dir=data_dir,project=PROJECT_ID)
-    original_sweep_kwargs = parse_sweep_kwargs_from_command_line()
-    desc_str = original_sweep_kwargs.get('desc_str',None)
-    with_id = original_sweep_kwargs.get('with_id',None)
-    eval_params_list = default_eval_params_list
-
-    if desc_str is None:
-        desc_str = 'Both-OS'
-
-    run = neptune.init_run(project=PROJECT_ID,
-                                    api_token=NEPTUNE_API_TOKEN,
-                                    with_id=with_id)
-
-    run_id = run["sys/id"].fetch()
-    output_dir = f'{output_save_dir}/{run_id}'
-    os.makedirs(output_dir,exist_ok=True)
-    
-    params = get_params(desc_str,sweep_kwargs=original_sweep_kwargs)
-    run['sweep_kwargs'] = stringify_unsupported(original_sweep_kwargs)
-    run['params'] = stringify_unsupported(params)
-    run['desc_str'] = desc_str
-    run['model_name'] = 'SurvivalNet'
-    run['pretrained_model'] = 'Model2925'
-    run['dataset'].track_files(data_dir)
-
-    print('RUN with PRETRAINED INITIALIZATION')
-    run = run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name='finetune')
 
 
 # Main for Surival Finetuning
@@ -273,6 +241,49 @@ def main2(run_id_list=None):
         run.stop()
 
     print('Done')
+
+
+def main0():
+    home_dir = os.path.expanduser("~")
+    data_dir = f'{home_dir}/DATA3'
+    output_save_dir = f'{home_dir}/OUTPUT'
+    print('Getting the latest dataset')
+    data_dir = get_latest_dataset(data_dir=data_dir,project=PROJECT_ID)
+    original_sweep_kwargs = parse_sweep_kwargs_from_command_line()
+    desc_str = original_sweep_kwargs.get('desc_str',None)
+    with_id = original_sweep_kwargs.get('with_id',None)
+    eval_params_list = default_eval_params_list
+
+
+
+    run = neptune.init_run(project=PROJECT_ID,
+                                    api_token=NEPTUNE_API_TOKEN,
+                                    with_id=with_id)
+
+    if (desc_str is None) and (with_id is None):
+        desc_str = 'Both-OS'
+    if with_id:
+        desc_str = run['desc_str'].fetch()
+        params = run['params'].fetch()
+        params = convert_neptune_kwargs(params)
+        original_sweep_kwargs = run['sweep_kwargs'].fetch()
+        original_sweep_kwargs = convert_neptune_kwargs(original_sweep_kwargs)
+    else:
+        params = get_params(desc_str,sweep_kwargs=original_sweep_kwargs)
+        run['sweep_kwargs'] = stringify_unsupported(original_sweep_kwargs)
+        run['params'] = stringify_unsupported(params)
+        run['desc_str'] = desc_str
+        run['model_name'] = 'SurvivalNet'
+        run['pretrained_model'] = 'Model2925'
+        run['dataset'].track_files(data_dir)
+
+    run_id = run["sys/id"].fetch()
+    output_dir = f'{output_save_dir}/{run_id}'
+    os.makedirs(output_dir,exist_ok=True)
+    
+    run = run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name='run')
+    run.stop()
+    return run_id
 
 
 
