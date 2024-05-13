@@ -121,51 +121,63 @@ def main():
         sweep_kwargs['random_init'] = True
         params = get_params(desc_str,sweep_kwargs=sweep_kwargs)
         record_train_metrics = defaultdict(list)
+        num_train_success = 0
         record_test_metrics = defaultdict(list)
+        num_test_success = 0
         for iter in range(5):
-            train_metrics = run_model_wrapper(data_dir,params,
-                            output_dir=output_dir,
-                            train_name='train',
-                            prefix=f'training_randinit_{iter}', 
-                            eval_name_list=['val','train'],
-                            eval_params_list=eval_params_list,
-                            run_dict=run)
+            try:
+                train_metrics = run_model_wrapper(data_dir,params,
+                                output_dir=output_dir,
+                                train_name='train',
+                                prefix=f'training_randinit_{iter}', 
+                                eval_name_list=['val','train'],
+                                eval_params_list=eval_params_list,
+                                run_dict=run)
 
-            for key,val in train_metrics.items():
-                if isinstance(val,dict):
-                    for k,v in val.items():
-                        if isinstance(v,dict):
-                            for kk,vv in v.items():
-                                record_train_metrics[key+'_'+k+'_'+kk].append(vv)
-                        else:
-                            record_train_metrics[key+'_'+k].append(v)
-                else:
-                    record_train_metrics[key].append(val)
-
-            test_metrics = run_model_wrapper(data_dir,params,
-                            output_dir=output_dir,
-                            train_name='trainval',
-                            prefix=f'testing_randinit_{iter}', 
-                            eval_name_list=['test','trainval'],
-                            eval_params_list=eval_params_list,
-                            run_dict=run)
-            
-            for key,val in test_metrics.items():
-                if isinstance(val,dict):
-                    for k,v in val.items():
-                        if isinstance(v,dict):
-                            for kk,vv in v.items():
-                                record_test_metrics[key+'_'+k+'_'+kk].append(vv)
-                        else:
-                            record_test_metrics[key+'_'+k].append(v)
-                else:
-                    record_test_metrics[key].append(val)
+                for key,val in train_metrics.items():
+                    if isinstance(val,dict):
+                        for k,v in val.items():
+                            if isinstance(v,dict):
+                                for kk,vv in v.items():
+                                    record_train_metrics[key+'_'+k+'_'+kk].append(vv)
+                            else:
+                                record_train_metrics[key+'_'+k].append(v)
+                    else:
+                        record_train_metrics[key].append(val)
+                num_train_success += 1
+            except ValueError as e:
+                print(e)
+                
+            try:
+                test_metrics = run_model_wrapper(data_dir,params,
+                                output_dir=output_dir,
+                                train_name='trainval',
+                                prefix=f'testing_randinit_{iter}', 
+                                eval_name_list=['test','trainval'],
+                                eval_params_list=eval_params_list,
+                                run_dict=run)
+                
+                for key,val in test_metrics.items():
+                    if isinstance(val,dict):
+                        for k,v in val.items():
+                            if isinstance(v,dict):
+                                for kk,vv in v.items():
+                                    record_test_metrics[key+'_'+k+'_'+kk].append(vv)
+                            else:
+                                record_test_metrics[key+'_'+k].append(v)
+                    else:
+                        record_test_metrics[key].append(val)
+                num_test_success += 1
+            except ValueError as e:
+                print(e)
 
         for key,val in record_train_metrics.items():
             run[f'avg_training_randinit/metrics/{key}'] = np.mean(val)
+        run[f'avg_training_randinit/num_success'] = num_train_success
 
         for key,val in record_test_metrics.items():
             run[f'avg_testing_randinit/metrics/{key}'] = np.mean(val)
+        run[f'avg_testing_randinit/num_success'] = num_test_success
 
 
         run.stop()
