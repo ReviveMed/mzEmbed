@@ -888,8 +888,8 @@ def parse_sweep_kwargs_from_command_line():
     parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
     parser.add_argument('--remove_nans', action='store_false', help='Remove rows with NaNs in the y-data')
     parser.add_argument('--train_name', type=str, default='train', help='Training name')
-    parser.add_argument('--desc_str', type=str, help='Description string', optional=True)
-    parser.add_argument('--with_id', type=int, help='Include the ID in the description string', optional=True)
+    parser.add_argument('--desc_str', type=str, help='Description string', nargs='?')
+    parser.add_argument('--with_id', type=int, help='Include the ID in the description string', nargs='?')
 
     args = parser.parse_args()
 
