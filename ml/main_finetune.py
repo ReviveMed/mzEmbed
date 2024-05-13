@@ -252,6 +252,8 @@ def main0():
     original_sweep_kwargs = parse_sweep_kwargs_from_command_line()
     desc_str = original_sweep_kwargs.get('desc_str',None)
     with_id = original_sweep_kwargs.get('with_id',None)
+    if with_id is not None:
+        with_id = 'SUR-'+str(with_id)
     eval_params_list = default_eval_params_list
 
 
