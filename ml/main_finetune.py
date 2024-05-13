@@ -93,10 +93,13 @@ def main():
     # run_dict = run['training_run']
 
     desc_str_list = [
-        'Both-OS',
-        'NIVO-OS',
-        'EVER-OS',
-        'NIVO-OS AND EVER-OS',
+        # 'Both-OS',
+        # 'NIVO-OS',
+        # 'EVER-OS',
+        # 'NIVO-OS AND EVER-OS',
+        'NIVO-OS ADV EVER-OS',
+        'IMDC',
+        # 'MSKCC',
         # 'NIVO-OS ADV EVER-OS',
     ]
 
@@ -121,6 +124,14 @@ def main():
                 'y_col_name':'EVER OS',
                 'y_head':'Both OS', # which head to apply to the y_col
                 'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
+            {
+                'y_col_name':'MSKCC BINARY',
+                'y_head':'MSKCC', # which head to apply to the y_col
+                'y_cols': ['MSKCC BINARY']}, # which columns to use for the y_col
+            {
+                'y_col_name':'IMDC BINARY',
+                'y_head':'IMDC', # which head to apply to the y_col
+                'y_cols': ['IMDC BINARY']}, # which columns to use for the y_col
         ]
 
 
@@ -133,6 +144,7 @@ def main():
         os.makedirs(output_dir,exist_ok=True)
         
         params = get_params(desc_str,sweep_kwargs=original_sweep_kwargs)
+        run['sweep_kwargs'] = stringify_unsupported(original_sweep_kwargs)
         run['params'] = stringify_unsupported(params)
         run['desc_str'] = desc_str
         run['model_name'] = 'SurvivalNet'
