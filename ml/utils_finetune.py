@@ -890,6 +890,7 @@ def parse_sweep_kwargs_from_command_line():
     parser.add_argument('--train_name', type=str, default='train', help='Training name')
     parser.add_argument('--desc_str', type=str, help='Description string', nargs='?')
     parser.add_argument('--with_id', type=int, help='Include the ID in the description string', nargs='?')
+    parser.add_argument('--num_iterations', type=int, default=10, help='Number of iterations for the sweep')
 
     args = parser.parse_args()
 
@@ -913,6 +914,7 @@ def parse_sweep_kwargs_from_command_line():
         'clip_grads_with_norm': args.no_clip_grads,
         'batch_size': args.batch_size,
         'train_name': args.train_name,
+        'num_iterations': args.num_iterations,
     }
 
     if args.desc_str is not None:

@@ -119,12 +119,14 @@ def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,pref
             num_test_success += 1
         except ValueError as e:
             print(e)
-
+    
+    run[f'all_training_{prefix_name}/metrics/{key}'] = []
     for key,val in record_train_metrics.items():
         run[f'all_training_{prefix_name}/metrics/{key}'].extend(val)
         run[f'avg_training_{prefix_name}/metrics/{key}'] = np.mean(val)
     run[f'avg_training_{prefix_name}/num_success'] = num_train_success
 
+    run[f'all_testing_{prefix_name}/metrics/{key}'] = []
     for key,val in record_test_metrics.items():
         run[f'all_testing_{prefix_name}/metrics/{key}'].extend(val)
         run[f'avg_testing_{prefix_name}/metrics/{key}'] = np.mean(val)
@@ -256,7 +258,7 @@ def main0():
         with_id = 'SUR-'+str(with_id)
     eval_params_list = default_eval_params_list
 
-
+    num_iterations = original_sweep_kwargs.get('num_iterations',10)
 
     run = neptune.init_run(project=PROJECT_ID,
                                     api_token=NEPTUNE_API_TOKEN,
@@ -283,7 +285,7 @@ def main0():
     output_dir = f'{output_save_dir}/{run_id}'
     os.makedirs(output_dir,exist_ok=True)
     
-    run = run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name='run')
+    run = run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name='run',num_iterations=num_iterations)
     run.stop()
     return run_id
 
