@@ -163,9 +163,12 @@ def run_model_wrapper(data_dir, params, output_dir=None,
                                                                         y_cols=y_cols,
                                                                         y_head=y_head))
                 else:
-                    metrics[f'{eval_name}__{y_col_name}'].update(evaluate_model_wrapper(encoder, head, adv, X_data_eval, y_data_eval,
+                    metrics[f'{eval_name}__head_{y_head}__on_{y_col_name}'].update(evaluate_model_wrapper(encoder, head, adv, X_data_eval, y_data_eval,
                                                                                         y_cols=y_cols,
                                                                                         y_head=y_head))
+                    # metrics[f'{eval_name}__{y_col_name}'].update(evaluate_model_wrapper(encoder, head, adv, X_data_eval, y_data_eval,
+                    #                                                 y_cols=y_cols,
+                    #                                                 y_head=y_head))
             except ValueError as e:
                 print(f'Error: {e}')
                 print(f'Error in {eval_name}__{y_col_name}')

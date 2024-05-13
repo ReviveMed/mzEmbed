@@ -77,7 +77,7 @@ def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,pref
 
 
 # Main for Surival Finetuning
-def main():
+def main(desc_str_list=None):
 
     home_dir = os.path.expanduser("~")
     data_dir = f'{home_dir}/DATA3'
@@ -92,16 +92,17 @@ def main():
     random_sweep_kwargs['use_rand_init'] = True
     # run_dict = run['training_run']
 
-    desc_str_list = [
-        # 'Both-OS',
-        # 'NIVO-OS',
-        # 'EVER-OS',
-        # 'NIVO-OS AND EVER-OS',
-        'NIVO-OS ADV EVER-OS',
-        'IMDC',
-        # 'MSKCC',
-        # 'NIVO-OS ADV EVER-OS',
-    ]
+    if desc_str_list is None:
+        desc_str_list = [
+            # 'Both-OS',
+            # 'NIVO-OS',
+            # 'EVER-OS',
+            # 'NIVO-OS AND EVER-OS',
+            'NIVO-OS ADV EVER-OS',
+            'IMDC',
+            # 'MSKCC',
+            # 'NIVO-OS ADV EVER-OS',
+        ]
 
     for desc_str in desc_str_list:
         print(desc_str)
@@ -116,6 +117,14 @@ def main():
                 'y_col_name':'EVER OS',
                 'y_head':'NIVO OS', # which head to apply to the y_col
                 'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
+            {
+                'y_col_name':'Both OS',
+                'y_head':'EVER OS', # which head to apply to the y_col
+                'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col
+            {
+                'y_col_name':'Both OS',
+                'y_head':'NIVO OS', # which head to apply to the y_col
+                'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col                
             {
                 'y_col_name':'NIVO OS',
                 'y_head':'Both OS', # which head to apply to the y_col
@@ -165,6 +174,94 @@ def main():
     print('Done')
 
 
+# Main for Surival Finetuning
+def main2(run_id_list=None):
+
+    home_dir = os.path.expanduser("~")
+    data_dir = f'{home_dir}/DATA3'
+    output_save_dir = f'{home_dir}/OUTPUT'
+    print('Getting the latest dataset')
+    data_dir = get_latest_dataset(data_dir=data_dir,project=PROJECT_ID)
+    
+    
+    with_id = None
+    # run_dict = run['training_run']
+
+    if run_id_list is None:
+        run_id_list = [
+            'SUR-2504',
+            "SUR-2503",
+            "SUR-2502",
+            "SUR-2501" ]
+
+    for with_id in run_id_list:
+        print(with_id)
+
+        eval_params_list = [
+            {},
+            {
+                'y_col_name':'NIVO OS',
+                'y_head':'EVER OS', # which head to apply to the y_col
+                'y_cols': ['NIVO OS','OS_Event']}, # which columns to use for the y_col
+            {
+                'y_col_name':'EVER OS',
+                'y_head':'NIVO OS', # which head to apply to the y_col
+                'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
+            {
+                'y_col_name':'Both OS',
+                'y_head':'EVER OS', # which head to apply to the y_col
+                'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col
+            {
+                'y_col_name':'Both OS',
+                'y_head':'NIVO OS', # which head to apply to the y_col
+                'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col                
+            {
+                'y_col_name':'NIVO OS',
+                'y_head':'Both OS', # which head to apply to the y_col
+                'y_cols': ['NIVO OS','OS_Event']}, # which columns to use for the y_col
+            {
+                'y_col_name':'EVER OS',
+                'y_head':'Both OS', # which head to apply to the y_col
+                'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
+            {
+                'y_col_name':'MSKCC BINARY',
+                'y_head':'MSKCC', # which head to apply to the y_col
+                'y_cols': ['MSKCC BINARY']}, # which columns to use for the y_col
+            {
+                'y_col_name':'IMDC BINARY',
+                'y_head':'IMDC', # which head to apply to the y_col
+                'y_cols': ['IMDC BINARY']}, # which columns to use for the y_col
+        ]
+
+
+        run = neptune.init_run(project=PROJECT_ID,
+                                    api_token=NEPTUNE_API_TOKEN,
+                                    with_id=with_id)
+
+        run_id = run["sys/id"].fetch()
+        params = run['params'].fetch()
+        params = convert_neptune_kwargs(params)
+        output_dir = f'{output_save_dir}/{run_id}'
+        os.makedirs(output_dir,exist_ok=True)
+
+
+        print('RUN with PRETRAINED INITIALIZATION')
+        run = run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name='finetune')
+
+
+        ### Repeat for Random Initialization ###
+        print('RUN with RANDOM INITIALIZATION')
+        params_w_randominit = {k:v for k,v in params.items()}
+        params_w_randominit['train_kwargs']['use_rand_init'] = True
+        run = run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name='randinit')
+
+        run.stop()
+
+    print('Done')
+
+
+
 if __name__ == '__main__':
 
-    main()
+    # main()
+    main2()
