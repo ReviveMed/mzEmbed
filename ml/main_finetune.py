@@ -121,12 +121,12 @@ def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,pref
             print(e)
 
     for key,val in record_train_metrics.items():
-        run[f'all_training_{prefix_name}/metrics/{key}'] = val
+        run[f'all_training_{prefix_name}/metrics/{key}'].extend(val)
         run[f'avg_training_{prefix_name}/metrics/{key}'] = np.mean(val)
     run[f'avg_training_{prefix_name}/num_success'] = num_train_success
 
     for key,val in record_test_metrics.items():
-        run[f'all_testing_{prefix_name}/metrics/{key}'] = val
+        run[f'all_testing_{prefix_name}/metrics/{key}'].extend(val)
         run[f'avg_testing_{prefix_name}/metrics/{key}'] = np.mean(val)
     run[f'avg_testing_{prefix_name}/num_success'] = num_test_success
 
