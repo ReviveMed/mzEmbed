@@ -100,8 +100,7 @@ def main(desc_str_list=None):
             # 'NIVO-OS AND EVER-OS',
             'NIVO-OS ADV EVER-OS',
             'IMDC',
-            # 'MSKCC',
-            # 'NIVO-OS ADV EVER-OS',
+            'MSKCC',
         ]
 
     for desc_str in desc_str_list:
@@ -263,5 +262,5 @@ def main2(run_id_list=None):
 
 if __name__ == '__main__':
 
-    # main()
-    main2()
+    main()
+    # main2()
