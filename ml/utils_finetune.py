@@ -5,7 +5,7 @@ import neptune
 import torch
 from neptune.utils import stringify_unsupported
 from misc import save_json, load_json, get_clean_batch_sz
-from utils_neptune import get_latest_dataset, check_neptune_existance, check_if_path_in_struc
+from utils_neptune import get_latest_dataset, check_neptune_existance, check_if_path_in_struc, convert_neptune_kwargs
 from models import get_encoder, get_head, MultiHead, create_model_wrapper, create_pytorch_model_from_info, CompoundModel
 from train4 import train_compound_model, create_dataloaders_old, CompoundDataset
 import os
@@ -69,10 +69,13 @@ def run_model_wrapper(data_dir, params, output_dir=None,
     #     run_dict[f'{prefix}/dataset'].track_files(data_dir)
     #     run_dict[f'{prefix}/model_name'] = 'Model2925'
 
-        default_params = run_dict['params'].fetch()
+        # default_params = run_dict['params'].fetch()
+        default_params = run_dict['params/train_kwargs'].fetch()
+        default_params = convert_neptune_kwargs(default_params)
         # find the difference between the default params and the current params
         params_diff = {}
-        for k,v in params.items():
+        # for k,v in params.items():
+        for k,v in params['train_kwargs'].items():
             if isinstance(v,dict):
                 for kk,vv in v.items():
                     if default_params.get(k) is None:
@@ -84,7 +87,8 @@ def run_model_wrapper(data_dir, params, output_dir=None,
                 if default_params.get(k) != v:
                     params_diff[k] = v
 
-        run_dict[f'{prefix}/params_diff'] = stringify_unsupported(params_diff)
+        # run_dict[f'{prefix}/params_diff'] = stringify_unsupported(params_diff)
+        run_dict[f'{prefix}/params_diff/train_kwargs'] = stringify_unsupported(params_diff)
         
         # run_dict[f'dataset'].track_files(data_dir)
         # run_dict[f'model_name'] = 'Model2925'
@@ -108,8 +112,9 @@ def run_model_wrapper(data_dir, params, output_dir=None,
         run_dict[f'{prefix}/models/encoder_info'].download(f'{saved_model_dir}/encoder_info.json')
         run_dict[f'{prefix}/models/head_state'].download(f'{saved_model_dir}/head_state.pt')
         run_dict[f'{prefix}/models/head_info'].download(f'{saved_model_dir}/head_info.json')
-        run_dict[f'{prefix}/models/adv_state'].download(f'{saved_model_dir}/adv_state.pt')
-        run_dict[f'{prefix}/models/adv_info'].download(f'{saved_model_dir}/adv_info.json')
+        if os.path.exists(f'{saved_model_dir}/adv_info.json'):
+            run_dict[f'{prefix}/models/adv_state'].download(f'{saved_model_dir}/adv_state.pt')
+            run_dict[f'{prefix}/models/adv_info'].download(f'{saved_model_dir}/adv_info.json')
     
     if os.path.exists(f'{saved_model_dir}/encoder_info.json'):
         encoder = create_model_wrapper(f'{saved_model_dir}/encoder_info.json',f'{saved_model_dir}/encoder_state.pt')

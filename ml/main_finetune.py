@@ -1,5 +1,6 @@
 from utils_finetune import *
 from utils_neptune import get_latest_dataset
+from neptune.utils import stringify_unsupported
 
 
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
@@ -64,7 +65,7 @@ def main():
         output_dir = f'{output_save_dir}/{run_id}'
         os.makedirs(output_dir,exist_ok=True)
 
-        run['params'] = params
+        run['params'] = stringify_unsupported(params)
         run['desc_str'] = desc_str
         run['model_name'] = 'SurvivalNet'
         run['pretrained_model'] = 'Model2925'
