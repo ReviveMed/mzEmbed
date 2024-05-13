@@ -388,6 +388,7 @@ def fit_model_wrapper(X, y, task_components_dict={}, run_dict={}, **train_kwargs
     early_stopping_patience = train_kwargs.get('early_stopping_patience', 0)
     scheduler_kind = train_kwargs.get('scheduler_kind', None)
     train_name = train_kwargs.get('train_name', 'train')
+    remove_nans = train_kwargs.get('remove_nans', False)
 
     ### Prepare the Data Loader
     X_size = X.shape[1]
@@ -400,7 +401,22 @@ def fit_model_wrapper(X, y, task_components_dict={}, run_dict={}, **train_kwargs
     else:
         batch_size = get_clean_batch_sz(X_size*(1-holdout_frac), batch_size)
 
-    train_dataset = CompoundDataset(X,y[y_head_cols], y[y_adv_cols])
+    y_head_df = y[y_head_cols]
+    y_adv_df = y[y_adv_cols]
+    if remove_nans:
+        y_head_nan_locs = y_head_df.isna().any(axis=1)
+        if y_adv_df.shape[1] > 0:
+            y_adv_nan_locs = y_adv_df.isna().any(axis=1)
+            nan_locs = y_head_nan_locs | y_adv_nan_locs
+        else:
+            nan_locs = y_head_nan_locs
+
+        X = X[~nan_locs]
+        y_head_df = y_head_df[~nan_locs]
+        y_adv_df = y_adv_df[~nan_locs]
+
+
+    train_dataset = CompoundDataset(X,y_head_df, y_adv_df)
     # stratify on the adversarial column (stratify=2)
     # this is probably not the most memory effecient method, would be better to do stratification before creating the dataset
     # train_loader_dct = create_dataloaders(train_dataset, batch_size, holdout_frac, set_name=train_name, stratify=2)
@@ -736,11 +752,22 @@ def parse_task_components_dict_from_str(desc_str,sweep_kwargs=None):
     if '__' in clean_desc_str:
         clean_desc_str = clean_desc_str.split('__')[0]
 
-    if 'ADV' in clean_desc_str:
+    if ('ADV' in clean_desc_str) and ('AUX' in clean_desc_str):
+        head_desc_str = clean_desc_str.split('AUX')[0]
+        aux_desc_str = clean_desc_str.split('AUX')[1].split('ADV')[0]
+        adv_desc_str = clean_desc_str.split('ADV')[1]
+
+    elif 'ADV' in clean_desc_str:
         adv_desc_str = clean_desc_str.split('ADV')[1]
         head_desc_str = clean_desc_str.split('ADV')[0]
+        aux_desc_str = ''
+    elif 'AUX' in clean_desc_str:
+        aux_desc_str = clean_desc_str.split('AUX')[1]
+        head_desc_str = clean_desc_str.split('AUX')[0]
+        adv_desc_str = ''
     else:
         adv_desc_str = ''
+        aux_desc_str = ''
         head_desc_str = clean_desc_str
 
     y_head_cols = []
@@ -826,6 +853,7 @@ def get_params(desc_str,sweep_kwargs=None):
         'clip_grads_with_norm',
         'encoder_weight',
         'adversary_weight',
+        'remove_nans',
         'train_name'
     ]
 
@@ -851,13 +879,17 @@ def parse_sweep_kwargs_from_command_line():
     parser.add_argument('--l1_reg_weight', type=float, default=0.0, help='L1 regularization weight')
     parser.add_argument('--noise_factor', type=float, default=0.1, help='Noise factor')
     parser.add_argument('--weight_decay', type=float, default=0, help='Weight decay')
-    parser.add_argument('--adversary_weight', type=float, default=1, help='Adversary weight')
+    parser.add_argument('--adversary_weight', type=float, default=1, help='Adversary Task weight')
+    parser.add_argument('--auxillary_weight', type=float, default=1, help='Auxillary Task weight')
     parser.add_argument('--adversarial_start_epoch', type=int, default=10, help='Adversarial start epoch')
     parser.add_argument('--encoder_weight', type=float, default=0, help='Encoder weight')
     # parser.add_argument('--clip_grads', action='store_true', help='Clip gradients with norm')
     parser.add_argument('--no_clip_grads', action='store_false', help='Clip gradients with norm')
     parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
+    parser.add_argument('--remove_nans', action='store_false', help='Remove rows with NaNs in the y-data')
     parser.add_argument('--train_name', type=str, default='train', help='Training name')
+    parser.add_argument('--desc_str', type=str, help='Description string', optional=True)
+    parser.add_argument('--with_id', type=int, help='Include the ID in the description string', optional=True)
 
     args = parser.parse_args()
 
@@ -874,12 +906,18 @@ def parse_sweep_kwargs_from_command_line():
         'noise_factor': args.noise_factor,
         'weight_decay': args.weight_decay,
         'adversary_weight': args.adversary_weight,
+        'auxillary_weight': args.auxillary_weight,
         'adversarial_start_epoch': args.adversarial_start_epoch,
         'encoder_weight': args.encoder_weight,
         # 'clip_grads_with_norm': args.clip_grads,
         'clip_grads_with_norm': args.no_clip_grads,
         'batch_size': args.batch_size,
-        'train_name': args.train_name
+        'train_name': args.train_name,
     }
+
+    if args.desc_str is not None:
+        sweep_kwargs['desc_str'] = args.desc_str
+    if args.with_id is not None:
+        sweep_kwargs['with_id'] = args.with_id
 
     return sweep_kwargs

@@ -8,7 +8,62 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 PROJECT_ID = 'revivemed/Survival-RCC'
 
 
-def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name,num_iterations=5):
+default_eval_params_list = [
+    # {},
+    {
+        'y_col_name':'NIVO OS',
+        'y_head':'NIVO OS', # which head to apply to the y_col
+        'y_cols': ['NIVO OS','OS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'NIVO OS',
+        'y_head':'EVER OS', # which head to apply to the y_col
+        'y_cols': ['NIVO OS','OS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'NIVO OS',
+        'y_head':'Both OS', # which head to apply to the y_col
+        'y_cols': ['NIVO OS','OS_Event']}, # which columns to use for the y_col
+
+
+    {
+        'y_col_name':'EVER OS',
+        'y_head':'NIVO OS', # which head to apply to the y_col
+        'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'EVER OS',
+        'y_head':'EVER OS', # which head to apply to the y_col
+        'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'EVER OS',
+        'y_head':'Both OS', # which head to apply to the y_col
+        'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
+    
+
+    {
+        'y_col_name':'Both OS',
+        'y_head':'EVER OS', # which head to apply to the y_col
+        'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'Both OS',
+        'y_head':'NIVO OS', # which head to apply to the y_col
+        'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col   
+    {
+        'y_col_name':'Both OS',
+        'y_head':'Both OS', # which head to apply to the y_col
+        'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col             
+    
+
+    {
+        'y_col_name':'MSKCC BINARY',
+        'y_head':'MSKCC', # which head to apply to the y_col
+        'y_cols': ['MSKCC BINARY']}, # which columns to use for the y_col
+    {
+        'y_col_name':'IMDC BINARY',
+        'y_head':'IMDC', # which head to apply to the y_col
+        'y_cols': ['IMDC BINARY']}, # which columns to use for the y_col
+]
+
+
+def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name,num_iterations=10):
 
     record_train_metrics = defaultdict(list)
     num_train_success = 0
@@ -75,6 +130,40 @@ def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,pref
 
     return run
 
+def main0():
+
+    home_dir = os.path.expanduser("~")
+    data_dir = f'{home_dir}/DATA3'
+    output_save_dir = f'{home_dir}/OUTPUT'
+    print('Getting the latest dataset')
+    data_dir = get_latest_dataset(data_dir=data_dir,project=PROJECT_ID)
+    original_sweep_kwargs = parse_sweep_kwargs_from_command_line()
+    desc_str = original_sweep_kwargs.get('desc_str',None)
+    with_id = original_sweep_kwargs.get('with_id',None)
+    eval_params_list = default_eval_params_list
+
+    if desc_str is None:
+        desc_str = 'Both-OS'
+
+    run = neptune.init_run(project=PROJECT_ID,
+                                    api_token=NEPTUNE_API_TOKEN,
+                                    with_id=with_id)
+
+    run_id = run["sys/id"].fetch()
+    output_dir = f'{output_save_dir}/{run_id}'
+    os.makedirs(output_dir,exist_ok=True)
+    
+    params = get_params(desc_str,sweep_kwargs=original_sweep_kwargs)
+    run['sweep_kwargs'] = stringify_unsupported(original_sweep_kwargs)
+    run['params'] = stringify_unsupported(params)
+    run['desc_str'] = desc_str
+    run['model_name'] = 'SurvivalNet'
+    run['pretrained_model'] = 'Model2925'
+    run['dataset'].track_files(data_dir)
+
+    print('RUN with PRETRAINED INITIALIZATION')
+    run = run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name='finetune')
+
 
 # Main for Surival Finetuning
 def main(desc_str_list=None):
@@ -85,7 +174,7 @@ def main(desc_str_list=None):
     print('Getting the latest dataset')
     data_dir = get_latest_dataset(data_dir=data_dir,project=PROJECT_ID)
     
-    
+    eval_params_list = default_eval_params_list
     with_id = None
     original_sweep_kwargs = parse_sweep_kwargs_from_command_line()
     random_sweep_kwargs =  {k:v for k,v in original_sweep_kwargs.items()}
@@ -105,42 +194,6 @@ def main(desc_str_list=None):
 
     for desc_str in desc_str_list:
         print(desc_str)
-
-        eval_params_list = [
-            {},
-            {
-                'y_col_name':'NIVO OS',
-                'y_head':'EVER OS', # which head to apply to the y_col
-                'y_cols': ['NIVO OS','OS_Event']}, # which columns to use for the y_col
-            {
-                'y_col_name':'EVER OS',
-                'y_head':'NIVO OS', # which head to apply to the y_col
-                'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
-            {
-                'y_col_name':'Both OS',
-                'y_head':'EVER OS', # which head to apply to the y_col
-                'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col
-            {
-                'y_col_name':'Both OS',
-                'y_head':'NIVO OS', # which head to apply to the y_col
-                'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col                
-            {
-                'y_col_name':'NIVO OS',
-                'y_head':'Both OS', # which head to apply to the y_col
-                'y_cols': ['NIVO OS','OS_Event']}, # which columns to use for the y_col
-            {
-                'y_col_name':'EVER OS',
-                'y_head':'Both OS', # which head to apply to the y_col
-                'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
-            {
-                'y_col_name':'MSKCC BINARY',
-                'y_head':'MSKCC', # which head to apply to the y_col
-                'y_cols': ['MSKCC BINARY']}, # which columns to use for the y_col
-            {
-                'y_col_name':'IMDC BINARY',
-                'y_head':'IMDC', # which head to apply to the y_col
-                'y_cols': ['IMDC BINARY']}, # which columns to use for the y_col
-        ]
 
 
         run = neptune.init_run(project=PROJECT_ID,
@@ -181,7 +234,7 @@ def main2(run_id_list=None):
     output_save_dir = f'{home_dir}/OUTPUT'
     print('Getting the latest dataset')
     data_dir = get_latest_dataset(data_dir=data_dir,project=PROJECT_ID)
-    
+    eval_params_list = default_eval_params_list
     
     with_id = None
     # run_dict = run['training_run']
@@ -195,43 +248,6 @@ def main2(run_id_list=None):
 
     for with_id in run_id_list:
         print(with_id)
-
-        eval_params_list = [
-            {},
-            {
-                'y_col_name':'NIVO OS',
-                'y_head':'EVER OS', # which head to apply to the y_col
-                'y_cols': ['NIVO OS','OS_Event']}, # which columns to use for the y_col
-            {
-                'y_col_name':'EVER OS',
-                'y_head':'NIVO OS', # which head to apply to the y_col
-                'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
-            {
-                'y_col_name':'Both OS',
-                'y_head':'EVER OS', # which head to apply to the y_col
-                'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col
-            {
-                'y_col_name':'Both OS',
-                'y_head':'NIVO OS', # which head to apply to the y_col
-                'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col                
-            {
-                'y_col_name':'NIVO OS',
-                'y_head':'Both OS', # which head to apply to the y_col
-                'y_cols': ['NIVO OS','OS_Event']}, # which columns to use for the y_col
-            {
-                'y_col_name':'EVER OS',
-                'y_head':'Both OS', # which head to apply to the y_col
-                'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
-            {
-                'y_col_name':'MSKCC BINARY',
-                'y_head':'MSKCC', # which head to apply to the y_col
-                'y_cols': ['MSKCC BINARY']}, # which columns to use for the y_col
-            {
-                'y_col_name':'IMDC BINARY',
-                'y_head':'IMDC', # which head to apply to the y_col
-                'y_cols': ['IMDC BINARY']}, # which columns to use for the y_col
-        ]
-
 
         run = neptune.init_run(project=PROJECT_ID,
                                     api_token=NEPTUNE_API_TOKEN,
@@ -262,5 +278,6 @@ def main2(run_id_list=None):
 
 if __name__ == '__main__':
 
-    main()
+    main0()
+    # main()
     # main2()
