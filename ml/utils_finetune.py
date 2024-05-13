@@ -128,16 +128,20 @@ def run_model_wrapper(data_dir, params, output_dir=None,
         X_data_train = pd.read_csv(f'{data_dir}/{X_filename}_{train_name}.csv', index_col=0)
         y_data_train = pd.read_csv(f'{data_dir}/{y_filename}_{train_name}.csv', index_col=0)
 
-        _, encoder, head, adv = fit_model_wrapper(X=X_data_train,
-                                                y=y_data_train,
-                                                task_components_dict=task_components_dict,
-                                                run_dict=run_dict[prefix],
-                                                **train_kwargs)
+        try:
+            _, encoder, head, adv = fit_model_wrapper(X=X_data_train,
+                                                    y=y_data_train,
+                                                    task_components_dict=task_components_dict,
+                                                    run_dict=run_dict[prefix],
+                                                    **train_kwargs)
 
-        save_model_wrapper(encoder, head, adv, 
-                           save_dir=saved_model_dir,
-                           run_dict=run_dict,
-                           prefix=prefix)
+            save_model_wrapper(encoder, head, adv, 
+                            save_dir=saved_model_dir,
+                            run_dict=run_dict,
+                            prefix=prefix)
+        except ValueError as e:
+            print(f'Error: {e}')
+            return None
 
 
     metrics = defaultdict(dict)

@@ -153,6 +153,7 @@ def main():
                 print(e)
                 
             try:
+                
                 test_metrics = run_model_wrapper(data_dir,params,
                                 output_dir=output_dir,
                                 train_name='trainval',
@@ -161,6 +162,9 @@ def main():
                                 eval_params_list=eval_params_list,
                                 run_dict=run)
                 
+                if test_metrics is None:
+                    continue
+
                 for key,val in test_metrics.items():
                     if isinstance(val,dict):
                         for k,v in val.items():
