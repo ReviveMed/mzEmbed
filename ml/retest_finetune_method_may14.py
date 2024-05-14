@@ -34,7 +34,7 @@ kwargs['plot_latent_space_cols'] = []
 kwargs['y_head_cols'] = ['OS','OS_Event']
 kwargs['y_adv_cols'] = []
 kwargs['upload_models_to_neptune'] = False
-kwargs['num_repeats'] = 2
+kwargs['num_repeats'] = 15
 
 
 kwargs['head_kwargs_dict'] = {}
@@ -68,7 +68,7 @@ kwargs['train_kwargs']['learning_rate'] = 0.0005414220374797538
 kwargs['train_kwargs']['l2_reg_weight'] = 0
 kwargs['train_kwargs']['l1_reg_weight'] = 0
 kwargs['train_kwargs']['noise_factor'] =0.2
-kwargs['train_kwargs']['weight_decay'] = 0
+kwargs['train_kwargs']['weight_decay'] = 0  
 kwargs['train_kwargs']['adversarial_mini_epochs'] = 5
 kwargs['train_kwargs']['adversarial_start_epoch'] = 10
 kwargs['run_evaluation'] = True

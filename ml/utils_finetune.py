@@ -389,6 +389,7 @@ def fit_model_wrapper(X, y, task_components_dict={}, run_dict={}, **train_kwargs
     scheduler_kind = train_kwargs.get('scheduler_kind', None)
     train_name = train_kwargs.get('train_name', 'train')
     remove_nans = train_kwargs.get('remove_nans', False)
+    yes_clean_batches = train_kwargs.get('yes_clean_batches', True)
 
     ### Prepare the Data Loader
     X_size = X.shape[1]
@@ -397,9 +398,11 @@ def fit_model_wrapper(X, y, task_components_dict={}, run_dict={}, **train_kwargs
         print('holdout_frac > 0 and early_stopping_patience < 1 is not recommended, set hold out frac to 0')
         print('UNLESS you are using a scheduler, in which case the holdout_frac is used for the scheduler')
         holdout_frac = 0
-        batch_size = get_clean_batch_sz(X_size, batch_size)
+        if yes_clean_batches:
+            batch_size = get_clean_batch_sz(X_size, batch_size)
     else:
-        batch_size = get_clean_batch_sz(X_size*(1-holdout_frac), batch_size)
+        if yes_clean_batches:
+            batch_size = get_clean_batch_sz(X_size*(1-holdout_frac), batch_size)
 
     y_head_df = y[y_head_cols]
     y_adv_df = y[y_adv_cols]
@@ -839,6 +842,7 @@ def get_params(desc_str,sweep_kwargs=None):
     train_kwargs_list = [
         'use_rand_init',
         'batch_size',
+        'yes_clean_batches',
         'holdout_frac',
         'early_stopping_patience',
         'scheduler_kind',
@@ -886,6 +890,7 @@ def parse_sweep_kwargs_from_command_line():
     # parser.add_argument('--clip_grads', action='store_true', help='Clip gradients with norm')
     parser.add_argument('--no_clip_grads', action='store_false', help='Clip gradients with norm')
     parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
+    parser.add_argument('--yes_clean_batches', action='store_true', help='Clean batch size so last batch is good size')
     parser.add_argument('--remove_nans', action='store_false', help='Remove rows with NaNs in the y-data')
     parser.add_argument('--train_name', type=str, default='train', help='Training name')
     parser.add_argument('--desc_str', type=str, help='Description string', nargs='?')
@@ -913,6 +918,7 @@ def parse_sweep_kwargs_from_command_line():
         # 'clip_grads_with_norm': args.clip_grads,
         'clip_grads_with_norm': args.no_clip_grads,
         'batch_size': args.batch_size,
+        'yes_clean_batches': args.yes_clean_batches,
         'train_name': args.train_name,
         'num_iterations': args.num_iterations,
     }

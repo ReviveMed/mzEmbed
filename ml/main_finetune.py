@@ -313,6 +313,7 @@ def parse_sweep_kwargs_from_command_line2():
     # parser.add_argument('--clip_grads', action='store_true', help='Clip gradients with norm')
     parser.add_argument('--no_clip_grads', action='store_false', help='Clip gradients with norm')
     parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
+    parser.add_argument('--clean_batch_size', action='store_true', help='Clean batch size so last batch is good size')
     parser.add_argument('--remove_nans', action='store_false', help='Remove rows with NaNs in the y-data')
     parser.add_argument('--train_name', type=str, default='train', help='Training name')
     parser.add_argument('--desc_str', type=str, help='Description string', nargs='?')
@@ -340,6 +341,7 @@ def parse_sweep_kwargs_from_command_line2():
         # 'clip_grads_with_norm': args.clip_grads,
         'clip_grads_with_norm': args.no_clip_grads,
         'batch_size': args.batch_size,
+        'clean_batch_size': args.clean_batch_size,
         'train_name': args.train_name,
         'num_iterations': args.num_iterations,
     }
