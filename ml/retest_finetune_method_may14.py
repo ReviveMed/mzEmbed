@@ -24,8 +24,8 @@ kwargs['load_encoder_loc'] = 'pretrain'
 kwargs['load_model_loc'] = False
 kwargs['X_filename'] = 'X_finetune'
 kwargs['y_filename'] = 'y_finetune'
-kwargs['eval_name'] = 'test2'
-kwargs['train_name'] = 'trainval2'
+kwargs['eval_name'] = 'test'
+kwargs['train_name'] = 'trainval'
 kwargs['run_training'] = True
 kwargs['run_evaluation'] = True
 kwargs['save_latent_space'] = True
@@ -76,7 +76,7 @@ kwargs['eval_kwargs'] = {}
 kwargs['eval_kwargs']['sklearn_models'] = {}
 kwargs['train_kwargs']['num_epochs'] = 71 
 
-data_dir = 'DATA'
+data_dir = '/Users/jonaheaton/DATA'
 kwargs = convert_model_kwargs_list_to_dict(kwargs)
 
 setup_id = 'RCC-2925_finetune'
