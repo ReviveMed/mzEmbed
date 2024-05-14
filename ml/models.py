@@ -922,9 +922,14 @@ class MultiClass_Head(Head):
                                              label_smoothing=self.label_smoothing)
         self.score_func_dict = {'AUROC (ovo, macro)': lambda y_score, y_true:
                                 roc_auc_score(y_true.numpy(), y_score.numpy(), average='macro', multi_class='ovo'),
-                                'ACC': lambda y_score, y_true: accuracy_score(y_true.numpy(), (torch.argmax(y_score, dim=1)).numpy()),}
+                                'ACC': lambda y_score, y_true: accuracy_score(y_true.numpy(), (torch.argmax(y_score, dim=1)).numpy()),
+                                'MSE': lambda y_score, y_true: F.mse_loss(torch.argmax(y_score, dim=1).float(), y_true),
+                                'MAE': lambda y_score, y_true: F.l1_loss(torch.argmax(y_score, dim=1).float(), y_true)}
+        
                                 # 'ACC': lambda y_score, y_true: accuracy_score(y_true.numpy(), y_score.numpy()),}
         
+
+
         # larger classes are given MORE weight when average="weighted"
 
 
@@ -1005,7 +1010,8 @@ class Ordinal_Head(Head):
         self.weight = kwargs.get('weight', 1.0)
         self.num_classes = kwargs.get('num_classes', 3)
         self.architecture = kwargs.get('architecture', kwargs)
-        self.use_corn = True
+        self.use_corn = kwargs.get('use_corn', True) #CORN Loss, otherwise CORAL loss
+        self.use_jonah_probs = kwargs.get('use_jonah_probs', True)
 
         if 'output_size' in self.architecture:
             if self.architecture['output_size'] != self.num_classes-1:
@@ -1028,15 +1034,16 @@ class Ordinal_Head(Head):
         else:
             self.loss_func = nn.BCEWithLogitsLoss(reduction=self.loss_reduction)
 
-        self.score_func_dict = {'AUROC (ovo, macro)': lambda y_score, y_true:
-                        roc_auc_score(y_true.numpy(), y_score.numpy(), average='macro', multi_class='ovo'),
-                        'ACC': lambda y_score, y_true: accuracy_score(y_true.numpy(), (torch.argmax(y_score, dim=1)).numpy()),
-                        'MSE': lambda y_score, y_true: F.mse_loss(torch.argmax(y_score, dim=1), y_true),
-                        'MAE': lambda y_score, y_true: F.l1_loss(torch.argmax(y_score, dim=1), y_true)}
-        
-        self.score_func_dict = {'ACC': lambda y_score, y_true: accuracy_score(y_true.numpy(), y_score.numpy()),
-                               'MSE': lambda y_score, y_true: F.mse_loss(y_score, y_true),
-                                'MAE': lambda y_score, y_true: F.l1_loss(y_score, y_true)}
+        if self.use_jonah_probs:
+            self.score_func_dict = {'AUROC (ovo, macro)': lambda y_score, y_true:
+                            roc_auc_score(y_true.numpy(), y_score.numpy(), average='macro', multi_class='ovo'),
+                            'ACC': lambda y_score, y_true: accuracy_score(y_true.numpy(), (torch.argmax(y_score, dim=1)).numpy()),
+                            'MSE': lambda y_score, y_true: F.mse_loss(torch.argmax(y_score, dim=1).float(), y_true),
+                            'MAE': lambda y_score, y_true: F.l1_loss(torch.argmax(y_score, dim=1).float(), y_true)}
+        else:
+            self.score_func_dict = {'ACC': lambda y_score, y_true: accuracy_score(y_true.numpy(), y_score.numpy()),
+                                'MSE': lambda y_score, y_true: F.mse_loss(y_score, y_true),
+                                    'MAE': lambda y_score, y_true: F.l1_loss(y_score, y_true)}
 
 
     def define_architecture(self, **kwargs):
@@ -1078,7 +1085,25 @@ class Ordinal_Head(Head):
         return self.loss_func(y0, y1_ordinal)
     
     def logits_to_proba(self, y_logits):
+        if self.use_jonah_probs:
+            # Jonah's custom method of extracting probability
+            eps = 1e-6
+            probs0 = torch.sigmoid(y_logits)
+            probs1 = torch.cumprod(probs0, dim=1)
+            probs2 = torch.cat([torch.ones((probs1.size(0),1)), probs1], dim=1)
+            probs3 = -1 * torch.cat([torch.diff(probs2, dim=1), -1 * probs2[:,-1].unsqueeze(1)], dim=1) + eps
+            probs4 = logit(probs3)
+            probs5 = F.softmax(probs4, dim=1)
+            # check for nans
+            if torch.isnan(probs5).any():
+                print('nans in probs5')
+                # which row has nans
+                id = torch.isnan(probs5).any(dim=1).nonzero()
+                print(id)
+            return probs5
+
         # https://github.com/rasbt/deeplearning-models/blob/master/pytorch_ipynb/ordinal/CORN_cement.ipynb
+        # below gives you the rank probability
         if self.use_corn:
             probs = F.sigmoid(y_logits)
             probs = torch.cumprod(probs, dim=1)
@@ -1113,13 +1138,13 @@ class Ordinal_Head(Head):
             logits, targets = _nan_cleaner(y_logits.detach(), y_true.detach(), ignore_nan)
             if logits is None:
                 return torch.tensor(0, dtype=torch.float32)
-            labels = self.logits_to_labels(logits)
-            # probs = self.logits_to_proba(logits)
-            # labels = self.proba_to_labels(probs)
-            return {k: v(labels, targets.long()) for k, v in self.score_func_dict.items()}
-        # Alt method
-            # probs = self.logits_to_proba(logits)
-            # return {k: v(probs, targets.long()) for k, v in self.score_func_dict.items()}
+            if self.use_jonah_probs:
+                probs = self.logits_to_proba(logits)
+                return {k: v(probs, targets.long()) for k, v in self.score_func_dict.items()}
+            else:
+                labels = self.logits_to_labels(logits)
+                return {k: v(labels, targets.long()) for k, v in self.score_func_dict.items()}
+
         except IndexError as e:
             print(f'when calculate score get IndexError: {e}')
             traceback.print_exc()
@@ -1935,3 +1960,11 @@ class CoxPHLoss(torch.nn.Module):
 
 # %%
 
+
+# Define the logit function
+# def logit(p):
+#     return torch.log(p / (1 - p))
+
+def logit(p):
+    eps = 1e-6
+    return torch.log(p / (torch.clamp((1 - p), min=eps)))

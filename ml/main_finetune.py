@@ -78,6 +78,11 @@ default_eval_params_list = [
         'y_col_name':'IMDC ORDINAL',
         'y_head':'IMDC_MultiClass', # which head to apply to the y_col
         'y_cols': ['IMDC ORDINAL']}, # which columns to use for the y_col        
+
+    {
+        'y_col_name': 'Benefit',
+        'y_head': 'Benefit',
+        'y_cols': ['Benefit']},
 ]
 
 
@@ -124,7 +129,7 @@ def parse_sweep_kwargs_from_command_line():
     parser.add_argument('--holdout_frac', type=float, default=0, help='Holdout fraction')
     parser.add_argument('--head_hidden_layers', type=int, default=0, help='Number of hidden layers in the head')
     parser.add_argument('--dropout_rate', type=float, default=0.2, help='Dropout rate')
-    parser.add_argument('--num_epochs', type=int, default=30, help='Number of epochs')
+    parser.add_argument('--num_epochs', type=int, default=50, help='Number of epochs')
     parser.add_argument('--early_stopping_patience', type=int, default=0, help='Early stopping patience')
     parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learning rate')
     parser.add_argument('--l2_reg_weight', type=float, default=0.0, help='L2 regularization weight')
@@ -133,7 +138,7 @@ def parse_sweep_kwargs_from_command_line():
     parser.add_argument('--weight_decay', type=float, default=0, help='Weight decay')
     parser.add_argument('--head_weight', type=float, default=1, help='Head Task weight')
     parser.add_argument('--adversary_weight', type=float, default=1, help='Adversary Task loss weight')
-    parser.add_argument('--auxillary_weight', type=float, default=1, help='Auxillary Task loss weight')
+    parser.add_argument('--auxillary_weight', type=float, default=0.5, help='Auxillary Task loss weight')
     parser.add_argument('--encoder_weight', type=float, default=0, help='Encoder loss weight')
     parser.add_argument('--adversarial_start_epoch', type=int, default=10, help='Adversarial start epoch')
     # parser.add_argument('--clip_grads', action='store_true', help='Clip gradients with norm')
@@ -204,6 +209,9 @@ def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,pref
                             eval_params_list=eval_params_list,
                             run_dict=run)
 
+            if train_metrics is None:
+                continue
+            
             for key,val in train_metrics.items():
                 if isinstance(val,dict):
                     for k,v in val.items():
@@ -217,7 +225,8 @@ def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,pref
             num_train_success += 1
         except ValueError as e:
             print(e)
-            
+    
+    for iter in range(num_iterations):
         try:
             
             test_metrics = run_model_wrapper(data_dir,params,
@@ -378,5 +387,5 @@ if __name__ == '__main__':
     user_kwargs = parse_sweep_kwargs_from_command_line()
     finetune_run_wrapper(**user_kwargs)
     # finetune_run_wrapper(with_id=2569)
-
+    # finetune_run_wrapper(with_id=2590)
    

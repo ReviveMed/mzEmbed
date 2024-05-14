@@ -356,17 +356,8 @@ if __name__ == '__main__':
 
     if EVAL_ON_TEST:
 
-        # best both-OS
-        run_id_list0 = ['SUR-623','SUR-173','SUR-722','SUR-46','SUR-494']
-        # run_id_list = []
-        # best NIVO-OS
-        # run_id_list1 = ['SUR-749','SUR-1335']
-        run_id_list1 = ['SUR-863','SUR-1403','SUR-1302','SUR-749','SUR-1335']
-        # best EVER-OS
-        run_id_list2 = ['SUR-1479','SUR-2053','SUR-2154','SUR-1583','SUR-1924']
-
-        run_id_list = run_id_list0 + run_id_list1 + run_id_list2
-
+        run_id_list = ['SUR-623','SUR-173','SUR-722','SUR-46','SUR-494']
+        run_id_list = ['SUR-46','SUR-494']
         for run_id in run_id_list:
 
             print(f'Running test evaluation for {run_id}')
@@ -375,37 +366,20 @@ if __name__ == '__main__':
                 api_token=NEPTUNE_API_TOKEN,
                 with_id=run_id)
             
-            try:
-                os_col = run['datasets/os_col'].fetch()
-                event_col = run['datasets/event_col'].fetch()
+            os_col = run['datasets/os_col'].fetch()
+            event_col = run['datasets/event_col'].fetch()
 
-                data_dict = create_data_dict(data_dir,'trainval',os_col,event_col)
-                data_dict = create_data_dict(data_dir,'test',os_col,event_col,data_dict)
+            data_dict = create_data_dict(data_dir,'trainval',os_col,event_col)
+            data_dict = create_data_dict(data_dir,'test',os_col,event_col,data_dict)
 
-                model_name = run['model'].fetch()
-                params = run['parameters'].fetch()
-                model = fit_model(model_name, params, data_dict, set_name='trainval')
+            model_name = run['model'].fetch()
+            params = run['parameters'].fetch()
+            model = fit_model(model_name, params, data_dict, set_name='trainval')
 
-                if False:
-                    model_stats = eval_model(model, data_dict, set_name='trainval')
-                    run['metrics/trainval/c_score'] = model_stats[0]['trainval', 'c_score']
-                    # 
-                    run['metrics/test2/c_score'] = model_stats[0]['test', 'c_score']
-
-                for alt_os_col in ['OS','NIVO OS', 'EVER OS']:
-                    # if alt_os_col == os_col:
-                        # continue
-                    alt_data_dict = create_data_dict(data_dir,'test',alt_os_col,event_col)
-                    v = alt_data_dict['test']
-                    run[f'metrics/test2/{alt_os_col} c_score'] = model.score(v["X"], v["y"])
-
-
-
-            except ArithmeticError as e:
-                print(e)
-                run['metrics/trainval/c_score'] = 0
-                run['metrics/test2/c_score'] = 0
-
+            model_stats = eval_model(model, data_dict, set_name='trainval')
+            run['metrics/trainval/c_score'] = model_stats[0]['trainval', 'c_score']
+            # 
+            run['metrics/test2/c_score'] = model_stats[0]['test', 'c_score']
 
             run.stop()
 

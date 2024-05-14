@@ -799,8 +799,13 @@ def parse_task_components_dict_from_str(desc_str,sweep_kwargs=None):
 
     head_hidden_layers = sweep_kwargs.get('head_hidden_layers',0)
 
+    if 'AND' in aux_desc_str:
+        aux_desc_str_list = aux_desc_str.split('AND')
+    else:
+        aux_desc_str_list = [aux_desc_str]
+
     for h_desc in head_desc_str_list:
-        head_weight = sweep_kwargs.get(f'{h_desc}__weight',1)
+        head_weight = sweep_kwargs.get(f'{h_desc}__weight',sweep_kwargs.get('default_head_weight',1))
         head_kwargs, head_cols, plot_latent_space_head_cols = get_head_kwargs_by_desc(h_desc,
                                                                                     num_hidden_layers=head_hidden_layers,
                                                                                     weight=head_weight,y_cols=y_head_cols)
@@ -815,6 +820,23 @@ def parse_task_components_dict_from_str(desc_str,sweep_kwargs=None):
             if col not in plot_latent_space_cols:
                 plot_latent_space_cols.append(col)
 
+    for h_desc in aux_desc_str_list:
+        head_weight = sweep_kwargs.get(f'{h_desc}__weight',sweep_kwargs.get('default_aux_weight',sweep_kwargs.get('auxiliary_weight',0.5)))
+        head_kwargs, head_cols, plot_latent_space_head_cols = get_head_kwargs_by_desc(h_desc,
+                                                                                    num_hidden_layers=head_hidden_layers,
+                                                                                    weight=head_weight,y_cols=y_head_cols)
+        if head_kwargs is None:
+            continue
+        head_kwargs_list.append(head_kwargs)
+        for col in head_cols:
+            if col not in y_head_cols:
+                y_head_cols.append(col)
+
+        for col in plot_latent_space_head_cols:
+            if col not in plot_latent_space_cols:
+                plot_latent_space_cols.append(col)
+
+
     y_adv_cols = []
     adv_kwargs_list = []
 
@@ -824,7 +846,7 @@ def parse_task_components_dict_from_str(desc_str,sweep_kwargs=None):
         adv_desc_str_list = [adv_desc_str]
 
     for a_desc in adv_desc_str_list:
-        adv_weight = sweep_kwargs.get(f'{a_desc}__weight',1)
+        adv_weight = sweep_kwargs.get(f'{a_desc}__weight',sweep_kwargs.get('default_adv_weight',1))
         adv_kwargs, adv_cols, plot_latent_space_adv_cols = get_head_kwargs_by_desc(a_desc,
                                                                                    num_hidden_layers=head_hidden_layers,
                                                                                     weight=adv_weight,y_cols=y_adv_cols)

@@ -52,3 +52,5 @@ tqdm
 wandb
 louvain
 xgboost
+coral-pytorch
+openpyxl
