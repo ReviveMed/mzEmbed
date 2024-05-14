@@ -379,7 +379,9 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                             for key, loss_val in multi_loss.items():
                                 if torch.isnan(loss_val) or torch.isinf(loss_val):
                                     continue
-                                run[f'{prefix}/{phase}/batch/head_loss/{key}'].append(loss_val)
+                                # run[f'{prefix}/{phase}/batch/head_loss/{key}'].append(loss_val)
+                                run[f'{prefix}/{phase}/batch/head_loss/{key}'].append(stringify_unsupported(loss_val))
+
                             head_loss = sum([h.weight * multi_loss[f'{h.kind}_{h.name}'] for h in head.heads])
                             # head_weight_sum = sum([h.weight for h in head.heads])
                             # if head_weight_sum>0.1:
@@ -403,7 +405,9 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                             for key, loss_val in multi_loss.items():
                                 if torch.isnan(loss_val) or torch.isinf(loss_val):
                                     continue
-                                run[f'{prefix}/{phase}/batch/adversary_loss/{key}'].append(loss_val)
+                                # run[f'{prefix}/{phase}/batch/adversary_loss/{key}'].append(loss_val)
+                                run[f'{prefix}/{phase}/batch/adversary_loss/{key}'].append(stringify_unsupported(loss_val))
+                                
                             adversary_loss = sum([h.weight * multi_loss[f'{h.kind}_{h.name}'] for h in adversary.heads])
                             # adv_weight_sum = sum([h.weight for h in adversary.heads])
                             # if adv_weight_sum>0.1:
@@ -429,7 +433,15 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                     else:
                         run[f'{prefix}/{phase}/batch/multi_head_loss'].append(head_loss)
 
-                    run[f'{prefix}/{phase}/batch/multi_adversary_loss'].append(adversary_loss)
+                    if torch.isnan(adversary_loss) or torch.isinf(adversary_loss):
+                        print('Adversary loss is nan/inf!')
+                        print('your learning rate is probably too high')
+                        return None, None, None
+                    else:
+                        run[f'{prefix}/{phase}/batch/multi_adversary_loss'].append(adversary_loss)
+                        # stringifying the loss for neptune
+                        # run[f'{prefix}/{phase}/batch/multi_adversary_loss'].append(stringify_unsupported(adversary_loss))
+
 
 
                     if isinstance(y_head_output, dict):
@@ -459,7 +471,9 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         adversary_weight*adversary_loss) #/ (encoder_weight + head_weight + adversary_weight)
 
                     if not torch.isnan(joint_loss) or torch.isinf(joint_loss):
-                        run[f'{prefix}/{phase}/batch/joint_loss'].append(joint_loss)
+                        # run[f'{prefix}/{phase}/batch/joint_loss'].append(joint_loss)
+                        # strinify support for neptune
+                        run[f'{prefix}/{phase}/batch/joint_loss'].append(stringify_unsupported(joint_loss))
                     
                     #TODO: there is an argument for not recording the losses when there is no gradient
                     # since they are not being used for optimization
@@ -527,14 +541,20 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                 running_losses['joint'] /= len(dataloaders[phase])
                 # check for nans and infinities, replace with 0
                 for k in running_losses.keys():
-                    if not torch.isfinite(torch.tensor(running_losses[k])):
+                    if not torch.isfinite(torch.tensor(running_losses[k])) or torch.isnan(torch.tensor(running_losses[k])):
                         print(f'Warning: {k} loss is not finite')
                         running_losses[k] = 0 #torch.tensor(0.0)
 
-                run[f'{prefix}/{phase}/epoch/encoder_loss'].append(running_losses['encoder'])
-                run[f'{prefix}/{phase}/epoch/multi_head_loss'].append(running_losses['head'])
-                run[f'{prefix}/{phase}/epoch/multi_adversary_loss'].append(running_losses['adversary'])
-                run[f'{prefix}/{phase}/epoch/joint_loss'].append(running_losses['joint'])
+                # run[f'{prefix}/{phase}/epoch/encoder_loss'].append(running_losses['encoder'])
+                # run[f'{prefix}/{phase}/epoch/multi_head_loss'].append(running_losses['head'])
+                # run[f'{prefix}/{phase}/epoch/multi_adversary_loss'].append(running_losses['adversary'])
+                # run[f'{prefix}/{phase}/epoch/joint_loss'].append(running_losses['joint'])
+
+                # strinify support for neptune
+                run[f'{prefix}/{phase}/epoch/encoder_loss'].append(stringify_unsupported(running_losses['encoder']))
+                run[f'{prefix}/{phase}/epoch/multi_head_loss'].append(stringify_unsupported(running_losses['head']))
+                run[f'{prefix}/{phase}/epoch/multi_adversary_loss'].append(stringify_unsupported(running_losses['adversary']))
+                run[f'{prefix}/{phase}/epoch/joint_loss'].append(stringify_unsupported(running_losses['joint']))
 
                 loss_history['encoder'][phase].append(running_losses['encoder'])
                 loss_history['head'][phase].append(running_losses['head'])
@@ -552,11 +572,14 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                     eval_scores.update(adversary.score(epoch_adversary_outputs, epoch_adversary_targets))
                 
                 for eval_name, eval_val in eval_scores.items():
+                    
                     if isinstance(eval_val, dict):
                         for k, v in eval_val.items():
-                            run[f'{prefix}/{phase}/epoch/{eval_name}/{k}'].append(v)
+                            # run[f'{prefix}/{phase}/epoch/{eval_name}/{k}'].append(v)
+                            run[f'{prefix}/{phase}/epoch/{eval_name}__{k}'].append(stringify_unsupported(v))
                     else:
-                        run[f'{prefix}/{phase}/epoch/{eval_name}'].append(eval_val)
+                        # run[f'{prefix}/{phase}/epoch/{eval_name}'].append(eval_val)
+                        run[f'{prefix}/{phase}/epoch/{eval_name}'].append(stringify_unsupported(eval_val))
 
 
                 if (verbose) and (epoch % 10 == 0):

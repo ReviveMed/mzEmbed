@@ -919,7 +919,8 @@ class MultiClass_Head(Head):
                                              weight=self.class_weight, 
                                              label_smoothing=self.label_smoothing)
         self.score_func_dict = {'AUROC (ovo, macro)': lambda y_score, y_true:
-                                roc_auc_score(y_true.numpy(), y_score.numpy(), average='macro', multi_class='ovo')}
+                                roc_auc_score(y_true.numpy(), y_score.numpy(), average='macro', multi_class='ovo'),
+                                'ACC (macro)': lambda y_score, y_true: accuracy_score(y_true.numpy(), y_score.numpy(), average='macro')}
         # larger classes are given MORE weight when average="weighted"
 
 

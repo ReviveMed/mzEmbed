@@ -635,7 +635,23 @@ def get_head_kwargs_by_desc(desc_str, num_hidden_layers=0, weight=1, y_cols=None
             weight = int(match.group(1))
             desc_str = desc_str.replace(match.group(0),'')
 
-    if 'mskcc' in desc_str.lower():
+    if 'mkscc-ord' in desc_str.lower():
+        y_head_cols = ['MSKCC ORDINAL']
+        head_name = 'MSKCC_Ordinal'
+        head_kind = 'Ordinal'
+        num_classes = 3
+        y_idx = 0
+        plot_latent_space_cols = ['MSKCC']
+
+    elif 'mskcc-multi' in desc_str.lower():
+        y_head_cols = ['MSKCC ORDINAL']
+        head_name = 'MSKCC_MultiClass'
+        head_kind = 'MultiClass'
+        num_classes = 3
+        y_idx = 0
+        plot_latent_space_cols = ['MSKCC']
+
+    elif 'mskcc' in desc_str.lower():
         # if 'mskcc-ord' in desc_str.lower:
             # raise NotImplementedError('not implemented yet')
         y_head_cols = ['MSKCC BINARY']
@@ -644,6 +660,22 @@ def get_head_kwargs_by_desc(desc_str, num_hidden_layers=0, weight=1, y_cols=None
         num_classes = 2
         y_idx = 0
         plot_latent_space_cols = ['MSKCC']
+
+    elif 'imdc-ord' in desc_str.lower():
+        y_head_cols = ['IMDC ORDINAL']
+        head_name = 'IMDC_Ordinal'
+        head_kind = 'Ordinal'
+        num_classes = 3
+        y_idx = 0
+        plot_latent_space_cols = ['IMDC']
+
+    elif 'imdc-multi' in desc_str.lower():
+        y_head_cols = ['IMDC ORDINAL']
+        head_name = 'IMDC_MultiClass'
+        head_kind = 'MultiClass'
+        num_classes = 3
+        y_idx = 0
+        plot_latent_space_cols = ['IMDC']
 
     elif 'imdc' in desc_str.lower():
         y_head_cols = ['IMDC BINARY']
@@ -655,6 +687,7 @@ def get_head_kwargs_by_desc(desc_str, num_hidden_layers=0, weight=1, y_cols=None
 
     elif 'nivo-benefit' in desc_str.lower():
         raise NotImplementedError()
+
 
     elif 'benefit' in desc_str.lower():
         y_head_cols = ['Benefit BINARY']
@@ -896,6 +929,7 @@ def parse_sweep_kwargs_from_command_line():
     parser.add_argument('--desc_str', type=str, help='Description string', nargs='?')
     parser.add_argument('--with_id', type=int, help='Include the ID in the description string', nargs='?')
     parser.add_argument('--num_iterations', type=int, default=10, help='Number of iterations for the sweep')
+    parser.add_argument('--name', type=str, help='Name of the sweep', nargs='?')
 
     args = parser.parse_args()
 
@@ -921,6 +955,8 @@ def parse_sweep_kwargs_from_command_line():
         'yes_clean_batches': args.yes_clean_batches,
         'train_name': args.train_name,
         'num_iterations': args.num_iterations,
+        'remove_nans': args.remove_nans,
+        'name': args.name
     }
 
     if args.desc_str is not None:

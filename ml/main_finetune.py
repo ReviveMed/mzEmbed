@@ -60,6 +60,24 @@ default_eval_params_list = [
         'y_col_name':'IMDC BINARY',
         'y_head':'IMDC', # which head to apply to the y_col
         'y_cols': ['IMDC BINARY']}, # which columns to use for the y_col
+
+    {
+        'y_col_name':'MSKCC ORDINAL',
+        'y_head':'MSKCC_Ordinal', # which head to apply to the y_col
+        'y_cols': ['MSKCC ORDINAL']}, # which columns to use for the y_col
+    {
+        'y_col_name':'IMDC ORDINAL',
+        'y_head':'IMDC_Ordinal', # which head to apply to the y_col
+        'y_cols': ['IMDC ORDINAL']}, # which columns to use for the y_col
+
+    {
+        'y_col_name':'MSKCC ORDINAL',
+        'y_head':'MSKCC_MultiClass', # which head to apply to the y_col
+        'y_cols': ['MSKCC ORDINAL']}, # which columns to use for the y_col
+    {
+        'y_col_name':'IMDC ORDINAL',
+        'y_head':'IMDC_MultiClass', # which head to apply to the y_col
+        'y_cols': ['IMDC ORDINAL']}, # which columns to use for the y_col        
 ]
 
 
@@ -282,80 +300,25 @@ def main0(user_kwargs):
         run['pretrained_model'] = 'Model2925'
         run['dataset'].track_files(data_dir)
 
+    eval_params_list = [x for x in eval_params_list if x['y_cols'][0] in params['task_kwargs']['y_head_cols']]
+    print('eval_params_list',eval_params_list)
     run_id = run["sys/id"].fetch()
     output_dir = f'{output_save_dir}/{run_id}'
     os.makedirs(output_dir,exist_ok=True)
     
     run = run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name='run',num_iterations=num_iterations)
+    # run['sys/failed'] = False
     run.stop()
     return run_id
 
 
 
-def parse_sweep_kwargs_from_command_line2():
-
-    parser = argparse.ArgumentParser(description='Parse command line arguments for sweep kwargs')
-    parser.add_argument('--use_randinit', action='store_true', help='Use random initialization')
-    parser.add_argument('--holdout_frac', type=float, default=0, help='Holdout fraction')
-    parser.add_argument('--head_hidden_layers', type=int, default=0, help='Number of hidden layers in the head')
-    parser.add_argument('--dropout_rate', type=float, default=0.2, help='Dropout rate')
-    parser.add_argument('--num_epochs', type=int, default=30, help='Number of epochs')
-    parser.add_argument('--early_stopping_patience', type=int, default=0, help='Early stopping patience')
-    parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learning rate')
-    parser.add_argument('--l2_reg_weight', type=float, default=0.0, help='L2 regularization weight')
-    parser.add_argument('--l1_reg_weight', type=float, default=0.0, help='L1 regularization weight')
-    parser.add_argument('--noise_factor', type=float, default=0.1, help='Noise factor')
-    parser.add_argument('--weight_decay', type=float, default=0, help='Weight decay')
-    parser.add_argument('--adversary_weight', type=float, default=1, help='Adversary Task weight')
-    parser.add_argument('--auxillary_weight', type=float, default=1, help='Auxillary Task weight')
-    parser.add_argument('--adversarial_start_epoch', type=int, default=10, help='Adversarial start epoch')
-    parser.add_argument('--encoder_weight', type=float, default=0, help='Encoder weight')
-    # parser.add_argument('--clip_grads', action='store_true', help='Clip gradients with norm')
-    parser.add_argument('--no_clip_grads', action='store_false', help='Clip gradients with norm')
-    parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
-    parser.add_argument('--clean_batch_size', action='store_true', help='Clean batch size so last batch is good size')
-    parser.add_argument('--remove_nans', action='store_false', help='Remove rows with NaNs in the y-data')
-    parser.add_argument('--train_name', type=str, default='train', help='Training name')
-    parser.add_argument('--desc_str', type=str, help='Description string', nargs='?')
-    parser.add_argument('--with_id', type=int, help='Include the ID in the description string', nargs='?')
-    parser.add_argument('--num_iterations', type=int, default=10, help='Number of iterations for the sweep')
-
-    args = parser.parse_args()
-
-    sweep_kwargs = {
-        'use_rand_init': args.use_randinit,
-        'holdout_frac': args.holdout_frac,
-        'head_hidden_layers': args.head_hidden_layers,
-        'dropout_rate': args.dropout_rate,
-        'num_epochs': args.num_epochs,
-        'early_stopping_patience': args.early_stopping_patience,
-        'learning_rate': args.learning_rate,
-        'l2_reg_weight': args.l2_reg_weight,
-        'l1_reg_weight': args.l1_reg_weight,
-        'noise_factor': args.noise_factor,
-        'weight_decay': args.weight_decay,
-        'adversary_weight': args.adversary_weight,
-        'auxillary_weight': args.auxillary_weight,
-        'adversarial_start_epoch': args.adversarial_start_epoch,
-        'encoder_weight': args.encoder_weight,
-        # 'clip_grads_with_norm': args.clip_grads,
-        'clip_grads_with_norm': args.no_clip_grads,
-        'batch_size': args.batch_size,
-        'clean_batch_size': args.clean_batch_size,
-        'train_name': args.train_name,
-        'num_iterations': args.num_iterations,
-    }
-
-    if args.desc_str is not None:
-        sweep_kwargs['desc_str'] = args.desc_str
-    if args.with_id is not None:
-        sweep_kwargs['with_id'] = args.with_id
-
-    return sweep_kwargs
-
-
 if __name__ == '__main__':
 
+    user_kwargs = parse_sweep_kwargs_from_command_line()
+    main0(user_kwargs)
+
+    exit()
     method1 = {
         'noise_factor': 0.25,
         'learning_rate': 0.0007869775056037999,
