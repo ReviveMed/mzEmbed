@@ -325,7 +325,7 @@ def finetune_both_pretrain_and_rand_wrapper(desc_str_list=None):
 
 
 
-def finetune_run_wrapper(user_kwargs):
+def finetune_run_wrapper(**user_kwargs):
     home_dir = os.path.expanduser("~")
     data_dir = f'{home_dir}/DATA3'
     output_save_dir = f'{home_dir}/OUTPUT'
@@ -367,7 +367,7 @@ def finetune_run_wrapper(user_kwargs):
     os.makedirs(output_dir,exist_ok=True)
     
     run = run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name='run',num_iterations=num_iterations)
-    # run['sys/failed'] = False
+    run['sys/failed'] = False
     run.stop()
     return run_id
 
@@ -375,7 +375,8 @@ def finetune_run_wrapper(user_kwargs):
 
 if __name__ == '__main__':
 
-    user_kwargs = parse_sweep_kwargs_from_command_line()
-    finetune_run_wrapper(user_kwargs)
+    # user_kwargs = parse_sweep_kwargs_from_command_line()
+    # finetune_run_wrapper(**user_kwargs)
+    finetune_run_wrapper(with_id=2569)
 
    

@@ -10,7 +10,7 @@ from misc import save_json, load_json
 import numpy as np
 
 # from torchmetrics import AUROC
-from sklearn.metrics import roc_auc_score, accuracy_score, f1_score, precision_score, recall_score
+from sklearn.metrics import roc_auc_score, accuracy_score, f1_score, precision_score, recall_score, balanced_accuracy_score
 from sklearn.base import BaseEstimator
 import traceback
 
@@ -920,7 +920,9 @@ class MultiClass_Head(Head):
                                              label_smoothing=self.label_smoothing)
         self.score_func_dict = {'AUROC (ovo, macro)': lambda y_score, y_true:
                                 roc_auc_score(y_true.numpy(), y_score.numpy(), average='macro', multi_class='ovo'),
-                                'ACC (macro)': lambda y_score, y_true: accuracy_score(y_true.numpy(), y_score.numpy(), average='macro')}
+                                'ACC': lambda y_score, y_true: accuracy_score(y_true.numpy(), (torch.argmax(y_score, dim=1)).numpy()),}
+                                # 'ACC': lambda y_score, y_true: accuracy_score(y_true.numpy(), y_score.numpy()),}
+        
         # larger classes are given MORE weight when average="weighted"
 
 
@@ -1001,12 +1003,18 @@ class Ordinal_Head(Head):
         self.weight = kwargs.get('weight', 1.0)
         self.num_classes = kwargs.get('num_classes', 3)
         self.architecture = kwargs.get('architecture', kwargs)
+
+        if 'output_size' in self.architecture:
+            if self.architecture['output_size'] != self.num_classes-1:
+                raise ValueError(f'Output layer has {kwargs["output_size"]} features, but should have {self.num_classes} features')
+        else:
+            self.architecture['output_size'] = self.num_classes-1
+
         self.loss_reduction = 'mean'
         self.network = Dense_Layers(**self.architecture)
         self.input_size = self.architecture.get('input_size', 1)
         self.output_size = self.architecture.get('output_size', self.num_classes-1)
 
-        
         # indepdent biases for each class
         self.biases = nn.Parameter(torch.zeros(self.num_classes - 1))
 
@@ -1015,14 +1023,26 @@ class Ordinal_Head(Head):
 
         # self.score_func_dict = {'AUROC (ovo, macro)': lambda y_score, y_true:
         #                 roc_auc_score(y_true.numpy(), y_score.numpy(), average='macro', multi_class='ovo')}
-        self.score_func_dict = {'ACC (macro)': lambda y_score, y_true: accuracy_score(y_true.numpy(), y_score.numpy(), average='macro'),}
+        self.score_func_dict = {'ACC': lambda y_score, y_true: accuracy_score(y_true.numpy(), y_score.numpy()),}
 
 
     def define_architecture(self, **kwargs):
         self.architecture = kwargs
         self.input_size = kwargs.get('input_size', 1)
-        self.output_size = kwargs.get('output_size', 1)
+        self.output_size = kwargs.get('output_size', self.num_classes-1)
         self.network = Dense_Layers(**kwargs)
+        pass
+
+    def update_class_weights(self, y_data):
+        #TODO: how to use this for the ordinal loss function?
+        y_true = y_data[:,self.y_idx]
+        # remove nans 
+        y_true = y_true[~torch.isnan(y_true)]
+        y_int = y_true.int()
+        self.class_weight= 1/torch.bincount(y_int)
+        if self.num_classes != len(self.class_weight):
+            raise ValueError(f'num_classes {self.num_classes} does not match the number of unique classes {len(self.class_weight)} in the data')
+    
         pass
 
     def forward(self, x):
@@ -1298,6 +1318,8 @@ def get_head(**kwargs):
         head = Regression_Head(**kwargs)
     elif kind == 'Cox':
         head = Cox_Head(**kwargs)
+    elif kind == 'Ordinal':
+        head = Ordinal_Head(**kwargs)
     elif kind == 'Decoder':
         raise NotImplementedError('Decoder head not tested')
         head = Decoder_Head(**kwargs)
@@ -1826,7 +1848,7 @@ def transform_labels_to_binary(y, num_classes):
     transformed_labels = torch.zeros(y.shape[0], num_classes-1)
     
     for idx, label in enumerate(y):
-        transformed_labels[idx, 0:label] = 1
+        transformed_labels[idx, 0:int(label)] = 1
         
     return transformed_labels
 
