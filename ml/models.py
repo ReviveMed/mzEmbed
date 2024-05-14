@@ -13,6 +13,8 @@ import numpy as np
 from sklearn.metrics import roc_auc_score, accuracy_score, f1_score, precision_score, recall_score, balanced_accuracy_score
 from sklearn.base import BaseEstimator
 import traceback
+from coral_pytorch.losses import corn_loss
+from coral_pytorch.dataset import corn_label_from_logits
 
 from lifelines.utils import concordance_index
 
@@ -1003,6 +1005,7 @@ class Ordinal_Head(Head):
         self.weight = kwargs.get('weight', 1.0)
         self.num_classes = kwargs.get('num_classes', 3)
         self.architecture = kwargs.get('architecture', kwargs)
+        self.use_corn = True
 
         if 'output_size' in self.architecture:
             if self.architecture['output_size'] != self.num_classes-1:
@@ -1019,11 +1022,21 @@ class Ordinal_Head(Head):
         self.biases = nn.Parameter(torch.zeros(self.num_classes - 1))
 
         self.file_id = self.kind + '_' + self.name
-        self.loss_func = nn.BCEWithLogitsLoss(reduction=self.loss_reduction)
+        if self.use_corn:
+            # self.loss_func = lambda(logits, class_labels: corn_loss(logits, class_labels, self.biases)) 
+            self.loss_func = lambda logits, class_labels: corn_loss(logits, class_labels, self.num_classes)
+        else:
+            self.loss_func = nn.BCEWithLogitsLoss(reduction=self.loss_reduction)
 
-        # self.score_func_dict = {'AUROC (ovo, macro)': lambda y_score, y_true:
-        #                 roc_auc_score(y_true.numpy(), y_score.numpy(), average='macro', multi_class='ovo')}
-        self.score_func_dict = {'ACC': lambda y_score, y_true: accuracy_score(y_true.numpy(), y_score.numpy()),}
+        self.score_func_dict = {'AUROC (ovo, macro)': lambda y_score, y_true:
+                        roc_auc_score(y_true.numpy(), y_score.numpy(), average='macro', multi_class='ovo'),
+                        'ACC': lambda y_score, y_true: accuracy_score(y_true.numpy(), (torch.argmax(y_score, dim=1)).numpy()),
+                        'MSE': lambda y_score, y_true: F.mse_loss(torch.argmax(y_score, dim=1), y_true),
+                        'MAE': lambda y_score, y_true: F.l1_loss(torch.argmax(y_score, dim=1), y_true)}
+        
+        self.score_func_dict = {'ACC': lambda y_score, y_true: accuracy_score(y_true.numpy(), y_score.numpy()),
+                               'MSE': lambda y_score, y_true: F.mse_loss(y_score, y_true),
+                                'MAE': lambda y_score, y_true: F.l1_loss(y_score, y_true)}
 
 
     def define_architecture(self, **kwargs):
@@ -1047,7 +1060,8 @@ class Ordinal_Head(Head):
 
     def forward(self, x):
         output = self.network(x)
-        output += self.biases
+        if not self.use_corn: #only do this for CORAL
+            output += self.biases
         return output
     
     def loss(self, y_logits, y_data, ignore_nan=True):
@@ -1057,11 +1071,20 @@ class Ordinal_Head(Head):
         y0, y1 = _nan_cleaner(y_logits, y_true, ignore_nan)
         if y0 is None:
             return torch.tensor(0, dtype=torch.float32)
-        y1_ordinal = transform_labels_to_binary(y1, self.num_classes)
+        if self.use_corn:
+            y1_ordinal = y1
+        else:
+            y1_ordinal = transform_labels_to_binary(y1, self.num_classes)
         return self.loss_func(y0, y1_ordinal)
     
     def logits_to_proba(self, y_logits):
-        return F.sigmoid(y_logits)
+        # https://github.com/rasbt/deeplearning-models/blob/master/pytorch_ipynb/ordinal/CORN_cement.ipynb
+        if self.use_corn:
+            probs = F.sigmoid(y_logits)
+            probs = torch.cumprod(probs, dim=1)
+        else:
+            probs = F.sigmoid(y_logits)
+        return probs
     
     def predict_proba(self, x):
         return self.logits_to_proba(self.forward(x))
@@ -1070,7 +1093,10 @@ class Ordinal_Head(Head):
         return transform_probs_to_labels(probs, threshold)
 
     def logits_to_labels(self, y_logits, threshold=0.5):
-        return self.proba_to_labels(self.logits_to_proba(y_logits), threshold)
+        if self.use_corn:
+            return corn_label_from_logits(y_logits).float()
+        else:
+            return self.proba_to_labels(self.logits_to_proba(y_logits), threshold)
 
     def predict(self, x, threshold=0.5):
         return self.probs_to_labels(self.predict_proba(x), threshold).float()
@@ -1087,9 +1113,13 @@ class Ordinal_Head(Head):
             logits, targets = _nan_cleaner(y_logits.detach(), y_true.detach(), ignore_nan)
             if logits is None:
                 return torch.tensor(0, dtype=torch.float32)
-            probs = self.logits_to_proba(logits)
-            labels = self.proba_to_labels(probs)
+            labels = self.logits_to_labels(logits)
+            # probs = self.logits_to_proba(logits)
+            # labels = self.proba_to_labels(probs)
             return {k: v(labels, targets.long()) for k, v in self.score_func_dict.items()}
+        # Alt method
+            # probs = self.logits_to_proba(logits)
+            # return {k: v(probs, targets.long()) for k, v in self.score_func_dict.items()}
         except IndexError as e:
             print(f'when calculate score get IndexError: {e}')
             traceback.print_exc()

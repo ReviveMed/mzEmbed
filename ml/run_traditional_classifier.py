@@ -105,6 +105,9 @@ def get_base_model(model_kind):
         base_model = SVC(probability=True)
     elif model_kind == 'xgboost':
         base_model = XGBClassifier()
+    elif model_kind == 'logistic_regression_multiclass':
+        # base_model = LogisticRegression(multi_class='multinomial')
+        base_model = LogisticRegression(multi_class='ovr')
     else:
         raise ValueError('The model name is not recognized.')
     return base_model
@@ -150,6 +153,16 @@ def fit_model(model_name, params, data_dict, set_name='train'):
     model.set_params(**params)
     X = data_dict[set_name]['X']
     y = data_dict[set_name]['y']
+    y_pred = model.predict(X)
+    unique_labels = np.unique(y)
+    num_labels = len(unique_labels)
+    if num_labels > 2:
+        if model_name == 'logistic_regression':
+            model.set_params(multi_class='ovr')
+        elif model_name == 'svc':
+            model.set_params(decision_function_shape='ovr')
+        elif model_name == 'xgboost':
+            model.set_params(objective='multi:softmax', num_class=num_labels)
     model.fit(X, y)
     return model
 
@@ -157,9 +170,17 @@ def evaluate_model(model, data_dict, set_name='test'):
     X = data_dict[set_name]['X']
     y = data_dict[set_name]['y']
     y_pred = model.predict(X)
-    y_prob = model.predict_proba(X)[:,1]
-    acc = accuracy_score(y, y_pred)
-    auc = roc_auc_score(y, y_prob)
+    unique_labels = np.unique(y)
+    num_labels = len(unique_labels)
+    # print(f"Number of labels: {num_labels}")
+    if num_labels > 2:
+        y_prob = model.predict_proba(X)
+        acc = accuracy_score(y, y_pred)
+        auc = roc_auc_score(y, y_prob, multi_class='ovr')
+    else:
+        y_prob = model.predict_proba(X)[:,1]
+        acc = accuracy_score(y, y_pred)
+        auc = roc_auc_score(y, y_prob)
     return acc, auc
 
 def run_model(model_name, params, data_dict, train_name='train', 
@@ -169,6 +190,7 @@ def run_model(model_name, params, data_dict, train_name='train',
         run_dict['model_name'] = model_name
         run_dict['params'] = stringify_unsupported(params)
         run_dict['target_col'] = data_dict[train_name]['target_col']
+        run_dict['num_classes'] = len(data_dict[train_name]['y'].unique())
         for set_name in data_dict.keys():
             if 'target_col':
                 target_col = data_dict[set_name]['target_col']

@@ -375,8 +375,8 @@ def finetune_run_wrapper(**user_kwargs):
 
 if __name__ == '__main__':
 
-    # user_kwargs = parse_sweep_kwargs_from_command_line()
-    # finetune_run_wrapper(**user_kwargs)
-    finetune_run_wrapper(with_id=2569)
+    user_kwargs = parse_sweep_kwargs_from_command_line()
+    finetune_run_wrapper(**user_kwargs)
+    # finetune_run_wrapper(with_id=2569)
 
    

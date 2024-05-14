@@ -116,7 +116,7 @@ for method in  [method6, method7, method8, method9]:
             user_kwargs['use_rand_init'] = use_randinit
             user_kwargs['desc_str'] = desc_str
             try:
-                finetune_run_wrapper(user_kwargs)
+                finetune_run_wrapper(**user_kwargs)
             except Exception as e:
                 print(e)
                 continue
