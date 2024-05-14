@@ -81,6 +81,113 @@ default_eval_params_list = [
 ]
 
 
+
+def get_params(desc_str,sweep_kwargs=None):
+
+    task_components_dict = parse_task_components_dict_from_str(desc_str,sweep_kwargs)
+
+    train_kwargs_list = [
+        'use_rand_init',
+        'batch_size',
+        'yes_clean_batches',
+        'holdout_frac',
+        'early_stopping_patience',
+        'scheduler_kind',
+        'num_epochs',
+        'learning_rate',
+        'noise_factor',
+        'weight_decay',
+        'l2_reg_weight',
+        'l1_reg_weight',
+        'dropout_rate',
+        'adversarial_start_epoch',
+        'clip_grads_with_norm',
+        'encoder_weight',
+        'head_weight',
+        'adversary_weight',
+        'remove_nans',
+        'train_name'
+    ]
+
+    train_kwargs_dict = {k:v for k,v in sweep_kwargs.items() if k in train_kwargs_list}
+    params = {
+        'task_kwargs': task_components_dict,
+        'train_kwargs': train_kwargs_dict
+    }
+    return params
+
+
+def parse_sweep_kwargs_from_command_line():
+
+    parser = argparse.ArgumentParser(description='Parse command line arguments for sweep kwargs')
+    parser.add_argument('--use_randinit', action='store_true', help='Use random initialization')
+    parser.add_argument('--holdout_frac', type=float, default=0, help='Holdout fraction')
+    parser.add_argument('--head_hidden_layers', type=int, default=0, help='Number of hidden layers in the head')
+    parser.add_argument('--dropout_rate', type=float, default=0.2, help='Dropout rate')
+    parser.add_argument('--num_epochs', type=int, default=30, help='Number of epochs')
+    parser.add_argument('--early_stopping_patience', type=int, default=0, help='Early stopping patience')
+    parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learning rate')
+    parser.add_argument('--l2_reg_weight', type=float, default=0.0, help='L2 regularization weight')
+    parser.add_argument('--l1_reg_weight', type=float, default=0.0, help='L1 regularization weight')
+    parser.add_argument('--noise_factor', type=float, default=0.1, help='Noise factor')
+    parser.add_argument('--weight_decay', type=float, default=0, help='Weight decay')
+    parser.add_argument('--head_weight', type=float, default=1, help='Head Task weight')
+    parser.add_argument('--adversary_weight', type=float, default=1, help='Adversary Task loss weight')
+    parser.add_argument('--auxillary_weight', type=float, default=1, help='Auxillary Task loss weight')
+    parser.add_argument('--encoder_weight', type=float, default=0, help='Encoder loss weight')
+    parser.add_argument('--adversarial_start_epoch', type=int, default=10, help='Adversarial start epoch')
+    # parser.add_argument('--clip_grads', action='store_true', help='Clip gradients with norm')
+    parser.add_argument('--no_clip_grads', action='store_false', help='Clip gradients with norm')
+    parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
+    parser.add_argument('--yes_clean_batches', action='store_true', help='Clean batch size so last batch is good size')
+    parser.add_argument('--remove_nans', action='store_false', help='Remove rows with NaNs in the y-data')
+    parser.add_argument('--train_name', type=str, default='train', help='Training name')
+    parser.add_argument('--desc_str', type=str, help='Description string', nargs='?')
+    parser.add_argument('--with_id', type=int, help='Include the ID in the description string', nargs='?')
+    parser.add_argument('--num_iterations', type=int, default=10, help='Number of iterations for the sweep')
+    parser.add_argument('--name', type=str, help='Name of the sweep', nargs='?')
+
+    args = parser.parse_args()
+
+    sweep_kwargs = {
+        'use_rand_init': args.use_randinit,
+        'holdout_frac': args.holdout_frac,
+        'head_hidden_layers': args.head_hidden_layers,
+        'dropout_rate': args.dropout_rate,
+        'num_epochs': args.num_epochs,
+        'early_stopping_patience': args.early_stopping_patience,
+        'learning_rate': args.learning_rate,
+        'l2_reg_weight': args.l2_reg_weight,
+        'l1_reg_weight': args.l1_reg_weight,
+        'noise_factor': args.noise_factor,
+        'weight_decay': args.weight_decay,
+        'head_weight': args.head_weight,
+        'adversary_weight': args.adversary_weight,
+        'auxillary_weight': args.auxillary_weight,
+        'adversarial_start_epoch': args.adversarial_start_epoch,
+        'encoder_weight': args.encoder_weight,
+        # 'clip_grads_with_norm': args.clip_grads,
+        'clip_grads_with_norm': args.no_clip_grads,
+        'batch_size': args.batch_size,
+        'yes_clean_batches': args.yes_clean_batches,
+        'train_name': args.train_name,
+        'num_iterations': args.num_iterations,
+        'remove_nans': args.remove_nans,
+        'name': args.name
+    }
+
+    if args.desc_str is not None:
+        sweep_kwargs['desc_str'] = args.desc_str
+    if args.with_id is not None:
+        sweep_kwargs['with_id'] = args.with_id
+
+    return sweep_kwargs
+
+#######################################################
+########### Main Function Wrappers  ###########
+#######################################################
+
+
 def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name,num_iterations=10):
 
     record_train_metrics = defaultdict(list)
@@ -156,7 +263,7 @@ def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,pref
 
 
 # Main for Surival Finetuning
-def main(desc_str_list=None):
+def finetune_both_pretrain_and_rand_wrapper(desc_str_list=None):
 
     home_dir = os.path.expanduser("~")
     data_dir = f'{home_dir}/DATA3'
@@ -216,56 +323,9 @@ def main(desc_str_list=None):
     print('Done')
 
 
-# Main for Surival Finetuning
-def main2(run_id_list=None):
-
-    home_dir = os.path.expanduser("~")
-    data_dir = f'{home_dir}/DATA3'
-    output_save_dir = f'{home_dir}/OUTPUT'
-    print('Getting the latest dataset')
-    data_dir = get_latest_dataset(data_dir=data_dir,project=PROJECT_ID)
-    eval_params_list = default_eval_params_list
-    
-    with_id = None
-    # run_dict = run['training_run']
-
-    if run_id_list is None:
-        run_id_list = [
-            'SUR-2504',
-            "SUR-2503",
-            "SUR-2502",
-            "SUR-2501" ]
-
-    for with_id in run_id_list:
-        print(with_id)
-
-        run = neptune.init_run(project=PROJECT_ID,
-                                    api_token=NEPTUNE_API_TOKEN,
-                                    with_id=with_id)
-
-        run_id = run["sys/id"].fetch()
-        params = run['params'].fetch()
-        params = convert_neptune_kwargs(params)
-        output_dir = f'{output_save_dir}/{run_id}'
-        os.makedirs(output_dir,exist_ok=True)
 
 
-        print('RUN with PRETRAINED INITIALIZATION')
-        run = run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name='finetune')
-
-
-        ### Repeat for Random Initialization ###
-        print('RUN with RANDOM INITIALIZATION')
-        params_w_randominit = {k:v for k,v in params.items()}
-        params_w_randominit['train_kwargs']['use_rand_init'] = True
-        run = run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name='randinit')
-
-        run.stop()
-
-    print('Done')
-
-
-def main0(user_kwargs):
+def finetune_run_wrapper(user_kwargs):
     home_dir = os.path.expanduser("~")
     data_dir = f'{home_dir}/DATA3'
     output_save_dir = f'{home_dir}/OUTPUT'
@@ -277,7 +337,7 @@ def main0(user_kwargs):
         with_id = 'SUR-'+str(with_id)
     eval_params_list = default_eval_params_list
 
-    num_iterations = user_kwargs.get('num_iterations',20)
+    num_iterations = user_kwargs.get('num_iterations',10)
 
     run = neptune.init_run(project=PROJECT_ID,
                                     api_token=NEPTUNE_API_TOKEN,
@@ -316,126 +376,6 @@ def main0(user_kwargs):
 if __name__ == '__main__':
 
     user_kwargs = parse_sweep_kwargs_from_command_line()
-    main0(user_kwargs)
+    finetune_run_wrapper(user_kwargs)
 
-    exit()
-    method1 = {
-        'noise_factor': 0.25,
-        'learning_rate': 0.0007869775056037999,
-        'l2_reg_weight': 1.0092405183765013e-05,
-        'l1_reg_weight': 3.137204254745065e-05,
-        'num_epochs': 87,
-        'head_hidden_layers': 1,
-        'EVER-OS__weight': 10.0,
-        'NIVO-OS__weight': 5.0
-    }
-
-    method2 = {
-        'noise_factor': 0.1,
-        'learning_rate': 0.0006221023998363983,
-        'l2_reg_weight': 0.0,
-        'l1_reg_weight': 0.0025635844524779894,
-        'num_epochs': 93,
-        'encoder_weight': 1.0,
-        'dropout_rate': 0.3,
-        'adversarial_start_epoch': 0,
-        'adversary_weight': 1.0,
-        'head_hidden_layers': 1,
-        'EVER-OS__weight': 10.0,
-        'NIVO-OS__weight': 4.0
-    }
-
-    method3 = {
-        'dropout_rate': 0.0,
-        'encoder_weight': 0.0,
-        'learning_rate': 0.000541422,
-        'noise_factor': 0.2,
-        'num_epochs': 71,
-        'batch_size': 64,
-        'head_hidden_layers': 0
-    }
-
-    method4 = {
-        'dropout_rate': 0.0,
-        'encoder_weight': 0.0,
-        'learning_rate': 0.000541422,
-        'noise_factor': 0.2,
-        'num_epochs': 71,
-        'batch_size': 32,
-        'head_hidden_layers': 0
-    }
-
-    method5 = {
-        'dropout_rate': 0.0,
-        'encoder_weight': 0.0,
-        'learning_rate': 0.000541422,
-        'noise_factor': 0.2,
-        'num_epochs': 71,
-        'batch_size': 32,
-        'head_hidden_layers': 0,
-        'remove_nans': True
-    }
-
-    method6 = {
-        'dropout_rate': 0.0,
-        'encoder_weight': 0.0,
-        'learning_rate': 0.0013,
-        'noise_factor': 0.2,
-        'num_epochs': 98,
-        'batch_size': 32,
-        'head_hidden_layers': 0,
-        'weight_decay': 0.000016,
-    }
-
-    method7 = {
-        'dropout_rate': 0.0,
-        'encoder_weight': 0.0,
-        'learning_rate': 0.0013,
-        'noise_factor': 0.2,
-        'num_epochs': 98,
-        'batch_size': 32,
-        'head_hidden_layers': 0,
-        'weight_decay': 0.000016,
-        'remove_nans': True,
-    }
-
-    method8 = {
-        'dropout_rate': 0.4,
-        'encoder_weight': 0.75,
-        'learning_rate': 0.0021,
-        'noise_factor': 0.25,
-        'num_epochs': 38,
-        'batch_size': 32,
-        'head_hidden_layers': 0,
-        'weight_decay': 0.0,
-        'remove_nans': True,
-    }
-
-    method9 = {
-        'dropout_rate': 0.4,
-        'encoder_weight': 0.75,
-        'learning_rate': 0.0021,
-        'noise_factor': 0.25,
-        'num_epochs': 38,
-        'batch_size': 32,
-        'head_hidden_layers': 0,
-        'weight_decay': 0.0,
-        'remove_nans': True,
-    }
-
-    # user_kwargs = parse_sweep_kwargs_from_command_line()
-    # method6, method7, method8, method9,method2
-    for method in  [method3, method4, method5]:
-        for desc_str in ['Both-OS','NIVO-OS','EVER-OS','NIVO-OS AND EVER-OS','IMDC','MSKCC','NIVO-OS ADV EVER-OS']:
-            for use_randinit in [True,False]:
-                user_kwargs = {k:v for k,v in method.items()}
-                user_kwargs['use_rand_init'] = use_randinit
-                user_kwargs['desc_str'] = desc_str
-                try:
-                    main0(user_kwargs)
-                except Exception as e:
-                    print(e)
-                    continue
-
-    # main()
-    # main2()
+   
