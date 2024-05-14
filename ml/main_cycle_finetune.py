@@ -77,6 +77,7 @@ method7 = {
     'noise_factor': 0.2,
     'num_epochs': 98,
     'batch_size': 32,
+    'clean_batch': False,
     'head_hidden_layers': 0,
     'weight_decay': 0.000016,
     'remove_nans': True,
@@ -108,7 +109,7 @@ method9 = {
 
 # user_kwargs = parse_sweep_kwargs_from_command_line()
 # method6, method7, method8, method9,method2
-for method in  [method3, method4, method5]:
+for method in  [method6, method7, method8, method9]:
     for desc_str in ['Both-OS','NIVO-OS','EVER-OS','NIVO-OS AND EVER-OS','IMDC','MSKCC','NIVO-OS ADV EVER-OS']:
         for use_randinit in [True,False]:
             user_kwargs = {k:v for k,v in method.items()}
