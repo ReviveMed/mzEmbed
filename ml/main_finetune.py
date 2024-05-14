@@ -459,14 +459,18 @@ if __name__ == '__main__':
     }
 
     # user_kwargs = parse_sweep_kwargs_from_command_line()
-
-    for method in  [method1, method2, method3, method4, method5, method6, method7, method8, method9]:
+    # method6, method7, method8, method9,method2
+    for method in  [method3, method4, method5]:
         for desc_str in ['Both-OS','NIVO-OS','EVER-OS','NIVO-OS AND EVER-OS','IMDC','MSKCC','NIVO-OS ADV EVER-OS']:
             for use_randinit in [True,False]:
                 user_kwargs = {k:v for k,v in method.items()}
                 user_kwargs['use_rand_init'] = use_randinit
                 user_kwargs['desc_str'] = desc_str
-                main0(user_kwargs)
+                try:
+                    main0(user_kwargs)
+                except Exception as e:
+                    print(e)
+                    continue
 
     # main()
     # main2()
