@@ -212,6 +212,22 @@ list_basicR = [basicR1_0, basicR1_1]
 all_methods = list_layerS + list_layerR + list_basicS + list_basicR
 
 
+desc_str_list0 = ['NIVO-OS ADV EVER-OS']
+
+
+for method in all_methods:
+    for desc_str in desc_str_list0:
+        for use_randinit in [True,False]:
+            user_kwargs = {k:v for k,v in method.items()}
+            user_kwargs['use_rand_init'] = use_randinit
+            user_kwargs['desc_str'] = desc_str
+            try:
+                finetune_run_wrapper(**user_kwargs)
+            except Exception as e:
+                print(e)
+                continue
+
+exit()
 
 desc_str_list1 = ['Both-OS','NIVO-OS','EVER-OS','NIVO-OS AND EVER-OS','IMDC','MSKCC','NIVO-OS ADV EVER-OS']
 desc_str_list2 = ['IMDC-ord','IMDC-multi','both-OS AUX Benefit']

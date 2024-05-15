@@ -10,6 +10,7 @@ PROJECT_ID = 'revivemed/Survival-RCC'
 
 default_eval_params_list = [
     # {},
+    ###### OS ######
     {
         'y_col_name':'NIVO OS',
         'y_head':'NIVO OS', # which head to apply to the y_col
@@ -51,7 +52,49 @@ default_eval_params_list = [
         'y_head':'Both OS', # which head to apply to the y_col
         'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col             
     
+    ###### PFS ######
+    {
+        'y_col_name':'NIVO PFS',
+        'y_head':'NIVO PFS', # which head to apply to the y_col
+        'y_cols': ['NIVO PFS','PFS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'NIVO PFS',
+        'y_head':'EVER PFS', # which head to apply to the y_col
+        'y_cols': ['NIVO PFS','PFS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'NIVO PFS',
+        'y_head':'Both PFS', # which head to apply to the y_col
+        'y_cols': ['NIVO PFS','PFS_Event']}, # which columns to use for the y_col
 
+
+    {
+        'y_col_name':'EVER PFS',
+        'y_head':'NIVO PFS', # which head to apply to the y_col
+        'y_cols': ['EVER PFS','PFS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'EVER PFS',
+        'y_head':'EVER PFS', # which head to apply to the y_col
+        'y_cols': ['EVER PFS','PFS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'EVER PFS',
+        'y_head':'Both PFS', # which head to apply to the y_col
+        'y_cols': ['EVER PFS','PFS_Event']}, # which columns to use for the y_col
+    
+
+    {
+        'y_col_name':'Both PFS',
+        'y_head':'EVER PFS', # which head to apply to the y_col
+        'y_cols': ['PFS','PFS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'Both PFS',
+        'y_head':'NIVO PFS', # which head to apply to the y_col
+        'y_cols': ['PFS','PFS_Event']}, # which columns to use for the y_col   
+    {
+        'y_col_name':'Both PFS',
+        'y_head':'Both PFS', # which head to apply to the y_col
+        'y_cols': ['PFS','PFS_Event']}, # which columns to use for the y_col  
+
+    ###### Prognostic Markers ######
     {
         'y_col_name':'MSKCC BINARY',
         'y_head':'MSKCC', # which head to apply to the y_col
@@ -78,6 +121,8 @@ default_eval_params_list = [
         'y_col_name':'IMDC ORDINAL',
         'y_head':'IMDC_MultiClass', # which head to apply to the y_col
         'y_cols': ['IMDC ORDINAL']}, # which columns to use for the y_col        
+
+    ###### Benefit ######
 
     {
         'y_col_name': 'Benefit BINARY',
@@ -374,7 +419,8 @@ def finetune_run_wrapper(**user_kwargs):
 
     desc_str_simplified  = desc_str.replace('-',' ').replace('_',' ')
     # eval_params_list = [x for x in default_eval_params_list if x['y_cols'][0] in params['task_kwargs']['y_head_cols']]
-    eval_params_list = [x for x in default_eval_params_list if x['y_head'][0].replace('-',' ').replace('_',' ') in desc_str_simplified]
+    # eval_params_list = [x for x in default_eval_params_list if x['y_head'][0].replace('-',' ').replace('_',' ') in desc_str_simplified]
+    eval_params_list = default_eval_params_list
     print('eval_params_list',eval_params_list)
     run_id = run["sys/id"].fetch()
     output_dir = f'{output_save_dir}/{run_id}'

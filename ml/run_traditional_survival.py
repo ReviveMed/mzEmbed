@@ -358,6 +358,7 @@ if __name__ == '__main__':
 
         run_id_list = ['SUR-623','SUR-173','SUR-722','SUR-46','SUR-494']
         run_id_list = ['SUR-46','SUR-494']
+        run_id_list = ['SUR-755']
         for run_id in run_id_list:
 
             print(f'Running test evaluation for {run_id}')
@@ -380,6 +381,17 @@ if __name__ == '__main__':
             run['metrics/trainval/c_score'] = model_stats[0]['trainval', 'c_score']
             # 
             run['metrics/test2/c_score'] = model_stats[0]['test', 'c_score']
+
+            data_dict = create_data_dict(data_dir=data_dir,set_name='test',os_col='EVER OS',event_col='OS_Event')
+            run['metrics/test2/EVER OS c_score'] = model.score(data_dict['test']["X"], data_dict['test']["y"])
+
+            data_dict = create_data_dict(data_dir=data_dir,set_name='test',os_col='NIVO OS',event_col='OS_Event')
+            run['metrics/test2/NIVO OS c_score'] = model.score(data_dict['test']["X"], data_dict['test']["y"])
+
+            data_dict = create_data_dict(data_dir=data_dir,set_name='test',os_col='OS',event_col='OS_Event')
+            run['metrics/test2/Both OS c_score'] = model.score(data_dict['test']["X"], data_dict['test']["y"])
+            run['metrics/test2/OS c_score'] = model.score(data_dict['test']["X"], data_dict['test']["y"])
+
 
             run.stop()
 
