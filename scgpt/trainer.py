@@ -546,7 +546,7 @@ def evaluate(
                     # loss = criterion_cls(output_values, celltype_labels)
                     loss = loss + cls_loss
                     # loss += cls_loss
-                    tmp_error = (1 - accuracy / len(input_gene_ids))
+                    tmp_error = torch.tensor(1 - accuracy / len(input_gene_ids),dtype=torch.float32)
 
                 elif config.task in ["integration", "multiomic"]:
                     # output_values = output_dict["mlm_output"]
