@@ -80,9 +80,9 @@ default_eval_params_list = [
         'y_cols': ['IMDC ORDINAL']}, # which columns to use for the y_col        
 
     {
-        'y_col_name': 'Benefit',
+        'y_col_name': 'Benefit BINARY',
         'y_head': 'Benefit',
-        'y_cols': ['Benefit']},
+        'y_cols': ['Benefit BINARY']},
 ]
 
 
@@ -343,8 +343,11 @@ def finetune_run_wrapper(**user_kwargs):
     desc_str = user_kwargs.get('desc_str',None)
     with_id = user_kwargs.get('with_id',None)
     if with_id is not None:
-        with_id = 'SUR-'+str(with_id)
-    eval_params_list = default_eval_params_list
+        if 'SUR' in with_id:
+            with_id = with_id
+        else:
+            with_id = 'SUR-'+str(with_id)
+        # with_id = 'SUR-'+str(with_id)
 
     num_iterations = user_kwargs.get('num_iterations',10)
 
@@ -369,7 +372,9 @@ def finetune_run_wrapper(**user_kwargs):
         run['pretrained_model'] = 'Model2925'
         run['dataset'].track_files(data_dir)
 
-    eval_params_list = [x for x in eval_params_list if x['y_cols'][0] in params['task_kwargs']['y_head_cols']]
+    desc_str_simplified  = desc_str.replace('-',' ').replace('_',' ')
+    # eval_params_list = [x for x in default_eval_params_list if x['y_cols'][0] in params['task_kwargs']['y_head_cols']]
+    eval_params_list = [x for x in default_eval_params_list if x['y_head'][0].replace('-',' ').replace('_',' ') in desc_str_simplified]
     print('eval_params_list',eval_params_list)
     run_id = run["sys/id"].fetch()
     output_dir = f'{output_save_dir}/{run_id}'

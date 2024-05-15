@@ -244,10 +244,11 @@ class VAE(nn.Module):
         activation = kwargs.get('activation', 'leakyrelu')
         use_batch_norm = kwargs.get('use_batch_norm', False)
         act_on_latent_layer = kwargs.get('act_on_latent_layer', False)
+        verbose = kwargs.get('verbose', False)
         # print the unusued kwargs
         for key, value in kwargs.items():
             if key not in ['input_size', 'hidden_size', 'latent_size', 'num_hidden_layers', 'dropout_rate', 'activation', 'use_batch_norm', 'act_on_latent_layer']:
-                print(f'Warning: {key} is not a valid argument for VAE')
+                if verbose: print(f'Warning: {key} is not a valid argument for VAE')
 
         self.goal = 'encode'
         self.kind = 'VAE'

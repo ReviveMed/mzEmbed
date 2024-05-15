@@ -157,7 +157,6 @@ def run_model_wrapper(data_dir, params, output_dir=None,
                 y_cols = params['task_kwargs']['y_head_cols']
 
             try:
-
                 if y_col_name is None:
                     metrics[f'{eval_name}' ].update(evaluate_model_wrapper(encoder, head, adv, X_data_eval, y_data_eval,
                                                                         y_cols=y_cols,
@@ -550,7 +549,9 @@ def evaluate_model_wrapper(encoder, head, adv, X_data_eval, y_data_eval, y_cols,
     else:
         multihead_name_list = head.heads_names
         if y_head not in multihead_name_list:
-            raise ValueError(f'Invalid head name: {y_head}')
+            return {}
+            # raise ValueError(f'Invalid head name: {y_head}')
+
         chosen_head_idx = multihead_name_list.index(y_head)
         chosen_head = head.heads[chosen_head_idx]
 
