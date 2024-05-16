@@ -87,14 +87,13 @@ def objective(trial):
 
 
 DATE_STR = 'May16'
-storage_name = 'optuna'
 study_name = f'{desc_str}_{DATE_STR}'
 
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 study = optuna.create_study(directions=['maximize', 'minimize'],
                         study_name=study_name, 
-                        storage=storage_name, 
+                        storage=WEBAPP_DB_LOC, 
                         load_if_exists=True)
 
 study.optimize(objective, n_trials=1)
