@@ -681,7 +681,13 @@ torch.save(best_model.state_dict(), save_dir / "best_model.pt")
 # %% Annotation of CellType Results
 if (config.task == "annotation") and (adata_test is not None):
 
-    predictions, labels, results = test(best_model, adata_test)
+    predictions, labels, results = test(model=best_model,
+                                        adata=adata_test,
+                                        gene_ids=gene_ids,
+                                        vocab=vocab,
+                                        config=config,
+                                        device=device,
+                                        logger=logger)
     # adata_test_raw.obs["predictions"] = [id2type[p] for p in predictions]
     adata_test.obs["predictions"] = [id2type[p] for p in predictions]
 
