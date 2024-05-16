@@ -64,27 +64,30 @@ def objective(trial):
 
 
     # Call finetune_run_wrapper with the hyperparameters
-    run_id, all_metrics = finetune_run_wrapper(**sweep_kwargs)
-    print('run_id:', run_id)
-    trial.set_user_attr('run_id', run_id)
+    try:
+        run_id, all_metrics = finetune_run_wrapper(**sweep_kwargs)
+        print('run_id:', run_id)
+        trial.set_user_attr('run_id', run_id)
 
-    # print(all_metrics.keys())
-    # Assume that result is a dictionary with the two objectives
-    # Replace 'objective1' and 'objective2' with your actual objectives
-    if 'trainrun__val__head_NIVO OS__on_NIVO OS_Concordance Index' not in all_metrics:
+        # print(all_metrics.keys())
+        # Assume that result is a dictionary with the two objectives
+        # Replace 'objective1' and 'objective2' with your actual objectives
+        if 'trainrun__val__head_NIVO OS__on_NIVO OS_Concordance Index' not in all_metrics:
+            optuna.TrialPruned()
+
+        objective1_array = all_metrics['trainrun__val__head_NIVO OS__on_NIVO OS_Concordance Index']
+        objective2_array = all_metrics['trainrun__val__head_NIVO OS__on_EVER OS_Concordance Index']
+        
+        num_success_iter = len(objective1_array)
+        trial.set_user_attr('num_success_iter', num_success_iter)
+
+        if num_success_iter < 3*num_iter/4:
+            optuna.TrialPruned()
+        
+        objective1 = np.mean(objective1_array)
+        objective2 = np.mean(objective2_array)
+    except Exception as e:
         optuna.TrialPruned()
-
-    objective1_array = all_metrics['trainrun__val__head_NIVO OS__on_NIVO OS_Concordance Index']
-    objective2_array = all_metrics['trainrun__val__head_NIVO OS__on_EVER OS_Concordance Index']
-    
-    num_success_iter = len(objective1_array)
-    trial.set_user_attr('num_success_iter', num_success_iter)
-
-    if num_success_iter < 3*num_iter/4:
-        optuna.TrialPruned()
-    
-    objective1 = np.mean(objective1_array)
-    objective2 = np.mean(objective2_array)
     
 
     return objective1, objective2
@@ -100,7 +103,7 @@ study = optuna.create_study(directions=['maximize', 'minimize'],
                         storage=WEBAPP_DB_LOC, 
                         load_if_exists=True)
 
-study.optimize(objective, n_trials=100)
+study.optimize(objective, n_trials=200)
 
 # Print the best parameters
 # print(study.best_params)
