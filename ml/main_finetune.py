@@ -238,7 +238,8 @@ def parse_sweep_kwargs_from_command_line():
 #######################################################
 
 
-def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name,num_iterations=10):
+def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,
+                            run,prefix_name,num_iterations=10,eval_on_test=True):
 
     record_train_metrics = defaultdict(list)
     num_train_success = 0
@@ -271,33 +272,34 @@ def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,pref
         except ValueError as e:
             print(e)
     
-    for iter in range(num_iterations):
-        try:
-            
-            test_metrics = run_model_wrapper(data_dir,params,
-                            output_dir=output_dir,
-                            train_name='trainval',
-                            prefix=f'testing_{prefix_name}_{iter}', 
-                            eval_name_list=['test','trainval'],
-                            eval_params_list=eval_params_list,
-                            run_dict=run)
-            
-            if test_metrics is None:
-                continue
+    if eval_on_test:
+        for iter in range(num_iterations):
+            try:
+                
+                test_metrics = run_model_wrapper(data_dir,params,
+                                output_dir=output_dir,
+                                train_name='trainval',
+                                prefix=f'testing_{prefix_name}_{iter}', 
+                                eval_name_list=['test','trainval'],
+                                eval_params_list=eval_params_list,
+                                run_dict=run)
+                
+                if test_metrics is None:
+                    continue
 
-            for key,val in test_metrics.items():
-                if isinstance(val,dict):
-                    for k,v in val.items():
-                        if isinstance(v,dict):
-                            for kk,vv in v.items():
-                                record_test_metrics[key+'_'+k+'_'+kk].append(vv)
-                        else:
-                            record_test_metrics[key+'_'+k].append(v)
-                else:
-                    record_test_metrics[key].append(val)
-            num_test_success += 1
-        except ValueError as e:
-            print(e)
+                for key,val in test_metrics.items():
+                    if isinstance(val,dict):
+                        for k,v in val.items():
+                            if isinstance(v,dict):
+                                for kk,vv in v.items():
+                                    record_test_metrics[key+'_'+k+'_'+kk].append(vv)
+                            else:
+                                record_test_metrics[key+'_'+k].append(v)
+                    else:
+                        record_test_metrics[key].append(val)
+                num_test_success += 1
+            except ValueError as e:
+                print(e)
     
     # run[f'all_training_{prefix_name}/metrics/{key}'] = []
     for key,val in record_train_metrics.items():
@@ -306,14 +308,19 @@ def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,pref
         run[f'avg_training_{prefix_name}/metrics/std_{key}'] = np.std(val)
     run[f'avg_training_{prefix_name}/num_success'] = num_train_success
 
-    # run[f'all_testing_{prefix_name}/metrics/{key}'] = []
-    for key,val in record_test_metrics.items():
-        # run[f'all_testing_{prefix_name}/metrics/{key}'].extend(val)
-        run[f'avg_testing_{prefix_name}/metrics/{key}'] = np.mean(val)
-        run[f'avg_testing_{prefix_name}/metrics/std_{key}'] = np.std(val)
-    run[f'avg_testing_{prefix_name}/num_success'] = num_test_success
+    if eval_on_test:
+        # run[f'all_testing_{prefix_name}/metrics/{key}'] = []
+        for key,val in record_test_metrics.items():
+            # run[f'all_testing_{prefix_name}/metrics/{key}'].extend(val)
+            run[f'avg_testing_{prefix_name}/metrics/{key}'] = np.mean(val)
+            run[f'avg_testing_{prefix_name}/metrics/std_{key}'] = np.std(val)
+        run[f'avg_testing_{prefix_name}/num_success'] = num_test_success
 
-    return run
+    all_metrics = {'trainrun__'+k:v for k,v in record_train_metrics.items()}
+    if eval_on_test:
+        all_metrics.update({'testrun__'+k:v for k,v in record_test_metrics.items()})
+
+    return run, all_metrics
 
 
 # Main for Surival Finetuning
@@ -426,10 +433,10 @@ def finetune_run_wrapper(**user_kwargs):
     output_dir = f'{output_save_dir}/{run_id}'
     os.makedirs(output_dir,exist_ok=True)
     
-    run = run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name='run',num_iterations=num_iterations)
+    run, all_metrics = run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name='run',num_iterations=num_iterations)
     run['sys/failed'] = False
     run.stop()
-    return run_id
+    return run_id, all_metrics
 
 
 
