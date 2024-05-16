@@ -103,8 +103,9 @@ hyperparameter_defaults = dict(
     include_zero_gene=True,
     pad_token="<pad>",
     mask_ratio=0.25, # ratio of masked values, default was 0.4
-    epochs=10, #original was 30
-    n_bins=101, #counts/intensity bins, default was 51
+    epochs=5, #original was 30
+    # n_bins=101, #counts/intensity bins, default was 51
+    n_bins=51, #counts/intensity bins, default was 51
     GEP=True,  # (MLM) Gene expression prediction, Gene expression modelling
     GEPC=True,  #(MVC) Masked value prediction for cell embedding, Gene expression modelling for cell objective
     CLS=True,  # celltype classification objective
@@ -117,15 +118,20 @@ hyperparameter_defaults = dict(
     input_style = "binned",  # "normed_raw", "log1p", or "binned"
     output_style = "binned",  # "normed_raw", "log1p", or "binned"
     input_emb_style = "continuous",  # "category" or "continuous" or "scaling"
+    input_layer_key = "X_binned",
     dab_weight=0.0, # weight for domain adversarial loss
     cell_emb_style = "cls",  # "avg-pool" or "w-pool" or "cls"
     adv_E_delay_epochs=0,  # delay adversarial training on encoder for a few epochs
     adv_D_delay_epochs=0,  # delay epochs for domain adversarial loss
     lr=1e-4,
     batch_size=32, #default was 64
-    layer_size=128,
-    nlayers=4,
-    nhead=4,
+    # layer_size=128,
+    # nlayers=4,
+    # nhead=4,
+    layer_size=64,
+    nlayers=2,
+    nhead=2,
+
     lr_ADV = 1e-3,  # learning rate for discriminator, used when ADV is True
     # if load model, batch_size, layer_size, nlayers, nhead will be ignored
     dropout=0.2,
@@ -347,7 +353,7 @@ if config.per_seq_batch_sample:
 print('Tokenize input')
 
 # %%
-input_layer_key = "X_binned"
+input_layer_key = config.input_layer_key
 all_counts = (
     adata.layers[input_layer_key].A
     if issparse(adata.layers[input_layer_key])
