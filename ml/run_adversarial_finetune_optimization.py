@@ -68,9 +68,12 @@ def objective(trial):
     print('run_id:', run_id)
     trial.set_user_attr('run_id', run_id)
 
-
+    # print(all_metrics.keys())
     # Assume that result is a dictionary with the two objectives
     # Replace 'objective1' and 'objective2' with your actual objectives
+    if 'trainrun__val__head_NIVO OS__on_NIVO OS_Concordance Index' not in all_metrics:
+        optuna.TrialPruned()
+
     objective1_array = all_metrics['trainrun__val__head_NIVO OS__on_NIVO OS_Concordance Index']
     objective2_array = all_metrics['trainrun__val__head_NIVO OS__on_EVER OS_Concordance Index']
     
