@@ -103,9 +103,9 @@ hyperparameter_defaults = dict(
     include_zero_gene=True,
     pad_token="<pad>",
     mask_ratio=0.25, # ratio of masked values, default was 0.4
-    epochs=5, #original was 30
-    # n_bins=101, #counts/intensity bins, default was 51
-    n_bins=51, #counts/intensity bins, default was 51
+    epochs=10, #original was 30
+    n_bins=101, #counts/intensity bins, default was 51
+    # n_bins=51, #counts/intensity bins, default was 51
     GEP=True,  # (MLM) Gene expression prediction, Gene expression modelling
     GEPC=True,  #(MVC) Masked value prediction for cell embedding, Gene expression modelling for cell objective
     CLS=True,  # celltype classification objective
@@ -125,12 +125,12 @@ hyperparameter_defaults = dict(
     adv_D_delay_epochs=0,  # delay epochs for domain adversarial loss
     lr=1e-4,
     batch_size=32, #default was 64
-    # layer_size=128,
-    # nlayers=4,
-    # nhead=4,
-    layer_size=64,
-    nlayers=2,
-    nhead=2,
+    layer_size=128,
+    nlayers=4,
+    nhead=4,
+    # layer_size=64,
+    # nlayers=2,
+    # nhead=2,
 
     lr_ADV = 1e-3,  # learning rate for discriminator, used when ADV is True
     # if load model, batch_size, layer_size, nlayers, nhead will be ignored
@@ -695,6 +695,12 @@ if (config.task == "annotation") and (adata_test is not None):
     palette_ = plt.rcParams["axes.prop_cycle"].by_key()["color"] 
     palette_ = plt.rcParams["axes.prop_cycle"].by_key()["color"] + plt.rcParams["axes.prop_cycle"].by_key()["color"] + plt.rcParams["axes.prop_cycle"].by_key()["color"]
     palette_ = {c: palette_[i] for i, c in enumerate(celltypes)}
+
+    # Compute the UMAP if it doesn't exist
+    if 'X_umap' not in adata_test.obsm.keys():
+        sc.pp.neighbors(adata_test)
+        sc.tl.umap(adata_test)
+
 
     with plt.rc_context({"figure.figsize": (6, 4), "figure.dpi": (300)}):
         sc.pl.umap(
