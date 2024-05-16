@@ -394,6 +394,7 @@ def finetune_run_wrapper(**user_kwargs):
     data_dir = get_latest_dataset(data_dir=data_dir,project=PROJECT_ID)
     desc_str = user_kwargs.get('desc_str',None)
     with_id = user_kwargs.get('with_id',None)
+    eval_on_test = user_kwargs.get('eval_on_test',True)
     if with_id is not None:
         if 'SUR' in with_id:
             with_id = with_id
@@ -433,7 +434,13 @@ def finetune_run_wrapper(**user_kwargs):
     output_dir = f'{output_save_dir}/{run_id}'
     os.makedirs(output_dir,exist_ok=True)
     
-    run, all_metrics = run_multiple_iterations(data_dir,params,output_dir,eval_params_list,run,prefix_name='run',num_iterations=num_iterations)
+    run, all_metrics = run_multiple_iterations(data_dir,params,
+                                               output_dir,
+                                               eval_params_list,
+                                               run,
+                                               prefix_name='run',
+                                               num_iterations=num_iterations,
+                                               eval_on_test=eval_on_test)
     run['sys/failed'] = False
     run.stop()
     return run_id, all_metrics
@@ -442,8 +449,10 @@ def finetune_run_wrapper(**user_kwargs):
 
 if __name__ == '__main__':
 
-    user_kwargs = parse_sweep_kwargs_from_command_line()
-    finetune_run_wrapper(**user_kwargs)
+    # user_kwargs = parse_sweep_kwargs_from_command_line()
+    # finetune_run_wrapper(**user_kwargs)
     # finetune_run_wrapper(with_id=2569)
     # finetune_run_wrapper(with_id=2590)
+
+    finetune_run_wrapper(desc_str='NIVO-OS ADV EVER-OS')
    

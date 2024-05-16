@@ -499,8 +499,8 @@ def save_model_wrapper(encoder, head, adv, save_dir=None, run_dict={}, prefix='t
     encoder.save_info(save_dir,save_name='encoder_info.json')
     head.save_state_to_path(save_dir,save_name='head_state.pt')
     head.save_info(save_dir,save_name='head_info.json')
-    adv.save_state_to_path(save_dir,save_name='adversary_state.pt')
-    adv.save_info(save_dir,save_name='adversary_info.json')
+    adv.save_state_to_path(save_dir,save_name='adv_state.pt')
+    adv.save_info(save_dir,save_name='adv_info.json')
 
     # torch.save(head.state_dict(), f'{save_dir}/{setup_id}_head_state_dict.pth')
     # torch.save(adv.state_dict(), f'{save_dir}/{setup_id}_adv_state_dict.pth')

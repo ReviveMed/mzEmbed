@@ -54,7 +54,8 @@ def objective(trial):
         'num_iterations': num_iter,
         'remove_nans': False,
         'name': 'layer-R ADVopt',
-        'desc_str': desc_str
+        'desc_str': desc_str,
+        'eval_on_test': False
     }
 
     for k,v in sweep_kwargs.items():
@@ -96,7 +97,7 @@ study = optuna.create_study(directions=['maximize', 'minimize'],
                         storage=WEBAPP_DB_LOC, 
                         load_if_exists=True)
 
-study.optimize(objective, n_trials=1)
+study.optimize(objective, n_trials=100)
 
 # Print the best parameters
-print(study.best_params)
+# print(study.best_params)
