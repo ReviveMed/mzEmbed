@@ -88,6 +88,8 @@ def objective(trial):
         objective2 = np.mean(objective2_array)
     except Exception as e:
         optuna.TrialPruned()
+        objective1 = -1
+        objective2 = 1
     
 
     return objective1, objective2
