@@ -462,7 +462,7 @@ if __name__ == '__main__':
     for with_id in [3419, 3098, 3162, 3209, 3217, 3223, 3414, 3419]:
         run = neptune.init_run(project=PROJECT_ID,
                                 api_token=NEPTUNE_API_TOKEN,
-                                with_id=with_id,
+                                with_id=f'SUR-{with_id}',
                                 mode='read-only')
         
         original_sweep_kwargs = run['sweep_kwargs'].fetch()
