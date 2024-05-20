@@ -452,7 +452,13 @@ if __name__ == '__main__':
     # user_kwargs = parse_sweep_kwargs_from_command_line()
     # finetune_run_wrapper(**user_kwargs)
     # finetune_run_wrapper(with_id=2569)
+
+    # SUR-3419, SUR-3098, SUR-3162, SUR-3209, SUR-3217, SUR-3223, SUR-3414, SUR-3419
     # finetune_run_wrapper(with_id=2590)
 
-    finetune_run_wrapper(desc_str='NIVO-OS ADV EVER-OS')
+
+    for with_id in [3419, 3098, 3162, 3209, 3217, 3223, 3414, 3419]:
+        finetune_run_wrapper(with_id=with_id)
+
+    # finetune_run_wrapper(desc_str='NIVO-OS ADV EVER-OS')
    
