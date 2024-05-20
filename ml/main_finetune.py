@@ -462,13 +462,14 @@ if __name__ == '__main__':
     for with_id in [3419, 3098, 3162, 3209, 3217, 3223, 3414, 3419]:
         run = neptune.init_run(project=PROJECT_ID,
                                 api_token=NEPTUNE_API_TOKEN,
-                                with_id=f'SUR-{with_id}',
-                                mode='read-only')
+                                with_id=f'SUR-{with_id}')
         
+        run['sweep_kwargs/name2'] = f'SUR-{with_id}'
         original_sweep_kwargs = run['sweep_kwargs'].fetch()
         run.stop()
         original_sweep_kwargs = convert_neptune_kwargs(original_sweep_kwargs)
         original_sweep_kwargs['use_rand_init'] = True
+        print(original_sweep_kwargs)
         finetune_run_wrapper(**original_sweep_kwargs)
 
     # finetune_run_wrapper(desc_str='NIVO-OS ADV EVER-OS')
