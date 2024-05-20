@@ -94,7 +94,7 @@ hyperparameter_defaults = dict(
     task="annotation",
     seed=42,
     dataset_name="metab_v0",
-    do_train=True,
+    do_train=False,
     # load_model="save/scGPT_bc",
     # load_model = None,
     mask_value=-1,
@@ -102,7 +102,7 @@ hyperparameter_defaults = dict(
     include_zero_gene=True,
     pad_token="<pad>",
     mask_ratio=0.25, # ratio of masked values, default was 0.4
-    epochs=30, #original was 30
+    epochs=2, #original was 30
     n_bins=101, #counts/intensity bins, default was 51
     # n_bins=51, #counts/intensity bins, default was 51
     GEP=True,  # (MLM) Gene expression prediction, Gene expression modelling
@@ -154,19 +154,19 @@ hyperparameter_defaults = dict(
     use_mod = False, #modality aware? set to True for multi-omics
     do_sample_in_train = False, # sample the bernoulli in training, 
     # load_model = None,
-    # celltype_label="Cohort Label",
+    celltype_label="Cohort Label",
     # celltype_label = 'Age Group',
-    # datasubset_label = 'pretrain_set',
-    # trainsubset_label = 'Train',
-    # valsubset_label = 'Val',
-    # testsubset_label = 'Test',
+    datasubset_label = 'pretrain_set',
+    trainsubset_label = 'Train',
+    valsubset_label = 'Val',
+    testsubset_label = 'Test',
 
     load_model = f"{data_dir}/save/dev_metab_v0-May16-14-47",
-    celltype_label="IMDC_binary_id",
-    datasubset_label = 'finetune_set',
-    trainsubset_label = 'Finetune',
-    valsubset_label = 'Validation',
-    testsubset_label = 'Test',
+    # celltype_label="IMDC Binary",
+    # datasubset_label = 'finetune_set',
+    # trainsubset_label = 'Finetune',
+    # valsubset_label = 'Validation',
+    # testsubset_label = 'Test',
     # celltype_label="sex",
     # datasubset_label = 'pretrain_set'
 
@@ -231,7 +231,12 @@ if dataset_name == "metab_v0":
         print('downloading data')
         download_data_file(data_url, save_dir=load_dir)
     adata = read_h5ad(load_path)
-    if config.celltype_label == "Age Group":
+    
+    if config.celltype_label == "IMDC Binary":
+        adata = adata[adata.obs["IMDC"].isin(["FAVORABLE", "POOR"])].copy()
+        adata.obs['IMDC Binary'] = adata.obs['IMDC']
+   
+    elif config.celltype_label == "Age Group":
         adata.obs["Age Group"] = ['adult' if 'adult' in x else 'child' for x in adata.obs['Cohort Label']]
 
     # adata = scvi.data.pbmc_dataset()  # 11990 × 3346
@@ -395,6 +400,7 @@ if datasubset_label in adata.obs:
     valid_batch_labels = batch_ids[adata.obs[datasubset_label] == valsubset_label]
     print('train/val split: ', len(train_data), len(valid_data))
 
+    adata_train = adata[adata.obs[datasubset_label] == trainsubset_label].copy()
     adata_test = adata[adata.obs[datasubset_label] == testsubset_label].copy()
 
 else:
@@ -410,6 +416,7 @@ else:
         all_counts, celltypes_labels, batch_ids, test_size=0.1, shuffle=True
     )
 
+    adata_train = adata.copy()
     adata_test = None
 # %%
 if config.load_model is None:
@@ -643,6 +650,48 @@ for epoch in range(1, config.epochs + 1):
         logger.info(f"Saving model to {save_dir}")
         torch.save(best_model.state_dict(), save_dir / f"model_e{best_model_epoch}.pt")
 
+        # eval on traindata
+        results = eval_testdata(
+            best_model,
+            adata_t = adata_sorted if config.per_seq_batch_sample else adata,
+            gene_ids=gene_ids,
+            vocab=vocab,
+            config=config,
+            logger=logger,
+            include_types=["cls"],
+            subset_label = config.trainsubset_label
+        )
+        results["batch_umap"].savefig(
+            save_dir / f"train_embeddings_batch_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
+        )
+
+        results["celltype_umap"].savefig(
+            save_dir / f"train_embeddings_celltype_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
+        )
+        metrics_to_log = {"train/" + k: v for k, v in results.items()}
+
+
+        # eval on val data
+        results = eval_testdata(
+            best_model,
+            adata_t = adata_sorted if config.per_seq_batch_sample else adata,
+            # adata_t=adata,
+            gene_ids=gene_ids,
+            vocab=vocab,
+            config=config,
+            logger=logger,
+            include_types=["cls"],
+            subset_label = config.valsubset_label
+        )
+        results["batch_umap"].savefig(
+            save_dir / f"val_embeddings_batch_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
+        )
+
+        results["celltype_umap"].savefig(
+            save_dir / f"val_embeddings_celltype_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
+        )
+        metrics_to_log = {"val/" + k: v for k, v in results.items()}
+
         # eval on testdata
         results = eval_testdata(
             best_model,
@@ -653,24 +702,45 @@ for epoch in range(1, config.epochs + 1):
             config=config,
             logger=logger,
             include_types=["cls"],
+            subset_label = config.testsubset_label
         )
         results["batch_umap"].savefig(
-            save_dir / f"embeddings_batch_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
+            save_dir / f"test_embeddings_batch_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
         )
 
         results["celltype_umap"].savefig(
-            save_dir / f"embeddings_celltype_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
+            save_dir / f"test_embeddings_celltype_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
         )
         metrics_to_log = {"test/" + k: v for k, v in results.items()}
         
         if USE_WANDB:
+            metrics_to_log["train/batch_umap"] = wandb.Image(
+                str(save_dir / f"train_embeddings_batch_umap[cls]_e{best_model_epoch}.png"),
+                caption=f"celltype avg_bio epoch {best_model_epoch}",
+            )
+
+            metrics_to_log["train/celltype_umap"] = wandb.Image(
+                str(save_dir / f"train_embeddings_celltype_umap[cls]_e{best_model_epoch}.png"),
+                caption=f"celltype avg_bio epoch {best_model_epoch}",
+            )
+
+            metrics_to_log["val/batch_umap"] = wandb.Image(
+                str(save_dir / f"val_embeddings_batch_umap[cls]_e{best_model_epoch}.png"),
+                caption=f"celltype avg_bio epoch {best_model_epoch}",
+            )
+
+            metrics_to_log["val/celltype_umap"] = wandb.Image(
+                str(save_dir / f"val_embeddings_celltype_umap[cls]_e{best_model_epoch}.png"),
+                caption=f"celltype avg_bio epoch {best_model_epoch}",
+            )
+            
             metrics_to_log["test/batch_umap"] = wandb.Image(
-                str(save_dir / f"embeddings_batch_umap[cls]_e{best_model_epoch}.png"),
+                str(save_dir / f"test_embeddings_batch_umap[cls]_e{best_model_epoch}.png"),
                 caption=f"celltype avg_bio epoch {best_model_epoch}",
             )
 
             metrics_to_log["test/celltype_umap"] = wandb.Image(
-                str(save_dir / f"embeddings_celltype_umap[cls]_e{best_model_epoch}.png"),
+                str(save_dir / f"test_embeddings_celltype_umap[cls]_e{best_model_epoch}.png"),
                 caption=f"celltype avg_bio epoch {best_model_epoch}",
             )
             metrics_to_log["test/best_model_epoch"] = best_model_epoch
@@ -684,7 +754,11 @@ for epoch in range(1, config.epochs + 1):
 
 # %%
 # save the best model
-torch.save(best_model.state_dict(), save_dir / "best_model.pt")
+if config.epochs > 0:
+    torch.save(best_model.state_dict(), save_dir / "best_model.pt")
+else:
+    best_model = model
+    torch.save(best_model.state_dict(), save_dir / "best_model.pt")
 
 # %% [markdown]
 # ## Gene embeddings
@@ -693,7 +767,7 @@ torch.save(best_model.state_dict(), save_dir / "best_model.pt")
 # %% Annotation of CellType Results
 if (config.task == "annotation") and (adata_test is not None):
 
-    predictions, labels, results = test(model=best_model,
+    predictions, labels, results, cell_embeddings = test(model=best_model,
                                         adata=adata_test,
                                         gene_ids=gene_ids,
                                         vocab=vocab,
@@ -702,6 +776,7 @@ if (config.task == "annotation") and (adata_test is not None):
                                         logger=logger)
     # adata_test_raw.obs["predictions"] = [id2type[p] for p in predictions]
     adata_test.obs["predictions"] = [id2type[p] for p in predictions]
+    adata_test.obsm["X_scGPT"] = cell_embeddings
 
     # plot
     palette_ = plt.rcParams["axes.prop_cycle"].by_key()["color"] 
@@ -710,8 +785,10 @@ if (config.task == "annotation") and (adata_test is not None):
 
     # Compute the UMAP if it doesn't exist
     if 'X_umap' not in adata_test.obsm.keys():
-        sc.pp.neighbors(adata_test)
-        sc.tl.umap(adata_test)
+        # sc.pp.neighbors(adata_test)
+        # sc.tl.umap(adata_test)
+        sc.pp.neighbors(adata_test, use_rep="X_scGPT")
+        sc.tl.umap(adata_test, min_dist=0.3)
 
 
     with plt.rc_context({"figure.figsize": (6, 4), "figure.dpi": (300)}):
@@ -758,6 +835,8 @@ if (config.task == "annotation") and (adata_test is not None):
         caption=f"confusion matrix",
     )
 
+print('results saved in: ')
+print(save_dir)
 
 # %%
 if USE_WANDB:
