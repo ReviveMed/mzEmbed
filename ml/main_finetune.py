@@ -396,7 +396,9 @@ def finetune_run_wrapper(**user_kwargs):
     with_id = user_kwargs.get('with_id',None)
     eval_on_test = user_kwargs.get('eval_on_test',True)
     if with_id is not None:
-        if 'SUR' in with_id:
+        if isinstance(with_id,int):
+            with_id = 'SUR-'+str(with_id)
+        elif 'SUR' in with_id:
             with_id = with_id
         else:
             with_id = 'SUR-'+str(with_id)
