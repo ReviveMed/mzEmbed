@@ -95,7 +95,6 @@ hyperparameter_defaults = dict(
     seed=42,
     dataset_name="metab_v0",
     do_train=True,
-    # load_model = f"{data_dir}/save/dev_metabolomics_apr24-Apr27-03-37",
     # load_model="save/scGPT_bc",
     load_model = None,
     mask_value=-1,
@@ -154,21 +153,24 @@ hyperparameter_defaults = dict(
     use_batch_labels = False, # whether to use batch labels, default was True
     use_mod = False, #modality aware? set to True for multi-omics
     do_sample_in_train = False, # sample the bernoulli in training, 
-    celltype_label="Cohort Label",
-    datasubset_label = 'pretrain_set',
-    trainsubset_label = 'Train',
-    valsubset_label = 'Val',
-    testsubset_label = 'Test',
-    # celltype_label="MSKCC_binary_id",
-    # datasubset_label = 'finetune_set',
-    # trainsubset_label = 'Finetune',
-    # valsubset_label = 'Validation',
+    # celltype_label="Cohort Label",
+    # celltype_label = 'Age Group',
+    # datasubset_label = 'pretrain_set',
+    # trainsubset_label = 'Train',
+    # valsubset_label = 'Val',
+    # testsubset_label = 'Test',
+
+    # load_model = f"{data_dir}/save/dev_metabolomics_apr24-Apr27-03-37",
+    celltype_label="IMDC_binary_id",
+    datasubset_label = 'finetune_set',
+    trainsubset_label = 'Finetune',
+    valsubset_label = 'Validation',
     # celltype_label="sex",
     # datasubset_label = 'pretrain_set'
 
 )              
 
-
+print('Today is: ', time.strftime('%b%d-%H-%M'))
 # %%
 
 # %%
@@ -227,6 +229,9 @@ if dataset_name == "metab_v0":
         print('downloading data')
         download_data_file(data_url, save_dir=load_dir)
     adata = read_h5ad(load_path)
+    if config.celltype_label == "Age Group":
+        adata.obs["Age Group"] = ['adult' if 'adult' in x else 'child' for x in adata.obs['Cohort Label']]
+
     # adata = scvi.data.pbmc_dataset()  # 11990 × 3346
     ori_batch_col = "Study ID"
     adata.obs["celltype"] = adata.obs[config.celltype_label].astype("category")
