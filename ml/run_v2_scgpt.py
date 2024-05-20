@@ -96,13 +96,13 @@ hyperparameter_defaults = dict(
     dataset_name="metab_v0",
     do_train=True,
     # load_model="save/scGPT_bc",
-    load_model = None,
+    # load_model = None,
     mask_value=-1,
     pad_value=-2,
     include_zero_gene=True,
     pad_token="<pad>",
     mask_ratio=0.25, # ratio of masked values, default was 0.4
-    epochs=10, #original was 30
+    epochs=30, #original was 30
     n_bins=101, #counts/intensity bins, default was 51
     # n_bins=51, #counts/intensity bins, default was 51
     GEP=True,  # (MLM) Gene expression prediction, Gene expression modelling
@@ -153,6 +153,7 @@ hyperparameter_defaults = dict(
     use_batch_labels = False, # whether to use batch labels, default was True
     use_mod = False, #modality aware? set to True for multi-omics
     do_sample_in_train = False, # sample the bernoulli in training, 
+    # load_model = None,
     # celltype_label="Cohort Label",
     # celltype_label = 'Age Group',
     # datasubset_label = 'pretrain_set',
@@ -160,11 +161,12 @@ hyperparameter_defaults = dict(
     # valsubset_label = 'Val',
     # testsubset_label = 'Test',
 
-    # load_model = f"{data_dir}/save/dev_metabolomics_apr24-Apr27-03-37",
+    load_model = f"{data_dir}/save/dev_metab_v0-May16-14-47",
     celltype_label="IMDC_binary_id",
     datasubset_label = 'finetune_set',
     trainsubset_label = 'Finetune',
     valsubset_label = 'Validation',
+    testsubset_label = 'Test',
     # celltype_label="sex",
     # datasubset_label = 'pretrain_set'
 
@@ -235,6 +237,11 @@ if dataset_name == "metab_v0":
     # adata = scvi.data.pbmc_dataset()  # 11990 × 3346
     ori_batch_col = "Study ID"
     adata.obs["celltype"] = adata.obs[config.celltype_label].astype("category")
+    
+    # drop the nan celltype
+    adata = adata[~adata.obs["celltype"].isna()]
+    adata = adata[adata.obs["celltype"] != "nan"]
+    
     data_is_raw = True
     filter_gene_by_counts = False
     adata_protein = None
