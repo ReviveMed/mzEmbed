@@ -103,12 +103,13 @@ hyperparameter_defaults = dict(
     include_zero_gene=True,
     pad_token="<pad>",
     mask_ratio=0.25, # ratio of masked values, default was 0.4
-    epochs=30, #original was 30
+    epochs=10, #original was 30
     # n_bins=101, #counts/intensity bins, default was 51
     n_bins=51, #counts/intensity bins, default was 51
     GEP=True,  # (MLM) Gene expression prediction, Gene expression modelling
     GEPC=True,  #(MVC) Masked value prediction for cell embedding, Gene expression modelling for cell objective
     CLS=True,  # celltype classification objective
+    # CLS =False,
     CCE =False,  # Contrastive cell embedding objective
     ESC=False,  # (ECS) Elastic similarity constraint, require ecs_thres>0
     ecs_thres=0,  # Elastic cell similarity objective, 0.0 to 1.0, 0.0 to disable. default was 0.8 in the paper it was 0.6
@@ -154,7 +155,7 @@ hyperparameter_defaults = dict(
     use_batch_labels = False, # whether to use batch labels, default was True
     use_mod = False, #modality aware? set to True for multi-omics
     do_sample_in_train = False, # sample the bernoulli in training, 
-    load_model = None,
+
     # celltype_label="Cohort Label",
     celltype_label = 'Age Group',
     datasubset_label = 'pretrain_set',
@@ -162,6 +163,8 @@ hyperparameter_defaults = dict(
     valsubset_label = 'Val',
     testsubset_label = 'Test',
 
+    # load_model = None,
+    load_model = f"{data_dir}/save/dev_metab_v0-May21-13-30", #10 epochs on Age Label
     # load_model = f"{data_dir}/save/dev_metab_v0-May16-14-47", #10 epochs on Cohort Label
     # load_model = f"{data_dir}/save/dev_metab_v0-May20-15-24", #30 epochs on IMDC Binary
     # celltype_label="IMDC Binary",
@@ -233,11 +236,18 @@ if dataset_name == "metab_v0":
         print('downloading data')
         download_data_file(data_url, save_dir=load_dir)
     adata = read_h5ad(load_path)
+
+    print('Make sure that Study ID ST000422 is properly labeled as adult_other')
+    adata[adata.obs['Study ID'] == 'ST000422'].obs['Cohort Label'] = 'adult_other'
     
     if config.celltype_label == "IMDC Binary":
         adata = adata[adata.obs["IMDC"].isin(["FAVORABLE", "POOR"])].copy()
         adata.obs['IMDC Binary'] = adata.obs['IMDC']
    
+    elif config.celltype_label == "MSKCC Binary":
+        adata = adata[adata.obs["MSKCC"].isin(["FAVORABLE", "POOR"])].copy()
+        adata.obs['MSKCC Binary'] = adata.obs['MSKCC']
+
     elif config.celltype_label == "Age Group":
         adata.obs["Age Group"] = ['adult' if 'adult' in x else 'child' for x in adata.obs['Cohort Label']]
 
@@ -615,7 +625,8 @@ for epoch in range(1, config.epochs + 1):
             model = model,
             loader=train_loader,
             vocab=vocab,
-            criterion_gep_gepc=criterion_gep_gepc if config.GEP and config.GEPC else None,
+            criterion_gep_gepc=criterion_gep_gepc if config.GEP or config.GEPC else None,
+            # criterion_gep_gepc=criterion_gep_gepc if config.GEP and config.GEPC else None,
             criterion_dab=criterion_dab if config.DAR else None,
             criterion_cls=criterion_cls if config.CLS else None,
             scaler=scaler,
@@ -632,7 +643,8 @@ for epoch in range(1, config.epochs + 1):
         model,
         loader=valid_loader,
         vocab=vocab,
-        criterion_gep_gepc=criterion_gep_gepc if config.GEP and config.GEPC else None,
+        criterion_gep_gepc=criterion_gep_gepc if config.GEP or config.GEPC else None,
+        # criterion_gep_gepc=criterion_gep_gepc if config.GEP and config.GEPC else None,
         criterion_dab=criterion_dab if config.DAR else None,
         criterion_cls=criterion_cls if config.CLS else None,
         device=device,
@@ -657,6 +669,7 @@ for epoch in range(1, config.epochs + 1):
     if epoch % config.save_eval_interval == 0 or epoch == config.epochs:
         logger.info(f"Saving model to {save_dir}")
         torch.save(best_model.state_dict(), save_dir / f"model_e{best_model_epoch}.pt")
+        metrics_to_log = {"epoch": epoch, "val/loss": val_loss}
 
         # eval on traindata
         results = eval_testdata(
@@ -676,7 +689,7 @@ for epoch in range(1, config.epochs + 1):
         results["celltype_umap"].savefig(
             save_dir / f"train_embeddings_celltype_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
         )
-        metrics_to_log = {"train/" + k: v for k, v in results.items()}
+        metrics_to_log.update({"train/" + k: v for k, v in results.items()})
 
 
         # eval on val data
@@ -689,7 +702,7 @@ for epoch in range(1, config.epochs + 1):
             config=config,
             logger=logger,
             include_types=["cls"],
-            subset_label = config.valsubset_label
+            subset_label = config.valsubset_label,
         )
         results["batch_umap"].savefig(
             save_dir / f"val_embeddings_batch_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
@@ -698,7 +711,8 @@ for epoch in range(1, config.epochs + 1):
         results["celltype_umap"].savefig(
             save_dir / f"val_embeddings_celltype_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
         )
-        metrics_to_log = {"val/" + k: v for k, v in results.items()}
+        # metrics_to_log = {"val/" + k: v for k, v in results.items()}
+        metrics_to_log.update({"val/" + k: v for k, v in results.items()})
 
         # eval on testdata
         results = eval_testdata(
@@ -710,8 +724,15 @@ for epoch in range(1, config.epochs + 1):
             config=config,
             logger=logger,
             include_types=["cls"],
-            subset_label = config.testsubset_label
+            subset_label = config.testsubset_label,
+            criterion_gep_gepc=criterion_gep_gepc if config.GEP or config.GEPC else None,
+            # criterion_gep_gepc=criterion_gep_gepc if config.GEP and config.GEPC else None,
+            criterion_dab=criterion_dab if config.DAR else None,
+            criterion_cls=criterion_cls if config.CLS else None,
+            device=device,
+            epoch=epoch
         )
+
         results["batch_umap"].savefig(
             save_dir / f"test_embeddings_batch_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
         )
@@ -719,7 +740,8 @@ for epoch in range(1, config.epochs + 1):
         results["celltype_umap"].savefig(
             save_dir / f"test_embeddings_celltype_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
         )
-        metrics_to_log = {"test/" + k: v for k, v in results.items()}
+        # metrics_to_log = {"test/" + k: v for k, v in results.items()}
+        metrics_to_log.update({"test/" + k: v for k, v in results.items()})
         
         if USE_WANDB:
             metrics_to_log["train/batch_umap"] = wandb.Image(

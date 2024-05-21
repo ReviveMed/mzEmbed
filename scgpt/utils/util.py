@@ -416,7 +416,9 @@ def eval_scib_metrics(
 
     # remove nan value in result_dict
     result_dict = {k: v for k, v in result_dict.items() if not np.isnan(v)}
-
+    if 'avg_bio' not in result_dict:
+        result_dict['avg_bio'] = 0.0
+        
     return result_dict
 
 
