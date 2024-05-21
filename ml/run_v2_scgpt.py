@@ -92,9 +92,10 @@ if not os.path.exists(data_dir):
 
 hyperparameter_defaults = dict(
     task="annotation",
+    # task = 'integration',
     seed=42,
     dataset_name="metab_v0",
-    do_train=False,
+    do_train=True,
     # load_model="save/scGPT_bc",
     # load_model = None,
     mask_value=-1,
@@ -102,9 +103,9 @@ hyperparameter_defaults = dict(
     include_zero_gene=True,
     pad_token="<pad>",
     mask_ratio=0.25, # ratio of masked values, default was 0.4
-    epochs=2, #original was 30
-    n_bins=101, #counts/intensity bins, default was 51
-    # n_bins=51, #counts/intensity bins, default was 51
+    epochs=30, #original was 30
+    # n_bins=101, #counts/intensity bins, default was 51
+    n_bins=51, #counts/intensity bins, default was 51
     GEP=True,  # (MLM) Gene expression prediction, Gene expression modelling
     GEPC=True,  #(MVC) Masked value prediction for cell embedding, Gene expression modelling for cell objective
     CLS=True,  # celltype classification objective
@@ -153,15 +154,16 @@ hyperparameter_defaults = dict(
     use_batch_labels = False, # whether to use batch labels, default was True
     use_mod = False, #modality aware? set to True for multi-omics
     do_sample_in_train = False, # sample the bernoulli in training, 
-    # load_model = None,
-    celltype_label="Cohort Label",
-    # celltype_label = 'Age Group',
+    load_model = None,
+    # celltype_label="Cohort Label",
+    celltype_label = 'Age Group',
     datasubset_label = 'pretrain_set',
     trainsubset_label = 'Train',
     valsubset_label = 'Val',
     testsubset_label = 'Test',
 
-    load_model = f"{data_dir}/save/dev_metab_v0-May16-14-47",
+    # load_model = f"{data_dir}/save/dev_metab_v0-May16-14-47", #10 epochs on Cohort Label
+    # load_model = f"{data_dir}/save/dev_metab_v0-May20-15-24", #30 epochs on IMDC Binary
     # celltype_label="IMDC Binary",
     # datasubset_label = 'finetune_set',
     # trainsubset_label = 'Finetune',
@@ -322,6 +324,11 @@ if config.load_model is not None:
     nhead = model_configs["nheads"]
     d_hid = model_configs["d_hid"]
     nlayers = model_configs["nlayers"]
+
+    backup_model_config_file = save_dir / "args.json"
+    with open(backup_model_config_file, "w") as f:
+        # json.dump(config.__dict__, f, indent=2)
+        json.dump(backup_model_config_file, f, indent=2)
 else:
     embsize = config.layer_size 
     nhead = config.nhead
@@ -425,7 +432,8 @@ if config.load_model is None:
         special_tokens,
     )
     vocab.save_json(vocab_file)
-
+else:
+    vocab.save_json(save_dir / "vocab.json")
     # vocab = Vocab(
     #     VocabPybind(genes + special_tokens, None)
     # )  # bidirectional lookup [gene <-> int]
