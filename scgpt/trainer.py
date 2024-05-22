@@ -913,6 +913,9 @@ def eval_testdata(
     celltypes_labels = adata_t.obs["celltype"].tolist()
     celltypes_labels = np.array(celltypes_labels)
 
+    celltypes_id_labels = adata_t.obs["celltype_id"].tolist()
+    celltypes_id_labels = np.array(celltypes_id_labels)
+
     batch_ids = adata_t.obs["batch_id"].tolist()
     batch_ids = np.array(batch_ids)
 
@@ -936,8 +939,8 @@ def eval_testdata(
         data_pt = prepare_dataset(tokenized_data=tokenized_all,
                                     batch_labels=batch_ids,
                                     config=config,
-                                    celltype_labels=celltypes_labels,
-                                    sort_seq_batch=config.sort_seq_batch,
+                                    celltype_labels=celltypes_id_labels,
+                                    sort_seq_batch=config.per_seq_batch_sample,
                                     epoch=0)
 
         data_loader = prepare_dataloader(

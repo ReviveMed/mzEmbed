@@ -103,7 +103,7 @@ hyperparameter_defaults = dict(
     include_zero_gene=True,
     pad_token="<pad>",
     mask_ratio=0.25, # ratio of masked values, default was 0.4
-    epochs=10, #original was 30
+    epochs=4, #original was 30
     # n_bins=101, #counts/intensity bins, default was 51
     n_bins=51, #counts/intensity bins, default was 51
     GEP=True,  # (MLM) Gene expression prediction, Gene expression modelling
@@ -338,7 +338,8 @@ if config.load_model is not None:
     backup_model_config_file = save_dir / "args.json"
     with open(backup_model_config_file, "w") as f:
         # json.dump(config.__dict__, f, indent=2)
-        json.dump(backup_model_config_file, f, indent=2)
+        # json.dump(backup_model_config_file, f, indent=2)
+        json.dump(model_configs, f, indent=2)
 else:
     embsize = config.layer_size 
     nhead = config.nhead
