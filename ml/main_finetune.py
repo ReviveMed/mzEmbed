@@ -246,7 +246,7 @@ def parse_sweep_kwargs_from_command_line():
 
 def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,
                             run,prefix_name,num_iterations=10,eval_on_test=True,
-                            file_suffix='_finetune',use_cross_val=False):
+                            file_suffix='_finetune',use_cross_val=False,yes_plot_latent_space=False):
 
     record_train_metrics = defaultdict(list)
     num_train_success = 0
@@ -289,7 +289,7 @@ def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,
                             eval_params_list=eval_params_list,
                             run_dict=run,
                             file_suffix=file_suffix,
-                            yes_plot_latent_space=(iter==num_iterations-1))
+                            yes_plot_latent_space=(yes_plot_latent_space and iter==num_iterations-1))
 
             if train_metrics is None:
                 continue
@@ -320,7 +320,7 @@ def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,
                                 eval_params_list=eval_params_list,
                                 run_dict=run,
                                 file_suffix=file_suffix,
-                                yes_plot_latent_space=(iter==num_iterations-1))
+                                yes_plot_latent_space=(yes_plot_latent_space and iter==num_iterations-1))
                 
                 if test_metrics is None:
                     continue

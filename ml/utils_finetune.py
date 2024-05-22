@@ -177,9 +177,12 @@ def run_model_wrapper(data_dir, params, output_dir=None,
                     #                                                 y_head=y_head)
 
                 if yes_plot_latent_space:
-                    create_latentspace_plots(X_data_eval,y_data_eval, encoder, saved_model_dir, eval_name,
-                                        run_dict, prefix, plot_latent_space='seaborn', 
-                                        plot_latent_space_cols=y_cols)
+                    if isinstance(y_cols,str):
+                        y_cols = [y_cols]
+                    if y_cols[0] in y_data_eval.columns:
+                        create_latentspace_plots(X_data_eval,y_data_eval, encoder, saved_model_dir, eval_name,
+                                            run_dict, prefix, plot_latent_space='seaborn', 
+                                            plot_latent_space_cols=y_cols)
 
             except ValueError as e:
                 print(f'Error: {e}')

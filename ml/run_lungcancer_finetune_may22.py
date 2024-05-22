@@ -5,12 +5,22 @@ from main_finetune import finetune_run_wrapper
 from misc import round_to_sig
 import numpy as np
 from misc import download_data_dir
+import neptune
+
+from utils_neptune import convert_neptune_kwargs
+
 lung_cancer_dir = '/Users/jonaheaton/ReviveMed Dropbox/Jonah Eaton/LungCancer'
 data_dir = os.path.join(lung_cancer_dir, 'data_v1')
 
+NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
+PROJECT_ID = 'revivemed/Survival-RCC'
+
+# desc_str = 'lungcancer v1'
 desc_str = 'lungcancer'
 DATE_STR = 'May22'
+head_hidden_layers = 1
 
+study_name = f'{desc_str}_{DATE_STR}'
 
 if not os.path.exists(data_dir):
     home_dir = os.path.expanduser("~")
@@ -43,7 +53,6 @@ if not os.path.exists(data_dir):
 def objective(trial):
     # Define your hyperparameters for finetune_run_wrapper
     num_iter = 10
-    head_hidden_layers = 1
 
     use_l2_reg = trial.suggest_categorical('use_l2_reg', [True, False])
     if use_l2_reg:
@@ -94,11 +103,12 @@ def objective(trial):
         'train_name': 'train',
         'num_iterations': num_iter,
         'remove_nans': False,
-        'name': 'layer-R AUXopt',
+        'name': 'layer-R LungCancer opt',
         'desc_str': desc_str,
         'eval_on_test': False,
         'file_suffix' : '_lungcancer',
-        'use_cross_val': True
+        'use_cross_val': True,
+        'study_name': study_name,
     }
 
     for k,v in sweep_kwargs.items():
@@ -136,7 +146,6 @@ def objective(trial):
 
 
 
-study_name = f'{desc_str}_{DATE_STR}'
 
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
@@ -145,4 +154,28 @@ study = optuna.create_study(directions=['maximize'],
                         storage=WEBAPP_DB_LOC, 
                         load_if_exists=True)
 
-study.optimize(objective, n_trials=5)
+study.optimize(objective, n_trials=45)
+
+
+# get the best trial and run it with random initialization
+best_trial = study.best_trial
+best_trial_params = best_trial.params
+best_trial_run_id = best_trial.user_attrs['run_id']
+print(best_trial_params)
+print(best_trial_run_id)
+
+
+for with_id in [best_trial_run_id]:
+    run = neptune.init_run(project=PROJECT_ID,
+                            api_token=NEPTUNE_API_TOKEN,
+                            with_id=with_id)
+    
+    run['sweep_kwargs/name2'] = with_id
+    run.wait()
+    original_sweep_kwargs = run['sweep_kwargs'].fetch()
+    run.stop()
+
+    original_sweep_kwargs = convert_neptune_kwargs(original_sweep_kwargs)
+    original_sweep_kwargs['use_rand_init'] = True
+    print(original_sweep_kwargs)
+    finetune_run_wrapper(**original_sweep_kwargs)
