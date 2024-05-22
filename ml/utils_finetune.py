@@ -14,6 +14,12 @@ from collections import defaultdict
 import re
 import argparse
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+import plotly.express as px
+
+from viz import generate_latent_space, generate_pca_embedding, generate_umap_embedding
+from misc import assign_color_map
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
 PROJECT_ID = 'revivemed/Survival-RCC'
@@ -24,7 +30,8 @@ PROJECT_ID = 'revivemed/Survival-RCC'
 def run_model_wrapper(data_dir, params, output_dir=None, 
                       train_name='train', prefix='training_run',
                       eval_name_list=['val'], eval_params_list=None, 
-                      run_dict=None):
+                      run_dict=None, file_suffix ='_finetune',
+                      yes_plot_latent_space=False):
     """
     Runs the model training and evaluation pipeline.
 
@@ -100,8 +107,8 @@ def run_model_wrapper(data_dir, params, output_dir=None,
     if output_dir is None:
         output_dir = os.path.expanduser('~/TEMP_MODELS')
 
-    X_filename = 'X_finetune'
-    y_filename = 'y_finetune'
+    X_filename = 'X'+file_suffix
+    y_filename = 'y'+file_suffix
     saved_model_dir = os.path.join(output_dir,prefix,'models')        
     os.makedirs(saved_model_dir,exist_ok=True)
     task_components_dict = params['task_kwargs']
@@ -167,7 +174,13 @@ def run_model_wrapper(data_dir, params, output_dir=None,
                                                                                         y_head=y_head))
                     # metrics[f'{eval_name}__{y_col_name}'].update(evaluate_model_wrapper(encoder, head, adv, X_data_eval, y_data_eval,
                     #                                                 y_cols=y_cols,
-                    #                                                 y_head=y_head))
+                    #                                                 y_head=y_head)
+
+                if yes_plot_latent_space:
+                    create_latentspace_plots(X_data_eval,y_data_eval, encoder, saved_model_dir, eval_name,
+                                        run_dict, prefix, plot_latent_space='seaborn', 
+                                        plot_latent_space_cols=y_cols)
+
             except ValueError as e:
                 print(f'Error: {e}')
                 # print(f'Error in {eval_name}__{y_col_name}')
@@ -180,6 +193,181 @@ def run_model_wrapper(data_dir, params, output_dir=None,
     return metrics
 
 ############################################################
+
+### Function to generate and plot the latent space
+def create_latentspace_plots(X_data_eval,y_data_eval, encoder,save_dir,eval_name,
+                             run,prefix,plot_latent_space='seaborn',
+                             plot_latent_space_cols=None,yes_plot_pca=False):
+
+    # plot_latent_space_cols = y_head_cols
+
+    Z_embed_savepath = os.path.join(save_dir, f'Z_embed_{eval_name}.csv')
+        
+    if check_neptune_existance(run,f'{prefix}/Z_{eval_name}'):
+        print(f'Z_{eval_name} already exists in {prefix} of run')
+    
+    else:
+        Z = generate_latent_space(X_data_eval, encoder)
+        Z.to_csv(os.path.join(save_dir, f'Z_{eval_name}.csv'))
+
+        Z_pca = generate_pca_embedding(Z)
+        Z_pca.to_csv(os.path.join(save_dir, f'Z_pca_{eval_name}.csv'))
+        Z_pca.columns = [f'PCA{i+1}' for i in range(Z_pca.shape[1])]
+
+        Z_umap = generate_umap_embedding(Z)
+        Z_umap.to_csv(os.path.join(save_dir, f'Z_umap_{eval_name}.csv'))
+        Z_umap.columns = [f'UMAP{i+1}' for i in range(Z_umap.shape[1])]
+
+        Z_embed = pd.concat([Z_pca, Z_umap], axis=1)
+        Z_embed = Z_embed.join(y_data_eval)
+        Z_embed.to_csv(Z_embed_savepath)
+        run[f'{prefix}/Z_embed_{eval_name}'].upload(Z_embed_savepath)
+    run.wait()
+
+
+
+    if plot_latent_space_cols is None:
+        plot_latent_space_cols = y_data_eval.columns
+    
+    print('plot_latent_space:', plot_latent_space)
+    print('plot_latent_space_cols:', plot_latent_space_cols)
+
+    if plot_latent_space:
+        if os.path.exists(Z_embed_savepath):
+            Z_embed = pd.read_csv(Z_embed_savepath, index_col=0)
+        else:
+            # check if the Z_embed file is in neptune
+            if check_neptune_existance(run,f'{prefix}/Z_embed_{eval_name}'):
+                raise ValueError(f'No Z_embed_{eval_name} file found in run')
+
+            # download the Z_embed file from neptune
+            run[f'{prefix}/Z_embed_{eval_name}'].download(Z_embed_savepath)
+            Z_embed = pd.read_csv(Z_embed_savepath, index_col=0)
+
+        missing_cols = [col for col in y_data_eval.columns if col not in Z_embed.columns]
+        if len(missing_cols) > 0:
+            print(f'Adding missing columns to Z_embed: {missing_cols}')
+            Z_embed = Z_embed.join(y_data_eval[missing_cols])
+            Z_embed.to_csv(Z_embed_savepath)
+            run[f'{prefix}/Z_embed_{eval_name}'].upload(Z_embed_savepath)
+
+
+
+        if (plot_latent_space=='seaborn') or (plot_latent_space=='both') or (plot_latent_space=='sns'):
+
+            for hue_col in plot_latent_space_cols:
+                if hue_col not in Z_embed.columns:
+                    print(f'{hue_col} not in Z_embed columns')
+                    continue
+
+
+                # palette = get_color_map(Z_embed[hue_col].nunique())
+                # Get the counts for each instance of the hue column, and the corresponding colormap
+                Z_count_sum = (~Z_embed[hue_col].isnull()).sum()
+                print(f'Number of samples in {eval_name}: {Z_count_sum}')
+                if Z_embed[hue_col].nunique() > 30:
+                    # if more than 30 unique values, then assume its continuous
+                    palette = 'flare'
+                    Z_counts = None
+                else:
+                    # if fewer than 30 unique values, then assume its categorical
+                    # palette = get_color_map(Z_embed[hue_col].nunique())
+                    palette = assign_color_map(Z_embed[hue_col].unique())
+                    Z_counts = Z_embed[hue_col].value_counts()
+
+                plot_title = f'{prefix} Latent Space of {eval_name} (N={Z_count_sum})'
+                # choose the marker size based on the number of nonnan values
+                # marker_sz = 10/(1+np.log(Z_count_sum))
+                marker_sz = 100/np.sqrt(Z_count_sum)
+
+                ## PCA ##
+                if yes_plot_pca:
+                    fig = sns.scatterplot(data=Z_embed, x='PCA1', y='PCA2', hue=hue_col, palette=palette,s=marker_sz)
+                    # place the legend outside the plot
+                    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+                    
+                    # edit the legend to include the number of samples in each cohort
+                    handles, labels = fig.get_legend_handles_labels()
+                    
+
+                    # Add the counts to the legend if hue_col is categorical
+                    if Z_counts is not None:
+                        # new_labels = [f'{label} ({Z_embed[Z_embed[hue_col]==label].shape[0]})' for label in labels]
+                        new_labels = []
+                        for label in labels:
+                            # new_labels.append(f'{label} ({Z_counts.loc[eval(label)]})')
+                            try:
+                                new_labels.append(f'{label} ({Z_counts.loc[label]})')
+                            except KeyError:
+                                new_labels.append(f'{label} ({Z_counts.loc[eval(label)]})')
+                    else:
+                        new_labels = labels
+
+
+                    # make the size of the markers in the handles larger
+                    for handle in handles:
+                        # print(dir(handle))
+                        handle.set_markersize(10)
+                        # handle._sizes = [100]
+                    
+                    plt.legend(handles, new_labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., title=hue_col)
+                    plt.title(plot_title)
+                    plt.savefig(os.path.join(save_dir, f'Z_pca_{hue_col}_{eval_name}.png'), bbox_inches='tight')
+                    run[f'{prefix}/sns_Z_pca_{hue_col}_{eval_name}'].upload(os.path.join(save_dir, f'Z_pca_{hue_col}_{eval_name}.png'))
+                    plt.close()
+
+                ## UMAP ##
+                fig = sns.scatterplot(data=Z_embed, x='UMAP1', y='UMAP2', hue=hue_col, palette=palette,s=marker_sz)
+                # place the legend outside the plot
+                plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+
+                # edit the legend to include the number of samples in each cohort
+                handles, labels = fig.get_legend_handles_labels()
+
+                # Add the counts to the legend if hue_col is categorical
+                if Z_counts is not None:
+                    # new_labels = [f'{label} ({Z_embed[Z_embed[hue_col]==label].shape[0]})' for label in labels]
+                    new_labels = []
+                    for label in labels:
+                        # new_labels.append(f'{label} ({Z_counts.loc[eval(label)]})')
+                        try:
+                            new_labels.append(f'{label} ({Z_counts.loc[label]})')
+                        except KeyError:
+                            new_labels.append(f'{label} ({Z_counts.loc[eval(label)]})')
+                else:
+                    new_labels = labels
+
+                # make the size of the markers in the handles larger
+                for handle in handles:
+                    # print(dir(handle))
+                    handle.set_markersize(10)
+                    # handle._sizes = [100]
+                
+                plt.legend(handles, new_labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., title=hue_col)
+
+                plt.title(plot_title)
+                plt.savefig(os.path.join(save_dir, f'Z_umap_{hue_col}_{eval_name}.png'), bbox_inches='tight', dpi=300)
+                run[f'{prefix}/sns_Z_umap_{hue_col}_{eval_name}'].upload(os.path.join(save_dir, f'Z_umap_{hue_col}_{eval_name}.png'))
+                plt.close()
+
+        if (plot_latent_space=='plotly') or (plot_latent_space=='both') or (plot_latent_space=='px'):
+            for hue_col in plot_latent_space_cols:
+                if yes_plot_pca:
+                    plotly_fig = px.scatter(Z_embed, x='PCA1', y='PCA2', color=hue_col, title=f'PCA {hue_col}')
+                    plotly_fig.update_traces(marker=dict(size=2*marker_sz))
+                    run[f'{prefix}/px_Z_pca_{hue_col}_{eval_name}'].upload(plotly_fig)
+                    plt.close()
+
+                plotly_fig = px.scatter(Z_embed, x='UMAP1', y='UMAP2', color=hue_col)
+                plotly_fig.update_traces(marker=dict(size=2*marker_sz))
+                run[f'{prefix}/px_Z_umap_{hue_col}_{eval_name}'].upload(plotly_fig)
+                plt.close()
+
+        run.wait()
+
+    return Z_embed
+
+
 
 
 ### Function to get the encoder
@@ -727,6 +915,15 @@ def get_head_kwargs_by_desc(desc_str, num_hidden_layers=0, weight=1, y_cols=None
         num_classes = 1
         y_idx = [0,1]
         plot_latent_space_cols = ['EVER OS']            
+
+    elif 'lungcancer' in desc_str.lower():
+        y_head_cols = ['LungCancer BINARY']
+        head_name = 'LungCancer'
+        head_kind = 'Binary'
+        num_classes = 2
+        y_idx = 0
+        plot_latent_space_cols = ['Group']
+
     else:
         raise ValueError('Unknown desc_str:',desc_str)
 

@@ -128,6 +128,12 @@ default_eval_params_list = [
         'y_col_name': 'Benefit BINARY',
         'y_head': 'Benefit',
         'y_cols': ['Benefit BINARY']},
+
+    ###### LungCancer Binary ######
+    {
+        'y_col_name': 'LungCancer BINARY',
+        'y_head': 'LungCancer',
+        'y_cols': ['LungCancer BINARY']},
 ]
 
 
@@ -239,21 +245,51 @@ def parse_sweep_kwargs_from_command_line():
 
 
 def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,
-                            run,prefix_name,num_iterations=10,eval_on_test=True):
+                            run,prefix_name,num_iterations=10,eval_on_test=True,
+                            file_suffix='_finetune',use_cross_val=False):
 
     record_train_metrics = defaultdict(list)
     num_train_success = 0
     record_test_metrics = defaultdict(list)
     num_test_success = 0
+
+    if use_cross_val:
+        #TODO: Test this
+        data_files  = os.listdir(data_dir)
+        # look for directories with 'fold' in the name
+        data_dirs = [x for x in data_files if 'fold' in x]
+        # only keep the directories
+        data_dirs = [x for x in data_dirs if os.path.isdir(os.path.join(data_dir,x))]
+        if len(data_dirs) == 0:
+            raise ValueError('No directories with fold in the name')
+        # sort the list by alphabetical order
+        data_dirs = sorted(data_dirs)
+
+        if num_iterations > len(data_dirs):
+            # if there are not enough folds, then repeat the folds
+            num_repeats = (num_iterations // len(data_dirs)) + 1
+            data_dirs = data_dirs*num_repeats
+            data_dirs = data_dirs[:num_iterations]
+        # data_dirs = [os.path.join(data_dir,x) for x in data_dirs]
+        # print(data_dirs)
+        # raise NotImplementedError('Cross Validation not implemented yet')
+        
+
     for iter in range(num_iterations):
         try:
-            train_metrics = run_model_wrapper(data_dir,params,
+            if use_cross_val:
+                data_dir0 = os.path.join(data_dir,data_dirs[iter])
+            else:
+                data_dir0 = data_dir
+            train_metrics = run_model_wrapper(data_dir0,params,
                             output_dir=output_dir,
                             train_name='train',
                             prefix=f'training_{prefix_name}_{iter}', 
                             eval_name_list=['val','train'],
                             eval_params_list=eval_params_list,
-                            run_dict=run)
+                            run_dict=run,
+                            file_suffix=file_suffix,
+                            yes_plot_latent_space=(iter==num_iterations-1))
 
             if train_metrics is None:
                 continue
@@ -282,7 +318,9 @@ def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,
                                 prefix=f'testing_{prefix_name}_{iter}', 
                                 eval_name_list=['test','trainval'],
                                 eval_params_list=eval_params_list,
-                                run_dict=run)
+                                run_dict=run,
+                                file_suffix=file_suffix,
+                                yes_plot_latent_space=(iter==num_iterations-1))
                 
                 if test_metrics is None:
                     continue
@@ -388,13 +426,19 @@ def finetune_both_pretrain_and_rand_wrapper(desc_str_list=None):
 
 def finetune_run_wrapper(**user_kwargs):
     home_dir = os.path.expanduser("~")
-    data_dir = f'{home_dir}/DATA3'
-    output_save_dir = f'{home_dir}/OUTPUT'
-    print('Getting the latest dataset')
-    data_dir = get_latest_dataset(data_dir=data_dir,project=PROJECT_ID)
+    
+    data_dir = user_kwargs.get('data_dir',None)
+    if data_dir is None:
+        data_dir = f'{home_dir}/DATA3'
+        print('Getting the latest dataset')
+        data_dir = get_latest_dataset(data_dir=data_dir,project=PROJECT_ID)
+        
+    output_save_dir = user_kwargs.get('output_save_dir',f'{home_dir}/OUTPUT')
+    file_suffix = user_kwargs.get('file_suffix','_finetune')
     desc_str = user_kwargs.get('desc_str',None)
     with_id = user_kwargs.get('with_id',None)
     eval_on_test = user_kwargs.get('eval_on_test',True)
+    use_cross_val = user_kwargs.get('use_cross_val',False)
     if with_id is not None:
         if isinstance(with_id,int):
             with_id = 'SUR-'+str(with_id)
@@ -442,7 +486,9 @@ def finetune_run_wrapper(**user_kwargs):
                                                run,
                                                prefix_name='run',
                                                num_iterations=num_iterations,
-                                               eval_on_test=eval_on_test)
+                                               eval_on_test=eval_on_test,
+                                                file_suffix=file_suffix,
+                                                use_cross_val=use_cross_val)
     run['sys/failed'] = False
     run.stop()
     return run_id, all_metrics
