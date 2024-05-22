@@ -103,8 +103,8 @@ def download_data_file(dropbox_url, save_dir='data'):
 
 
 hyperparameter_defaults = dict(
-    task="annotation",
-    # task = 'integration',
+    # task="annotation",
+    task = 'integration',
     seed=42,
     dataset_name="metab_v0",
     do_train=True,
@@ -120,7 +120,7 @@ hyperparameter_defaults = dict(
     n_bins=51, #counts/intensity bins, default was 51
     GEP=True,  # (MLM) Gene expression prediction, Gene expression modelling
     GEPC=True,  #(MVC) Masked value prediction for cell embedding, Gene expression modelling for cell objective
-    CLS=True,  # celltype classification objective
+    CLS=False,  # celltype classification objective
     # CLS =False,
     CCE =False,  # Contrastive cell embedding objective
     ESC=False,  # (ECS) Elastic similarity constraint, require ecs_thres>0
@@ -161,7 +161,7 @@ hyperparameter_defaults = dict(
     # max_seq_len = 4001, # # Default n_hvg+1
     max_seq_len=1201, #1200 was the amount specified in the paper
     freeze = False, #freeze
-    per_seq_batch_sample = True, # whether to sort samples by batch_id
+    per_seq_batch_sample = False, # whether to sort samples by batch_id
     explicit_zero_prob = True, # whether explicit bernoulli for zeros
     normalize_total = False, # 3. whether to normalize the raw data and to what sum
     use_batch_labels = False, # whether to use batch labels, default was True
@@ -205,7 +205,8 @@ def train_scgpt_wrapper(**kwargs):
     result_summary_dict = {}
 
     result_summary_dict.update(config_dict)
-    start_time = time.strftime('%b%d-%H-%M')
+    start_time_str = time.strftime('%b%d-%H-%M')
+    start_time = time.time()
 
     if USE_WANDB:
         print('using WandB')
@@ -219,7 +220,7 @@ def train_scgpt_wrapper(**kwargs):
         print(config)
         result_summary_dict.update({"wandb_run_id": run.id,
                                     'wandb_name': run.name,
-                                    'start_time': start_time})
+                                    'start_time': start_time_str})
                                     # "wandb_url": run.url()})
 
         set_seed(config.seed)
@@ -710,7 +711,13 @@ def train_scgpt_wrapper(**kwargs):
                 config=config,
                 logger=logger,
                 include_types=["cls"],
-                subset_label = config.trainsubset_label
+                subset_label = config.trainsubset_label,
+                criterion_gep_gepc=criterion_gep_gepc if config.GEP or config.GEPC else None,
+                # criterion_gep_gepc=criterion_gep_gepc if config.GEP and config.GEPC else None,
+                criterion_dab=criterion_dab if config.DAR else None,
+                criterion_cls=criterion_cls if config.CLS else None,
+                device=device,
+                # epoch=epoch
             )
             results["batch_umap"].savefig(
                 save_dir / f"train_embeddings_batch_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
@@ -733,6 +740,12 @@ def train_scgpt_wrapper(**kwargs):
                 logger=logger,
                 include_types=["cls"],
                 subset_label = config.valsubset_label,
+                criterion_gep_gepc=criterion_gep_gepc if config.GEP or config.GEPC else None,
+                # criterion_gep_gepc=criterion_gep_gepc if config.GEP and config.GEPC else None,
+                criterion_dab=criterion_dab if config.DAR else None,
+                criterion_cls=criterion_cls if config.CLS else None,
+                device=device,
+                # epoch=epoch
             )
             results["batch_umap"].savefig(
                 save_dir / f"val_embeddings_batch_umap[cls]_e{best_model_epoch}.png", dpi=300, bbox_inches="tight"
@@ -760,7 +773,7 @@ def train_scgpt_wrapper(**kwargs):
                 criterion_dab=criterion_dab if config.DAR else None,
                 criterion_cls=criterion_cls if config.CLS else None,
                 device=device,
-                epoch=epoch
+                # epoch=epoch
             )
 
             results["batch_umap"].savefig(
@@ -912,18 +925,40 @@ def train_scgpt_wrapper(**kwargs):
         wandb.finish()
     gc.collect()
 
+    result_summary_dict['save_dir'] = save_dir
     # record the end time and the total elapsed time
-    end_time = time.strftime('%b%d-%H-%M')
-    result_summary_dict.update({"end_time": end_time})
+    end_time_str = time.strftime('%b%d-%H-%M')
+    result_summary_dict.update({"end_time": end_time_str})
     result_summary_dict.update({"total_time": time.strftime('%H:%M:%S', time.gmtime(time.time() - start_time))})
+
 
     return result_summary_dict
 
 
+def clean_res_values(k,v):
+    # check if the value is an image
+    if isinstance(v,wandb.Image):
+        return False
+    elif isinstance(v,plt.Figure):
+        return False
+    return True
+
 # %%
 if __name__ == "__main__":
     # train_scgpt_wrapper()
-    train_scgpt_wrapper(epochs=20)
+    results_dict = train_scgpt_wrapper(epochs=3,layer_size=64,nlayers=2,nhead=2)
     # train_scgpt_wrapper(epochs=1, load_model = f"{data_dir}/save/dev_metab_v0-May20-15-24")
     # train_scgpt_wrapper(epochs=1, load_model = f"{data_dir}/save/dev_metab_v0-May21-13-30")
     # train_scgpt_wrapper(epochs=1, load_model = f"{data_dir}/save/dev_metab_v0-May21-13-30", celltype_label="IMDC Binary", datasubset_label = 'finetune_set', trainsubset_label = 'Finetune', valsubset_label = 'Validation', testsubset_label = 'Test')
+
+
+# %%
+# save results dict to json
+    print(results_dict)
+    os.makedirs('results', exist_ok=True)
+
+    # remove the images from the results dict
+    results_dict = {k: v for k, v in results_dict.items() 
+                           if clean_res_values(k,v)}
+    with open('results/results_dict.json', 'w') as fp:
+        json.dump(results_dict, fp)

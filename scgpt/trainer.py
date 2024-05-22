@@ -611,7 +611,7 @@ def evaluate(
                 )
                 
                 loss = torch.tensor(0,dtype=torch.float32)
-                if 'cls_output' in output_dict:
+                if ('cls_output' in output_dict) and config.CLS:
                     output_values = output_dict["cls_output"]
                     cls_loss = criterion_cls(output_values, celltype_labels)
                     cls_accuracy = (output_values.argmax(1) == celltype_labels).sum().item()
@@ -651,7 +651,7 @@ def evaluate(
                     loss = loss + cls_loss
                     # loss += cls_loss
                     tmp_error = torch.tensor(1 - cls_accuracy / len(input_gene_ids),dtype=torch.float32)
-                    tmp_cls_accuracy = cls_accuracy
+                    tmp_cls_accuracy = cls_accuracy/ len(input_gene_ids)
 
                 elif config.task in ["integration", "multiomic"]:
                     # output_values = output_dict["mlm_output"]
