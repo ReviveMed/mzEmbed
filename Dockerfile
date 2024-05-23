@@ -47,6 +47,13 @@ RUN apt-get update && apt-get install -y vim
 RUN pip install --upgrade pip
 RUN pip install mysqlclient
 
+# Install R base
+RUN apt-get install -y r-base
+
+# Install R devtools
+RUN apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev
+RUN R -e "install.packages('devtools', repos='http://cran.rstudio.com/')"
+
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements_4.txt
