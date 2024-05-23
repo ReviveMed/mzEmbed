@@ -36,8 +36,10 @@ def objective(trial):
     epochs = trial.suggest_int('epochs', 5, 30, step=1)
     n_bins = trial.suggest_int('n_bins', 51, 101, step=10)
     # lr = trial.suggest_float('lr', 1e-5, 1e-3, log=True)
-    layer_size = trial.suggest_int('layer_size', 64, 512, step=64)
-    nlayers = trial.suggest_int('nlayers', 2, 12, step=1)
+    # layer_size = trial.suggest_int('layer_size', 64, 512, step=64)
+    layer_size = trial.suggest_int('layer_size', 64, 128, step=64)
+    nlayers = trial.suggest_int('nlayers', 2, 8, step=2)
+    # nlayers = trial.suggest_int('nlayers', 2, 12, step=1)
     nhead = trial.suggest_int('nhead', 2, 8, step=2)
     if nhead == 6:
         print('overwriting nhead=6 to nhead=4')
