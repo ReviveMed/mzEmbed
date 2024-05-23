@@ -927,6 +927,14 @@ def get_head_kwargs_by_desc(desc_str, num_hidden_layers=0, weight=1, y_cols=None
         y_idx = 0
         plot_latent_space_cols = ['Group']
 
+    elif 'bmi' in desc_str.lower():
+        y_head_cols = ['BMI']
+        head_name = 'BMI'
+        head_kind = 'Regression'
+        num_classes = 1
+        y_idx = 0
+        plot_latent_space_cols = ['BMI']
+
     else:
         raise ValueError('Unknown desc_str:',desc_str)
 

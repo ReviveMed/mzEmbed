@@ -134,6 +134,12 @@ default_eval_params_list = [
         'y_col_name': 'LungCancer BINARY',
         'y_head': 'LungCancer',
         'y_cols': ['LungCancer BINARY']},
+
+    ###### Stanford BMI ######
+    {
+        'y_col_name': 'BMI',
+        'y_head': 'BMI',
+        'y_cols': ['BMI']},
 ]
 
 
@@ -246,7 +252,9 @@ def parse_sweep_kwargs_from_command_line():
 
 def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,
                             run,prefix_name,num_iterations=10,eval_on_test=True,
-                            file_suffix='_finetune',use_cross_val=False,yes_plot_latent_space=False):
+                            file_suffix='_finetune',
+                            use_cross_val=False,
+                            yes_plot_latent_space=False):
 
     record_train_metrics = defaultdict(list)
     num_train_success = 0
@@ -439,6 +447,7 @@ def finetune_run_wrapper(**user_kwargs):
     with_id = user_kwargs.get('with_id',None)
     eval_on_test = user_kwargs.get('eval_on_test',True)
     use_cross_val = user_kwargs.get('use_cross_val',False)
+    yes_plot_latent_space = user_kwargs.get('yes_plot_latent_space',False)
     if with_id is not None:
         if isinstance(with_id,int):
             with_id = 'SUR-'+str(with_id)
@@ -488,7 +497,8 @@ def finetune_run_wrapper(**user_kwargs):
                                                num_iterations=num_iterations,
                                                eval_on_test=eval_on_test,
                                                 file_suffix=file_suffix,
-                                                use_cross_val=use_cross_val)
+                                                use_cross_val=use_cross_val,
+                                                yes_plot_latent_space=yes_plot_latent_space)
     run['sys/failed'] = False
     run.stop()
     return run_id, all_metrics
