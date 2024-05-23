@@ -52,7 +52,9 @@ RUN apt-get install -y r-base
 
 # Install R devtools
 RUN apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev
-RUN R -e "install.packages('devtools', repos='http://cran.rstudio.com/')"
+RUN apt-get install -y libfontconfig1-dev libharfbuzz-dev libfribidi-dev libtiff-dev
+RUN R -e "install.packages(c('systemfonts', 'textshaping', 'ragg', 'pkgdown'), repos='http://cran.rstudio.com/',dependencies = TRUE)"
+RUN R -e "install.packages('devtools', repos='http://cran.rstudio.com/', dependencies = TRUE)"
 
 
 # Install any needed packages specified in requirements.txt
