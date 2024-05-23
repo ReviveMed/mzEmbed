@@ -281,6 +281,9 @@ def train_scgpt_wrapper(**kwargs):
         elif config.celltype_label == "Age Group":
             adata.obs["Age Group"] = ['adult' if 'adult' in x else 'child' for x in adata.obs['Cohort Label']]
 
+        elif config.celltype_label == "Dummy":
+            adata.obs["Dummy"] = ['dummy' for x in adata.obs['Cohort Label']]
+
         # adata = scvi.data.pbmc_dataset()  # 11990 × 3346
         ori_batch_col = "Study ID"
         adata.obs["celltype"] = adata.obs[config.celltype_label].astype("category")
