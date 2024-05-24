@@ -53,9 +53,15 @@ def objective(trial):
     elif task == 'annotation':
         CLS = True
 
+    if celltype_label == 'Dummy':
+        GEPC = False
+    else:
+        GEPC = True
+
     pretrain_config = dict(
         task =task,
         CLS = CLS,
+        GEPC = GEPC,
         celltype_label = celltype_label,
         datasubset_label = 'pretrain_set',
         trainsubset_label = 'Train',
@@ -83,7 +89,7 @@ def objective(trial):
     if 'val/gepc' in pretrain_res:
         val_gepc_loss = pretrain_res['val/gepc']
     else: val_gepc_loss = val_gep_loss
-    
+
     save_dir = pretrain_res['save_dir']
     # trial.set_user_attr('save_dir', save_dir)
     trial.set_user_attr('pretrain_wandb_name', pretrain_res['wandb_name'])
