@@ -75,10 +75,15 @@ def objective(trial):
 
 
     pretrain_res = train_scgpt_wrapper(**pretrain_config)
+    if 'val/avg_bio' in pretrain_res:
+        val_avg_bio = pretrain_res['val/avg_bio']
+    else: val_avg_bio = 0
 
-    val_avg_bio = pretrain_res['val/avg_bio']
     val_gep_loss = pretrain_res['val/gep']
-    val_gepc_loss = pretrain_res['val/gepc']
+    if 'val/gepc' in pretrain_res:
+        val_gepc_loss = pretrain_res['val/gepc']
+    else: val_gepc_loss = val_gep_loss
+    
     save_dir = pretrain_res['save_dir']
     # trial.set_user_attr('save_dir', save_dir)
     trial.set_user_attr('pretrain_wandb_name', pretrain_res['wandb_name'])
