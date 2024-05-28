@@ -10,14 +10,16 @@ import neptune
 from utils_neptune import convert_neptune_kwargs
 
 lung_cancer_dir = '/Users/jonaheaton/ReviveMed Dropbox/Jonah Eaton/stanford-hmp2'
-data_dir = os.path.join(lung_cancer_dir, 'data_v1') # data_v1 is only the baseline data
+data_dir = os.path.join(lung_cancer_dir, 'data_v3') # data_v1 is only the baseline data
+# v2 is the synthetic pool data
+# v3 is the map pool data
 
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 PROJECT_ID = 'revivemed/Survival-RCC'
 
 # desc_str = 'lungcancer v1'
-desc_str = 'stanford bmi v1'
-DATE_STR = 'May24'
+desc_str = 'stanford bmi pooldata'
+DATE_STR = 'May28'
 head_hidden_layers = 0
 name = 'basic-R Stanford-BMI opt'
 file_suffix = '_stanford-hmp'
@@ -28,7 +30,11 @@ if not os.path.exists(data_dir):
     home_dir = os.path.expanduser("~")
     data_dir = os.path.join(home_dir, "Stanford_HMP_DATA")
     if not os.path.exists(data_dir):
-        dropbox_url = 'https://www.dropbox.com/scl/fo/41i39c8gi3o615kjbz4cm/AOcDvdlEolMpZvGZcamERR4?rlkey=10q6no0h2pbkjlh7xl5pv86xa&dl=1'
+        # synthetic pool data
+        # dropbox_url = 'https://www.dropbox.com/scl/fo/41i39c8gi3o615kjbz4cm/AOcDvdlEolMpZvGZcamERR4?rlkey=10q6no0h2pbkjlh7xl5pv86xa&dl=1'
+
+        # map pool data
+        dropbox_url = 'https://www.dropbox.com/scl/fo/7izriautf8fpenq45eotm/AKILvZhXAoMJ8ON4kACrI6g?rlkey=8y770ltc4rx81euln1btu861v&dl=1'
         os.makedirs(data_dir)
         download_data_dir(dropbox_url, save_dir=data_dir)
 
@@ -129,10 +135,14 @@ def objective(trial):
     # print(all_metrics.keys())
     # Assume that result is a dictionary with the two objectives
     # Replace 'objective1' and 'objective2' with your actual objectives
-    if 'avg_training_run/metrics/val__head_BMI__on_BMI_MAE' not in all_metrics:
+
+    obj_neptune = 'avg_training_run/metrics/val__head_BMI__on_BMI_MAE'
+    obj_clean = 'trainrun__val__head_BMI__on_BMI_MAE'
+
+    if obj_clean not in all_metrics:
         optuna.TrialPruned()
 
-    objective1_array = all_metrics['avg_training_run/metrics/val__head_BMI__on_BMI_MAE']
+    objective1_array = all_metrics[obj_clean]
 
     num_success_iter = len(objective1_array)
     trial.set_user_attr('num_success_iter', num_success_iter)
@@ -158,7 +168,7 @@ study = optuna.create_study(directions=['minimize'],
                         storage=WEBAPP_DB_LOC, 
                         load_if_exists=True)
 
-study.optimize(objective, n_trials=5)
+study.optimize(objective, n_trials=50)
 
 
 # get the best trial and run it with random initialization
