@@ -121,29 +121,29 @@ def objective(trial):
 
 
     # Call finetune_run_wrapper with the hyperparameters
-    try:
-        run_id, all_metrics = finetune_run_wrapper(**sweep_kwargs)
-        print('run_id:', run_id)
-        trial.set_user_attr('run_id', run_id)
+    # try:
+    run_id, all_metrics = finetune_run_wrapper(**sweep_kwargs)
+    print('run_id:', run_id)
+    trial.set_user_attr('run_id', run_id)
 
-        # print(all_metrics.keys())
-        # Assume that result is a dictionary with the two objectives
-        # Replace 'objective1' and 'objective2' with your actual objectives
-        if 'avg_training_run/metrics/val__head_BMI__on_BMI_MAE' not in all_metrics:
-            optuna.TrialPruned()
-
-        objective1_array = all_metrics['avg_training_run/metrics/val__head_BMI__on_BMI_MAE']
-
-        num_success_iter = len(objective1_array)
-        trial.set_user_attr('num_success_iter', num_success_iter)
-
-        if num_success_iter < 3*num_iter/4:
-            optuna.TrialPruned()
-        
-        objective1 = np.mean(objective1_array)
-    except Exception as e:
+    # print(all_metrics.keys())
+    # Assume that result is a dictionary with the two objectives
+    # Replace 'objective1' and 'objective2' with your actual objectives
+    if 'avg_training_run/metrics/val__head_BMI__on_BMI_MAE' not in all_metrics:
         optuna.TrialPruned()
-        objective1 = -1
+
+    objective1_array = all_metrics['avg_training_run/metrics/val__head_BMI__on_BMI_MAE']
+
+    num_success_iter = len(objective1_array)
+    trial.set_user_attr('num_success_iter', num_success_iter)
+
+    if num_success_iter < 3*num_iter/4:
+        optuna.TrialPruned()
+    
+    objective1 = np.mean(objective1_array)
+    # except Exception as e:
+    #     optuna.TrialPruned()
+    #     objective1 = -1
     
 
     return objective1
