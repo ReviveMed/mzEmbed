@@ -197,10 +197,12 @@ trials_df = study.trials_dataframe()
 # Sort the trials by value in ascending order and select the top 10
 top_10_trials = trials_df.sort_values("value", ascending=True).head(10)
 # get the top 20 models
+print(top_10_trials)
+# exit()
 
 for i in range(10):
     print(top_10_trials.iloc[i])
-    with_id = top_10_trials.iloc[i]['user_attrs']['run_id']
+    with_id = top_10_trials.iloc[i]['user_attrs_run_id']
 
     run = neptune.init_run(project=PROJECT_ID,
                             api_token=NEPTUNE_API_TOKEN,
