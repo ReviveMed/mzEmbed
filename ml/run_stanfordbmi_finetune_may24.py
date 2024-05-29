@@ -178,13 +178,51 @@ best_trial_run_id = best_trial.user_attrs['run_id']
 print(best_trial_params)
 print(best_trial_run_id)
 
+# Plot latent space for the best trial
+# print('best_trial_run_id:', best_trial_run_id)
+# run = neptune.init_run(project=PROJECT_ID,
+#                         api_token=NEPTUNE_API_TOKEN,
+#                         with_id=best_trial_run_id)
+
+# original_sweep_kwargs = run['sweep_kwargs'].fetch()
+# run.stop()
+# original_sweep_kwargs = convert_neptune_kwargs(original_sweep_kwargs)
+# original_sweep_kwargs['with_id'] = best_trial_run_id
+# original_sweep_kwargs['yes_plot_latent_space'] = True
+# finetune_run_wrapper(**original_sweep_kwargs)
 
 
-print('best_trial_run_id:', best_trial_run_id)
+# Get a DataFrame representation of the trials
+trials_df = study.trials_dataframe()
+# Sort the trials by value in ascending order and select the top 10
+top_10_trials = trials_df.sort_values("value", ascending=True).head(10)
+# get the top 20 models
 
+for i in range(10):
+    print(top_10_trials.iloc[i])
+    with_id = top_10_trials.iloc[i]['user_attrs']['run_id']
+
+    run = neptune.init_run(project=PROJECT_ID,
+                            api_token=NEPTUNE_API_TOKEN,
+                            with_id=with_id)
+    
+    run['sys/tags'] = ['may29_top_10']
+    original_sweep_kwargs = run['sweep_kwargs'].fetch()
+    run.stop()
+    original_sweep_kwargs = convert_neptune_kwargs(original_sweep_kwargs)
+    original_sweep_kwargs['with_id'] = best_trial_run_id
+    original_sweep_kwargs['yes_plot_latent_space'] = True
+    finetune_run_wrapper(**original_sweep_kwargs)
+# finetune_run_wrapper(yes_plot_latent_space=True,with_id=best_trial_run_id)
+
+
+
+
+
+# also plot for the randinit
 run = neptune.init_run(project=PROJECT_ID,
                         api_token=NEPTUNE_API_TOKEN,
-                        with_id=best_trial_run_id)
+                        with_id='SUR-4707')
 
 original_sweep_kwargs = run['sweep_kwargs'].fetch()
 run.stop()
@@ -192,7 +230,6 @@ original_sweep_kwargs = convert_neptune_kwargs(original_sweep_kwargs)
 original_sweep_kwargs['with_id'] = best_trial_run_id
 original_sweep_kwargs['yes_plot_latent_space'] = True
 finetune_run_wrapper(**original_sweep_kwargs)
-# finetune_run_wrapper(yes_plot_latent_space=True,with_id=best_trial_run_id)
 
 exit()
 
@@ -208,5 +245,6 @@ for with_id in [best_trial_run_id]:
 
     original_sweep_kwargs = convert_neptune_kwargs(original_sweep_kwargs)
     original_sweep_kwargs['use_rand_init'] = True
+    original_sweep_kwargs['yes_plot_latent_space'] = True
     print(original_sweep_kwargs)
     finetune_run_wrapper(**original_sweep_kwargs)
