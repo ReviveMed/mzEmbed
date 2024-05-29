@@ -135,6 +135,11 @@ default_eval_params_list = [
         'y_head': 'LungCancer',
         'y_cols': ['LungCancer BINARY']},
 
+    {
+        'y_col_name': 'Cancer',
+        'y_head': 'Cancer',
+        'y_cols': ['Cancer']},
+
     ###### Stanford BMI ######
     {
         'y_col_name': 'BMI',
@@ -317,14 +322,29 @@ def run_multiple_iterations(data_dir,params,output_dir,eval_params_list,
             print(e)
     
     if eval_on_test:
+        data_files = os.listdir(data_dir)
+        
+        train_name = 'trainval'
+        for x in data_files:
+            # if 'trainval' in x:
+            #     train_name = 'trainval'
+            #     break
+            if 'discovery' in x:
+                train_name = 'discovery'
+                break
+        print('train_name for the evaluating on the test set:',train_name)
+
+
         for iter in range(num_iterations):
             try:
                 
+                os.listdir(data_dir)
+
                 test_metrics = run_model_wrapper(data_dir,params,
                                 output_dir=output_dir,
-                                train_name='trainval',
+                                train_name=train_name,
                                 prefix=f'testing_{prefix_name}_{iter}', 
-                                eval_name_list=['test','trainval'],
+                                eval_name_list=['test',train_name],
                                 eval_params_list=eval_params_list,
                                 run_dict=run,
                                 file_suffix=file_suffix,
