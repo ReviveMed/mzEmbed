@@ -36,25 +36,25 @@ if not os.path.exists(data_dir):
         download_data_dir(dropbox_url, save_dir=data_dir)
 
 
-finetune_run_wrapper(data_dir=data_dir,
-                     desc_str = desc_str,
-                     num_iterations = 10,
-                     eval_on_test = False,
-                     file_suffix = file_suffix,
-                     num_epochs = 20,
-                     dropout_rate=0.2,
-                     head_hidden_layers=0,
-                     noise_factor=0.1,
-                     encoder_weight=0.1,
-                     use_cross_val=False,
-                     yes_plot_latent_space=True)
+# finetune_run_wrapper(data_dir=data_dir,
+#                      desc_str = desc_str,
+#                      num_iterations = 10,
+#                      eval_on_test = False,
+#                      file_suffix = file_suffix,
+#                      num_epochs = 20,
+#                      dropout_rate=0.2,
+#                      head_hidden_layers=0,
+#                      noise_factor=0.1,
+#                      encoder_weight=0.1,
+#                      use_cross_val=False,
+#                      yes_plot_latent_space=True)
 
 # TODO cross-validation
 # TODO: umaps of latent space
 
 ############
 
-exit()
+# exit()
 
 def objective(trial):
     # Define your hyperparameters for finetune_run_wrapper
