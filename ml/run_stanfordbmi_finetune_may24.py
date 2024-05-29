@@ -197,7 +197,7 @@ trials_df = study.trials_dataframe()
 # Sort the trials by value in ascending order and select the top 10
 top_10_trials = trials_df.sort_values("value", ascending=True).head(10)
 # get the top 20 models
-print(top_10_trials)
+# print(top_10_trials)
 # exit()
 
 for i in range(10):
@@ -212,7 +212,7 @@ for i in range(10):
     original_sweep_kwargs = run['sweep_kwargs'].fetch()
     run.stop()
     original_sweep_kwargs = convert_neptune_kwargs(original_sweep_kwargs)
-    original_sweep_kwargs['with_id'] = best_trial_run_id
+    original_sweep_kwargs['with_id'] = with_id
     original_sweep_kwargs['yes_plot_latent_space'] = True
     finetune_run_wrapper(**original_sweep_kwargs)
 # finetune_run_wrapper(yes_plot_latent_space=True,with_id=best_trial_run_id)
