@@ -208,7 +208,7 @@ for i in range(10):
                             api_token=NEPTUNE_API_TOKEN,
                             with_id=with_id)
     
-    run['sys/tags'] = ['may29_top_10']
+    run['sys/tags'].add('may29_top10')
     original_sweep_kwargs = run['sweep_kwargs'].fetch()
     run.stop()
     original_sweep_kwargs = convert_neptune_kwargs(original_sweep_kwargs)
