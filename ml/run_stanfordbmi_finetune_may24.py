@@ -168,7 +168,7 @@ study = optuna.create_study(directions=['minimize'],
                         storage=WEBAPP_DB_LOC, 
                         load_if_exists=True)
 
-study.optimize(objective, n_trials=50)
+study.optimize(objective, n_trials=0)
 
 
 # get the best trial and run it with random initialization
@@ -178,6 +178,23 @@ best_trial_run_id = best_trial.user_attrs['run_id']
 print(best_trial_params)
 print(best_trial_run_id)
 
+
+
+print('best_trial_run_id:', best_trial_run_id)
+
+run = neptune.init_run(project=PROJECT_ID,
+                        api_token=NEPTUNE_API_TOKEN,
+                        with_id=best_trial_run_id)
+
+original_sweep_kwargs = run['sweep_kwargs'].fetch()
+run.stop()
+original_sweep_kwargs = convert_neptune_kwargs(original_sweep_kwargs)
+original_sweep_kwargs['with_id'] = best_trial_run_id
+original_sweep_kwargs['yes_plot_latent_space'] = True
+finetune_run_wrapper(**original_sweep_kwargs)
+# finetune_run_wrapper(yes_plot_latent_space=True,with_id=best_trial_run_id)
+
+exit()
 
 for with_id in [best_trial_run_id]:
     run = neptune.init_run(project=PROJECT_ID,
