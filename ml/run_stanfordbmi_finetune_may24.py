@@ -192,6 +192,25 @@ print(best_trial_run_id)
 # finetune_run_wrapper(**original_sweep_kwargs)
 
 
+# Plot train a model on the train+val data
+print('best_trial_run_id:', best_trial_run_id)
+run = neptune.init_run(project=PROJECT_ID,
+                        api_token=NEPTUNE_API_TOKEN,
+                        with_id=best_trial_run_id)
+
+original_sweep_kwargs = run['sweep_kwargs'].fetch()
+run.stop()
+original_sweep_kwargs = convert_neptune_kwargs(original_sweep_kwargs)
+original_sweep_kwargs['with_id'] = best_trial_run_id
+original_sweep_kwargs['yes_plot_latent_space'] = True
+original_sweep_kwargs['eval_on_test'] = True
+original_sweep_kwargs['data_dir'] = '/Users/jonaheaton/ReviveMed Dropbox/Jonah Eaton/stanford-hmp2/data_v3'
+original_sweep_kwargs['num_iterations'] =1
+finetune_run_wrapper(**original_sweep_kwargs)
+
+exit()
+
+
 # Get a DataFrame representation of the trials
 trials_df = study.trials_dataframe()
 # Sort the trials by value in ascending order and select the top 10

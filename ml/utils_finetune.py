@@ -275,7 +275,7 @@ def create_latentspace_plots(X_data_eval,y_data_eval, encoder,save_dir,eval_name
                 else:
                     # if fewer than 30 unique values, then assume its categorical
                     # palette = get_color_map(Z_embed[hue_col].nunique())
-                    palette = assign_color_map(Z_embed[hue_col].unique())
+                    palette = assign_color_map(Z_embed[hue_col].unique().dropna())
                     Z_counts = Z_embed[hue_col].value_counts()
 
                 plot_title = f'{prefix} Latent Space of {eval_name} (N={Z_count_sum})'
