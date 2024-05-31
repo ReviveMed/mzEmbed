@@ -268,7 +268,15 @@ def train_scgpt_wrapper(**kwargs):
         adata = read_h5ad(load_path)
 
         print('Make sure that Study ID ST000422 is properly labeled as adult_other')
-        adata[adata.obs['Study ID'] == 'ST000422'].obs['Cohort Label'] = 'adult_other'
+        # adata[adata.obs['Study ID'] == 'ST000422'].obs['Cohort Label'] = 'adult_other'
+        print('All samples in ST001408 are male')
+        # adata[adata.obs['Study ID'] == 'ST001408'].obs['sex'] = 'M'
+        print('All samples in ST002023 are female')
+        # adata[adata.obs['Study ID'] == 'ST002027'].obs['sex'] = 'F'
+
+        adata.obs.loc[adata.obs['Study ID'] == 'ST000422', 'Cohort Label'] = 'adult_other'
+        adata.obs.loc[adata.obs['Study ID'] == 'ST001408', 'sex'] = 'M'
+        adata.obs.loc[adata.obs['Study ID'] == 'ST002027', 'sex'] = 'F'
         
         if config.celltype_label == "IMDC Binary":
             adata = adata[adata.obs["IMDC"].isin(["FAVORABLE", "POOR"])].copy()
@@ -277,6 +285,13 @@ def train_scgpt_wrapper(**kwargs):
         elif config.celltype_label == "MSKCC Binary":
             adata = adata[adata.obs["MSKCC"].isin(["FAVORABLE", "POOR"])].copy()
             adata.obs['MSKCC Binary'] = adata.obs['MSKCC']
+
+        elif config.celltype_label == "Cohort Sex":
+            cohort_vals = adata.obs['Cohort Label'].values
+            sex_vals = adata.obs['sex'].values
+
+            new_vals = [f'{x}_{y}' for x, y in zip(cohort_vals,sex_vals)]
+            adata.obs['cohort sex labels'] = pd.Categorical(new_vals)
 
         elif config.celltype_label == "Age Group":
             adata.obs["Age Group"] = ['adult' if 'adult' in x else 'child' for x in adata.obs['Cohort Label']]
