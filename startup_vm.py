@@ -84,6 +84,7 @@ def get_mspeak_from_job_id(script_path_mspeak, job_id, freq_th, max_samples_th):
     records = cursor.fetchall()
     user_id = records[0][1]
     job_time = records[0][3]
+    user_selected_normalization_method = records[0][48]
     # job_time = job_time.strftime("%Y-%m-%d %H:%M:%S")
     mzlearn_path = f"mzlearn/{user_id}/{job_time}"
 
@@ -132,14 +133,18 @@ def get_mspeak_from_job_id(script_path_mspeak, job_id, freq_th, max_samples_th):
                                         )
 
     # use pool_map normalization if possible, else use synthetic normalization
-    pool_map_intensity_path = f"{script_path}/{job_id}/result-/final_peaks/intensity_max_pool_map_norm.csv"
-    synthetic_norm_intensity_path = f"{script_path}/{job_id}/result-/final_peaks/intensity_max_synthetic_map_norm.csv"
-    normalized_intensity_df = pd.DataFrame()
-    if os.path.exists(pool_map_intensity_path):
-        normalized_intensity_df = pd.read_csv(pool_map_intensity_path, index_col=0)
-    else:  # use synthetic normalization if pool_map normalization does not exist
-        normalized_intensity_df = pd.read_csv(synthetic_norm_intensity_path, index_col=0)
-    # if normalized_intensity_df is not empty, then use it to update the intensity of the origin_study
+    # use user selected normalization method
+    # normalization_methods: hall_mark_normalization,pool_map_normalization,synthetic_map_normalization
+    # pool_map_intensity_path = f"{script_path}/{job_id}/result-/final_peaks/intensity_max_pool_map_norm.csv"
+    # synthetic_norm_intensity_path = f"{script_path}/{job_id}/result-/final_peaks/intensity_max_synthetic_map_norm.csv"
+    if user_selected_normalization_method == 'pool_map_normalization':
+        normalized_intensity_peak_list_path = f"{script_path}/{job_id}/result-/final_peaks/intensity_max_pool_map_norm.csv"
+    elif user_selected_normalization_method == 'synthetic_map_normalization':
+        normalized_intensity_peak_list_path = f"{script_path}/{job_id}/result-/final_peaks/intensity_max_synthetic_map_norm.csv"
+    else:
+        normalized_intensity_peak_list_path = f"{script_path}/{job_id}/result-/final_peaks/intensity_max_norm.csv"
+
+    normalized_intensity_df = pd.read_csv(normalized_intensity_peak_list_path, index_col=0)
     if not normalized_intensity_df.empty:
         print("peak intensity added")
         study_mspeak.add_peak_intensity(normalized_intensity_df)
