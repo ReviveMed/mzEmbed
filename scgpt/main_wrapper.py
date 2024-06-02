@@ -291,7 +291,7 @@ def train_scgpt_wrapper(**kwargs):
             sex_vals = adata.obs['sex'].values
 
             new_vals = [f'{x}_{y}' for x, y in zip(cohort_vals,sex_vals)]
-            adata.obs['cohort sex labels'] = pd.Categorical(new_vals)
+            adata.obs['Cohort Sex'] = pd.Categorical(new_vals)
 
         elif config.celltype_label == "Age Group":
             adata.obs["Age Group"] = ['adult' if 'adult' in x else 'child' for x in adata.obs['Cohort Label']]
