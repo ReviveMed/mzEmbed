@@ -259,7 +259,11 @@ def train_scgpt_wrapper(**kwargs):
     # ## Loading and preparing data
     if dataset_name == "metab_v1":
         print('this metabolomics data has already been log2 transformed, missing value filled and study-id standardized')
-        data_url = 'https://www.dropbox.com/scl/fo/ltukt9smkbc60j88lkhn5/ADCoBKOkmF9L7LUKs7VdZbg?rlkey=pf19njmgm3mrex5a10y2qq4hf&dl=1'
+        
+        # link to the directory of the data
+        # data_dir_url = 'https://www.dropbox.com/scl/fo/ltukt9smkbc60j88lkhn5/ADCoBKOkmF9L7LUKs7VdZbg?rlkey=pf19njmgm3mrex5a10y2qq4hf&dl=1'
+        
+        data_url = 'https://www.dropbox.com/scl/fi/kmnfye2le2gr8c19c7nwc/data.h5ad?rlkey=vvvlyqk9bihqpdi04xa9rse5f&dl=1'
         load_dir = Path(f"{data_dir}/{dataset_name}")
         load_dir.mkdir(parents=True, exist_ok=True)
         load_path = load_dir / "data.h5ad"
@@ -1009,7 +1013,7 @@ def clean_res_values(k,v):
 # %%
 if __name__ == "__main__":
     # train_scgpt_wrapper()
-    results_dict = train_scgpt_wrapper(epochs=3,layer_size=64,nlayers=2,nhead=2)
+    results_dict = train_scgpt_wrapper(epochs=3,layer_size=32,nlayers=2,nhead=2)
     # train_scgpt_wrapper(epochs=1, load_model = f"{data_dir}/save/dev_metab_v0-May20-15-24")
     # train_scgpt_wrapper(epochs=1, load_model = f"{data_dir}/save/dev_metab_v0-May21-13-30")
     # train_scgpt_wrapper(epochs=1, load_model = f"{data_dir}/save/dev_metab_v0-May21-13-30", celltype_label="IMDC Binary", datasubset_label = 'finetune_set', trainsubset_label = 'Finetune', valsubset_label = 'Validation', testsubset_label = 'Test')
