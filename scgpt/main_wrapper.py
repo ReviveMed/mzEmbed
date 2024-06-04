@@ -305,6 +305,12 @@ def train_scgpt_wrapper(**kwargs):
         filter_gene_by_counts = False
         adata_protein = None
 
+        # The data needs to be positive, since the missing values are the zeros
+        lowest_val = np.floor(adata.X.min())
+        if lowest_val < 0:
+            print(f"lowest value is {lowest_val}, add {abs(lowest_val)+1} to make all values positive")
+            adata.X = adata.X + abs(lowest_val) + 1
+
     elif dataset_name == "metab_v0":
         # /Users/jonaheaton/Desktop/scGPT-main/data/metabolomics_apr24/data.h5ad
         data_url = 'https://www.dropbox.com/scl/fi/5g4ml5qio2ptumj8m3yjo/data.h5ad?rlkey=nlsrmacl5vzx9wxvci59vdj5p&dl=1'
