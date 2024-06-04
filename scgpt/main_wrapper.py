@@ -106,7 +106,8 @@ hyperparameter_defaults = dict(
     # task="annotation",
     task = 'integration',
     seed=42,
-    dataset_name="metab_v0",
+    # dataset_name="metab_v0",
+    dataset_name="metab_v1",
     do_train=True,
     # load_model="save/scGPT_bc",
     # load_model = None,
@@ -256,7 +257,51 @@ def train_scgpt_wrapper(**kwargs):
 
     # %%
     # ## Loading and preparing data
-    if dataset_name == "metab_v0":
+    if dataset_name == "metab_v1":
+        print('this metabolomics data has already been log2 transformed, missing value filled and study-id standardized')
+        data_url = 'https://www.dropbox.com/scl/fo/ltukt9smkbc60j88lkhn5/ADCoBKOkmF9L7LUKs7VdZbg?rlkey=pf19njmgm3mrex5a10y2qq4hf&dl=1'
+        load_dir = Path(f"{data_dir}/{dataset_name}")
+        load_dir.mkdir(parents=True, exist_ok=True)
+        load_path = load_dir / "data.h5ad"
+        if not os.path.exists(load_path):
+            print('downloading data')
+            download_data_file(data_url, save_dir=load_dir)
+        adata = read_h5ad(load_path)
+
+        if config.celltype_label == "IMDC Binary":
+            adata = adata[adata.obs["IMDC"].isin(["FAVORABLE", "POOR"])].copy()
+            adata.obs['IMDC Binary'] = adata.obs['IMDC']
+    
+        elif config.celltype_label == "MSKCC Binary":
+            adata = adata[adata.obs["MSKCC"].isin(["FAVORABLE", "POOR"])].copy()
+            adata.obs['MSKCC Binary'] = adata.obs['MSKCC']
+
+        elif config.celltype_label == "Cohort Sex":
+            cohort_vals = adata.obs['Cohort Label'].values
+            sex_vals = adata.obs['sex'].values
+
+            new_vals = [f'{x}_{y}' for x, y in zip(cohort_vals,sex_vals)]
+            adata.obs['Cohort Sex'] = pd.Categorical(new_vals)
+
+        elif config.celltype_label == "Age Group":
+            adata.obs["Age Group"] = ['adult' if 'adult' in x else 'child' for x in adata.obs['Cohort Label']]
+
+        elif config.celltype_label == "Dummy":
+            adata.obs["Dummy"] = ['dummy' for x in adata.obs['Cohort Label']]
+
+        # adata = scvi.data.pbmc_dataset()  # 11990 × 3346
+        ori_batch_col = "Study ID"
+        adata.obs["celltype"] = adata.obs[config.celltype_label].astype("category")
+        
+        # drop the nan celltype
+        adata = adata[~adata.obs["celltype"].isna()]
+        adata = adata[adata.obs["celltype"] != "nan"]
+        
+        data_is_raw = False
+        filter_gene_by_counts = False
+        adata_protein = None
+
+    elif dataset_name == "metab_v0":
         # /Users/jonaheaton/Desktop/scGPT-main/data/metabolomics_apr24/data.h5ad
         data_url = 'https://www.dropbox.com/scl/fi/5g4ml5qio2ptumj8m3yjo/data.h5ad?rlkey=nlsrmacl5vzx9wxvci59vdj5p&dl=1'
         load_dir = Path(f"{data_dir}/{dataset_name}")

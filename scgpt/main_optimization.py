@@ -1,4 +1,5 @@
 import optuna
+import gc
 
 from main_wrapper import train_scgpt_wrapper
 import argparse
@@ -20,10 +21,9 @@ args = parser.parse_args()
 celltype_label = args.label
 num_trials = args.ntrials
 
-# "Cohort Sex"
 
 study_info_dict = {
-    'study_name': [f'scGPT {celltype_label} May22'],
+    'study_name': [f'scGPT {celltype_label} June04'],
     'directions': ['maximize','minimize','minimize'],
     'task': 'integration'
 } 
@@ -32,21 +32,21 @@ study_info_dict = {
 
 def objective(trial):
 
-    mask_ratio = trial.suggest_float('mask_ratio', 0.1, 0.1, step=0.05)
+    mask_ratio = trial.suggest_float('mask_ratio', 0.05, 0.25, step=0.05)
     epochs = trial.suggest_int('epochs', 20, 30, step=1)
-    n_bins = trial.suggest_int('n_bins', 41, 51, step=10)
+    n_bins = trial.suggest_int('n_bins', 21, 51, step=10)
     # lr = trial.suggest_float('lr', 1e-5, 1e-3, log=True)
     # layer_size = trial.suggest_int('layer_size', 64, 512, step=64)
     # layer_size = trial.suggest_int('layer_size', 64, 128, step=64)
-    layer_size = trial.suggest_int('layer_size', 64, 64, step=32)
-    nlayers = trial.suggest_int('nlayers', 2, 2, step=2)
+    layer_size = trial.suggest_int('layer_size', 32, 64, step=32)
+    nlayers = trial.suggest_int('nlayers', 2, 4, step=2)
     # nlayers = trial.suggest_int('nlayers', 2, 12, step=1)
-    nhead = trial.suggest_int('nhead', 2, 2, step=2)
+    nhead = trial.suggest_int('nhead', 2, 4, step=2)
     if nhead == 6:
         print('overwriting nhead=6 to nhead=4')
         nhead = 4
-    dropout = trial.suggest_float('dropout', 0.05, 0.1, step=0.05)
-    max_seq_len = trial.suggest_int('max_seq_len', 1801, 1801, step=200)
+    dropout = trial.suggest_float('dropout', 0.05, 0.25, step=0.05)
+    max_seq_len = trial.suggest_int('max_seq_len', 1001, 2401, step=200)
 
 
     # mask_ratio = trial.suggest_float('mask_ratio', 0.1, 0.5, step=0.05)
@@ -81,6 +81,7 @@ def objective(trial):
         CLS = CLS,
         GEPC = GEPC,
         celltype_label = celltype_label,
+        dataset_name="metab_v1",
         datasubset_label = 'pretrain_set',
         trainsubset_label = 'Train',
         valsubset_label = 'Val',
@@ -115,6 +116,7 @@ def objective(trial):
     finetune_config1 = dict(
         task = 'annotation',
         CLS= True,
+        dataset_name="metab_v1",
         celltype_label = "IMDC Binary",
         datasubset_label = 'finetune_set',
         trainsubset_label = 'Finetune',
@@ -139,6 +141,11 @@ def objective(trial):
     trial.set_user_attr('MSKCC_wandb_name', finetune_res2['wandb_name'])
     trial.set_user_attr('IMDC_val_cls_accuracy', finetune1_val_cls_accuracy)
     trial.set_user_attr('MSKCC_val_cls_accuracy', finetune2_val_cls_accuracy)
+    
+    # take out the garbage and clean up
+    gc.collect()
+
+
 
     return val_avg_bio, val_gep_loss, val_gepc_loss
 

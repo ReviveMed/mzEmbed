@@ -1410,6 +1410,7 @@ def create_model_wrapper(model_info_path, model_state_path=None, is_encoder=True
 
     if model_state_path is not None:
         model.load_state_dict(torch.load(model_state_path))
+        print(f'Loaded model state from {model_state_path}')
     return model
 
 
