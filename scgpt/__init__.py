@@ -27,3 +27,4 @@ from .trainer import (
     eval_testdata,
     test,
 )
+from .main_wrapper import train_scgpt_wrapper

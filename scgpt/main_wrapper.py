@@ -34,7 +34,9 @@ from torchtext._torchtext import (
 # %%
 
 # sys.path.append("../")
-sys.path.insert(0, "../")
+# sys.path.insert(0, "../")
+# sys.path.insert(1, "../")
+# sys.path.insert(1, "/app/mz_embed_engine/scgpt")
 #You may need to add scGPT to the python path
 # export PYTHONPATH="${PYTHONPATH}:/app/mz_embed_engine/scgpt"
 
@@ -298,8 +300,8 @@ def train_scgpt_wrapper(**kwargs):
         adata.obs["celltype"] = adata.obs[config.celltype_label].astype("category")
         
         # drop the nan celltype
-        adata = adata[~adata.obs["celltype"].isna()]
-        adata = adata[adata.obs["celltype"] != "nan"]
+        adata = adata[~adata.obs["celltype"].isna()].copy()
+        adata = adata[adata.obs["celltype"] != "nan"].copy()
         
         data_is_raw = False
         filter_gene_by_counts = False
@@ -416,7 +418,9 @@ def train_scgpt_wrapper(**kwargs):
             f"match {np.sum(gene_ids_in_vocab >= 0)}/{len(gene_ids_in_vocab)} genes "
             f"in vocabulary of size {len(vocab)}."
         )
-        adata = adata[:, adata.var["id_in_vocab"] >= 0]
+        adata = adata[:, adata.var["id_in_vocab"] >= 0].copy()
+        # if we don't copy it, and the layer is NOT sparse, then preprocessor doesn't work properly
+        # adata = adata[:, adata.var["id_in_vocab"] >= 0]
 
         # model
         if os.path.exists(model_config_file):
@@ -1018,8 +1022,39 @@ def clean_res_values(k,v):
 
 # %%
 if __name__ == "__main__":
+
+    finetune_config1 = dict(
+        task = 'annotation',
+        CLS= True,
+        dataset_name="metab_v1",
+        # dataset_name="metab_v0",
+        celltype_label = "IMDC Binary",
+        # celltype_label = 'Cohort Label',
+        datasubset_label = 'finetune_set',
+        trainsubset_label = 'Finetune',
+        valsubset_label = 'Validation',
+        testsubset_label = 'Test',
+        load_model = '/home/jonaheaton/DATA2/save/dev_metab_v1-Jun04-16-11',
+
+        # task = 'integration',
+        # CLS= False,
+        # celltype_label = 'Cohort Label',
+        # dataset_name="metab_v1",
+        # datasubset_label = 'pretrain_set',
+        # trainsubset_label = 'Train',
+        # valsubset_label = 'Val',
+        # testsubset_label = 'Test',
+        # load_model = None,
+
+        mask_ratio = 0.05,
+        epochs = 15,
+    )
+
+    finetune_res1 = train_scgpt_wrapper(**finetune_config1)
+    results_dict = finetune_res1
+
     # train_scgpt_wrapper()
-    results_dict = train_scgpt_wrapper(epochs=3,layer_size=32,nlayers=2,nhead=2)
+    # results_dict = train_scgpt_wrapper(epochs=3,layer_size=32,nlayers=2,nhead=2)
     # train_scgpt_wrapper(epochs=1, load_model = f"{data_dir}/save/dev_metab_v0-May20-15-24")
     # train_scgpt_wrapper(epochs=1, load_model = f"{data_dir}/save/dev_metab_v0-May21-13-30")
     # train_scgpt_wrapper(epochs=1, load_model = f"{data_dir}/save/dev_metab_v0-May21-13-30", celltype_label="IMDC Binary", datasubset_label = 'finetune_set', trainsubset_label = 'Finetune', valsubset_label = 'Validation', testsubset_label = 'Test')
