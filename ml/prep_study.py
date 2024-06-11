@@ -489,8 +489,9 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
 
         if choose_from_distribution:
             num_attention_heads = IntDistribution(2, 5, step=1)
-            num_hidden_layers = IntDistribution(2, 3, step=1)
+            num_hidden_layers = IntDistribution(2, 4, step=2)
             dropout_rate = FloatDistribution(0, 0.5, step=0.1)
+            hidden_size = IntDistribution(16, 64, step=16)
 
         encoder_kwargs = {
                     'activation': 'relu',
