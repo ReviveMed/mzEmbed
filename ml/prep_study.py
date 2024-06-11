@@ -482,6 +482,26 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         l1_reg_weight = 0
 
     elif 'MA_Encoder' in encoder_kind:
+        latent_size = 16
+        num_hidden_layers = 2
+        dropout_rate = 0.2
+        encoder_weight = 1
+        head_weight = 0
+        adv_weight = 0
+        cohort_label_weight = 0
+        isfemale_weight = 0
+        ispediatric_weight = 0
+        age_weight = 0
+        l2_reg_weight = 0
+        l1_reg_weight = 0
+        num_epochs = 100
+        lr = 0.001
+        optimizer_name = 'adamw'
+        early_stopping_patience = 0
+        weight_decay = 0.00001
+        adversarial_mini_epochs = 2
+        adversarial_start_epoch = 0
+
         num_epochs = 20
         num_attention_heads = 2
         hidden_size = 32
@@ -493,6 +513,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
             num_hidden_layers = IntDistribution(2, 4, step=2)
             dropout_rate = FloatDistribution(0, 0.5, step=0.1)
             hidden_size = IntDistribution(16, 64, step=16)
+            adversarial_start_epoch = IntDistribution(-1, 10, step=2)
 
         encoder_kwargs = {
                     'activation': 'relu',
@@ -641,7 +662,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
                     'adversary_weight': adv_weight,
                     'noise_factor': 0.1,
                     'early_stopping_patience': early_stopping_patience,
-                    'adversarial_mini_epochs': adversarial_mini_epochs,
+                    # 'adversarial_mini_epochs': adversarial_mini_epochs,
                     'adversarial_start_epoch': adversarial_start_epoch
                 },
 
