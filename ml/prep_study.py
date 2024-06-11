@@ -486,6 +486,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         num_attention_heads = 2
         hidden_size = 32
         latent_size = 16
+        encoder_weight = 1
 
         if choose_from_distribution:
             num_attention_heads = IntDistribution(2, 5, step=1)
