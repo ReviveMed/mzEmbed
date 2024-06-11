@@ -639,7 +639,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     ##### Create an evaluation summary that averages ######
     run_struc = run.get_structure()
     avg_iter_count = 0
-
+    run.wait()
     for set_name in eval_loader_dct.keys():
         for key in run_struc[setup_id]['eval'][set_name].keys():
             val_array = run[f'{setup_id}/eval/{set_name}/{key}'].fetch_values()
