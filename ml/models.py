@@ -28,6 +28,12 @@ def get_model(model_kind, input_size, **kwargs):
         model = VAE(input_size = input_size, **kwargs)
     elif model_kind == 'AE':
         model = AE(input_size = input_size, **kwargs)
+
+    elif model_kind == 'MA_Encoder_to_MA_Decoder':
+        model = MA_Encoder_to_MA_Decoder(input_size = input_size, **kwargs)
+    elif model_kind == 'MA_Encoder_to_FF_Decoder':
+        model = MA_Encoder_to_FF_Decoder(input_size = input_size, **kwargs)
+
     elif model_kind == 'TGEM_Encoder':
         model = TGEM_Encoder(input_size = input_size, **kwargs)
     else:
@@ -156,7 +162,7 @@ class Dense_Layers(nn.Module):
         elif activation == 'elu':
             activation_func = nn.ELU()
         else:
-            raise ValueError('activation must be one of "leakyrelu", "relu", "tanh", or "sigmoid"')
+            raise ValueError('activation must be one of "leakyrelu", "relu", "tanh", or "sigmoid", user gave: {}'.format(activation))
 
         if num_hidden_layers < 1:
             # raise ValueError('num_hidden_layers must be at least 1')
@@ -222,6 +228,14 @@ class GradReverse(Function):
 
 def grad_reverse(x: torch.Tensor, lambd: float = 1.0) -> torch.Tensor:
     return GradReverse.apply(x, lambd)
+
+
+
+##################################################################################################################
+##################################################################################################################
+##################################################################################################################
+############ Domain Adaptation Models ############
+
 
 
 ############ Autoencoder Models ############
@@ -568,10 +582,553 @@ class AE(nn.Module):
             else:
                 save_name = self.file_id + '_info.json'
         save_json(self.get_info(), os.path.join(save_path, save_name))   
+
+##################################################################################################################
+##################################################################################################################
+##################################################################################################################
+############ Updated Encoder Decoder Models ############
+
+
+
+class MultiAttention_Latent_Encoder(nn.Module):
+    def __init__(self, **kwargs):
+        super(MultiAttention_Latent_Encoder, self).__init__()
+        self.input_size = kwargs.get('input_size', 1)
+        self.hidden_size = kwargs.get('hidden_size', 1)
+        self.num_heads = kwargs.get('num_attention_heads', 1)
+        self.num_layers = kwargs.get('num_layers', kwargs.get('num_hidden_layers', 1))
+        self.dropout_rate = kwargs.get('dropout_rate', 0.2)
+        self.latent_size = kwargs.get('latent_size', 1)
+        
+        # Embedding layer
+        self.embedding = nn.Linear(self.input_size, self.hidden_size) 
+        
+        # Transformer Encoder
+        self.encoder_layer = nn.TransformerEncoderLayer(d_model=self.hidden_size, nhead=self.num_heads, dim_feedforward=4*self.hidden_size, dropout=self.dropout_rate)
+        self.transformer_encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=self.num_layers)
+
+        # Linear layer to reduce dimensionality to latent space
+        self.fc_latent = nn.Linear(self.hidden_size, self.latent_size)
+
+    def forward(self, x):
+        # Embed the input
+        x = self.embedding(x)
+        
+        # Add a sequence dimension for the Transformer Encoder
+        x = x.unsqueeze(1)
+        
+        # Pass through the Transformer Encoder
+        x = self.transformer_encoder(x)
+        
+        # Remove the sequence dimension
+        x = x.squeeze(1)
+
+        # Reduce the dimensionality to the latent space
+        x = self.fc_latent(x)
+        return x
+
+class MultiAttention_Latent_Decoder(nn.Module):
+    def __init__(self, **kwargs):
+        super(MultiAttention_Latent_Decoder, self).__init__()
+        self.latent_size = kwargs.get('latent_size', 1)
+        self.hidden_size = kwargs.get('hidden_size', 1)
+        self.num_heads = kwargs.get('num_attention_heads', 1)
+        self.num_layers = kwargs.get('num_layers', kwargs.get('num_hidden_layers', 1))
+        self.dropout_rate = kwargs.get('dropout_rate', 0.2)
+        self.output_size = kwargs.get('output_size', kwargs.get('input_size', 1))
+        latent_size = self.latent_size
+        hidden_size = self.hidden_size
+        num_heads = self.num_heads
+        num_layers = self.num_layers
+        dropout_rate = self.dropout_rate
+        
+        # Linear layer to increase dimensionality from latent space
+        self.fc_hidden = nn.Linear(self.latent_size, self.hidden_size)
+        
+        # Transformer Decoder
+        self.decoder_layer = nn.TransformerDecoderLayer(d_model=self.hidden_size, nhead=self.num_heads, dim_feedforward=4*hidden_size, dropout=dropout_rate)
+        self.transformer_decoder = nn.TransformerDecoder(self.decoder_layer, num_layers=num_layers)
+
+        # Output layer
+        self.fc_output = nn.Linear(hidden_size, self.output_size)
+
+    def forward(self, x):
+        # Increase the dimensionality from the latent space
+        x = self.fc_hidden(x)
+        
+        # Add a sequence dimension for the Transformer Decoder
+        x = x.unsqueeze(1)
+        
+        # Pass through the Transformer Decoder
+        x = self.transformer_decoder(x)
+        
+        # Remove the sequence dimension
+        x = x.squeeze(1)
+        
+        # Reduce the dimensionality to the output space
+        x = self.fc_output(x)
+        return x
+
+
+class FeedForward_Latent_Encoder(nn.Module):
+    def __init__(self, **kwargs):
+        super(FeedForward_Latent_Encoder, self).__init__()
+        self.input_size = kwargs.get('input_size', 1)
+        self.hidden_size = kwargs.get('hidden_size', 1)
+        self.latent_size = kwargs.get('latent_size', 1)
+        self.num_hidden_layers = kwargs.get('num_hidden_layers', kwargs.get('num_layers', 1))
+        self.dropout_rate = kwargs.get('dropout_rate', 0.2)
+        self.activation = kwargs.get('activation', 'leakyrelu')
+        self.use_batch_norm = kwargs.get('use_batch_norm', False)
+        self.act_on_output_layer = kwargs.get('act_on_output_layer', False)
+        input_size = self.input_size
+        hidden_size = self.hidden_size
+        latent_size = self.latent_size
+        num_hidden_layers = self.num_hidden_layers
+        dropout_rate = self.dropout_rate
+        
+        self.encoder = Dense_Layers(input_size=input_size,
+                                    hidden_size=hidden_size,
+                                    output_size=latent_size,
+                                    num_hidden_layers=num_hidden_layers,
+                                    dropout_rate=dropout_rate,
+                                    activation=self.activation,
+                                    use_batch_norm=self.use_batch_norm,
+                                    act_on_output_layer=self.act_on_output_layer)
+        
+    def forward(self, x):
+        return self.encoder(x)
+    
+
+class FeedFoward_Latent_Decoder(nn.Module):
+    def __init__(self, **kwargs):
+        super(FeedFoward_Latent_Decoder, self).__init__()
+        self.latent_size = kwargs.get('latent_size', 1)
+        self.hidden_size = kwargs.get('hidden_size', 1)
+        self.output_size = kwargs.get('output_size', kwargs.get('input_size', 1))
+        self.num_hidden_layers = kwargs.get('num_hidden_layers', kwargs.get('num_layers', 1))
+        self.dropout_rate = kwargs.get('dropout_rate', 0.2)
+        self.activation = kwargs.get('activation', 'leakyrelu')
+        self.use_batch_norm = kwargs.get('use_batch_norm', False)
+        # self.act_on_output_layer = kwargs.get('act_on_output_layer', False)
+        latent_size = self.latent_size
+        hidden_size = self.hidden_size
+        output_size = self.output_size
+        num_hidden_layers = self.num_hidden_layers
+        dropout_rate = self.dropout_rate
+        
+        self.decoder = Dense_Layers(input_size=latent_size,
+                                    hidden_size=hidden_size,
+                                    output_size=output_size,
+                                    num_hidden_layers=num_hidden_layers,
+                                    dropout_rate=dropout_rate,
+                                    activation=self.activation,
+                                    use_batch_norm=self.use_batch_norm,
+                                    act_on_output_layer=False)
+
+    def forward(self, x):
+        return self.decoder(x)
     
 
 
-#########################################################
+
+class Default_EncoderDecoder(nn.Module):
+    def __init__(self, **kwargs):
+        super(Default_EncoderDecoder, self).__init__()
+        self.input_size = kwargs.get('input_size', 1)
+        self.hidden_size = kwargs.get('hidden_size', 1)
+        self.latent_size = kwargs.get('latent_size', 1)
+        self.num_hidden_layers = kwargs.get('num_hidden_layers', kwargs.get('num_layers', 1))
+        self.num_attention_heads = kwargs.get('num_attention_heads', 1)
+        self.dropout_rate = kwargs.get('dropout_rate', 0.2)
+        self.activation = kwargs.get('activation', 'leakyrelu')
+        self.use_batch_norm = kwargs.get('use_batch_norm', False)
+        self.act_on_output_layer = kwargs.get('act_on_output_layer', False)
+
+        self.encoder = FeedForward_Latent_Encoder(
+            input_size=self.input_size,
+            hidden_size=self.hidden_size,
+            latent_size=self.latent_size,
+            num_hidden_layers=self.num_hidden_layers,
+            dropout_rate=self.dropout_rate,
+            activation=self.activation,
+            use_batch_norm=self.use_batch_norm,
+            act_on_output_layer=self.act_on_output_layer
+        )
+        self.decoder = FeedFoward_Latent_Decoder(
+            latent_size=self.latent_size,
+            hidden_size=self.hidden_size,
+            output_size=self.input_size,
+            num_hidden_layers=self.num_hidden_layers,
+            dropout_rate=self.dropout_rate,
+            activation=self.activation,
+            use_batch_norm=self.use_batch_norm,
+            act_on_output_layer=False
+        )
+
+        self.goal = 'encode'
+        self.kind = 'EncoderDecoder'
+        self.name = 'EncoderDecoder'
+        self.file_id = 'EncoderDecoder'
+
+    def forward(self, x):
+        z = self.encoder(x)
+        return self.decoder(z)
+
+    def transform(self, x):
+        return self.encoder(x)
+
+    def loss(self, x, x_recon):
+        return F.mse_loss(x_recon, x, reduction='mean')
+
+    def forward_to_loss(self, x):
+        z = self.encoder(x)
+        x_recon = self.decoder(z)
+        return self.loss(x, x_recon)
+
+    def transform_with_loss(self, x):
+        z = self.encoder(x)
+        x_recon = self.decoder(z)
+        return z, self.loss(x, x_recon)
+    
+    def generate(self, z):
+        return self.decoder(z)
+
+    def init_layers(self):
+        pass
+
+    def reset_params(self):
+        _reset_params(self)
+
+    def get_file_ids(self):
+        return [self.file_id]
+
+
+    def save_state_to_path(self, save_path, save_name=None):
+        if save_name is None:
+            if os.path.isfile(save_path):
+                save_name = os.path.basename(save_path)
+                save_path = os.path.dirname(save_path)
+            else:
+                save_name = self.file_id + '_state.pt'
+        torch.save(self.state_dict(), os.path.join(save_path, save_name))
+        pass
+
+    def load_state_from_path(self, load_path, load_name=None):
+        if load_name is None:
+            # check if the load_path is to a file
+            if os.path.isfile(load_path):
+                load_name = os.path.basename(load_path)
+                load_path = os.path.dirname(load_path)
+            else:
+                load_name = self.file_id + '_state.pt'
+        self.load_state_dict(torch.load(os.path.join(load_path, load_name)))
+        pass
+
+
+    def get_hyperparameters(self):
+        # cycle through all the attributes of the class and save them
+        hyperparameters = {}
+        for key, value in self.__dict__.items():
+            # skip if it is a private attribute
+            if key[0] == '_':
+                continue
+            
+            # skip if it is a method
+            if callable(value):
+                continue
+            hyperparameters[key] = value
+        return hyperparameters
+
+    def get_info(self):
+        return self.get_hyperparameters()
+
+    def save_info(self, save_path, save_name=None):
+        # save_json(self.get_hyperparameters(), save_path)
+        # pass
+        if save_name is None:
+            if os.path.isfile(save_path):
+                save_name = os.path.basename(save_path)
+                save_path = os.path.dirname(save_path)
+            else:
+                save_name = self.file_id + '_info.json'
+        save_json(self.get_info(), os.path.join(save_path, save_name))   
+    
+
+
+class Default_VariationalEncoderDecoder(Default_EncoderDecoder):
+    def __init__(self, **kwargs):
+        super(Default_VariationalEncoderDecoder, self).__init__()
+        self.input_size = kwargs.get('input_size', 1)
+        self.hidden_size = kwargs.get('hidden_size', 1)
+        self.latent_size = kwargs.get('latent_size', 1)
+        self.num_hidden_layers = kwargs.get('num_hidden_layers', kwargs.get('num_layers', 1))
+        self.num_attention_heads = kwargs.get('num_attention_heads', 1)
+        self.dropout_rate = kwargs.get('dropout_rate', 0.2)
+        self.activation = kwargs.get('activation', 'leakyrelu')
+        self.use_batch_norm = kwargs.get('use_batch_norm', False)
+        self.act_on_output_layer = kwargs.get('act_on_output_layer', False)
+
+        self.encoder = FeedForward_Latent_Encoder(
+            input_size=self.input_size,
+            hidden_size=self.hidden_size,
+            latent_size=2*self.latent_size,
+            num_hidden_layers=self.num_hidden_layers,
+            dropout_rate=self.dropout_rate,
+            activation=self.activation,
+            use_batch_norm=self.use_batch_norm,
+            act_on_output_layer=self.act_on_output_layer
+        )
+        self.decoder = FeedFoward_Latent_Decoder(
+            latent_size=self.latent_size,
+            hidden_size=self.hidden_size,
+            output_size=self.input_size,
+            num_hidden_layers=self.num_hidden_layers,
+            dropout_rate=self.dropout_rate,
+            activation=self.activation,
+            use_batch_norm=self.use_batch_norm,
+            act_on_output_layer=False
+        )
+
+        self.kind = 'VariationalEncoderDecoder'
+        self.name = 'VariationalEncoderDecoder'
+        self.file_id = 'VariationalEncoderDecoder'
+        self.kl_weight = kwargs.get('kl_weight', 1.0)
+
+        
+    def forward(self, x):
+        mu, log_var = self.encoder(x).chunk(2, dim=1)
+        z = self.reparameterize(mu, log_var)
+        return self.decoder(z), mu, log_var
+    
+    def transform(self, x):
+        mu, log_var = self.encoder(x).chunk(2, dim=1)
+        return mu
+    
+    def reparameterize(self, mu, log_var):
+        std = torch.exp(0.5*log_var)
+        eps = torch.randn_like(std)
+        return mu + eps*std
+    
+    def loss(self, x, x_recon, mu, log_var):
+        recon_loss = F.mse_loss(x_recon, x, reduction='mean')
+        kl_loss = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
+        return torch.add(recon_loss, self.kl_weight*kl_loss)
+    
+    def forward_to_loss(self, x):
+        mu, log_var = self.encoder(x).chunk(2, dim=1)
+        z = self.reparameterize(mu, log_var)
+        x_recon = self.decoder(z)
+        return self.loss(x, x_recon, mu, log_var)
+    
+    def transform_with_loss(self, x):
+        mu, log_var = self.encoder(x).chunk(2, dim=1)
+        z = self.reparameterize(mu, log_var)
+        x_recon = self.decoder(z)
+        return mu, self.loss(x, x_recon, mu, log_var)
+
+
+class FF_Encoder_to_FF_Decoder(Default_EncoderDecoder):
+    def __init__(self, **kwargs):
+        super(FF_Encoder_to_FF_Decoder, self).__init__()
+
+        self.input_size = kwargs.get('input_size', 1)
+        self.hidden_size = kwargs.get('hidden_size', 1)
+        self.latent_size = kwargs.get('latent_size', 1)
+        self.num_hidden_layers = kwargs.get('num_hidden_layers', kwargs.get('num_layers', 1))
+        self.num_attention_heads = kwargs.get('num_attention_heads', 1)
+        self.dropout_rate = kwargs.get('dropout_rate', 0.2)
+        self.activation = kwargs.get('activation', 'leakyrelu')
+        self.use_batch_norm = kwargs.get('use_batch_norm', False)
+        self.act_on_output_layer = kwargs.get('act_on_output_layer', False)
+
+        self.encoder = FeedForward_Latent_Encoder(
+            input_size=self.input_size,
+            hidden_size=self.hidden_size,
+            latent_size=self.latent_size,
+            num_hidden_layers=self.num_hidden_layers,
+            dropout_rate=self.dropout_rate,
+            activation=self.activation,
+            use_batch_norm=self.use_batch_norm,
+            act_on_output_layer=self.act_on_output_layer
+        )
+
+        self.decoder = FeedFoward_Latent_Decoder(
+            latent_size=self.latent_size,
+            hidden_size=self.hidden_size,
+            output_size=self.input_size,
+            num_hidden_layers=self.num_hidden_layers,
+            dropout_rate=self.dropout_rate,
+            activation=self.activation,
+            use_batch_norm=self.use_batch_norm,
+            act_on_output_layer=False
+        )
+
+        self.kind = 'FF_Encoder_to_FF_Decoder'
+        self.name = 'FF_Encoder_to_FF_Decoder'
+        self.file_id = 'FF_Encoder_to_FF_Decoder'
+
+class FF_VEncoder_to_FF_Decoder(Default_VariationalEncoderDecoder):
+    def __init__(self, **kwargs):
+        super(FF_VEncoder_to_FF_Decoder, self).__init__()
+        self.input_size = kwargs.get('input_size', 1)
+        self.hidden_size = kwargs.get('hidden_size', 1)
+        self.latent_size = kwargs.get('latent_size', 1)
+        self.num_hidden_layers = kwargs.get('num_hidden_layers', kwargs.get('num_layers', 1))
+        self.num_attention_heads = kwargs.get('num_attention_heads', 1)
+        self.dropout_rate = kwargs.get('dropout_rate', 0.2)
+        self.activation = kwargs.get('activation', 'leakyrelu')
+        self.use_batch_norm = kwargs.get('use_batch_norm', False)
+        self.act_on_output_layer = kwargs.get('act_on_output_layer', False)
+        self.kind = 'FF_VEncoder_to_FF_Decoder'
+        self.name = 'FF_VEncoder_to_FF_Decoder'
+        self.file_id = 'FF_VEncoder_to_FF_Decoder'
+
+        self.encoder = FeedForward_Latent_Encoder(
+            input_size=self.input_size,
+            hidden_size=self.hidden_size,
+            latent_size=2*self.latent_size,
+            num_hidden_layers=self.num_hidden_layers,
+            dropout_rate=self.dropout_rate,
+            activation=self.activation,
+            use_batch_norm=self.use_batch_norm,
+            act_on_output_layer=self.act_on_output_layer
+        )
+
+        self.decoder = FeedFoward_Latent_Decoder(
+            latent_size=self.latent_size,
+            hidden_size=self.hidden_size,
+            output_size=self.input_size,
+            num_hidden_layers=self.num_hidden_layers,
+            dropout_rate=self.dropout_rate,
+            activation=self.activation,
+            use_batch_norm=self.use_batch_norm,
+            act_on_output_layer=False
+        )
+
+
+class MA_Encoder_to_MA_Decoder(Default_EncoderDecoder):
+    def __init__(self, **kwargs):
+        super(MA_Encoder_to_MA_Decoder, self).__init__()
+        self.input_size = kwargs.get('input_size', 1)
+        self.hidden_size = kwargs.get('hidden_size', 1)
+        self.latent_size = kwargs.get('latent_size', 1)
+        self.num_hidden_layers = kwargs.get('num_hidden_layers', kwargs.get('num_layers', 1))
+        self.num_attention_heads = kwargs.get('num_attention_heads', 1)
+        self.dropout_rate = kwargs.get('dropout_rate', 0.2)
+        self.activation = kwargs.get('activation', 'leakyrelu')
+        self.use_batch_norm = kwargs.get('use_batch_norm', False)
+        self.act_on_output_layer = kwargs.get('act_on_output_layer', False)
+
+        self.encoder = MultiAttention_Latent_Encoder(
+            input_size=self.input_size,
+            hidden_size=self.hidden_size,
+            latent_size=self.latent_size,
+            num_layers=self.num_hidden_layers,
+            dropout_rate=self.dropout_rate,
+            num_attention_heads=self.num_attention_heads
+        )
+        self.decoder = MultiAttention_Latent_Decoder(
+            latent_size=self.latent_size,
+            hidden_size=self.hidden_size,
+            output_size=self.input_size,
+            num_layers=self.num_hidden_layers,
+            dropout_rate=self.dropout_rate,
+            num_attention_heads=self.num_attention_heads
+        )
+
+        self.goal = 'encode'
+        self.kind = 'MA_Encoder_to_MA_Decoder'
+        self.name = 'MA_Encoder_to_MA_Decoder'
+        self.file_id = 'MA_Encoder_to_MA_Decoder'
+
+
+class MA_Encoder_to_FF_Decoder(Default_EncoderDecoder):
+    def __init__(self, **kwargs):
+        super(MA_Encoder_to_FF_Decoder, self).__init__()
+        self.input_size = kwargs.get('input_size', 1)
+        self.hidden_size = kwargs.get('hidden_size', 1)
+        self.latent_size = kwargs.get('latent_size', 1)
+        self.num_hidden_layers = kwargs.get('num_hidden_layers', kwargs.get('num_layers', 1))
+        self.num_attention_heads = kwargs.get('num_attention_heads', 1)
+        self.dropout_rate = kwargs.get('dropout_rate', 0.2)
+        self.activation = kwargs.get('activation', 'leakyrelu')
+        self.use_batch_norm = kwargs.get('use_batch_norm', False)
+        self.act_on_output_layer = kwargs.get('act_on_output_layer', False)
+
+        self.encoder = MultiAttention_Latent_Encoder(
+            input_size=self.input_size,
+            hidden_size=self.hidden_size,
+            latent_size=self.latent_size,
+            num_layers=self.num_hidden_layers,
+            dropout_rate=self.dropout_rate,
+            num_attention_heads=self.num_attention_heads
+        )
+        self.decoder = FeedFoward_Latent_Decoder(
+            latent_size=self.latent_size,
+            hidden_size=self.hidden_size,
+            output_size=self.input_size,
+            num_hidden_layers=self.num_hidden_layers,
+            dropout_rate=self.dropout_rate,
+            activation=self.activation,
+            use_batch_norm=self.use_batch_norm,
+            act_on_output_layer=False
+        )
+
+        self.goal = 'encode'
+        self.kind = 'MA_Encoder_to_FF_Decoder'
+        self.name = 'MA_Encoder_to_FF_Decoder'
+        self.file_id = 'MA_Encoder_to_FF_Decoder'
+
+
+class MA_VEncoder_to_FF_Decoder(Default_VariationalEncoderDecoder):
+    def __init__(self, **kwargs):
+        super(MA_VEncoder_to_FF_Decoder, self).__init__()
+        self.input_size = kwargs.get('input_size', 1)
+        self.hidden_size = kwargs.get('hidden_size', 1)
+        self.latent_size = kwargs.get('latent_size', 1)
+        self.num_hidden_layers = kwargs.get('num_hidden_layers', kwargs.get('num_layers', 1))
+        self.num_attention_heads = kwargs.get('num_attention_heads', 1)
+        self.dropout_rate = kwargs.get('dropout_rate', 0.2)
+        self.activation = kwargs.get('activation', 'leakyrelu')
+        self.use_batch_norm = kwargs.get('use_batch_norm', False)
+        self.act_on_output_layer = kwargs.get('act_on_output_layer', False)
+        
+        self.encoder = MultiAttention_Latent_Encoder(
+            input_size=self.input_size,
+            hidden_size=self.hidden_size,
+            latent_size=2*self.latent_size,
+            num_layers=self.num_hidden_layers,
+            dropout_rate=self.dropout_rate,
+            num_attention_heads=self.num_attention_heads
+        )
+
+        self.decoder = FeedFoward_Latent_Decoder(
+            latent_size=self.latent_size,
+            hidden_size=self.hidden_size,
+            output_size=self.input_size,
+            num_hidden_layers=self.num_hidden_layers,
+            dropout_rate=self.dropout_rate,
+            activation=self.activation,
+            use_batch_norm=self.use_batch_norm,
+            act_on_output_layer=False
+        )
+
+        self.goal = 'encode'
+        self.kind = 'MA_VEncoder_to_FF_Decoder'
+        self.name = 'MA_VEncoder_to_FF_Decoder'
+        self.file_id = 'MA_VEncoder_to_FF_Decoder'
+
+
+   
+
+
+
+
+
+##################################################################################################################
+##################################################################################################################
+##################################################################################################################
 ####### Heads #######
 
 

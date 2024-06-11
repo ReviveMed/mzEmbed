@@ -146,11 +146,12 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
     noise_factor = kwargs.get('noise_factor', 0)
     l1_reg_weight = kwargs.get('l1_reg_weight', 0)
     l2_reg_weight = kwargs.get('l2_reg_weight', 0)
+    penalize_decoder_weights = kwargs.get('penalize_decoder_weights', False) # for backwards compatibility, set to True
     phase_list = kwargs.get('phase_list', None)
     scheduler_kind = kwargs.get('scheduler_kind', None)
     scheduler_kwargs = kwargs.get('scheduler_kwargs', {})
     verbose = kwargs.get('verbose', True)
-    adversarial_mini_epochs = kwargs.get('adversarial_mini_epochs', 1)
+    #adversarial_mini_epochs = kwargs.get('adversarial_mini_epochs', 1)
     adversarial_start_epoch = kwargs.get('adversarial_start_epoch', -1)
     prefix = kwargs.get('prefix', 'train')
     train_name = kwargs.get(f'train_name', 'train')
@@ -223,7 +224,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
         'phase_list': phase_list,
         'phase_sizes': dataset_size_dct,
         'batch_sizes': batch_size_dct,
-        'adversarial_mini_epochs': adversarial_mini_epochs,
+        # 'adversarial_mini_epochs': adversarial_mini_epochs,
         'adversarial_start_epoch': adversarial_start_epoch,
     }
     #TODO add a run prefix to all the keys
@@ -500,9 +501,17 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         
                         joint_loss_w_penalty = joint_loss
                         # right now we are also penalizing the weights in the decoder, do we want to do that?
-                        joint_loss_w_penalty += get_reg_penalty(encoder, l1_reg_weight, l2_reg_weight)
-                        # if 'encoder' in encoder._modules:
-                            # joint_loss_w_penalty += get_reg_penalty(encoder.encoder, l1_reg_weight, l2_reg_weight)
+                        if penalize_decoder_weights: # for backwards compatibility
+                            joint_loss_w_penalty += get_reg_penalty(encoder, l1_reg_weight, l2_reg_weight)
+                        else:
+                            if 'encoder' in encoder._modules:
+                                joint_loss_w_penalty += get_reg_penalty(encoder.encoder, l1_reg_weight, l2_reg_weight)
+                                if (encoder_weight > 0) and ('decoder' in encoder._modules):
+                                    joint_loss_w_penalty += get_reg_penalty(encoder.decoder, l1_reg_weight, l2_reg_weight)
+                            else:
+                                joint_loss_w_penalty += get_reg_penalty(encoder, l1_reg_weight, l2_reg_weight)
+
+
                         joint_loss_w_penalty += get_reg_penalty(head, l1_reg_weight, l2_reg_weight)
 
                         # we probably don't care about the adversary weights

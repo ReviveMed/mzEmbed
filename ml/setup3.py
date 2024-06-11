@@ -387,7 +387,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                     encoder_state_dict = torch.load(local_path)
                     encoder.load_state_dict(encoder_state_dict)
                 else:
-                    encoder.init_layers()
+                    if 'init_layers' in dir(encoder):
+                        encoder.init_layers()
                     # encoder.reset_params()
                     print('encoder random initialized')
 

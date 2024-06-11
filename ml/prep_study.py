@@ -481,6 +481,35 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         l2_reg_weight = 0 # loss explodes if not 0
         l1_reg_weight = 0
 
+    elif 'MA_Encoder' in encoder_kind:
+        num_epochs = 20
+        num_attention_heads = 2
+        hidden_size = 32
+        latent_size = 16
+
+        if choose_from_distribution:
+            num_attention_heads = IntDistribution(2, 5, step=1)
+            num_hidden_layers = IntDistribution(2, 3, step=1)
+            dropout_rate = FloatDistribution(0, 0.5, step=0.1)
+
+        encoder_kwargs = {
+                    'activation': 'relu',
+                    'num_attention_heads': num_attention_heads,
+                    'num_hidden_layers': num_hidden_layers,
+                    'dropout_rate': dropout_rate,
+                    'hidden_size': hidden_size,
+                    'latent_size': latent_size,
+                    }
+        
+        num_epochs_min = 5
+        num_epochs_max = 50
+        num_epochs_step = 5
+
+        early_stopping_patience_step = 5
+        early_stopping_patience_max = 20 
+        l1_reg_weight = 0
+        l2_reg_weight = 0
+
     elif encoder_kind == 'TGEM_Encoder':
         if choose_from_distribution:
             n_head = IntDistribution(2, 5, step=1)
