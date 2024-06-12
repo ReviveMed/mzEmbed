@@ -474,7 +474,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['train_kwargs']['l1_reg_weight'] = sweep_kwargs.get('train_kwargs__l1_reg_weight')
         kwargs['train_kwargs']['noise_factor'] = sweep_kwargs.get('train_kwargs__noise_factor')
         kwargs['train_kwargs']['weight_decay'] = sweep_kwargs.get('train_kwargs__weight_decay')
-        kwargs['train_kwargs']['adversarial_mini_epochs'] = sweep_kwargs.get('train_kwargs__adversarial_mini_epochs')
+        # kwargs['train_kwargs']['adversarial_mini_epochs'] = sweep_kwargs.get('train_kwargs__adversarial_mini_epochs')
         kwargs['train_kwargs']['adversarial_start_epoch'] = sweep_kwargs.get('train_kwargs__adversarial_start_epoch')
         kwargs['run_evaluation'] = True
         kwargs['eval_kwargs'] = {}
@@ -583,7 +583,7 @@ if __name__ == '__main__':
     if len(sys.argv)>5:
         eval_name = sys.argv[5]
     else:
-        eval_name = 'val2'
+        eval_name = 'val'
 
 
     if chosen_id is None:
@@ -629,18 +629,23 @@ if __name__ == '__main__':
         print('more than one desc_str, do not waste time recomputing plots')
         recompute_plot = False
 
-    data_dir = get_latest_dataset()
+    homedir = os.path.expanduser("~")
+    data_dir = f'{homedir}/PRETRAIN_DATA'
+    os.makedirs(data_dir, exist_ok=True)
+    data_dir = get_latest_dataset(data_dir=data_dir)
+
     redo = False
-    update_finetune_data('finetune_val',data_dir,redo=redo)
-    update_finetune_data('finetune_train',data_dir,redo=redo)
-    update_finetune_data('finetune_test',data_dir,redo=redo)
-    update_finetune_data('finetune_trainval',data_dir,redo=redo)
+    if '2' in eval_name:
+        update_finetune_data('finetune_val',data_dir,redo=redo)
+        update_finetune_data('finetune_train',data_dir,redo=redo)
+        update_finetune_data('finetune_test',data_dir,redo=redo)
+        update_finetune_data('finetune_trainval',data_dir,redo=redo)
 
     already_run = []
     print('Number of runs to finetune:',len(run_id_list))
 
     sweep_kwargs = None
-    eval_on_test = True
+    pretrain_eval_on_test = True
 
 
     # run_id_list = ['RCC-1735']
@@ -693,7 +698,7 @@ if __name__ == '__main__':
                                         eval_name=eval_name,
                                         recompute_plot=recompute_plot,
                                         sweep_kwargs=sweep_kwargs,
-                                        eval_on_test=eval_on_test)
+                                        pretrain_eval_on_test=pretrain_eval_on_test)
                 # do not bother attempting to plot the latent space again
                 plot_latent_space0 = False
             except NeptuneException as e:

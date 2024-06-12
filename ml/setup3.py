@@ -312,7 +312,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
     latent_size = encoder_kwargs.get('latent_size', 8)
     input_size = kwargs.get('input_size', None)
-    if 'hidden_size_mult' in encoder_kwargs:
+    if ('hidden_size_mult' in encoder_kwargs) and (encoder_kwargs['hidden_size_mult'] > 0):
         encoder_kwargs['hidden_size'] = int(encoder_kwargs['hidden_size_mult']*latent_size)
         # remove the hidden_size_mult key
         encoder_kwargs.pop('hidden_size_mult')
@@ -639,19 +639,21 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     ##### Create an evaluation summary that averages ######
     run_struc = run.get_structure()
     avg_iter_count = 0
-    run.wait()
-    for set_name in eval_loader_dct.keys():
-        for key in run_struc[setup_id]['eval'][set_name].keys():
-            val_array = run[f'{setup_id}/eval/{set_name}/{key}'].fetch_values()
-            run[f'{setup_id}/avg/{set_name} {key}'] = round(val_array['value'].mean(),5)
-            if avg_iter_count == 0:
-                avg_iter_count = len(val_array['value'])
 
-    # for key in run_struc[setup_id]['eval'][train_name].keys():
-    #     val_array = run[f'{setup_id}/eval/{train_name}/{key}'].fetch_values()
-    #     run[f'{setup_id}/avg/{train_name} {key}'] = round(val_array['value'].mean(),5)
+    if run_evaluation:
+        run.wait()
+        for set_name in eval_loader_dct.keys():
+            for key in run_struc[setup_id]['eval'][set_name].keys():
+                val_array = run[f'{setup_id}/eval/{set_name}/{key}'].fetch_values()
+                run[f'{setup_id}/avg/{set_name} {key}'] = round(val_array['value'].mean(),5)
+                if avg_iter_count == 0:
+                    avg_iter_count = len(val_array['value'])
 
-    run[f'{setup_id}/avg/iter_count'] = avg_iter_count
+        # for key in run_struc[setup_id]['eval'][train_name].keys():
+        #     val_array = run[f'{setup_id}/eval/{train_name}/{key}'].fetch_values()
+        #     run[f'{setup_id}/avg/{train_name} {key}'] = round(val_array['value'].mean(),5)
+
+        run[f'{setup_id}/avg/iter_count'] = avg_iter_count
     
     ####################################
     ###### Generate the Latent Space ######

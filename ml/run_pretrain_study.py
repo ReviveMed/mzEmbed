@@ -26,7 +26,7 @@ import sys
 if len(sys.argv)>1:
     encoder_kind = sys.argv[1]
 else:
-    encoder_kind = input('Enter encoder kind (AE, VAE, TGEM_Encoder): ')
+    encoder_kind = input('Enter encoder kind (AE, VAE, TGEM_Encoder, MA_Encoder_to_FF_Decoder): ')
 
 
 if len(sys.argv)>2:
@@ -42,7 +42,7 @@ else:
 # encoder_kind = 'TGEM_Encoder'
 
 STUDY_DICT = {
-    'study_name': 'Multi Obj Apr15',
+    'study_name': 'Multi Obj June12',
     'encoder_kind': encoder_kind,
     'objectives': {
         'reconstruction_loss':{
@@ -86,8 +86,10 @@ STUDY_DICT = {
 #TODO save the study info dict to neptune metadata
 
 def main(STUDY_INFO_DICT):
-    
-    data_dir = get_latest_dataset()
+    homedir = os.path.expanduser("~")
+    data_dir = f'{homedir}/PRETRAIN_DATA'
+    os.makedirs(data_dir, exist_ok=True)
+    data_dir = get_latest_dataset(data_dir=data_dir)
 
     def compute_objective(run_id):
         return objective_func3(run_id,
@@ -161,14 +163,16 @@ def main(STUDY_INFO_DICT):
 
 if __name__ == '__main__':
 
-    if (encoder_kind == 'AE') or (encoder_kind == 'VAE'):
+    if encoder_kind in  ['AE','VAE','MA_Encoder_to_FF_Decoder']:
         OBJ_list = [
             STUDY_DICT, #dual obj 1
         ]
 
     elif encoder_kind == 'TGEM_Encoder':
+        #no encoder
+        STUDY_DICT['objectives'].pop('reconstruction_loss')
         OBJ_list = [
-            STUDY_DICT, #no encoder
+            STUDY_DICT, 
         ]
 
     for study_info_dict in OBJ_list:

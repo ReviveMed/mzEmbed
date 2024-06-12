@@ -394,6 +394,8 @@ def objective_func3(run_id,data_dir,recompute_eval=False,objective_keys=None,obj
 
 def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
     activation = 'leakyrelu'
+    batch_size = 64
+    noise_factor = 0.1
 
     # these are the defaults if you don't want to choose from a distribution
     if not choose_from_distribution:
@@ -407,6 +409,8 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         isfemale_weight = 0
         ispediatric_weight = 0
         age_weight = 0
+        use_l1_reg = False
+        use_l2_reg = False
         l2_reg_weight = 0
         l1_reg_weight = 0
         num_epochs = 100
@@ -414,14 +418,18 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         optimizer_name = 'adamw'
         early_stopping_patience = 0
         weight_decay = 0.00001
-        adversarial_mini_epochs = 2
         adversarial_start_epoch = 0
+        if 'MA_Encoder' in encoder_kind:
+            hidden_size = 16
+            hidden_size_mult = 0
+            num_attention_heads = 2
+        else:
+            num_attention_heads = 0
+            hidden_size_mult = 1.5
+            hidden_size = 0
 
 
     if choose_from_distribution:
-        if encoder_kind in ['AE','VAE']:
-            latent_size = IntDistribution(4, 128, step=1)
-
         cohort_label_weight = FloatDistribution(0,10,step=0.1) #10
         isfemale_weight = FloatDistribution(0,20,step=0.1) #20
         ispediatric_weight = FloatDistribution(0,10,step=0.1) #10
@@ -432,13 +440,44 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         age_weight = FloatDistribution(0,10,step=0.1) #10
     
 
-    if encoder_kind in ['AE']:
+    if (encoder_kind in ['AE','VAE']) or ('MA_Encoder' in encoder_kind):
         if choose_from_distribution:
-            num_hidden_layers = IntDistribution(1, 10)
-            dropout_rate = FloatDistribution(0, 0.5, step=0.1)
+            latent_size = IntDistribution(4, 128, step=1)
+            if encoder_kind == 'VAE':  
+                activation = 'leakyrelu'
+                num_hidden_layers = IntDistribution(1, 5) 
+                dropout_rate = FloatDistribution(0, 0.3, step=0.15)
+                use_l1_reg = False
+                use_l2_reg = False
+                l2_reg_weight = 0 # loss explodes if not 0
+                l1_reg_weight = 0
+                num_attention_heads = 0
+                hidden_size_mult = 1.5
+                hidden_size = 0
+            
+            elif 'MA_Encoder' in encoder_kind:
+                activation = 'relu'
+                num_attention_heads = IntDistribution(2, 5, step=1)
+                num_hidden_layers = IntDistribution(2, 4, step=2)
+                hidden_size = IntDistribution(16, 64, step=16)
+                hidden_size_mult = 0
+                use_l1_reg =False
+                use_l2_reg = False
+                l2_reg_weight = 0
+                l1_reg_weight = 0
+            else:
+                activation = 'leakyrelu'
+                num_hidden_layers = IntDistribution(1, 10)
+                dropout_rate = FloatDistribution(0, 0.5, step=0.1)
+                # use_l1_reg = CategoricalDistribution([True, False])
+                # use_l2_reg = CategoricalDistribution([True, False])
+                l2_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
+                l1_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
+                num_attention_heads = 0
+                hidden_size_mult = 1.5
+                hidden_size = 0
+            
             encoder_weight = FloatDistribution(0,5,step=0.1)
-            l2_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
-            l1_reg_weight = FloatDistribution(0, 0.01, step=0.0001)
 
         encoder_kwargs = {
                     'activation': activation,
@@ -446,92 +485,18 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
                     'num_hidden_layers': num_hidden_layers,
                     'dropout_rate': dropout_rate,
                     'use_batch_norm': False,
-                    # 'hidden_size': int(1.5*latent_size),
-                    'hidden_size_mult' : 1.5
-                    }
-        num_epochs_min = 50
-        num_epochs_max = 300
-        num_epochs_step = 10
-        adversarial_mini_epochs = 2
-        early_stopping_patience_step = 10
-        early_stopping_patience_max = 50
-
-    elif encoder_kind == 'VAE':       
-        if choose_from_distribution:
-            num_hidden_layers = IntDistribution(1, 5) 
-            dropout_rate = FloatDistribution(0, 0.3, step=0.15)
-            adversarial_mini_epochs = IntDistribution(2, 6, step=1)
-            encoder_weight = FloatDistribution(0,10,step=0.1)
-
-
-        encoder_kwargs = {
-                    'activation': activation,
-                    'latent_size': latent_size,
-                    'num_hidden_layers': num_hidden_layers,
-                    'dropout_rate': dropout_rate,
-                    'use_batch_norm': False,
-                    # 'hidden_size': int(1.5*latent_size),
-                    'hidden_size_mult' : 1.5
-                    }
-        num_epochs_min = 50
-        num_epochs_max = 300
-        num_epochs_step = 10
-        early_stopping_patience_step = 10
-        early_stopping_patience_max = 50
-        l2_reg_weight = 0 # loss explodes if not 0
-        l1_reg_weight = 0
-
-    elif 'MA_Encoder' in encoder_kind:
-        latent_size = 16
-        num_hidden_layers = 2
-        dropout_rate = 0.2
-        encoder_weight = 1
-        head_weight = 0
-        adv_weight = 0
-        cohort_label_weight = 0
-        isfemale_weight = 0
-        ispediatric_weight = 0
-        age_weight = 0
-        l2_reg_weight = 0
-        l1_reg_weight = 0
-        num_epochs = 100
-        lr = 0.001
-        optimizer_name = 'adamw'
-        early_stopping_patience = 0
-        weight_decay = 0.00001
-        adversarial_mini_epochs = 2
-        adversarial_start_epoch = 0
-
-        num_epochs = 20
-        num_attention_heads = 2
-        hidden_size = 32
-        latent_size = 16
-        encoder_weight = 1
-
-        if choose_from_distribution:
-            num_attention_heads = IntDistribution(2, 5, step=1)
-            num_hidden_layers = IntDistribution(2, 4, step=2)
-            dropout_rate = FloatDistribution(0, 0.5, step=0.1)
-            hidden_size = IntDistribution(16, 64, step=16)
-            adversarial_start_epoch = IntDistribution(-1, 10, step=2)
-
-        encoder_kwargs = {
-                    'activation': 'relu',
-                    'num_attention_heads': num_attention_heads,
-                    'num_hidden_layers': num_hidden_layers,
-                    'dropout_rate': dropout_rate,
                     'hidden_size': hidden_size,
-                    'latent_size': latent_size,
+                    'hidden_size_mult' : hidden_size_mult,
+                    'num_attention_heads': num_attention_heads,
                     }
         
-        num_epochs_min = 5
-        num_epochs_max = 50
-        num_epochs_step = 5
 
-        early_stopping_patience_step = 5
-        early_stopping_patience_max = 20 
-        l1_reg_weight = 0
-        l2_reg_weight = 0
+        num_epochs_min = 50
+        num_epochs_max = 300
+        num_epochs_step = 10
+        early_stopping_patience_step = 10
+        early_stopping_patience_max = 50
+
 
     elif encoder_kind == 'TGEM_Encoder':
         if choose_from_distribution:
@@ -550,7 +515,6 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         num_epochs_min = 10
         num_epochs_max = 50
         num_epochs_step = 1
-        adversarial_mini_epochs = 1
         early_stopping_patience_step = 5
         early_stopping_patience_max = 20
         l2_reg_weight = 0
@@ -560,7 +524,8 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
     if choose_from_distribution:
         num_epochs = IntDistribution(num_epochs_min, num_epochs_max, step=num_epochs_step)
         lr = FloatDistribution(0.0001, 0.05, log=True)
-        optimizer_name = CategoricalDistribution(['adam','adamw'])
+        # optimizer_name = CategoricalDistribution(['adam','adamw'])
+        optimizer_name = 'adamw'
         weight_decay = FloatDistribution(0, 0.0005, step=0.00001)
         early_stopping_patience = IntDistribution(0, early_stopping_patience_max, step=early_stopping_patience_step)
         adversarial_start_epoch = IntDistribution(-1, 10, step=2)
@@ -582,7 +547,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
                 ## Pretrain ##
 
                 'holdout_frac': 0.2, # each trial the train/val samples will be different, also not stratified?
-                'batch_size': 64,
+                'batch_size': batch_size,
                 
                 'head_kwargs_list': [
                     {
@@ -655,12 +620,14 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
                     'num_epochs': num_epochs,
                     'lr': lr,
                     'weight_decay': weight_decay,
+                    # 'use_l1_reg': use_l1_reg,
+                    # 'use_l2_reg': use_l2_reg,
                     'l1_reg_weight': l1_reg_weight,
                     'l2_reg_weight': l2_reg_weight,
                     'encoder_weight': encoder_weight,
                     'head_weight': head_weight,
                     'adversary_weight': adv_weight,
-                    'noise_factor': 0.1,
+                    'noise_factor': noise_factor,
                     'early_stopping_patience': early_stopping_patience,
                     # 'adversarial_mini_epochs': adversarial_mini_epochs,
                     'adversarial_start_epoch': adversarial_start_epoch
@@ -669,6 +636,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         }
     
     kwargs = round_kwargs_to_sig(kwargs,sig_figs=sig_figs)
+    kwargs = convert_model_kwargs_list_to_dict(kwargs,style=2)
     return kwargs
 
 

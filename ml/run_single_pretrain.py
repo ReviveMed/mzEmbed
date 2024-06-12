@@ -14,7 +14,8 @@ data_dir = get_latest_dataset(data_dir=data_dir)
 encoder_kind = 'MA_Encoder_to_FF_Decoder'
 # encoder_kind = 'VAE'
 # kwargs = make_kwargs(encoder_kind=encoder_kind,choose_from_distribution=False)
-kwargs = make_kwargs(encoder_kind=encoder_kind,choose_from_distribution=True)
+kwargs = make_kwargs(encoder_kind=encoder_kind,choose_from_distribution=False)
+
 kwargs['run_evaluation'] = True
 # kwargs['eval_kwargs'] = {
 #     'sklearn_models': {
