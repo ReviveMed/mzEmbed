@@ -335,6 +335,8 @@ def train_scgpt_wrapper(**kwargs):
             updated_var_info = adata.var.copy()
             updated_var_info = pd.concat([updated_var_info, updated_var_info])
             updated_obs_info = adata.obs.copy()
+            updated_var_info.index = updated_index
+            updated_var_info['gene_name'] = updated_index
 
             # concatenate the two matrices into one new adata object
             if issparse(adata_pos):
