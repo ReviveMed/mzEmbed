@@ -38,10 +38,13 @@ def objective(trial):
     # lr = trial.suggest_float('lr', 1e-5, 1e-3, log=True)
     # layer_size = trial.suggest_int('layer_size', 64, 512, step=64)
     # layer_size = trial.suggest_int('layer_size', 64, 128, step=64)
-    layer_size = trial.suggest_int('layer_size', 32, 64, step=32)
-    nlayers = trial.suggest_int('nlayers', 2, 8, step=2)
+    # layer_size = trial.suggest_int('layer_size', 32, 64, step=32)
+    layer_size = trial.suggest_int('layer_size', 32, 32, step=32)
+    nlayers = trial.suggest_int('nlayers', 2, 2, step=2)
+    # nlayers = trial.suggest_int('nlayers', 2, 8, step=2)
     # nlayers = trial.suggest_int('nlayers', 2, 12, step=1)
-    nhead = trial.suggest_int('nhead', 2, 8, step=2)
+    # nhead = trial.suggest_int('nhead', 2, 8, step=2)
+    nhead = trial.suggest_int('nhead', 2, 2, step=2)
     if nhead == 6:
         print('overwriting nhead=6 to nhead=4')
         nhead = 4
