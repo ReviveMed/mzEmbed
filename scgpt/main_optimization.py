@@ -49,8 +49,8 @@ def objective(trial):
         print('overwriting nhead=6 to nhead=4')
         nhead = 4
     dropout = trial.suggest_float('dropout', 0.05, 0.25, step=0.05)
-    # max_seq_len = trial.suggest_int('max_seq_len', 1001, 2401, step=200)
-    max_seq_len = trial.suggest_int('max_seq_len', 2001, 5201, step=400)
+    max_seq_len = trial.suggest_int('max_seq_len', 1001, 2401, step=200)
+    # max_seq_len = trial.suggest_int('max_seq_len', 2001, 5201, step=400)
 
 
     # mask_ratio = trial.suggest_float('mask_ratio', 0.1, 0.5, step=0.05)
