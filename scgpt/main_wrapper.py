@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import wandb
-from scipy.sparse import issparse
+from scipy.sparse import issparse, hstack
 import matplotlib.pyplot as plt
 from torch import nn
 from torch.nn import functional as F
@@ -259,7 +259,7 @@ def train_scgpt_wrapper(**kwargs):
 
     # %%
     # ## Loading and preparing data
-    if dataset_name == "metab_v1":
+    if (dataset_name == "metab_v1") or (dataset_name == "metab_v2"):
         print('this metabolomics data has already been log2 transformed, missing value filled and study-id standardized')
         
         # link to the directory of the data
@@ -307,11 +307,49 @@ def train_scgpt_wrapper(**kwargs):
         filter_gene_by_counts = False
         adata_protein = None
 
-        # The data needs to be positive, since the missing values are the zeros
-        lowest_val = np.floor(adata.X.min())
-        if lowest_val < 0:
-            print(f"lowest value is {lowest_val}, add {abs(lowest_val)+1} to make all values positive")
-            adata.X = adata.X + abs(lowest_val) + 1
+        if (dataset_name == "metab_v1"):
+            # Method #1 for removing the non-positive values
+            # The data needs to be positive, since the missing values are the zeros
+            lowest_val = np.floor(adata.X.min())
+            if lowest_val < 0:
+                print(f"lowest value is {lowest_val}, add {abs(lowest_val)+1} to make all values positive")
+                adata.X = adata.X + abs(lowest_val) + 1
+
+        elif (dataset_name == "metab_v2"):
+            # Method #2 for removing the non-positive values
+            # make two matrices, one with the positive values zeroed out, and one with the negative values zeroed out
+            # then combine the two matrices
+            org_genes = adata.var.index.tolist()
+            adata_neg = adata.X.copy()
+            adata_neg[adata_neg > 0] = 0
+            adata_neg = adata_neg * -1
+            adata_pos = adata.X.copy()  
+            adata_pos[adata_pos < 0] = 0
+
+            # currently zero values are treated as missing values, so we need to we need to account for this
+            adata_pos[adata_pos == 0] = 1e-6      
+            # concatenate the two matrices into one new adata object
+
+            # update the index, var and obs information
+            updated_index= [f'{x}_pos' for x in org_genes] + [f'{x}_neg' for x in org_genes]
+            updated_var_info = adata.var.copy()
+            updated_var_info = pd.concat([updated_var_info, updated_var_info])
+            updated_obs_info = adata.obs.copy()
+
+            # concatenate the two matrices into one new adata object
+            if issparse(adata_pos):
+                adata_combined = hstack([adata_pos, adata_neg])
+            else:
+                adata_combined = np.concatenate((adata_pos, adata_neg), axis=1)
+            
+            adata = AnnData(adata_combined)
+            adata.var.index = updated_index
+            adata.var = updated_var_info
+            adata.obs = updated_obs_info
+
+            # currently zero values are treated as missing, but we don't have missing values, so add small value to all values
+            if not issparse(adata.X):
+                adata.X = adata.X + 0.01
 
     elif dataset_name == "metab_v0":
         # /Users/jonaheaton/Desktop/scGPT-main/data/metabolomics_apr24/data.h5ad

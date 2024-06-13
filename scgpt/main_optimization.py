@@ -31,7 +31,7 @@ study_info_dict = {
 
 
 def objective(trial):
-
+    dataset_name = 'metab_v2'
     mask_ratio = trial.suggest_float('mask_ratio', 0.05, 0.25, step=0.05)
     epochs = trial.suggest_int('epochs', 20, 40, step=1)
     n_bins = trial.suggest_int('n_bins', 21, 51, step=10)
@@ -46,7 +46,8 @@ def objective(trial):
         print('overwriting nhead=6 to nhead=4')
         nhead = 4
     dropout = trial.suggest_float('dropout', 0.05, 0.25, step=0.05)
-    max_seq_len = trial.suggest_int('max_seq_len', 1001, 2401, step=200)
+    # max_seq_len = trial.suggest_int('max_seq_len', 1001, 2401, step=200)
+    max_seq_len = trial.suggest_int('max_seq_len', 2001, 5201, step=400)
 
 
     # mask_ratio = trial.suggest_float('mask_ratio', 0.1, 0.5, step=0.05)
@@ -81,7 +82,7 @@ def objective(trial):
         CLS = CLS,
         GEPC = GEPC,
         celltype_label = celltype_label,
-        dataset_name="metab_v1",
+        dataset_name=dataset_name,
         datasubset_label = 'pretrain_set',
         trainsubset_label = 'Train',
         valsubset_label = 'Val',
@@ -116,7 +117,7 @@ def objective(trial):
     finetune_config1 = dict(
         task = 'annotation',
         CLS= True,
-        dataset_name="metab_v1",
+        dataset_name=dataset_name,
         celltype_label = "IMDC Binary",
         datasubset_label = 'finetune_set',
         trainsubset_label = 'Finetune',
