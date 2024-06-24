@@ -1119,9 +1119,368 @@ class MA_VEncoder_to_FF_Decoder(Default_VariationalEncoderDecoder):
         self.name = 'MA_VEncoder_to_FF_Decoder'
         self.file_id = 'MA_VEncoder_to_FF_Decoder'
 
+##################################################################################################################
+##################################################################################################################
+##################################################################################################################
 
-   
+from performer import PerformerModule
+import math
 
+
+def next_16x(x):
+    return int(math.ceil(x / 16) * 16)
+
+def gatherData(data, labels, pad_token_id):
+    """
+    I think:
+        labels>0 indicates real data, labels=0 indicates missing or not-applicable data
+    """
+    value_nums = labels.sum(1)
+    max_num = next_16x(max(value_nums))
+
+    fake_data = torch.full((data.shape[0], max_num), pad_token_id,
+                           device=data.device)
+    data = torch.hstack([data, fake_data])
+
+    fake_label = torch.full((labels.shape[0], max_num), 1,
+                            device=labels.device)
+    none_labels = ~labels
+    labels = labels.float()
+    labels[none_labels] = torch.tensor(-float('Inf'), device=labels.device)
+
+    tmp_data = torch.tensor([(i + 1) * 20000 for i in range(labels.shape[1], 0, -1)], device=labels.device)
+    labels += tmp_data
+
+    labels = torch.hstack([labels, fake_label])
+
+    fake_label_gene_idx = labels.topk(max_num).indices
+
+    new_data = torch.gather(data, 1, fake_label_gene_idx)
+
+    if np.isnan(pad_token_id):
+        padding_labels = torch.isnan(new_data)
+    else:
+        padding_labels = (new_data == pad_token_id)
+
+    return new_data, padding_labels
+
+
+
+class AutoDiscretizationEmbedding(nn.Module):
+    def __init__(self, dim, max_seq_len, bin_num, bin_alpha):
+        super().__init__()
+
+        self.dim = dim
+        self.max_seq_len = max_seq_len
+        self.bin_num = bin_num
+        self.bin_alpha = bin_alpha
+
+        self.mlp = nn.Linear(1, self.bin_num)
+        self.mlp2 = nn.Linear(self.bin_num, self.bin_num)
+        self.LeakyReLU = nn.LeakyReLU(0.1)
+        self.Softmax = nn.Softmax(dim=-1)
+        self.emb = nn.Embedding(self.bin_num, self.dim)
+
+        self.emb_mask = nn.Embedding(1, self.dim)
+        self.emb_pad = nn.Embedding(1, self.dim)
+
+        self.bin_num_idx = torch.tensor(range(self.bin_num))
+        # print('self.bin_num_idx',self.bin_num_idx, self.bin_num_idx.shape)
+
+        self.tensor0 = torch.tensor(0, dtype=torch.long)
+
+    def forward(self, x, x_mask_idx=None, x_pad_idx=None, output_weight=0):
+        if x_mask_idx is None:
+            x_mask_idx = torch.empty((0, 3), dtype=torch.int64)
+            # x_mask_idx = (x==self.mask_token_id).nonzero()
+
+
+        if x_pad_idx is None:
+            x_pad_idx = torch.empty((0, 3), dtype=torch.int64)
+            # x_pad_idx = (x==self.pad_token_id).nonzero()
+
+        # print("x_mask",x_mask_idx.shape,x_mask_idx)
+
+        x = self.mlp(x) # [B,N,1] -> [B,N,H]
+        x = self.LeakyReLU(x) # [B,N,H]
+        x_crosslayer = self.mlp2(x) # [B,N,H]
+        x = self.bin_alpha * x + x_crosslayer # [B,N,H]
+        weight = self.Softmax(x) # [B, N, H]
+        # print('weight', weight.shape, weight, torch.sum(weight, 2))
+
+        bin_num_idx = self.bin_num_idx.to(x.device) # [H,]
+        # print('bin_num_idx', bin_num_idx.shape)
+
+        token_emb = self.emb(bin_num_idx) # [H, D]
+        # print('token_emb', token_emb.shape)
+        x = torch.matmul(weight, token_emb) #[B, N, D]
+
+        # print("x_emb",x.shape,x)
+
+        tensor0 = torch.tensor(0, dtype=torch.long, device=x.device)
+
+        mask_token_emb = self.emb_mask(tensor0).to(x.device).type(x.dtype)
+        # print(mask_token_emb.dtype)
+        # print("x", x.dtype)
+        x[x_mask_idx[:,0],x_mask_idx[:,1],:] = mask_token_emb.repeat(x_mask_idx.shape[0],1)
+        # print("x_emb",x.shape,x)
+
+        pad_token_emb = self.emb_pad(tensor0).to(x.device).type(x.dtype)
+        x[x_pad_idx[:,0],x_pad_idx[:,1],:] = pad_token_emb.repeat(x_pad_idx.shape[0],1)
+
+        if output_weight:
+            return x,weight
+        return x
+
+
+
+class EmbeddingModule(nn.Module):
+    def __init__(self,
+            *,
+            max_seq_len,  # max length of sequence AND number of metabolites
+            embed_dim,  # encoder dim of tokens
+            bin_alpha = 1.0,
+            bin_num = 10):
+        super(EmbeddingModule, self).__init__()
+
+        self.max_seq_len = max_seq_len
+        self.embed_dim = embed_dim
+        self.token_emb = AutoDiscretizationEmbedding(embed_dim, max_seq_len, bin_num=bin_num, bin_alpha=bin_alpha)
+        self.pos_emb = nn.Embedding(max_seq_len+1, embed_dim)  #RandomPositionalEmbedding(embed_dim, max_seq_len)
+
+    def forward(self,x,x_pos_ids,x_mask=None,x_pad=None,output_attentions=False):
+        if (x_mask is None):
+            x_mask = torch.zeros_like(x, dtype=torch.bool)
+            # x_mask = x == self.mask_token_id
+
+        if x_pad is None:
+            x_pad = torch.zeros_like(x, dtype=torch.bool)
+            # x_pad = x == self.pad_token_id
+
+        b, n, device = *x.shape, x.device
+        assert n <= self.max_seq_len, f'sequence length {n} must be less than the max sequence length {self.max_seq_len}'
+
+        # token and positional embedding
+        x = self.token_emb(torch.unsqueeze(x, 2),
+                           output_weight = 0,
+                           x_mask_idx=torch.unsqueeze(x_mask, 2).nonzero(),
+                           x_pad_idx = torch.unsqueeze(x_pad, 2).nonzero())
+
+        if output_attentions:
+            x.requires_grad_()  # used for attn_map output
+
+        position_emb = self.pos_emb(x_pos_ids)
+        x += position_emb
+        return x
+    
+class InverseEmbed(nn.Module):
+    def __init__(self,*, embed_dim, decoder_embed_dim):
+        super(InverseEmbed, self).__init__()
+
+        self.decoder_embed = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
+        self.norm = nn.LayerNorm(decoder_embed_dim)
+        self.to_final = nn.Linear(decoder_embed_dim, 1)
+
+    def forward(self, x):
+        x = self.decoder_embed(x)
+        x = self.norm(x)
+        x = self.to_final(x).squeeze(-1)
+        return x
+
+
+class MetabToSequence:
+    def __init__(self, * ,max_seq_len=128):
+        super(MetabToSequence, self).__init__()
+
+        self.max_seq_len = max_seq_len
+        self.pad_token_id = np.nan
+        self.missing_val_id = np.nan # the value that represents missing values
+
+    def get_pos_ids(self, x, x_labels=None):
+        x_ids = torch.arange(x.shape[1], device=x.device).repeat(x.shape[0], 1)
+        if x_labels is None:
+            return x_ids
+        x_ids, _ = gatherData(x_ids, x_labels, self.pad_token_id)
+        return x_ids
+
+    def transform(self, x, x_hidden=None, x_labels=None):
+        if x_labels is None:
+            if np.isnan(self.missing_val_id):
+                x_labels = ~torch.isnan(x)
+            else:
+                x_labels = x != self.missing_val_id
+        
+        x_seq, x_pad = gatherData(data=x,
+                                    labels=x_labels,
+                                    pad_token_id=self.pad_token_id)
+        x_seq[x_pad] = 0
+        
+        x_ids = torch.arange(x.shape[1], device=x.device).repeat(x.shape[0], 1)
+        x_pos_ids, _ = gatherData(x_ids, x_labels, self.pad_token_id)
+        x_pos_ids[x_pad] = self.max_seq_len
+
+        x_mask, _ = gatherData(x_hidden.long(), x_labels, self.pad_token_id)
+        x_mask[x_pad] = 0
+        x_mask = x_mask.bool()
+
+        return x_seq, x_pos_ids, x_mask, x_pad
+    
+    def inverse_transform(self, x_seq, x_pos_ids, x_mask=None):
+
+        x0 = torch.zeros((x_seq.shape[0], self.max_seq_len+1), device=x_seq.device)
+        x0[:,:] = self.missing_val_id
+        x0_hidden = torch.zeros((x_seq.shape[0], self.max_seq_len+1), device=x_seq.device)
+        for i in range(x_seq.shape[0]):
+            subset = x_pos_ids[i,:].long()
+            x0[i,subset] = x_seq[i]
+            if x_mask is not None:
+                x0_hidden[i,subset] = x_mask[i].float()
+        # drop the last column
+        x0 = x0[:,:-1]
+        x0_hidden = x0_hidden[:,:-1].bool()
+        return x0, x0_hidden
+
+
+class EncoderModule(nn.Module):
+    def __init__(self, *, embed_dim, num_heads, num_layers, ff_mult=4, dropout=0.1):
+        super(EncoderModule, self).__init__()
+        self.norm = nn.LayerNorm(embed_dim)
+        self.encoder_layer = nn.TransformerEncoderLayer(
+            d_model=embed_dim,
+            nhead=num_heads,
+            dim_feedforward=embed_dim*ff_mult,
+            dropout=dropout,
+            batch_first=True) # this was changed, used to be false, but should have been true?
+
+        self.transformer_encoder = nn.TransformerEncoder(
+            self.encoder_layer,
+            num_layers=num_layers,
+            norm=self.norm)
+
+    def forward(self, x, mask=None):
+        x = self.transformer_encoder(x, src_key_padding_mask=mask)
+        return x
+
+class metabFoundation(Default_EncoderDecoder):
+    def __init__(self, **kwargs):
+        super(metabFoundation, self).__init__()
+        self.input_size = kwargs.get('input_size', 1)
+        self.hidden_size = kwargs.get('hidden_size', 1)
+        self.latent_size = kwargs.get('latent_size', 1)
+        self.num_hidden_layers = kwargs.get('num_hidden_layers', kwargs.get('num_layers', 1))
+        self.num_attention_heads = kwargs.get('num_attention_heads', 1)
+        self.dropout_rate = kwargs.get('dropout_rate', 0)
+        self.activation = kwargs.get('activation', 'leakyrelu')
+        self.use_batch_norm = kwargs.get('use_batch_norm', False)
+        self.act_on_output_layer = kwargs.get('act_on_output_layer', False)
+
+        self.max_seq_len=kwargs.get('max_seq_len', 128)
+        self.num_encoder_heads = kwargs.get('num_encoder_heads', kwargs.get('num_attention_heads', 1))
+        self.num_decoder_heads = kwargs.get('num_decoder_heads', kwargs.get('num_attention_heads', 1))
+        self.num_encoder_layers = kwargs.get('num_encoder_layers', kwargs.get('num_hidden_layers', 1))
+        self.num_decoder_layers = kwargs.get('num_decoder_layers', kwargs.get('num_hidden_layers', 1))
+        self.embed_dim = kwargs.get('embed_dim', self.hidden_size)
+        self.inverse_embed_dim = kwargs.get('inverse_embed_dim', self.hidden_size)
+
+        self.metab_to_seq = MetabToSequence(max_seq_len=kwargs.get('max_seq_len', 128))
+
+
+        self.seq_to_embed = EmbeddingModule(
+            max_seq_len=self.max_seq_len,
+            embed_dim=self.embed_dim,
+            bin_alpha=1.0,
+            bin_num=10)
+        
+        self.embed_to_encoder = EncoderModule(
+            embed_dim=self.embed_dim, 
+            num_heads=self.num_encoder_heads, 
+            num_layers=self.num_encoder_layers, 
+            ff_mult=4, 
+            dropout=self.dropout_rate)
+            
+        self.decoder_to_embed = PerformerModule(
+                max_seq_len=self.max_seq_len,
+                dim = self.embed_dim,
+                depth = self.num_decoder_layers,
+                heads = self.num_decoder_heads,
+                dim_head=self.embed_dim,
+                ff_dropout=0.,
+                attn_dropout=0.,
+            )
+        
+        self.embed_to_seq = InverseEmbed(
+            embed_dim=self.embed_dim, 
+            decoder_embed_dim=self.inverse_embed_dim)
+
+        self.encoder = nn.Sequential(
+            self.seq_to_embed,
+            self.embed_to_encoder
+        )
+
+        self.decoder = nn.Sequential(
+            self.decoder_to_embed,
+            self.embed_to_seq
+        )
+
+        self.kind = 'metabFoundation'
+        self.name = 'metabFoundation'
+        self.file_id = 'metabFoundation'
+
+    def foward(self, x):
+        x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x)
+        x_emb = self.seq_to_embed(x_seq, x_pos_ids, x_mask, x_pad)
+        x_enc = self.embed_to_encoder(x_emb)
+        # x_out_emb = self.decoder_to_embed(x_enc)
+        # x_out_seq = self.embed_to_seq(x_out_emb)
+        x_enc_pooled = torch.mean(x_enc, 2)
+        return x_enc_pooled
+    
+    def transform(self, x, as_seq=True):
+        x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x)
+        x_emb = self.seq_to_embed(x_seq, x_pos_ids, x_mask, x_pad)
+        x_enc = self.embed_to_encoder(x_emb)
+        x_enc_pooled = torch.mean(x_enc, 2)
+        return x_enc_pooled
+        # if as_seq:
+        #     return x_enc_pooled, x_pos_ids, x_mask, x_pad
+        # x_latent = self.metab_to_seq.inverse_transform(x_enc_pooled, x_pos_ids)
+        # return x_latent
+    
+    def loss(self, x, x_recon):
+        return F.mse_loss(x_recon, x, reduction='mean')
+    
+    def forward_to_loss(self, x, mask_loss_weight=10.0):
+        x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x)
+        x_emb = self.seq_to_embed(x_seq, x_pos_ids, x_mask, x_pad)
+        x_enc = self.embed_to_encoder(x_emb)
+        x_out_emb = self.decoder_to_embed(x_enc)
+        x_out_seq = self.embed_to_seq(x_out_emb)
+
+        all_loss = self.loss(x_seq[~x_pad], x_out_seq[~x_pad])
+        masked_loss = self.loss(x_seq[x_mask], x_out_seq[x_mask])
+        total_loss = all_loss + mask_loss_weight * masked_loss
+
+        return  total_loss
+    
+    def transform_with_loss(self, x, mask_loss_weight=10.0):
+        x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x)
+        x_emb = self.seq_to_embed(x_seq, x_pos_ids, x_mask, x_pad)
+        x_enc = self.embed_to_encoder(x_emb)
+        x_out_emb = self.decoder_to_embed(x_enc)
+        x_out_seq = self.embed_to_seq(x_out_emb)
+
+        all_loss = self.loss(x_seq[~x_pad], x_out_seq[~x_pad])
+        masked_loss = self.loss(x_seq[x_mask], x_out_seq[x_mask])
+        total_loss = all_loss + mask_loss_weight * masked_loss
+        return x_enc, total_loss
+    
+    def generate(self, z, x_pos_ids,as_seq=False):
+        x_out_emb = self.decoder_to_embed(z)
+        x_out_seq = self.embed_to_seq(x_out_emb)
+        if as_seq:
+            return x_out_seq
+        x_out = self.metab_to_seq.inverse_transform(x_out_seq,x_pos_ids)
+        return x_out
 
 
 
