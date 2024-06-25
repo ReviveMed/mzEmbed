@@ -1248,6 +1248,9 @@ class EmbeddingModule(nn.Module):
         self.token_emb = AutoDiscretizationEmbedding(embed_dim, max_seq_len, bin_num=bin_num, bin_alpha=bin_alpha)
         self.pos_emb = nn.Embedding(max_seq_len+1, embed_dim)  #RandomPositionalEmbedding(embed_dim, max_seq_len)
 
+    def get_pos_embedding(self, x_pos_ids):
+        return self.pos_emb(x_pos_ids)
+
     def forward(self,x,x_pos_ids,x_mask=None,x_pad=None,output_attentions=False):
         if (x_mask is None):
             x_mask = torch.zeros_like(x, dtype=torch.bool)
@@ -1272,12 +1275,21 @@ class EmbeddingModule(nn.Module):
         position_emb = self.pos_emb(x_pos_ids)
         x += position_emb
         return x
-    
+
+class PreDecoderModule(nn.Module):
+    def __init__(self,*, embed_dim, decoder_embed_dim):
+        self.decoder_embed = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
+    def forward(self, x,pos_emb):
+        x += pos_emb
+        x = self.decoder_embed(x)
+        return x
+
 class InverseEmbed(nn.Module):
     def __init__(self,*, embed_dim, decoder_embed_dim):
         super(InverseEmbed, self).__init__()
-
+        # TODO, the decoder_embed was used BEFORE the decoder in scFoundation, is this better or worse?
         self.decoder_embed = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
+
         self.norm = nn.LayerNorm(decoder_embed_dim)
         self.to_final = nn.Linear(decoder_embed_dim, 1)
 
@@ -1339,6 +1351,19 @@ class MetabToSequence:
         x0 = x0[:,:-1]
         x0_hidden = x0_hidden[:,:-1].bool()
         return x0, x0_hidden
+
+    def remove_seq_padding(self, x_seq, x_pos_ids, x_mask,x_pad):
+        # this is still in development
+        # See the forward method in the "MaeAutobin" module in scFoundation for guidance
+        if len(x_seq) > 2:
+            y_emb = torch.zeros((x_seq.shape[0], self.max_seq_len, x_seq.shape[2]), device=x_seq.device)
+        else:
+            y_emb = torch.zeros((x_seq.shape[0], self.max_seq_len), device=x_seq.device)
+
+        x_labels = ~(x_mask | x_pad)
+        batch_idx, gen_idx = (x_labels == True).nonzero(as_tuple=True)
+        y_emb[batch_idx, gen_idx] = x_seq[~x_pad].to(y_emb.dtype)
+        return y_emb
 
 
 class EncoderModule(nn.Module):
