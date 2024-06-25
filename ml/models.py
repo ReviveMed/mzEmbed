@@ -29,6 +29,9 @@ def get_model(model_kind, input_size, **kwargs):
     elif model_kind == 'AE':
         model = AE(input_size = input_size, **kwargs)
 
+    elif model_kind == 'metabFoundation':
+        model = metabFoundation(input_size = input_size, **kwargs)
+
     elif model_kind == 'MA_Encoder_to_MA_Decoder':
         model = MA_Encoder_to_MA_Decoder(input_size = input_size, **kwargs)
     elif model_kind == 'MA_Encoder_to_FF_Decoder':
@@ -1308,11 +1311,15 @@ class MetabToSequence:
         self.pad_token_id = np.nan
         self.missing_val_id = np.nan # the value that represents missing values
 
+    def __call__(self, x, x_hidden=None):
+        return self.transform(x, x_hidden=x_hidden)
+
     def get_pos_ids(self, x, x_labels=None):
         x_ids = torch.arange(x.shape[1], device=x.device).repeat(x.shape[0], 1)
         if x_labels is None:
             return x_ids
         x_ids, _ = gatherData(x_ids, x_labels, self.pad_token_id)
+        x_ids = x_ids.long()
         return x_ids
 
     def transform(self, x, x_hidden=None, x_labels=None):
@@ -1327,9 +1334,10 @@ class MetabToSequence:
                                     pad_token_id=self.pad_token_id)
         x_seq[x_pad] = 0
         
-        x_ids = torch.arange(x.shape[1], device=x.device).repeat(x.shape[0], 1)
-        x_pos_ids, _ = gatherData(x_ids, x_labels, self.pad_token_id)
+        x_pos_ids = torch.arange(x.shape[1], device=x.device).repeat(x.shape[0], 1)
+        x_pos_ids, _ = gatherData(x_pos_ids, x_labels, self.pad_token_id)
         x_pos_ids[x_pad] = self.max_seq_len
+        x_pos_ids = x_pos_ids.long()
 
         x_mask, _ = gatherData(x_hidden.long(), x_labels, self.pad_token_id)
         x_mask[x_pad] = 0
@@ -1389,25 +1397,27 @@ class EncoderModule(nn.Module):
 class metabFoundation(Default_EncoderDecoder):
     def __init__(self, **kwargs):
         super(metabFoundation, self).__init__()
-        self.input_size = kwargs.get('input_size', 1)
-        self.hidden_size = kwargs.get('hidden_size', 1)
-        self.latent_size = kwargs.get('latent_size', 1)
+        # self.input_size = kwargs.get('input_size', 1)
+        # self.hidden_size = kwargs.get('hidden_size', 1)
+        # self.latent_size = kwargs.get('latent_size', 1)
         self.num_hidden_layers = kwargs.get('num_hidden_layers', kwargs.get('num_layers', 1))
         self.num_attention_heads = kwargs.get('num_attention_heads', 1)
         self.dropout_rate = kwargs.get('dropout_rate', 0)
-        self.activation = kwargs.get('activation', 'leakyrelu')
-        self.use_batch_norm = kwargs.get('use_batch_norm', False)
-        self.act_on_output_layer = kwargs.get('act_on_output_layer', False)
+        # self.activation = kwargs.get('activation', 'leakyrelu')
+        # self.use_batch_norm = kwargs.get('use_batch_norm', False)
+        # self.act_on_output_layer = kwargs.get('act_on_output_layer', False)
 
-        self.max_seq_len=kwargs.get('max_seq_len', 128)
+        self.max_seq_len=kwargs.get('max_seq_len', kwargs.get('input_size', 128))
+        self.input_size = self.max_seq_len
         self.num_encoder_heads = kwargs.get('num_encoder_heads', kwargs.get('num_attention_heads', 1))
         self.num_decoder_heads = kwargs.get('num_decoder_heads', kwargs.get('num_attention_heads', 1))
         self.num_encoder_layers = kwargs.get('num_encoder_layers', kwargs.get('num_hidden_layers', 1))
         self.num_decoder_layers = kwargs.get('num_decoder_layers', kwargs.get('num_hidden_layers', 1))
-        self.embed_dim = kwargs.get('embed_dim', self.hidden_size)
-        self.inverse_embed_dim = kwargs.get('inverse_embed_dim', self.hidden_size)
+        self.embed_dim = kwargs.get('embed_dim', kwargs.get('hidden_size', 1))
+        self.inverse_embed_dim = kwargs.get('inverse_embed_dim', kwargs.get('hidden_size', 1))
+        self.default_hidden_fraction = kwargs.get('default_hidden_fraction', 0.2)
 
-        self.metab_to_seq = MetabToSequence(max_seq_len=kwargs.get('max_seq_len', 128))
+        self.metab_to_seq = MetabToSequence(max_seq_len=self.max_seq_len)
 
 
         self.seq_to_embed = EmbeddingModule(
@@ -1451,31 +1461,39 @@ class metabFoundation(Default_EncoderDecoder):
         self.name = 'metabFoundation'
         self.file_id = 'metabFoundation'
 
-    def foward(self, x):
-        x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x)
+    def foward(self, x, x_hidden=None,as_seq=False):
+        if x_hidden is None:
+            x_hidden = torch.rand_like(x) < self.default_hidden_fraction
+        x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x,x_hidden=x_hidden)
         x_emb = self.seq_to_embed(x_seq, x_pos_ids, x_mask, x_pad)
         x_enc = self.embed_to_encoder(x_emb)
         # x_out_emb = self.decoder_to_embed(x_enc)
         # x_out_seq = self.embed_to_seq(x_out_emb)
         x_enc_pooled = torch.mean(x_enc, 2)
+        if as_seq:
+            return x_enc
         return x_enc_pooled
     
-    def transform(self, x, as_seq=True):
-        x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x)
+    def transform(self, x, x_hidden=None, as_seq=False):
+        if x_hidden is None:
+            x_hidden = torch.rand_like(x) < self.default_hidden_fraction
+        x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x,x_hidden=x_hidden)
         x_emb = self.seq_to_embed(x_seq, x_pos_ids, x_mask, x_pad)
         x_enc = self.embed_to_encoder(x_emb)
         x_enc_pooled = torch.mean(x_enc, 2)
+        if as_seq:
+            return x_enc_pooled, x_enc, x_pos_ids, x_mask, x_pad
         return x_enc_pooled
-        # if as_seq:
-        #     return x_enc_pooled, x_pos_ids, x_mask, x_pad
         # x_latent = self.metab_to_seq.inverse_transform(x_enc_pooled, x_pos_ids)
         # return x_latent
     
     def loss(self, x, x_recon):
         return F.mse_loss(x_recon, x, reduction='mean')
     
-    def forward_to_loss(self, x, mask_loss_weight=10.0):
-        x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x)
+    def forward_to_loss(self, x, mask_loss_weight=10.0,x_hidden=None):
+        if x_hidden is None:
+            x_hidden = torch.rand_like(x) < self.default_hidden_fraction
+        x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x,x_hidden=x_hidden)
         x_emb = self.seq_to_embed(x_seq, x_pos_ids, x_mask, x_pad)
         x_enc = self.embed_to_encoder(x_emb)
         x_out_emb = self.decoder_to_embed(x_enc)
@@ -1485,10 +1503,12 @@ class metabFoundation(Default_EncoderDecoder):
         masked_loss = self.loss(x_seq[x_mask], x_out_seq[x_mask])
         total_loss = all_loss + mask_loss_weight * masked_loss
 
-        return  total_loss
+        return total_loss
     
-    def transform_with_loss(self, x, mask_loss_weight=10.0):
-        x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x)
+    def transform_with_loss(self, x, mask_loss_weight=10.0,x_hidden=None, as_seq=False):
+        if x_hidden is None:
+            x_hidden = torch.rand_like(x) < self.default_hidden_fraction
+        x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x,x_hidden=x_hidden)
         x_emb = self.seq_to_embed(x_seq, x_pos_ids, x_mask, x_pad)
         x_enc = self.embed_to_encoder(x_emb)
         x_out_emb = self.decoder_to_embed(x_enc)
@@ -1497,9 +1517,14 @@ class metabFoundation(Default_EncoderDecoder):
         all_loss = self.loss(x_seq[~x_pad], x_out_seq[~x_pad])
         masked_loss = self.loss(x_seq[x_mask], x_out_seq[x_mask])
         total_loss = all_loss + mask_loss_weight * masked_loss
-        return x_enc, total_loss
+        if as_seq:
+            return x_enc, total_loss
+        x_enc_pooled = torch.mean(x_enc, 2)
+        return x_enc_pooled, total_loss
     
-    def generate(self, z, x_pos_ids,as_seq=False):
+    def generate(self, z, x_pos_ids=None,as_seq=False):
+        if x_pos_ids is None:
+            x_pos_ids = torch.arange(self.max_seq_len, device=z.device).repeat(z.shape[0], 1)
         x_out_emb = self.decoder_to_embed(z)
         x_out_seq = self.embed_to_seq(x_out_emb)
         if as_seq:

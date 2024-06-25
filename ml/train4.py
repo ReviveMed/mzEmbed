@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from models import get_reg_penalty, grad_reverse
 from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler, WeightedRandomSampler
 from sklearn.model_selection import train_test_split
-
+import time
 import random
 import math
 import torch.utils.data
@@ -188,7 +188,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                 train_name = phase
                 break
     print('Training on', train_name)
-
+    start_time = time.time()
 
     if scheduler_kind is not None:
         # Right now, Scheduler only impacts the encoder optimizer
@@ -423,6 +423,9 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                     if torch.isnan(encoder_loss) or torch.isinf(encoder_loss):
                         print('Encoder loss is nan/inf!')
                         print('your learning rate is probably too high')
+                        end_time = time.time()
+                        elapsed_minutes = (end_time - start_time) / 60
+                        print(f'Training took {elapsed_minutes:.2f} minutes')
                         return None, None, None
                     else:
                         run[f'{prefix}/{phase}/batch/encoder_loss'].append(encoder_loss)
@@ -430,6 +433,9 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                     if torch.isnan(head_loss) or torch.isinf(head_loss):
                         print('Head loss is nan/inf!')
                         print('your learning rate is probably too high')
+                        end_time = time.time()
+                        elapsed_minutes = (end_time - start_time) / 60
+                        print(f'Training took {elapsed_minutes:.2f} minutes')
                         return None, None, None
                     else:
                         run[f'{prefix}/{phase}/batch/multi_head_loss'].append(head_loss)
@@ -437,6 +443,9 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                     if torch.isnan(adversary_loss) or torch.isinf(adversary_loss):
                         print('Adversary loss is nan/inf!')
                         print('your learning rate is probably too high')
+                        end_time = time.time()
+                        elapsed_minutes = (end_time - start_time) / 60
+                        print(f'Training took {elapsed_minutes:.2f} minutes')
                         return None, None, None
                     else:
                         run[f'{prefix}/{phase}/batch/multi_adversary_loss'].append(adversary_loss)
@@ -444,31 +453,27 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         # run[f'{prefix}/{phase}/batch/multi_adversary_loss'].append(stringify_unsupported(adversary_loss))
 
 
-                    y_head_output = y_head_output.to("cpu").detach()
-                    y_adversary_output = y_adversary_output.to("cpu").detach()
-                    y_head = y_head.to("cpu").detach()
-                    y_adversary = y_adversary.to("cpu").detach()
                     if isinstance(y_head_output, dict):
                         if isinstance(epoch_head_outputs, dict):
                             for k in y_head_output.keys():
-                                epoch_head_outputs[k] = torch.cat((epoch_head_outputs[k], y_head_output[k]), 0)
+                                epoch_head_outputs[k] = torch.cat((epoch_head_outputs[k], y_head_output[k].to("cpu").detach()), 0)
                         else:
-                            epoch_head_outputs = y_head_output
+                            epoch_head_outputs = {k: y_head_output[k].to("cpu").detach() for k in y_head_output.keys()}
                     else:
-                        epoch_head_outputs = torch.cat((epoch_head_outputs, y_head_output), 0)
-                    epoch_head_targets = torch.cat((epoch_head_targets, y_head), 0)
+                        epoch_head_outputs = torch.cat((epoch_head_outputs, y_head_output.to("cpu").detach()), 0)
+                    epoch_head_targets = torch.cat((epoch_head_targets, y_head.to("cpu").detach()), 0)
 
                     if epoch > adversarial_start_epoch:
                         if isinstance(y_adversary_output, dict):
                             if isinstance(epoch_adversary_outputs, dict):
                                 for k in y_adversary_output.keys():
-                                    epoch_adversary_outputs[k] = torch.cat((epoch_adversary_outputs[k], y_adversary_output[k]), 0)
+                                    epoch_adversary_outputs[k] = torch.cat((epoch_adversary_outputs[k], y_adversary_output[k].to("cpu").detach()), 0)
                             else:
-                                epoch_adversary_outputs = y_adversary_output
+                                epoch_adversary_outputs = {k: y_adversary_output[k].to("cpu").detach() for k in y_adversary_output.keys()}
                         else:
-                            epoch_adversary_outputs = torch.cat((epoch_adversary_outputs, y_adversary_output), 0)
+                            epoch_adversary_outputs = torch.cat((epoch_adversary_outputs, y_adversary_output.to("cpu").detach()), 0)
 
-                        epoch_adversary_targets = torch.cat((epoch_adversary_targets, y_adversary), 0)
+                        epoch_adversary_targets = torch.cat((epoch_adversary_targets, y_adversary.to("cpu").detach()), 0)
                     
                     joint_loss = (encoder_weight*encoder_loss + \
                         head_weight*head_loss + \
@@ -619,6 +624,9 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
         run[f'{prefix}/best_epoch'] = best_loss['epoch']
         # run[f'{prefix}/best_joint_loss'] = best_loss['joint']
 
+    end_time = time.time()
+    elapsed_minutes = (end_time - start_time) / 60
+    print(f'Training took {elapsed_minutes:.2f} minutes')
     return encoder, head, adversary
 
 # %%
@@ -687,12 +695,22 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
                 y_adversary = y_adversary.to(device)
                 clin_vars = clin_vars.to(device)
                 
-                z = encoder.transform(X)
+                if encoder.kind == 'metabFoundation':
+                    X_hidden = torch.rand_like(X) < encoder.default_hidden_fraction
+                    X_hidden.to(device)
+                    x_seq, x_pos_ids, x_mask, x_pad = encoder.metab_to_seq.transform(X,x_hidden=X_hidden)
+                    z, z_enc, z_pos_ids, z_mask, z_pad = encoder.transform(X,x_hidden=X_hidden,as_seq=True)
+                    z_recon = encoder.generate(z_enc, x_pos_ids=z_pos_ids, as_seq=True)
+                    # compute only the masked value reconstruction
+                    recon_loss += F.mse_loss(x_seq[x_mask], z_recon[x_mask])* X.size(0)
+                else:
+                    z = encoder.transform(X)
+                    X_recon = encoder.generate(z)
+                    recon_loss += F.mse_loss(X_recon, X)* X.size(0)
 
                 if sklearn_models:
                     latent_outputs = torch.cat((latent_outputs, z), 0)
-                X_recon = encoder.generate(z)
-                recon_loss += F.mse_loss(X_recon, X)* X.size(0)
+                
                 y_head_output = head(torch.cat((z, clin_vars), 1))
                 y_adversary_output = adversary(z)
                 head_loss += head.joint_loss(y_head_output, y_head) * y_head.size(0)

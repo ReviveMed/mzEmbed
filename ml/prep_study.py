@@ -413,8 +413,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         use_l2_reg = False
         l2_reg_weight = 0
         l1_reg_weight = 0
-        # num_epochs = 100
-        num_epochs = 20
+        num_epochs = 100
         lr = 0.001
         optimizer_name = 'adamw'
         early_stopping_patience = 0
@@ -424,6 +423,20 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
             hidden_size = 16
             hidden_size_mult = 0
             num_attention_heads = 2
+        elif 'metabFoundation' in encoder_kind:
+            num_attention_heads = 2
+            num_hidden_layers = 2
+            latent_size = -1
+            hidden_size = 16
+            num_epochs = 5
+
+            head_weight = 1.0
+            adv_weight = 0
+            cohort_label_weight = 1.0
+            isfemale_weight = 2.0
+            ispediatric_weight = 2.0
+            age_weight = 2.0
+
         else:
             num_attention_heads = 0
             hidden_size_mult = 1.5
@@ -455,7 +468,8 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
                 num_attention_heads = 0
                 hidden_size_mult = 1.5
                 hidden_size = 0
-            
+
+
             elif 'MA_Encoder' in encoder_kind:
                 activation = 'relu'
                 num_attention_heads = IntDistribution(2, 5, step=1)
@@ -497,6 +511,31 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         num_epochs_step = 10
         early_stopping_patience_step = 10
         early_stopping_patience_max = 50
+
+    elif encoder_kind == 'metabFoundation':
+        latent_size = -1
+        if choose_from_distribution:
+            num_attention_heads = IntDistribution(2, 5, step=1)
+            num_hidden_layers = IntDistribution(2, 4, step=2)
+            dropout_rate = FloatDistribution(0, 0.5, step=0.1)
+            hidden_size = IntDistribution(16, 64, step=16)
+        
+        encoder_kwargs = {
+                    'num_attention_heads': num_attention_heads,
+                    'hidden_size': hidden_size,
+                    'latent_size': latent_size,
+                    'num_hidden_layers': num_hidden_layers,
+                    'dropout_rate': dropout_rate,
+                    }
+
+        encoder_weight = 1
+        num_epochs_min = 10
+        num_epochs_max = 100
+        num_epochs_step = 10
+        early_stopping_patience_step = 5
+        early_stopping_patience_max = 20
+        l2_reg_weight = 0
+        l1_reg_weight = 0
 
 
     elif encoder_kind == 'TGEM_Encoder':

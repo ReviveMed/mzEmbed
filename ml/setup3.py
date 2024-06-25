@@ -187,6 +187,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     run_training = kwargs.get('run_training', True)
     run_evaluation = kwargs.get('run_evaluation', True)
     save_latent_space = kwargs.get('save_latent_space', True)
+    use_subset_of_features = kwargs.get('use_subset_of_features', False)
+    random_seed = kwargs.get('random_seed', 42)
+    np.random.seed(random_seed)
     
     try:
         print('loading data')
@@ -221,6 +224,14 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             X_size = X_data_eval.shape[1]
         # nan_data = pd.read_csv(f'{data_dir}/{nan_filename}_{eval_name}.csv', index_col=0)
 
+        if use_subset_of_features:
+            feature_subset = kwargs.get('feature_subset', 0.25)
+            if isinstance(feature_subset, float):
+                # choose random subset of features
+                feature_subset = np.random.choice(X_data_train.columns, int(feature_subset*X_data_train.shape[1]), replace=False)
+            X_data_train = X_data_train[feature_subset]
+            X_data_eval = X_data_eval[feature_subset]
+            X_size = len(feature_subset)
 
         ####################################
         ##### Create the DataLoaders ######
@@ -328,8 +339,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     # if input_size is None:
 
 
-    if encoder_kind == 'TGEM_Encoder':
+    if (encoder_kind == 'TGEM_Encoder') or (encoder_kind == 'metabFoundation'):
         latent_size = input_size
+        # encoder_kwargs['latent_size'] = latent_size
 
     ############################################
     
