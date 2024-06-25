@@ -413,7 +413,8 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         use_l2_reg = False
         l2_reg_weight = 0
         l1_reg_weight = 0
-        num_epochs = 100
+        # num_epochs = 100
+        num_epochs = 20
         lr = 0.001
         optimizer_name = 'adamw'
         early_stopping_patience = 0

@@ -11,8 +11,8 @@ data_dir = f'{homedir}/PRETRAIN_DATA'
 os.makedirs(data_dir, exist_ok=True)
 data_dir = get_latest_dataset(data_dir=data_dir)
 
-encoder_kind = 'MA_Encoder_to_FF_Decoder'
-# encoder_kind = 'VAE'
+# encoder_kind = 'MA_Encoder_to_FF_Decoder'
+encoder_kind = 'VAE'
 # kwargs = make_kwargs(encoder_kind=encoder_kind,choose_from_distribution=False)
 kwargs = make_kwargs(encoder_kind=encoder_kind,choose_from_distribution=False)
 

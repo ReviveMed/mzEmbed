@@ -39,7 +39,7 @@ lifelines
 scikit-survival # scikit-learn for survival analysis, they suggest using conda to install
 torchtext>=0.14.0 # needed for scGPT
 tqdm>=4.64.0
-anndata #annotated data, needed for scGPT, but should be used for future work too
+anndata
 datasets>=2.3.2
 leidenalg>=0.8.10
 llvmlite
@@ -56,3 +56,5 @@ louvain
 xgboost
 coral-pytorch
 openpyxl
+local-attention
+# einops
