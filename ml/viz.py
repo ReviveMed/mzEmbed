@@ -22,13 +22,18 @@ def generate_latent_space(X_data, encoder, batch_size=128):
         X_data = torch.tensor(X_data.to_numpy(), dtype=torch.float32)
     Z = torch.tensor([])
     encoder.eval()
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    encoder.to(device)
     with torch.inference_mode():
         for i in range(0, len(X_data), batch_size):
             # print(i, len(X_data))
-            Z_batch = encoder.transform(X_data[i:i+batch_size])
+            X_batch = X_data[i:i+batch_size].to(device)
+            Z_batch = encoder.transform(X_batch)
+            Z_batch = Z_batch.cpu()
             Z = torch.cat((Z, Z_batch), dim=0)
         Z = Z.detach().numpy()
         Z = pd.DataFrame(Z, index=x_index)
+    encoder.to('cpu')
     return Z
 
 

@@ -444,7 +444,10 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                         # run[f'{prefix}/{phase}/batch/multi_adversary_loss'].append(stringify_unsupported(adversary_loss))
 
 
-
+                    y_head_output = y_head_output.to("cpu").detach()
+                    y_adversary_output = y_adversary_output.to("cpu").detach()
+                    y_head = y_head.to("cpu").detach()
+                    y_adversary = y_adversary.to("cpu").detach()
                     if isinstance(y_head_output, dict):
                         if isinstance(epoch_head_outputs, dict):
                             for k in y_head_output.keys():
@@ -627,7 +630,7 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
     
     prefix = kwargs.get('prefix', 'eval')
     sklearn_models = kwargs.get('sklearn_models', None)
-    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     encoder.eval()
     head.eval()
@@ -661,9 +664,12 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
     all_targets = defaultdict(dict)
     
     for phase in phase_list:
-        recon_loss = torch.tensor(0.0)
-        head_loss = torch.tensor(0.0)
-        adversary_loss = torch.tensor(0.0)
+        encoder = encoder.to(device)
+        head = head.to(device)
+        adversary = adversary.to(device)
+        recon_loss = torch.tensor(0.0).to(device)
+        head_loss = torch.tensor(0.0).to(device)
+        adversary_loss = torch.tensor(0.0).to(device)
         
 
         latent_outputs = torch.tensor([])
@@ -676,7 +682,13 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
         with torch.inference_mode():
             for data in dataloaders[phase]:
                 X, y_head, y_adversary, clin_vars = data
+                X = X.to(device)
+                y_head = y_head.to(device)
+                y_adversary = y_adversary.to(device)
+                clin_vars = clin_vars.to(device)
+                
                 z = encoder.transform(X)
+
                 if sklearn_models:
                     latent_outputs = torch.cat((latent_outputs, z), 0)
                 X_recon = encoder.generate(z)
@@ -686,24 +698,28 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
                 head_loss += head.joint_loss(y_head_output, y_head) * y_head.size(0)
                 adversary_loss += adversary.joint_loss(y_adversary_output, y_adversary) * y_adversary.size(0)
                 
+                # y_head_output = y_head_output.to("cpu").detach()
+                # y_adversary_output = y_adversary_output.to("cpu").detach()
                 if isinstance(y_head_output, dict):
                     if isinstance(head_ouputs, dict):
                         for k in y_head_output.keys():
-                            head_ouputs[k] = torch.cat((head_ouputs[k], y_head_output[k]), 0)
+                            head_ouputs[k] = torch.cat((head_ouputs[k], y_head_output[k].to("cpu").detach()), 0)
                     else:
-                        head_ouputs = y_head_output
+                        head_ouputs = {k: y_head_output[k].to("cpu").detach() for k in y_head_output.keys()}
                 else:
-                    head_ouputs = torch.cat((head_ouputs, y_head_output), 0)
+                    head_ouputs = torch.cat((head_ouputs, y_head_output.to("cpu").detach()), 0)
 
                 if isinstance(y_adversary_output, dict):
                     if isinstance(adversary_outputs, dict):
                         for k in y_adversary_output.keys():
-                            adversary_outputs[k] = torch.cat((adversary_outputs[k], y_adversary_output[k]), 0)
+                            adversary_outputs[k] = torch.cat((adversary_outputs[k], y_adversary_output[k].to("cpu").detach()), 0)
                     else:
-                        adversary_outputs = y_adversary_output
+                        adversary_outputs = {k: y_adversary_output[k].to("cpu").detach() for k in y_adversary_output.keys()}
                 else:
-                    adversary_outputs = torch.cat((adversary_outputs, y_adversary_output), 0)
+                    adversary_outputs = torch.cat((adversary_outputs, y_adversary_output.to("cpu").detach()), 0)
 
+                y_head = y_head.to("cpu").detach()
+                y_adversary = y_adversary.to("cpu").detach()
                 head_targets = torch.cat((head_targets, y_head), 0)
                 adversary_targets = torch.cat((adversary_targets, y_adversary), 0)
 
@@ -716,6 +732,9 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
             #     'adversary': adversary_targets
             # }
 
+            # head_loss.to("cpu")
+            # adversary_loss.to("cpu")
+            # recon_loss.to("cpu")
             latent_outputs_by_phase[phase] = latent_outputs
             adversary_targets_by_phase[phase] = adversary_targets
             recon_loss = recon_loss / len(dataloaders[phase].dataset)
@@ -727,6 +746,8 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
                 'adversary': adversary_loss.item(),
                 }
             
+            head.to("cpu")
+            adversary.to("cpu")
             end_state_eval[phase] = {}
             end_state_eval[phase] = head.score(head_ouputs, head_targets)
             end_state_eval[phase].update(adversary.score(adversary_outputs, adversary_targets))
