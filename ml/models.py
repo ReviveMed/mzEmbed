@@ -1409,13 +1409,18 @@ class metabFoundation(Default_EncoderDecoder):
 
         self.max_seq_len=kwargs.get('max_seq_len', kwargs.get('input_size', 128))
         self.input_size = self.max_seq_len
+        
         self.num_encoder_heads = kwargs.get('num_encoder_heads', kwargs.get('num_attention_heads', 1))
         self.num_decoder_heads = kwargs.get('num_decoder_heads', kwargs.get('num_attention_heads', 1))
+        
         self.num_encoder_layers = kwargs.get('num_encoder_layers', kwargs.get('num_hidden_layers', 1))
         self.num_decoder_layers = kwargs.get('num_decoder_layers', kwargs.get('num_hidden_layers', 1))
+        
         self.embed_dim = kwargs.get('embed_dim', kwargs.get('hidden_size', 1))
-        self.inverse_embed_dim = kwargs.get('inverse_embed_dim', kwargs.get('hidden_size', 1))
-        self.latent_size = self.embed_dim
+        # self.inverse_embed_dim = kwargs.get('inverse_embed_dim', kwargs.get('hidden_size', 1))
+        self.decoder_embed_dim = kwargs.get('decoder_embed_dim', kwargs.get('hidden_size', 1))
+        
+        self.latent_size = 2*self.embed_dim
         self.default_hidden_fraction = kwargs.get('default_hidden_fraction', 0.2)
 
         self.metab_to_seq = MetabToSequence(max_seq_len=self.max_seq_len)

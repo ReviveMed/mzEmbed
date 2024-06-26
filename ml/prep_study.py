@@ -420,6 +420,8 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         early_stopping_patience = 0
         weight_decay = 0.00001
         adversarial_start_epoch = 0
+        num_decoder_layers = -1
+
         if 'MA_Encoder' in encoder_kind:
             hidden_size = 16
             hidden_size_mult = 0
@@ -427,16 +429,20 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         elif 'metabFoundation' in encoder_kind:
             num_attention_heads = 2
             num_hidden_layers = 4
-            hidden_size = 16
+            num_decoder_layers = 2
+
+            
+            hidden_size = 32
             latent_size = 2*hidden_size
-            num_epochs = 2
+            decoder_embed_dim = 16
+            num_epochs = 50
 
             head_weight = 1.0
             adv_weight = 0
             cohort_label_weight = 1.0
             isfemale_weight = 3.0
             ispediatric_weight = 1.0
-            age_weight = 0.1
+            age_weight = 1.0
 
         else:
             num_attention_heads = 0
@@ -504,6 +510,8 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
                     'hidden_size': hidden_size,
                     'hidden_size_mult' : hidden_size_mult,
                     'num_attention_heads': num_attention_heads,
+                    'num_decoder_layers': num_decoder_layers,
+                    'decoder_embed_dim': decoder_embed_dim,
                     }
         
 
