@@ -327,6 +327,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         encoder_kwargs['hidden_size'] = int(encoder_kwargs['hidden_size_mult']*latent_size)
         # remove the hidden_size_mult key
         encoder_kwargs.pop('hidden_size_mult')
+        hidden_size = encoder_kwargs['hidden_size']
+    else:
+        hidden_size = encoder_kwargs.get('hidden_size', -1)
     
     if input_size is None:
         try:
@@ -339,8 +342,10 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     # if input_size is None:
 
 
-    if (encoder_kind == 'TGEM_Encoder') or (encoder_kind == 'metabFoundation'):
+    if (encoder_kind == 'TGEM_Encoder'): # or (encoder_kind == 'metabFoundation'):
         latent_size = input_size
+    elif encoder_kind == 'metabFoundation':
+        latent_size = hidden_size
         # encoder_kwargs['latent_size'] = latent_size
 
     ############################################

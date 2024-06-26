@@ -427,9 +427,9 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         elif 'metabFoundation' in encoder_kind:
             num_attention_heads = 2
             num_hidden_layers = 4
-            latent_size = -1
             hidden_size = 16
-            num_epochs = 100
+            atent_size = hidden_size
+            num_epochs = 2
 
             head_weight = 1.0
             adv_weight = 0

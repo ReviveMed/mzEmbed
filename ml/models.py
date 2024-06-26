@@ -1415,6 +1415,7 @@ class metabFoundation(Default_EncoderDecoder):
         self.num_decoder_layers = kwargs.get('num_decoder_layers', kwargs.get('num_hidden_layers', 1))
         self.embed_dim = kwargs.get('embed_dim', kwargs.get('hidden_size', 1))
         self.inverse_embed_dim = kwargs.get('inverse_embed_dim', kwargs.get('hidden_size', 1))
+        self.latent_size = self.embed_dim
         self.default_hidden_fraction = kwargs.get('default_hidden_fraction', 0.2)
 
         self.metab_to_seq = MetabToSequence(max_seq_len=self.max_seq_len)
@@ -1433,19 +1434,24 @@ class metabFoundation(Default_EncoderDecoder):
             ff_mult=4, 
             dropout=self.dropout_rate)
             
+        self.encoder_to_decoder = nn.Linear(self.embed_dim, self.decoder_embed_dim, bias=True)
+
         self.decoder_to_embed = PerformerModule(
                 max_seq_len=self.max_seq_len,
-                dim = self.embed_dim,
+                dim = self.decoder_embed_dim,
                 depth = self.num_decoder_layers,
                 heads = self.num_decoder_heads,
-                dim_head=self.embed_dim,
+                dim_head=self.decoder_embed_dim,
                 ff_dropout=0.,
                 attn_dropout=0.,
             )
         
-        self.embed_to_seq = InverseEmbed(
-            embed_dim=self.embed_dim, 
-            decoder_embed_dim=self.inverse_embed_dim)
+        self.norm = nn.LayerNorm(self.decoder_embed_dim)
+        self.to_final = nn.Linear(self.decoder_embed_dim, 1)
+
+        # self.embed_to_seq = InverseEmbed(
+        #     embed_dim=self.embed_dim, 
+        #     decoder_embed_dim=self.inverse_embed_dim)
 
         self.encoder = nn.Sequential(
             self.seq_to_embed,
@@ -1453,23 +1459,34 @@ class metabFoundation(Default_EncoderDecoder):
         )
 
         self.decoder = nn.Sequential(
+            self.encoder_to_decoder,
             self.decoder_to_embed,
-            self.embed_to_seq
+            self.norm,
+            self.to_final
         )
+
 
         self.kind = 'metabFoundation'
         self.name = 'metabFoundation'
         self.file_id = 'metabFoundation'
 
+    def get_embedding(self,x_enc):
+        x_enc_pool_mean = torch.mean(x_enc, 1) #pooling along the embed dim
+        x_enc_pool_max, _ = torch.max(x_enc, 1)
+        # x_enc_pool_sum = torch.sum(x_enc, 1)
+        x_enc_pool = torch.cat([x_enc_pool_mean, x_enc_pool_max], 1)
+        return x_enc_pool
+
     def foward(self, x, x_hidden=None,as_seq=False):
         if x_hidden is None:
             x_hidden = torch.rand_like(x) < self.default_hidden_fraction
+        
         x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x,x_hidden=x_hidden)
         x_emb = self.seq_to_embed(x_seq, x_pos_ids, x_mask, x_pad)
         x_enc = self.embed_to_encoder(x_emb)
-        # x_out_emb = self.decoder_to_embed(x_enc)
-        # x_out_seq = self.embed_to_seq(x_out_emb)
-        x_enc_pooled = torch.mean(x_enc, 2)
+        
+        x_enc_pooled = self.get_embedding(x_enc)
+        
         if as_seq:
             return x_enc
         return x_enc_pooled
@@ -1477,10 +1494,15 @@ class metabFoundation(Default_EncoderDecoder):
     def transform(self, x, x_hidden=None, as_seq=False):
         if x_hidden is None:
             x_hidden = torch.rand_like(x) < self.default_hidden_fraction
+        
+        #encode
         x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x,x_hidden=x_hidden)
         x_emb = self.seq_to_embed(x_seq, x_pos_ids, x_mask, x_pad)
         x_enc = self.embed_to_encoder(x_emb)
-        x_enc_pooled = torch.mean(x_enc, 2)
+        
+        # sample embedding
+        x_enc_pooled = self.get_embedding(x_enc)
+        
         if as_seq:
             return x_enc_pooled, x_enc, x_pos_ids, x_mask, x_pad
         return x_enc_pooled
@@ -1493,12 +1515,18 @@ class metabFoundation(Default_EncoderDecoder):
     def forward_to_loss(self, x, mask_loss_weight=10.0,x_hidden=None):
         if x_hidden is None:
             x_hidden = torch.rand_like(x) < self.default_hidden_fraction
+       
+        # encode
         x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x,x_hidden=x_hidden)
         x_emb = self.seq_to_embed(x_seq, x_pos_ids, x_mask, x_pad)
         x_enc = self.embed_to_encoder(x_emb)
-        x_out_emb = self.decoder_to_embed(x_enc)
-        x_out_seq = self.embed_to_seq(x_out_emb)
+        
+        # decode
+        position_emb = self.seq_to_embed.get_pos_embedding(x_pos_ids)
+        x_enc += position_emb
+        x_out_seq = self.decoder(x_enc).squeeze(-1)
 
+        # loss
         all_loss = self.loss(x_seq[~x_pad], x_out_seq[~x_pad])
         masked_loss = self.loss(x_seq[x_mask], x_out_seq[x_mask])
         total_loss = all_loss + mask_loss_weight * masked_loss
@@ -1508,25 +1536,37 @@ class metabFoundation(Default_EncoderDecoder):
     def transform_with_loss(self, x, mask_loss_weight=10.0,x_hidden=None, as_seq=False):
         if x_hidden is None:
             x_hidden = torch.rand_like(x) < self.default_hidden_fraction
+        # encode
         x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x,x_hidden=x_hidden)
         x_emb = self.seq_to_embed(x_seq, x_pos_ids, x_mask, x_pad)
         x_enc = self.embed_to_encoder(x_emb)
-        x_out_emb = self.decoder_to_embed(x_enc)
-        x_out_seq = self.embed_to_seq(x_out_emb)
+        
+        #decode
+        position_emb = self.seq_to_embed.get_pos_embedding(x_pos_ids)
+        x_enc_w_pos = x_enc + position_emb
+        # x_enc += position_emb
+        x_out_seq = self.decoder(x_enc_w_pos).squeeze(-1)
 
+        # loss
         all_loss = self.loss(x_seq[~x_pad], x_out_seq[~x_pad])
         masked_loss = self.loss(x_seq[x_mask], x_out_seq[x_mask])
         total_loss = all_loss + mask_loss_weight * masked_loss
+        
         if as_seq:
             return x_enc, total_loss
-        x_enc_pooled = torch.mean(x_enc, 2)
+        
+        x_enc_pooled = self.get_embedding(x_enc)
         return x_enc_pooled, total_loss
     
-    def generate(self, z, x_pos_ids=None,as_seq=False):
+    def generate(self, x_enc, x_pos_ids=None,as_seq=False):
         if x_pos_ids is None:
             x_pos_ids = torch.arange(self.max_seq_len, device=z.device).repeat(z.shape[0], 1)
-        x_out_emb = self.decoder_to_embed(z)
-        x_out_seq = self.embed_to_seq(x_out_emb)
+
+        position_emb = self.seq_to_embed.get_pos_embedding(x_pos_ids)
+        x_enc_w_pos = x_enc + position_emb
+        # x_enc += position_emb
+        x_out_seq = self.decoder(x_enc_w_pos).squeeze(-1)
+        
         if as_seq:
             return x_out_seq
         x_out = self.metab_to_seq.inverse_transform(x_out_seq,x_pos_ids)
