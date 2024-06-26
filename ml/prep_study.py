@@ -428,15 +428,15 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
             num_attention_heads = 2
             num_hidden_layers = 4
             hidden_size = 16
-            atent_size = hidden_size
+            latent_size = 2*hidden_size
             num_epochs = 2
 
             head_weight = 1.0
             adv_weight = 0
             cohort_label_weight = 1.0
-            isfemale_weight = 5.0
-            ispediatric_weight = 2.0
-            age_weight = 1.0
+            isfemale_weight = 3.0
+            ispediatric_weight = 1.0
+            age_weight = 0.1
 
         else:
             num_attention_heads = 0
