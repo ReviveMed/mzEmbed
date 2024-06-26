@@ -395,6 +395,7 @@ def objective_func3(run_id,data_dir,recompute_eval=False,objective_keys=None,obj
 def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
     activation = 'leakyrelu'
     batch_size = 64
+    # batch_size = 32
     noise_factor = 0.1
 
     # these are the defaults if you don't want to choose from a distribution
@@ -425,17 +426,17 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
             num_attention_heads = 2
         elif 'metabFoundation' in encoder_kind:
             num_attention_heads = 2
-            num_hidden_layers = 2
+            num_hidden_layers = 4
             latent_size = -1
             hidden_size = 16
-            num_epochs = 5
+            num_epochs = 100
 
             head_weight = 1.0
             adv_weight = 0
             cohort_label_weight = 1.0
-            isfemale_weight = 2.0
+            isfemale_weight = 5.0
             ispediatric_weight = 2.0
-            age_weight = 2.0
+            age_weight = 1.0
 
         else:
             num_attention_heads = 0

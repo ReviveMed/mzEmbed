@@ -28,12 +28,14 @@ kwargs['run_evaluation'] = True
 print(kwargs)
 
 setup_id = 'pretrain'
+# with_id = 'RCC-3132'
 run_id = setup_neptune_run(data_dir,
                            setup_id=setup_id,
                            neptune_mode='async',
                         #    neptune_mode='debug',
                            yes_logging = True,
                            tags=['debug'],
+                           # load_model_from_run_id=with_id,
                            **kwargs)
 print(run_id)
 
