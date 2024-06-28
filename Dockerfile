@@ -34,6 +34,8 @@ COPY ./id_ed25519.pub /root/.ssh/id_ed25519.pub
 
 RUN apt-get update
 
+# sudo apt-get install -y git screen htop build-essential pkg-config libmariadb-dev-compat wget vim
+
 # install git
 RUN apt-get install -y git
 # Install useful system packages
