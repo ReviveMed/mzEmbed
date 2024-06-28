@@ -415,7 +415,8 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         l2_reg_weight = 0
         l1_reg_weight = 0
         num_epochs = 100
-        lr = 0.001
+        # lr = 0.001
+        lr = 0.0005
         optimizer_name = 'adamw'
         early_stopping_patience = 0
         weight_decay = 0.00001
@@ -430,17 +431,17 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
             num_attention_heads = 2
             num_hidden_layers = 4
             num_decoder_layers = 2
-
+            default_hidden_fraction = 0.2
             
             hidden_size = 32
             latent_size = 2*hidden_size
             decoder_embed_dim = 16
-            num_epochs = 50
+            num_epochs = 150
 
             head_weight = 1.0
             adv_weight = 0
             cohort_label_weight = 1.0
-            isfemale_weight = 3.0
+            isfemale_weight = 10.0
             ispediatric_weight = 1.0
             age_weight = 1.0
 
@@ -512,6 +513,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
                     'num_attention_heads': num_attention_heads,
                     'num_decoder_layers': num_decoder_layers,
                     'decoder_embed_dim': decoder_embed_dim,
+                    'default_hidden_fraction': default_hidden_fraction
                     }
         
 
@@ -522,7 +524,6 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         early_stopping_patience_max = 50
 
     elif encoder_kind == 'metabFoundation':
-        latent_size = -1
         if choose_from_distribution:
             num_attention_heads = IntDistribution(2, 5, step=1)
             num_hidden_layers = IntDistribution(2, 4, step=2)

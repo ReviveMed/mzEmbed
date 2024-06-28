@@ -459,6 +459,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['adv_kwargs_list'] = adv_kwargs_list
 
         kwargs['encoder_kwargs']['dropout_rate'] = sweep_kwargs.get('encoder_kwargs__dropout_rate')
+        kwargs['encoder_kwargs']['default_hidden_fraction'] = 0.0
 
 
         # kwargs['train_kwargs']['num_epochs'] = 20

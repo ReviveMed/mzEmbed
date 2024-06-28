@@ -39,4 +39,17 @@ run_id = setup_neptune_run(data_dir,
                            **kwargs)
 print(run_id)
 
+
+# kwargs['encoder_kwargs']['decoder_embed_dim'] = 16
+# kwargs['encoder_kwargs']['latent_size'] = 32
+# run_id = setup_neptune_run(data_dir,
+#                            setup_id=setup_id,
+#                            neptune_mode='async',
+#                         #    neptune_mode='debug',
+#                            yes_logging = True,
+#                            tags=['debug'],
+#                            # load_model_from_run_id=with_id,
+#                            **kwargs)
+# print(run_id)
+
 # RCC-2893
