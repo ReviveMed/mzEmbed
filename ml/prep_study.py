@@ -440,12 +440,12 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
             num_epochs = 300
 
             # head_weight = 1.0
-            head_weight = 1
+            head_weight = 0
             adv_weight = 0
             cohort_label_weight = 1.0
             isfemale_weight = 10.0
             ispediatric_weight = 1.0
-            age_weight =0.1
+            age_weight = 0.1
 
         else:
             num_attention_heads = 0

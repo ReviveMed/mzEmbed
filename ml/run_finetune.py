@@ -461,7 +461,6 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['adv_kwargs_list'] = adv_kwargs_list
 
         kwargs['encoder_kwargs']['dropout_rate'] = sweep_kwargs.get('encoder_kwargs__dropout_rate')
-        kwargs['encoder_kwargs']['default_hidden_fraction'] = 0.0
 
 
         # kwargs['train_kwargs']['num_epochs'] = 20
@@ -482,6 +481,11 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['run_evaluation'] = True
         kwargs['eval_kwargs'] = {}
         kwargs['eval_kwargs']['sklearn_models'] = {}
+
+        if kwargs['train_kwargs']['encoder_weight'] > 0:
+            kwargs['encoder_kwargs']['default_hidden_fraction'] = 0.2
+        else:
+            kwargs['encoder_kwargs']['default_hidden_fraction'] = 0.0
 
         if num_epochs is None:
             # if encoder_kind == 'TGEM_Encoder':
@@ -700,8 +704,8 @@ if __name__ == '__main__':
                     print('weight decay:',decay)
                     sweep_kwargs['train_kwargs__weight_decay'] = decay
 
-            if 'encoderW_' in desc_str:
-                match = re.search(r'encoderW_(\d+)', desc_str.lower())
+            if 'encW_' in desc_str:
+                match = re.search(r'encW_(\d+)', desc_str)
                 if match:
                     encoderW = float(match.group(1))/10
                     print('encoder weight:',encoderW)
