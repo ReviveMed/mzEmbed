@@ -31,8 +31,10 @@ default_sweep_kwargs = {
     'train_kwargs__num_epochs': 30,
     'train_kwargs__early_stopping_patience': 0,
     'train_kwargs__learning_rate': 0.0005,
-    'train_kwargs__l2_reg_weight': 0.0005,
-    'train_kwargs__l1_reg_weight': 0.005,
+    # 'train_kwargs__l2_reg_weight': 0.0005,
+    # 'train_kwargs__l1_reg_weight': 0.005,
+    'train_kwargs__l2_reg_weight': 0,
+    'train_kwargs__l1_reg_weight': 0,
     'train_kwargs__noise_factor': 0.1,
     'train_kwargs__weight_decay': 0,
     'train_kwargs__adversarial_mini_epochs': 5,
@@ -445,7 +447,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['run_training'] = True
         kwargs['run_evaluation'] = True
         kwargs['save_latent_space'] = True
-        kwargs['plot_latent_space'] = ''
+        kwargs['plot_latent_space'] = 'sns'
         kwargs['plot_latent_space_cols'] = plot_latent_space_cols
         kwargs['y_head_cols'] = y_head_cols
         kwargs['y_adv_cols'] = y_adv_cols
@@ -690,6 +692,20 @@ if __name__ == '__main__':
                     noi_factor = float(match.group(1))/10
                     print('noi_factor:',noi_factor)
                     sweep_kwargs['train_kwargs__noise_factor'] = noi_factor
+
+            if 'decay_' in desc_str:
+                match = re.search(r'decay_(\d+)', desc_str.lower())
+                if match:
+                    decay = float(match.group(1))/10000
+                    print('weight decay:',decay)
+                    sweep_kwargs['train_kwargs__weight_decay'] = decay
+
+            if 'encoderW_' in desc_str:
+                match = re.search(r'encoderW_(\d+)', desc_str.lower())
+                if match:
+                    encoderW = float(match.group(1))/10
+                    print('encoder weight:',encoderW)
+                    sweep_kwargs['train_kwargs__encoder_weight'] = encoderW
 
             try:
                 run_id = compute_finetune(run_id,n_trials=n_trials,

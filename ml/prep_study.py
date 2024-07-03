@@ -395,7 +395,8 @@ def objective_func3(run_id,data_dir,recompute_eval=False,objective_keys=None,obj
 def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
     activation = 'leakyrelu'
     # batch_size = 64
-    batch_size = 32
+    # batch_size = 32
+    batch_size = 24
     noise_factor = 0.1
 
     # these are the defaults if you don't want to choose from a distribution
@@ -433,10 +434,10 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
             num_decoder_layers = 2
             default_hidden_fraction = 0.2
             
-            hidden_size = 64
+            hidden_size = 96
             latent_size = 2*hidden_size
             decoder_embed_dim = 16
-            num_epochs = 150
+            num_epochs = 300
 
             # head_weight = 1.0
             head_weight = 1
@@ -444,7 +445,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
             cohort_label_weight = 1.0
             isfemale_weight = 10.0
             ispediatric_weight = 1.0
-            age_weight = 1.0
+            age_weight =0.1
 
         else:
             num_attention_heads = 0
