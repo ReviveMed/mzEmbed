@@ -155,6 +155,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
     adversarial_start_epoch = kwargs.get('adversarial_start_epoch', -1)
     prefix = kwargs.get('prefix', 'train')
     train_name = kwargs.get(f'train_name', 'train')
+    freeze_encoder = kwargs.get('freeze_encoder', False)
     
     optimizer_name = kwargs.get('optimizer_name', 'adamw')
     head_optimizer_name = kwargs.get('head_optimizer_name', optimizer_name)
@@ -226,6 +227,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
         'batch_sizes': batch_size_dct,
         # 'adversarial_mini_epochs': adversarial_mini_epochs,
         'adversarial_start_epoch': adversarial_start_epoch,
+        'freeze_encoder': freeze_encoder,
     }
     #TODO add a run prefix to all the keys
     run[f'{prefix}/learning_parameters'] = stringify_unsupported(learning_parameters)
@@ -234,19 +236,37 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
         early_stopping_patience = num_epochs
 
 
+
     # define the losses averages across the epochs
     encoder_type = encoder.kind
     encoder.to(device)
     head.to(device)
     adversary.to(device)
+    
+    # Freeze the weights of the encoder except for the last layer
+    if freeze_encoder:
+        if hasattr(encoder, 'encoder'):
+            print('freeze the encoder parameters')
+            for param in encoder.encoder.parameters():
+                param.requires_grad = False
 
-    encoder_optimizer = get_optimizer(optimizer_name, encoder, learning_rate, weight_decay)
+        if encoder.kind == 'metabFoundation':  
+            print('unfreeze the last layer of the encoder')    
+            for param in encoder.embed_to_encoder.transformer_encoder.layers[-1].parameters():
+                param.requires_grad = True
+
+        elif encoder.kind == 'VAE':
+            raise NotImplementedError('Freezing the encoder for VAE is not yet implemented')
+        else:
+            raise NotImplementedError('Freezing the encoder for this encoder type is not yet implemented')
+    
+    encoder_optimizer = get_optimizer(optimizer_name, filter(lambda p: p.requires_grad, encoder.parameters()), learning_rate, weight_decay)
     
     if head_weight > 0:
         head_optimizer = get_optimizer(head_optimizer_name, head, head_learning_rate, head_weight_decay)
     else: 
         head_optimizer = None
-
+    
     if adversary_weight > 0:
         adversary_optimizer = get_optimizer(adversarial_optimizer_name, adversary, adversarial_learning_rate, adversary_weight_decay)
     else:

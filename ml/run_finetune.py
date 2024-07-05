@@ -42,6 +42,7 @@ default_sweep_kwargs = {
     'train_kwargs__adversarial_start_epoch': 10,
     'train_kwargs__encoder_weight': 0,
     'train_kwargs__clip_grads_with_norm': False,
+    'train_kwargs__freeze_encoder': False,
 }
 
 
@@ -476,6 +477,7 @@ def compute_finetune(run_id,plot_latent_space=False,
         kwargs['train_kwargs']['l1_reg_weight'] = sweep_kwargs.get('train_kwargs__l1_reg_weight')
         kwargs['train_kwargs']['noise_factor'] = sweep_kwargs.get('train_kwargs__noise_factor')
         kwargs['train_kwargs']['weight_decay'] = sweep_kwargs.get('train_kwargs__weight_decay')
+        kwargs['train_kwargs']['freeze_encoder'] = sweep_kwargs.get('train_kwargs__freeze_encoder')
         # kwargs['train_kwargs']['adversarial_mini_epochs'] = sweep_kwargs.get('train_kwargs__adversarial_mini_epochs')
         kwargs['train_kwargs']['adversarial_start_epoch'] = sweep_kwargs.get('train_kwargs__adversarial_start_epoch')
         kwargs['run_evaluation'] = True
@@ -517,6 +519,8 @@ def compute_finetune(run_id,plot_latent_space=False,
             kwargs['run_random_init'] = True
             kwargs['load_model_weights'] = False
             kwargs['save_latent_space'] = False
+            # unfreeze the encoder
+            kwargs['train_kwargs']['freeze_encoder'] = False
             
             setup_id = f'{desc_str}_randinit'
             _ = setup_neptune_run(data_dir,setup_id=setup_id,with_run_id=run_id,**kwargs)
@@ -667,6 +671,10 @@ if __name__ == '__main__':
             # customize the sweep kwargs based on the desc_str
             if 'hhl' in desc_str:
                 sweep_kwargs['head_hidden_layers'] = 1
+
+            if 'freeze' in desc_str:
+                sweep_kwargs['train_kwargs__freeze_encoder'] = True
+
 
             if 'epc_' in desc_str:
                 match = re.search(r'epc_(\d+)', desc_str.lower())

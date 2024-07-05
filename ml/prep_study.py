@@ -437,7 +437,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
             hidden_size = 96
             latent_size = 2*hidden_size
             decoder_embed_dim = 16
-            num_epochs = 300
+            num_epochs =300
 
             # head_weight = 1.0
             head_weight = 0
