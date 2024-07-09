@@ -423,6 +423,8 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
         weight_decay = 0.00001
         adversarial_start_epoch = 0
         num_decoder_layers = -1
+        decoder_embed_dim = -1
+        default_hidden_fraction = 0.0
 
         if 'MA_Encoder' in encoder_kind:
             hidden_size = 16

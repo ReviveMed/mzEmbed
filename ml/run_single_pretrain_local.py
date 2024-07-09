@@ -29,22 +29,71 @@ print(kwargs)
 
 
 kwargs['y_head_cols'] = ['Sex','Cohort Label v0', 'Age']
+kwargs['y_adv_cols'] = ['Study ID']
+kwargs['X_filename']  = 'X_Finetune'
+kwargs['y_filename']  = 'y_Finetune'
+kwargs['train_name'] = 'Discovery_Train'
+kwargs['eval_name']  = 'Discovery_Train2'
 kwargs['head_kwargs_list'] = []
+kwargs['head_kwargs_dict'] = {}
+kwargs['adv_kwargs_list'] = []
+kwargs['adv_kwargs_dict'] = {}
+kwargs['train_kwargs']['train_name'] = 'Discovery_Train'
 kwargs['train_kwargs']['encoder_weight'] = 1
 kwargs['train_kwargs']['head_weight'] = 1
-kwargs['head_kwargs_list'] = [
-                        {
-                        'kind': 'MultiClass',
-                        'name': 'Cohort Label',
-                        'y_idx': 1,
-                        'weight': 1.0,
-                        'hidden_size': 4,
-                        'num_hidden_layers': 1,
-                        'dropout_rate': 0,
-                        'activation': 'leakyrelu',
-                        'use_batch_norm': False,
-                        'num_classes': 4,
-                    },
+# kwargs['head_kwargs_list'] = [
+#                         {
+#                         'kind': 'MultiClass',
+#                         'name': 'Cohort Label',
+#                         'y_idx': 1,
+#                         'weight': 1.0,
+#                         'hidden_size': 4,
+#                         'num_hidden_layers': 1,
+#                         'dropout_rate': 0,
+#                         'activation': 'leakyrelu',
+#                         'use_batch_norm': False,
+#                         'num_classes': 4,
+#                     },
+#                     {
+#                         'kind': 'Binary',
+#                         'name': 'Sex',
+#                         'y_idx': 0,
+#                         'weight': 2.0,
+#                         'hidden_size': 4,
+#                         'num_hidden_layers': 1,
+#                         'dropout_rate': 0,
+#                         'activation': 'leakyrelu',
+#                         'use_batch_norm': False,
+#                         'num_classes': 2,
+#                     },
+#                     {
+#                         'kind': 'Regression',
+#                         'name': 'Age',
+#                         'y_idx': 2,
+#                         'weight': 1.0,
+#                         'hidden_size': 4,
+#                         'num_hidden_layers': 1,
+#                         'dropout_rate': 0,
+#                         'activation': 'leakyrelu',
+#                         'use_batch_norm': False,
+#                     }
+# ]
+
+kwargs['head_kwargs_dict'] = {
+                # 'MultiClass_Cohort Label': 
+                    #         {
+                    #     'kind': 'MultiClass',
+                    #     'name': 'Cohort Label',
+                    #     'y_idx': 1,
+                    #     'weight': 1.0,
+                    #     'hidden_size': 4,
+                    #     'num_hidden_layers': 1,
+                    #     'dropout_rate': 0,
+                    #     'activation': 'leakyrelu',
+                    #     'use_batch_norm': False,
+                    #     'num_classes': 4,
+                    # },
+                    'Binary_Sex':
                     {
                         'kind': 'Binary',
                         'name': 'Sex',
@@ -57,6 +106,7 @@ kwargs['head_kwargs_list'] = [
                         'use_batch_norm': False,
                         'num_classes': 2,
                     },
+                    'Regression_Age':
                     {
                         'kind': 'Regression',
                         'name': 'Age',
@@ -68,7 +118,7 @@ kwargs['head_kwargs_list'] = [
                         'activation': 'leakyrelu',
                         'use_batch_norm': False,
                     }
-]
+}
 
 data_dir = '/Users/jonaheaton/ReviveMed Dropbox/Jonah Eaton/development_CohortCombination/alignment_RCC_2024_Feb_27/July_09_Data2/formatted_data'
 

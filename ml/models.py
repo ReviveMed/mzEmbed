@@ -100,9 +100,12 @@ def get_reg_penalty(model,l1_lambda,l2_lambda):
     return l1_lambda * torch.sum(all_params.abs()) + l2_lambda * torch.sum(all_params.pow(2))
 
 
-def _nan_cleaner(y_output, y_true, ignore_nan=True):
+def _nan_cleaner(y_output, y_true, ignore_nan=True, label_type='class'):
         if ignore_nan:
-            mask = ~torch.isnan(y_true)
+            if label_type == 'continuous':
+                mask = ~torch.isnan(y_true) 
+            elif label_type == 'class':
+                mask = ~torch.isnan(y_true) & (y_true != -1)
             if mask.sum().item() == 0:
                 return None, None
             return y_output[mask], y_true[mask]
@@ -1851,6 +1854,8 @@ class Binary_Head(Head):
         y_true = y_data[:,self.y_idx]
         # remove nans 
         y_true = y_true[~torch.isnan(y_true)]
+        # remove -1 values
+        y_true = y_true[y_true != -1]
         y_int = y_true.int()
         self.num_sample_per_class = torch.bincount(y_int)
         # print(self.num_sample_per_class)
@@ -2202,7 +2207,7 @@ class Regression_Head(Head):
         if self.weight == 0:
             return torch.tensor(0, dtype=torch.float32)
         y_true = y_data[:,self.y_idx]
-        y0, y1 = _nan_cleaner(y_output, y_true, ignore_nan)
+        y0, y1 = _nan_cleaner(y_output, y_true, ignore_nan, label_type='continuous')
         if y0 is None:
             return torch.tensor(0, dtype=torch.float32)
         return self.loss_func(y0.squeeze(), y1.squeeze())
@@ -2212,7 +2217,7 @@ class Regression_Head(Head):
             return {k: 0 for k, v in self.score_func_dict.items()}
         try:
             y_true = y_data[:,self.y_idx]
-            y0, y1 = _nan_cleaner(y_output.detach(), y_true.detach(), ignore_nan)
+            y0, y1 = _nan_cleaner(y_output.detach(), y_true.detach(), ignore_nan, label_type='continuous')
             if y0 is None:
                 return torch.tensor(0, dtype=torch.float32)
             return {k: v(y0.squeeze(), y1.squeeze()) for k, v in self.score_func_dict.items()}
@@ -2337,7 +2342,7 @@ class Decoder_Head(Head):
         if self.weight == 0:
             return torch.tensor(0, dtype=torch.float32)
         y_true = y_data[:,self.y_idx]
-        y0, y1 = _nan_cleaner(y_output, y_true, ignore_nan)
+        y0, y1 = _nan_cleaner(y_output, y_true, ignore_nan, label_type='continuous')
         if y0 is None:
             return torch.tensor(0, dtype=torch.float32)
         return self.loss_func(y0.squeeze(), y1.squeeze())
@@ -2347,7 +2352,7 @@ class Decoder_Head(Head):
             return {k: 0 for k, v in self.score_func_dict.items()}
         try:
             y_true = y_data[:,self.y_idx]
-            y0, y1 = _nan_cleaner(y_output.detach(), y_true.detach(), ignore_nan)
+            y0, y1 = _nan_cleaner(y_output.detach(), y_true.detach(), ignore_nan, label_type='continuous')
             if y0 is None:
                 return torch.tensor(0, dtype=torch.float32)
             return {k: v(y0.squeeze(), y1.squeeze()) for k,

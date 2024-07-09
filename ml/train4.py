@@ -38,11 +38,19 @@ class CompoundDataset(Dataset):
         if (y_head is None) or (y_head.size == 0):
             self.y_head = torch.tensor(np.zeros((len(X), 1)), dtype=torch.float32)
         else:
+            for col in y_head.columns:
+                if y_head[col].dtype == 'object':
+                    print('converting', col, 'to category')
+                    y_head.loc[:, col] = y_head[col].astype('category').cat.codes
             self.y_head = torch.tensor(y_head.astype(float).to_numpy(), dtype=torch.float32)
         
         if (y_adv is None) or (y_adv.size == 0):
             self.y_adv = torch.tensor(np.zeros((len(X), 1)), dtype=torch.float32)
         else:
+            for col in y_adv.columns:
+                if y_adv[col].dtype == 'object':
+                    print('converting', col, 'to category')
+                    y_adv.loc[:, col] = y_adv[col].astype('category').cat.codes
             self.y_adv = torch.tensor(y_adv.astype(float).to_numpy(), dtype=torch.float32)
 
         if (other is None) or (other.size == 0):
@@ -260,7 +268,8 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
         else:
             raise NotImplementedError('Freezing the encoder for this encoder type is not yet implemented')
     
-    encoder_optimizer = get_optimizer(optimizer_name, filter(lambda p: p.requires_grad, encoder.parameters()), learning_rate, weight_decay)
+    # encoder_optimizer = get_optimizer(optimizer_name, filter(lambda p: p.requires_grad, encoder.parameters()), learning_rate, weight_decay)
+    encoder_optimizer = get_optimizer(optimizer_name, encoder, learning_rate, weight_decay)
     
     if head_weight > 0:
         head_optimizer = get_optimizer(head_optimizer_name, head, head_learning_rate, head_weight_decay)
