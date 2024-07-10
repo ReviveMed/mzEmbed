@@ -161,7 +161,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
     verbose = kwargs.get('verbose', True)
     #adversarial_mini_epochs = kwargs.get('adversarial_mini_epochs', 1)
     adversarial_start_epoch = kwargs.get('adversarial_start_epoch', -1)
-    prefix = kwargs.get('prefix', 'train')
+    prefix = kwargs.get('prefix', 'fit')
     train_name = kwargs.get(f'train_name', 'train')
     freeze_encoder = kwargs.get('freeze_encoder', False)
     
@@ -461,7 +461,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
 
                     if torch.isnan(head_loss) or torch.isinf(head_loss):
                         print('Head loss is nan/inf!')
-                        print('your learning rate is probably too high')
+                        print('your learning rate is probably too high, or batch size is too small')
                         end_time = time.time()
                         elapsed_minutes = (end_time - start_time) / 60
                         print(f'Training took {elapsed_minutes:.2f} minutes')

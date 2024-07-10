@@ -389,6 +389,141 @@ def objective_func3(run_id,data_dir,recompute_eval=False,objective_keys=None,obj
     return tuple(obj_vals)
 
 
+########################################################################################
+# if the variable is single value, then use the single value, if it is None, then use the min,max,step with optuna, if it is a list, then pick from the list
+
+def make_kwargs_set(sig_figs=2,
+                    encoder_kind='VAE',
+                    activation_func= 'leakyrelu',
+                    head_kwargs_dict={},
+                    adv_kwargs_dict={},
+
+                    batch_size=None, batch_size_min=16,batch_size_max=64,batch_size_step=16,
+                    noise_factor=None, noise_factor_min=0.01, noise_factor_max=0.1, noise_factor_step=0.01,
+                    latent_size=None, latent_size_min=4, latent_size_max=128, latent_size_step=4,
+                    hidden_size=None, hidden_size_min=16, hidden_size_max=64, hidden_size_step=16,
+                    hidden_size_mult=None, hidden_size_mult_min=0, hidden_size_mult_max=2, hidden_size_mult_step=0.5,
+                    num_hidden_layers=None, num_hidden_layers_min=1, num_hidden_layers_max=10, num_hidden_layers_step=1,
+                    
+                    num_attention_heads=None, num_attention_heads_min=1, num_attention_heads_max=5, num_attention_heads_step=1,
+                    num_decoder_layers=None, num_decoder_layers_min=1, num_decoder_layers_max=5, num_decoder_layers_step=1,
+                    decoder_embed_dim=None, decoder_embed_dim_min=4, decoder_embed_dim_max=64, decoder_embed_dim_step=4,
+                    default_hidden_fraction=None, default_hidden_fraction_min=0, default_hidden_fraction_max=0.5, default_hidden_fraction_step=0.1,
+
+                    dropout_rate=None, dropout_rate_min=0, dropout_rate_max=0.5, dropout_rate_step=0.1,
+                    encoder_weight=None, encoder_weight_min=0, encoder_weight_max=5, encoder_weight_step=0.1,
+                    head_weight=None, head_weight_min=0, head_weight_max=10, head_weight_step=0.1,
+                    adv_weight=None, adv_weight_min=0, adv_weight_max=10, adv_weight_step=0.1,
+
+                    task_head_weight=None, task_head_weight_min=0, task_head_weight_max=10, task_head_weight_step=0.1,
+                    task_adv_weight=None, task_adv_weight_min=0, task_adv_weight_max=10, task_adv_weight_step=0.1,
+                    task_hidden_size=None, task_hidden_size_min=4, task_hidden_size_max=64, task_hidden_size_step=4,
+                    task_num_hidden_layers=None, task_num_hidden_layers_min=1, task_num_hidden_layers_max=5, task_num_hidden_layers_step=1,
+
+                    weight_decay=None, weight_decay_min=0, weight_decay_max=0.0005, weight_decay_step=0.00001, weight_decay_log=False,
+                    l1_reg_weight=None, l1_reg_weight_min=0, l1_reg_weight_max=0.01, l1_reg_weight_step=0.0001, l1_reg_weight_log=False,
+                    l2_reg_weight=None, l2_reg_weight_min=0, l2_reg_weight_max=0.01, l2_reg_weight_step=0.0001, l2_reg_weight_log=False,
+                    num_epochs=None, num_epochs_min=50, num_epochs_max=300, num_epochs_step=10, num_epochs_log=False,
+                    learning_rate=None, learning_rate_min=0.0001, learning_rate_max=0.05, learning_rate_step=None,learning_rate_log=True,
+                    early_stopping_patience=None, early_stopping_patience_min=0, early_stopping_patience_max=50, early_stopping_patience_step=5,
+                    adversarial_start_epoch=None, adversarial_start_epoch_min=-1, adversarial_start_epoch_max=10, adversarial_start_epoch_step=2,
+                    ):
+
+
+    if batch_size is None:
+        batch_size = IntDistribution(batch_size_min, batch_size_max, step=batch_size_step)
+    elif isinstance(batch_size, list):
+        batch_size = CategoricalDistribution(batch_size)
+
+    if noise_factor is None:
+        noise_factor = FloatDistribution(noise_factor_min, noise_factor_max, step=noise_factor_step)
+    elif isinstance(noise_factor, list):
+        noise_factor = CategoricalDistribution(noise_factor)
+
+    if encoder_kind in ['AE','VAE']:
+        if latent_size is None:
+            latent_size = IntDistribution(latent_size_min, latent_size_max, step=latent_size_step)
+        elif isinstance(latent_size, list):
+            latent_size = CategoricalDistribution(latent_size)
+
+    if hidden_size is None:
+        hidden_size = IntDistribution(hidden_size_min, hidden_size_max, step=hidden_size_step)
+    elif isinstance(hidden_size, list):
+        hidden_size = CategoricalDistribution(hidden_size)
+    elif hidden_size == -1:
+        if (hidden_size_mult is None):
+            hidden_size_mult = FloatDistribution(hidden_size_mult_min, hidden_size_mult_max, step=hidden_size_mult_step)
+        elif isinstance(hidden_size_mult, list):
+            hidden_size_mult = CategoricalDistribution(hidden_size_mult)
+
+    if num_hidden_layers is None:
+        num_hidden_layers = IntDistribution(num_hidden_layers_min, num_hidden_layers_max, step=num_hidden_layers_step)
+    elif isinstance(num_hidden_layers, list):
+        num_hidden_layers = CategoricalDistribution(num_hidden_layers)
+
+    if encoder_kind in ['metabFoundation']:
+
+        if num_attention_heads is None:
+            num_attention_heads = IntDistribution(num_attention_heads_min, num_attention_heads_max, step=num_attention_heads_step)
+        elif isinstance(num_attention_heads, list):
+            num_attention_heads = CategoricalDistribution(num_attention_heads)
+
+        if num_decoder_layers is None:
+            num_decoder_layers = IntDistribution(num_decoder_layers_min, num_decoder_layers_max, step=num_decoder_layers_step)
+        elif isinstance(num_decoder_layers, list):
+            num_decoder_layers = CategoricalDistribution(num_decoder_layers)
+
+        if decoder_embed_dim is None:
+            decoder_embed_dim = IntDistribution(decoder_embed_dim_min, decoder_embed_dim_max, step=decoder_embed_dim_step)
+        elif isinstance(decoder_embed_dim, list):
+            decoder_embed_dim = CategoricalDistribution(decoder_embed_dim)
+
+        if default_hidden_fraction is None:
+            default_hidden_fraction = FloatDistribution(default_hidden_fraction_min, default_hidden_fraction_max, step=default_hidden_fraction_step)
+        elif isinstance(default_hidden_fraction, list):
+            default_hidden_fraction = CategoricalDistribution(default_hidden_fraction)
+
+    if dropout_rate is None:
+        dropout_rate = FloatDistribution(dropout_rate_min, dropout_rate_max, step=dropout_rate_step)
+    elif isinstance(dropout_rate, list):
+        dropout_rate = CategoricalDistribution(dropout_rate)
+
+    if encoder_weight is None:
+        encoder_weight = FloatDistribution(encoder_weight_min, encoder_weight_max, step=encoder_weight_step)
+    elif isinstance(encoder_weight, list):
+        encoder_weight = CategoricalDistribution(encoder_weight)
+
+    if len(head_kwargs_dict) > 0:
+        if head_weight is None:
+            head_weight = FloatDistribution(head_weight_min, head_weight_max, step=head_weight_step)
+        elif isinstance(head_weight, list):
+            head_weight = CategoricalDistribution(head_weight)
+    
+    for head_kwargs_key in head_kwargs_dict.keys():
+        if head_weight is None:
+            head_kwargs_dict[head_kwargs_key].update({'weight': FloatDistribution(task_head_weight_min, task_head_weight_max, step=task_head_weight_step)})
+        elif isinstance(head_weight, list):
+            head_kwargs_dict[head_kwargs_key].update({'weight': CategoricalDistribution(task_head_weight)})
+        else:
+            head_kwargs_dict[head_kwargs_key].update({'weight': task_head_weight})
+            
+    
+    else:
+        head_weight = 0
+
+    if len(adv_kwargs_dict) >0:
+        if adv_weight is None:
+            adv_weight = FloatDistribution(adv_weight_min, adv_weight_max, step=adv_weight_step)
+        elif isinstance(adv_weight, list):
+            adv_weight = CategoricalDistribution(adv_weight)
+    else:
+        adv_weight = 0
+            
+
+
+    pass
+
+
 
 ########################################################################################
 
@@ -669,7 +804,7 @@ def make_kwargs(sig_figs=2,encoder_kind='AE',choose_from_distribution=True):
                 ],
 
 
-                'train_kwargs': {
+                'fit_kwargs': {
                     'optimizer_name': optimizer_name,
                     'num_epochs': num_epochs,
                     'lr': lr,
@@ -858,7 +993,7 @@ def dict_diff(d1, d2):
 def dict_diff_cleanup(diff,ignore_keys_list=None):
     if ignore_keys_list is None:
         ignore_keys_list = ['run_evaluation','save_latent_space','plot_latent_space_cols','plot_latent_space',\
-                    'eval_kwargs','train_kwargs__eval_funcs','run_training','encoder_kwargs__hidden_size','overwrite_existing_kwargs',\
+                    'eval_kwargs','train_kwargs__eval_funcs','fit_kwargs__eval_funcs','run_training','encoder_kwargs__hidden_size','overwrite_existing_kwargs',\
                     'load_model_loc','study_info_dict']
         new_ignore_keys_list = ['y_head_cols','head_kwargs_dict__Binary_isFemale','eval_name','train_name',
                                 'head_kwargs_dict__Regression_Age']

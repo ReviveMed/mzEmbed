@@ -39,6 +39,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                       restart_run=False,
                       tags=['v3.3'],**kwargs):
     print(setup_id)
+    print(kwargs)
     if run is None:
         run, is_run_new = start_neptune_run(with_run_id=with_run_id,
                                             neptune_mode=neptune_mode,
@@ -69,6 +70,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
     if (not is_run_new) and (not setup_is_new):
         overwrite_existing_kwargs = kwargs.get('overwrite_existing_kwargs', False)
+        update_existing_kwargs = kwargs.get('update_existing_kwargs', False)
+        ignore_existing_kwargs = kwargs.get('ignore_existing_kwargs', False)
         if overwrite_existing_kwargs:
             print(f'Overwriting existing {setup_id} in run {run["sys/id"].fetch()}')
             existing_kwargs = run[f'{setup_id}/original_kwargs'].fetch()
@@ -99,6 +102,16 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                                             capture_stderr=False,
                                             capture_hardware_metrics=False,
                                             mode='read-only')
+            
+            
+            # existing_kwargs = pretrained_run[f'{setup_id}/original_kwargs'].fetch()
+            # existing_kwargs = convert_neptune_kwargs(existing_kwargs)
+            # # run[f'{setup_id}/original_kwargs'] = stringify_unsupported(kwargs)
+            # #TODO: log the existing kwargs to a file
+            # new_kwargs = {**existing_kwargs}
+            # new_kwargs.update(kwargs)
+            # kwargs = new_kwargs
+
         else:
             pretrained_run = run
 
@@ -197,30 +210,58 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             dataset_hash = open(f'{data_dir}/hash.txt','r').read()
             run[f'{setup_id}/datasets/hash'] = dataset_hash
 
-        X_filename = kwargs.get('X_filename', 'X_pretrain')
-        y_filename = kwargs.get('y_filename', 'y_pretrain')
-        # nan_filename = kwargs.get('nan_filename', 'nans')
+        X_fit_file = kwargs.get('X_train_file',None)
+        y_fit_file = kwargs.get('y_train_file',None)
+        X_eval_file = kwargs.get('X_eval_file',None)
+        y_eval_file = kwargs.get('y_eval_file',None)
+        
         train_name = kwargs.get('train_name', 'train')
         eval_name = kwargs.get('eval_name', 'val')
+
+        X_filename_prefix = kwargs.get('X_filename_prefix',None)
+        if (X_filename_prefix is None) and ('X_filename' in kwargs):
+            print('Warning argument "X_filename" is depreciated')
+            X_filename_prefix = kwargs.get('X_filename', 'X_pretrain')
+        elif X_filename_prefix is None:
+            X_filename_prefix = 'X_pretrain'
+
+        y_filename_prefix = kwargs.get('y_filename_prefix', None)
+        if (y_filename_prefix is None) and ('y_filename' in kwargs):
+            print('Warning argument "y_filename" is depreciated')
+            y_filename_prefix = kwargs.get('y_filename', 'y_pretrain')
+        elif y_filename_prefix is None:
+            y_filename_prefix = X_filename_prefix.replace('X','y')
+
+
+        if X_fit_file is None:
+            X_fit_file = f'{data_dir}/{X_filename_prefix}_{train_name}.csv'
+        if y_fit_file is None:
+            y_fit_file = f'{data_dir}/{y_filename_prefix}_{train_name}.csv'
+        if X_eval_file is None:
+            X_eval_file = f'{data_dir}/{X_filename_prefix}_{eval_name}.csv'
+        if y_eval_file is None:
+            y_eval_file = f'{data_dir}/{y_filename_prefix}_{eval_name}.csv'
+        
+        # nan_filename = kwargs.get('nan_filename', 'nans')
         X_size = None
-        train_dataset = None
+        fit_dataset = None
         eval_dataset = None
 
         if run_training or run_evaluation:
-            X_data_train = pd.read_csv(f'{data_dir}/{X_filename}_{train_name}.csv', index_col=0)
-            y_data_train = pd.read_csv(f'{data_dir}/{y_filename}_{train_name}.csv', index_col=0)
+            X_data_train = pd.read_csv(X_fit_file, index_col=0)
+            y_data_train = pd.read_csv(y_fit_file, index_col=0)
             X_size = X_data_train.shape[1]
-            run[f'{setup_id}/datasets/X_train'].track_files(f'{data_dir}/{X_filename}_{train_name}.csv')
-            run[f'{setup_id}/datasets/y_train'].track_files(f'{data_dir}/{y_filename}_{train_name}.csv')
+            run[f'{setup_id}/datasets/X_fit'].track_files(X_fit_file)
+            run[f'{setup_id}/datasets/y_fit'].track_files(y_fit_file)
         # nan_data = pd.read_csv(f'{data_dir}/{nan_filename}_{train_name}.csv', index_col=0)
         else:
             X_data_train = None
 
         if run_evaluation or save_latent_space:
-            X_data_eval = pd.read_csv(f'{data_dir}/{X_filename}_{eval_name}.csv', index_col=0)
-            y_data_eval = pd.read_csv(f'{data_dir}/{y_filename}_{eval_name}.csv', index_col=0)
-            run[f'{setup_id}/datasets/X_eval'].track_files(f'{data_dir}/{X_filename}_{eval_name}.csv')
-            run[f'{setup_id}/datasets/y_eval'].track_files(f'{data_dir}/{y_filename}_{eval_name}.csv')
+            X_data_eval = pd.read_csv(X_eval_file, index_col=0)
+            y_data_eval = pd.read_csv(y_eval_file, index_col=0)
+            run[f'{setup_id}/datasets/X_eval'].track_files(X_eval_file)
+            run[f'{setup_id}/datasets/y_eval'].track_files(y_eval_file)
             X_size = X_data_eval.shape[1]
         # nan_data = pd.read_csv(f'{data_dir}/{nan_filename}_{eval_name}.csv', index_col=0)
 
@@ -238,9 +279,11 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         batch_size = kwargs.get('batch_size', 32)
         holdout_frac = kwargs.get('holdout_frac', 0)
         yes_clean_batches = kwargs.get('yes_clean_batches', False)
-        train_kwargs = kwargs.get('train_kwargs', {})
-        early_stopping_patience = train_kwargs.get('early_stopping_patience', 0)
-        scheduler_kind = train_kwargs.get('scheduler_kind', None)
+        fit_kwargs = kwargs.get('fit_kwargs', {})
+        if (not fit_kwargs) and 'train_kwargs' in kwargs:
+            print('Warning: using train_kwargs instead of fit_kwargs. train_kwargs is depreciated')
+        early_stopping_patience = fit_kwargs.get('early_stopping_patience', 0)
+        scheduler_kind = fit_kwargs.get('scheduler_kind', None)
 
         if (holdout_frac > 0) and (early_stopping_patience < 1) and (scheduler_kind is None):
             # raise ValueError('holdout_frac > 0 and early_stopping_patience < 1 is not recommended')
@@ -249,16 +292,16 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             holdout_frac = 0
 
         if run_training or run_evaluation:
-            train_dataset = CompoundDataset(X_data_train,y_data_train[y_head_cols], y_data_train[y_adv_cols])
+            fit_dataset = CompoundDataset(X_data_train,y_data_train[y_head_cols], y_data_train[y_adv_cols])
             eval_dataset = CompoundDataset(X_data_eval,y_data_eval[y_head_cols], y_data_eval[y_adv_cols])
             if yes_clean_batches:
                 batch_size = get_clean_batch_sz(X_size, batch_size)
             # stratify on the adversarial column (stratify=2)
             # this is probably not the most memory effecient method, would be better to do stratification before creating the dataset
-            # train_loader_dct = create_dataloaders(train_dataset, batch_size, holdout_frac, set_name=train_name, stratify=2)
-            train_loader_dct = create_dataloaders_old(train_dataset, batch_size, holdout_frac, set_name=train_name)
+            # fit_loader_dct = create_dataloaders(fit_dataset, batch_size, holdout_frac, set_name=train_name, stratify=2)
+            fit_loader_dct = create_dataloaders_old(fit_dataset, batch_size, holdout_frac, set_name=train_name)
             eval_loader_dct = create_dataloaders(eval_dataset, batch_size, set_name = eval_name)
-            eval_loader_dct.update(train_loader_dct)
+            eval_loader_dct.update(fit_loader_dct)
 
             ########################################
             ##### Custom Evaluation for OS predictions
@@ -290,11 +333,11 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                             # y_head_cols_temp = y_head_cols.copy()
                             #TODO replace the y_head columns that correspond to h with the y_adv columns that correspond to a
                             
-                            train_dataset2 = CompoundDataset(X_data_train,y_data_train[y_adv_cols], y_data_train[y_adv_cols])
+                            fit_dataset2 = CompoundDataset(X_data_train,y_data_train[y_adv_cols], y_data_train[y_adv_cols])
                             eval_dataset2 = CompoundDataset(X_data_eval,y_data_eval[y_adv_cols], y_data_eval[y_adv_cols])
-                            train_loader_dct2 = create_dataloaders_old(train_dataset2, batch_size, set_name=train_name+'_'+adv_name)
+                            fit_loader_dct2 = create_dataloaders_old(fit_dataset2, batch_size, set_name=train_name+'_'+adv_name)
                             eval_loader_dct2 = create_dataloaders(eval_dataset2, batch_size, set_name = eval_name+'_'+adv_name)
-                            eval_loader_dct.update(train_loader_dct2)
+                            eval_loader_dct.update(fit_loader_dct2)
                             eval_loader_dct.update(eval_loader_dct2)
 
             ########################################
@@ -309,6 +352,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     ########################################################################
     ###### Repeated Training and Evaluation
 
+    recompute_evaluation = kwargs.get('recompute_evaluation', False)
     num_repeats = kwargs.get('num_repeats', 1)
     yes_save_model = True
     
@@ -365,6 +409,14 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         num_existing_repeats = len(eval_recon_loss_history)
         print(f'Already computed {num_existing_repeats} train/eval repeats')
     except NeptuneException:
+        num_existing_repeats = 0
+
+    if (num_existing_repeats == 1 ) and (recompute_evaluation):
+        # delete the existing evaluation results, if there is only one evaluation
+        # if there is more than one evaluation, then there has been multiple fit iterations 
+        # and unless they were all saved, we won't be able to recompute the all evaluations
+        del run[f'{eval_prefix}/{eval_name}']
+        run.wait()
         num_existing_repeats = 0
 
     if num_existing_repeats > num_repeats:
@@ -449,9 +501,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                     print(f'{h.kind} {h.name} uses columns: {cols}')
 
                 # Assign the class weights to the head and adv models so the loss is balanced
-                if train_dataset is not None:
+                if fit_dataset is not None:
                     #TODO: loadd the class weights from the model json
-                    head.update_class_weights(train_dataset.y_head)
+                    head.update_class_weights(fit_dataset.y_head)
 
 
                 if load_head_loc and load_model_weights:
@@ -501,9 +553,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                     cols = y_adv_col_array[a.y_idx]
                     print(f'{a.kind} {a.name} uses columns: {cols}')
 
-                if train_dataset is not None:
+                if fit_dataset is not None:
                     #TODO load the class weights from the model info json
-                    adv.update_class_weights(train_dataset.y_adv)
+                    adv.update_class_weights(fit_dataset.y_adv)
 
                 if load_adv_loc and load_model_weights:
                     adv_file_ids = adv.get_file_ids()
@@ -553,11 +605,14 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                     adv.reset_params()
 
 
-                train_kwargs = kwargs.get('train_kwargs', {})
-                train_kwargs['prefix'] = f'{setup_id}/train2'
-                encoder, head, adv = train_compound_model(train_loader_dct, 
+                fit_kwargs = kwargs.get('fit_kwargs', {})
+                if (not fit_kwargs) and 'train_kwargs' in kwargs:
+                    print('Warning: using train_kwargs instead of fit_kwargs. depreceate train_kwargs')
+                    fit_kwargs = kwargs.get('train_kwargs',{})
+                fit_kwargs['prefix'] = f'{setup_id}/fit'
+                encoder, head, adv = train_compound_model(fit_loader_dct, 
                                                         encoder, head, adv, 
-                                                        run=run, **train_kwargs)
+                                                        run=run, **fit_kwargs)
                 if encoder is None:
                     raise ValueError('Encoder is None after training')
 
@@ -734,8 +789,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                 Z_embed_train_savepath = os.path.join(save_dir, f'Z_embed_{train_name}.csv')
                 if (not os.path.exists(Z_embed_train_savepath)):
                     if X_data_train is None:
-                        X_data_train = pd.read_csv(f'{data_dir}/{X_filename}_{train_name}.csv', index_col=0)
-                        y_data_train = pd.read_csv(f'{data_dir}/{y_filename}_{train_name}.csv', index_col=0)
+                        X_data_train = pd.read_csv(f'{data_dir}/{X_filename_prefix}_{train_name}.csv', index_col=0)
+                        y_data_train = pd.read_csv(f'{data_dir}/{y_filename_prefix}_{train_name}.csv', index_col=0)
 
                     Z = generate_latent_space(X_data_train, encoder)
                     Z.to_csv(os.path.join(save_dir, f'Z_{train_name}.csv'))
@@ -757,7 +812,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
 
         plot_latent_space = kwargs.get('plot_latent_space', '')
-        plot_latent_space_cols = kwargs.get('plot_latent_space_cols', [y_head_cols, y_adv_cols])
+        plot_latent_space_cols = kwargs.get('plot_latent_space_cols', y_head_cols+y_adv_cols)
         yes_plot_pca = kwargs.get('yes_plot_pca', False)
         print('plot_latent_space:', plot_latent_space)
         print('plot_latent_space_cols:', plot_latent_space_cols)
@@ -923,8 +978,8 @@ def main():
     data_dir = get_latest_dataset(data_dir)
 
     kwargs = {
-        'X_filename': 'X_finetune',
-        'y_filename': 'y_finetune',
+        'X_filename_prefix': 'X_finetune',
+        'y_filename_prefix': 'y_finetune',
         'y_head_cols' : ['MSKCC BINARY','Benefit ORDINAL'],
         'y_adv_cols' : ['OS_Event'],
         # 'load_model_loc': 'pretrain',
@@ -983,7 +1038,7 @@ def main():
                 'num_classes': 2,
             },
         ],
-        'train_kwargs': {
+        'fit_kwargs': {
             'num_epochs': 10,
             'learning_rate': 0.001,
             'optimizer_kind': 'Adam',

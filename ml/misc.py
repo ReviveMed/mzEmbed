@@ -291,6 +291,10 @@ def get_color_map(n):
     
 def assign_color_map(unique_vals):
     my_colors = get_color_map(len(unique_vals))
+    # check fo mixed types
+    unique_val_types = [type(val) for val in unique_vals]
+    if len(set(unique_val_types)) > 1:
+        unique_vals = [str(val) for val in unique_vals]
     color_map = dict(zip(np.sort(unique_vals), my_colors))
     return color_map    
 
