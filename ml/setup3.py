@@ -295,7 +295,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             fit_dataset = CompoundDataset(X_data_train,y_data_train[y_head_cols], y_data_train[y_adv_cols])
             eval_dataset = CompoundDataset(X_data_eval,y_data_eval[y_head_cols], y_data_eval[y_adv_cols])
             if yes_clean_batches:
-                batch_size = get_clean_batch_sz(X_data_train.shape[1], batch_size)
+                print('attempt to clean batch size so last batch is large')
+                batch_size = get_clean_batch_sz(X_data_train.shape[0], batch_size)
             # stratify on the adversarial column (stratify=2)
             # this is probably not the most memory effecient method, would be better to do stratification before creating the dataset
             # fit_loader_dct = create_dataloaders(fit_dataset, batch_size, holdout_frac, set_name=train_name, stratify=2)
@@ -610,6 +611,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                     print('Warning: using train_kwargs instead of fit_kwargs. depreceate train_kwargs')
                     fit_kwargs = kwargs.get('train_kwargs',{})
                 fit_kwargs['prefix'] = f'{setup_id}/fit'
+                if 'train_name' not in fit_kwargs:
+                    fit_kwargs['train_name'] = train_name
                 encoder, head, adv = train_compound_model(fit_loader_dct, 
                                                         encoder, head, adv, 
                                                         run=run, **fit_kwargs)

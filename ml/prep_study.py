@@ -11,6 +11,10 @@ from sklearn.linear_model import LogisticRegression
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 from neptune.utils import stringify_unsupported
 
+import os
+import pandas as pd
+import anndata as ad
+
 # import neptune exceptions
 from neptune.exceptions import NeptuneException #, NeptuneServerError
 
@@ -388,6 +392,137 @@ def objective_func3(run_id,data_dir,recompute_eval=False,objective_keys=None,obj
     run.stop()
     return tuple(obj_vals)
 
+########################################################################################
+########################################################################################
+########################################################################################
+
+
+def create_selected_data(input_data_dir, sample_selection_col, 
+        metadata_df=None,subdir_col='Study ID',
+        output_dir=None, metadata_cols=[], 
+        save_nan=False, use_anndata=False):
+
+
+    if output_dir is None:
+        output_dir = os.path.join(input_data_dir, 'formatted_data')
+        os.makedirs(output_dir, exist_ok=True)
+
+    if metadata_df is None:
+        metadata_df = pd.read_csv(f'{input_data_dir}/metadata.csv', index_col=0)
+    subdir_list = metadata_df[subdir_col].unique()
+
+    select_ids = metadata_df[metadata_df[sample_selection_col]].index.to_list()
+    print(f'Number of samples selected: {len(select_ids)}')
+
+    if len(metadata_cols) == 0:
+        metadata_cols = metadata_df.columns.to_list()
+
+    save_file_id = sample_selection_col.replace(' ', '_')
+    h5ad_file = f'{output_dir}/{save_file_id}.h5ad'
+
+    if use_anndata and os.path.exists(h5ad_file):
+        print(f'Files already exist at {output_dir}')
+        return output_dir
+    if not use_anndata and os.path.exists(f'{output_dir}/y_{save_file_id}.csv') and os.path.exists(f'{output_dir}/X_{save_file_id}.csv'):
+        print(f'Files already exist at {output_dir}')
+        return output_dir
+
+
+    X_list = []
+    obs_list = []
+
+    for subdir in subdir_list:
+        if save_nan:
+            intensity_file = f'{input_data_dir}/{subdir}/nan_matrix.csv'
+        else:
+            intensity_file = f'{input_data_dir}/{subdir}/scaled_intensity_matrix.csv'
+
+        if os.path.exists(intensity_file):
+            subdirs = metadata_df[metadata_df['Study ID'] == subdir].index.to_list()
+            subset_select_ids = list(set(select_ids).intersection(subdir))
+            if len(subset_select_ids) > 0:
+                intensity_df = pd.read_csv(intensity_file, index_col=0)
+                intensity_df = intensity_df.loc[subset_select_ids].copy()
+                X_list.append(intensity_df)
+                obs_list.extend(subset_select_ids)
+        else:
+            print(f'{subdir} is missing')
+            continue
+
+    X = pd.concat(X_list, axis=0)
+    obs = metadata_df.loc[obs_list, metadata_cols]
+
+    if len(obs) != X.shape[0]:
+        print('Warning, the number of samples in the metadata and intensity matrix do not match')
+        print(f'Number of samples in metadata: {len(obs)}')
+        print(f'Number of samples in intensity matrix: {X.shape[0]}')
+        common_samples = list(set(X.index).intersection(obs.index))
+        print(f'Number of common samples: {len(common_samples)}')
+        if len(common_samples) < 0.9 * len(obs):
+            raise ValueError('The number of lost samples is too many, check the data')
+        X = X.loc[common_samples, :].copy()
+        obs = obs.loc[common_samples, :].copy()
+
+    if use_anndata:
+        adata = ad.AnnData(X=X, obs=obs)
+        adata.write_h5ad(h5ad_file)
+        print(f'Anndata file saved at {h5ad_file}')
+    else:
+        obs.to_csv(f'{output_dir}/y_{save_file_id}.csv')
+        X.to_csv(f'{output_dir}/X_{save_file_id}.csv')
+        print('CSV files saved')
+
+    return output_dir
+
+########################################################################################
+
+def get_task_head_kwargs(head_kind,y_head_col,y_cols=None,head_name=None,num_classes=0):
+
+    if head_name is None:
+        head_name = y_head_col
+
+    if y_cols is None:
+        y_cols = []
+
+    y_head_cols = [y_head_col]
+    if head_kind == 'Cox':
+        if 'OS' in y_head_col:
+           y_head_cols.append('OS_Event')
+        elif 'PFS' in y_head_col:
+            y_head_cols.append('PFS_Event')
+        else:
+            raise ValueError(f"y_head_col {y_head_col} not recognized for Cox model")
+
+    if head_kind == 'Binary':
+        num_classes = 2
+    elif (head_kind == 'MultiClass') or (head_kind == 'Ordinal'):
+        if num_classes == 0:
+            raise ValueError("num_classes must be specified for MultiClass and Ordinal heads")
+
+
+    for col in y_head_cols:
+        if col not in y_cols:
+            y_cols.append(col)
+
+    if len(y_head_cols) == 1:
+        y_idx = y_cols.index(y_head_cols[0])
+    else:
+        y_idx = [y_cols.index(col) for col in y_head_cols]
+
+    head_kwargs = {
+            'kind': head_kind,
+            'name': head_name,
+            'weight': 1.0,
+            'y_idx': y_idx,
+            'hidden_size': 4,
+            'num_hidden_layers': 1,
+            'dropout_rate': 0,
+            'activation': 'leakyrelu',
+            'use_batch_norm': False,
+            'num_classes': num_classes,
+            }
+
+    return head_kwargs, y_head_cols
 
 ########################################################################################
 # if the variable is single value, then use the single value, if it is None, then use the min,max,step with optuna, if it is a list, then pick from the list
@@ -395,11 +530,10 @@ def objective_func3(run_id,data_dir,recompute_eval=False,objective_keys=None,obj
 def make_kwargs_set(sig_figs=2,
                     encoder_kind='VAE',
                     activation_func= 'leakyrelu',
+                    use_batch_norm= False,
                     head_kwargs_dict={},
                     adv_kwargs_dict={},
 
-                    batch_size=None, batch_size_min=16,batch_size_max=64,batch_size_step=16,
-                    noise_factor=None, noise_factor_min=0.01, noise_factor_max=0.1, noise_factor_step=0.01,
                     latent_size=None, latent_size_min=4, latent_size_max=128, latent_size_step=4,
                     hidden_size=None, hidden_size_min=16, hidden_size_max=64, hidden_size_step=16,
                     hidden_size_mult=None, hidden_size_mult_min=0, hidden_size_mult_max=2, hidden_size_mult_step=0.5,
@@ -423,6 +557,9 @@ def make_kwargs_set(sig_figs=2,
                     weight_decay=None, weight_decay_min=0, weight_decay_max=0.0005, weight_decay_step=0.00001, weight_decay_log=False,
                     l1_reg_weight=None, l1_reg_weight_min=0, l1_reg_weight_max=0.01, l1_reg_weight_step=0.0001, l1_reg_weight_log=False,
                     l2_reg_weight=None, l2_reg_weight_min=0, l2_reg_weight_max=0.01, l2_reg_weight_step=0.0001, l2_reg_weight_log=False,
+                    
+                    batch_size=None, batch_size_min=16,batch_size_max=64,batch_size_step=16,
+                    noise_factor=None, noise_factor_min=0.01, noise_factor_max=0.1, noise_factor_step=0.01,
                     num_epochs=None, num_epochs_min=50, num_epochs_max=300, num_epochs_step=10, num_epochs_log=False,
                     learning_rate=None, learning_rate_min=0.0001, learning_rate_max=0.05, learning_rate_step=None,learning_rate_log=True,
                     early_stopping_patience=None, early_stopping_patience_min=0, early_stopping_patience_max=50, early_stopping_patience_step=5,
@@ -430,16 +567,7 @@ def make_kwargs_set(sig_figs=2,
                     ):
 
 
-    if batch_size is None:
-        batch_size = IntDistribution(batch_size_min, batch_size_max, step=batch_size_step)
-    elif isinstance(batch_size, list):
-        batch_size = CategoricalDistribution(batch_size)
-
-    if noise_factor is None:
-        noise_factor = FloatDistribution(noise_factor_min, noise_factor_max, step=noise_factor_step)
-    elif isinstance(noise_factor, list):
-        noise_factor = CategoricalDistribution(noise_factor)
-
+    ##### Encoder Architecture #####
     if encoder_kind in ['AE','VAE']:
         if latent_size is None:
             latent_size = IntDistribution(latent_size_min, latent_size_max, step=latent_size_step)
@@ -493,36 +621,180 @@ def make_kwargs_set(sig_figs=2,
     elif isinstance(encoder_weight, list):
         encoder_weight = CategoricalDistribution(encoder_weight)
 
+
+    ##### Task Architcture #####
+    if (len(head_kwargs_dict) > 0) or (len(adv_kwargs_dict) > 0):
+        if task_hidden_size is None:
+            task_hidden_size = IntDistribution(task_hidden_size_min, task_hidden_size_max, step=task_hidden_size_step)
+        elif isinstance(task_hidden_size, list):
+            task_hidden_size = CategoricalDistribution(task_hidden_size)
+        
+        if task_num_hidden_layers is None:
+            task_num_hidden_layers = IntDistribution(task_num_hidden_layers_min, task_num_hidden_layers_max, step=task_num_hidden_layers_step)
+        elif isinstance(task_num_hidden_layers, list):
+            task_num_hidden_layers = CategoricalDistribution(task_num_hidden_layers)
+
+
+    ##### Head Tasks #####
     if len(head_kwargs_dict) > 0:
+        
         if head_weight is None:
             head_weight = FloatDistribution(head_weight_min, head_weight_max, step=head_weight_step)
         elif isinstance(head_weight, list):
             head_weight = CategoricalDistribution(head_weight)
-    
-    for head_kwargs_key in head_kwargs_dict.keys():
-        if head_weight is None:
-            head_kwargs_dict[head_kwargs_key].update({'weight': FloatDistribution(task_head_weight_min, task_head_weight_max, step=task_head_weight_step)})
-        elif isinstance(head_weight, list):
-            head_kwargs_dict[head_kwargs_key].update({'weight': CategoricalDistribution(task_head_weight)})
-        else:
-            head_kwargs_dict[head_kwargs_key].update({'weight': task_head_weight})
+
+        for head_kwargs_key in head_kwargs_dict.keys():
             
-    
+            head_kwargs_dict[head_kwargs_key]['hidden_size'] = task_hidden_size
+            head_kwargs_dict[head_kwargs_key]['num_hidden_layers'] = task_num_hidden_layers
+
+            if head_weight is None:
+                head_kwargs_dict[head_kwargs_key].update({'weight': FloatDistribution(task_head_weight_min, task_head_weight_max, step=task_head_weight_step)})
+            elif isinstance(head_weight, list):
+                head_kwargs_dict[head_kwargs_key].update({'weight': CategoricalDistribution(task_head_weight)})
+            else:
+                head_kwargs_dict[head_kwargs_key].update({'weight': task_head_weight})
     else:
         head_weight = 0
-
+    
+    ##### Adversarial Tasks #####
     if len(adv_kwargs_dict) >0:
         if adv_weight is None:
             adv_weight = FloatDistribution(adv_weight_min, adv_weight_max, step=adv_weight_step)
         elif isinstance(adv_weight, list):
             adv_weight = CategoricalDistribution(adv_weight)
+
+        for adv_kwargs_key in adv_kwargs_dict.keys():
+            adv_kwargs_dict[adv_kwargs_key]['hidden_size'] = task_hidden_size
+            adv_kwargs_dict[adv_kwargs_key]['num_hidden_layers'] = task_num_hidden_layers
+
+            if adv_weight is None:
+                adv_kwargs_dict[adv_kwargs_key].update({'weight': FloatDistribution(task_adv_weight_min, task_adv_weight_max, step=task_adv_weight_step)})
+            elif isinstance(adv_weight, list):
+                adv_kwargs_dict[adv_kwargs_key].update({'weight': CategoricalDistribution(task_adv_weight)})
+            else:
+                adv_kwargs_dict[adv_kwargs_key].update({'weight': task_adv_weight})
     else:
         adv_weight = 0
             
 
+    ##### Regularization Hyperparams #####
+    if weight_decay is None:
+        if weight_decay_log:
+            weight_decay = FloatDistribution(weight_decay_min, weight_decay_max, log=weight_decay_log)
+        else:
+            weight_decay = FloatDistribution(weight_decay_min, weight_decay_max, step=weight_decay_step)
+    elif isinstance(weight_decay, list):
+        weight_decay = CategoricalDistribution(weight_decay)
+
+    if l1_reg_weight is None:
+        if l1_reg_weight_log:
+            l1_reg_weight = FloatDistribution(l1_reg_weight_min, l1_reg_weight_max, log=l1_reg_weight_log)
+        else:
+            l1_reg_weight = FloatDistribution(l1_reg_weight_min, l1_reg_weight_max, step=l1_reg_weight_step)
+    elif isinstance(l1_reg_weight, list):
+        l1_reg_weight = CategoricalDistribution(l1_reg_weight)
+
+    if l2_reg_weight is None:
+        if l2_reg_weight_log:
+            l2_reg_weight = FloatDistribution(l2_reg_weight_min, l2_reg_weight_max, log=l2_reg_weight_log)
+        else:
+            l2_reg_weight = FloatDistribution(l2_reg_weight_min, l2_reg_weight_max, step=l2_reg_weight_step)
+    elif isinstance(l2_reg_weight, list):
+        l2_reg_weight = CategoricalDistribution(l2_reg_weight)
 
     pass
 
+    ##### Fitting/Training Hyperparams #####
+
+    if batch_size is None:
+        batch_size = IntDistribution(batch_size_min, batch_size_max, step=batch_size_step)
+    elif isinstance(batch_size, list):
+        batch_size = CategoricalDistribution(batch_size)
+
+    if noise_factor is None:
+        noise_factor = FloatDistribution(noise_factor_min, noise_factor_max, step=noise_factor_step)
+    elif isinstance(noise_factor, list):
+        noise_factor = CategoricalDistribution(noise_factor)
+
+    if num_epochs is None:
+        if num_epochs_log:
+            num_epochs = IntDistribution(num_epochs_min, num_epochs_max, log=num_epochs_log)
+        else:
+            num_epochs = IntDistribution(num_epochs_min, num_epochs_max, step=num_epochs_step)
+    elif isinstance(num_epochs, list):
+        num_epochs = CategoricalDistribution(num_epochs)
+
+    if learning_rate is None:
+        if learning_rate_log:
+            learning_rate = FloatDistribution(learning_rate_min, learning_rate_max, log=learning_rate_log)
+        else:
+            learning_rate = FloatDistribution(learning_rate_min, learning_rate_max, step=learning_rate_step)
+    elif isinstance(learning_rate, list):
+        learning_rate = CategoricalDistribution(learning_rate)
+
+    if early_stopping_patience is None:
+        early_stopping_patience = IntDistribution(early_stopping_patience_min, early_stopping_patience_max, step=early_stopping_patience_step)
+    elif isinstance(early_stopping_patience, list):
+        early_stopping_patience = CategoricalDistribution(early_stopping_patience)
+
+    if adversarial_start_epoch is None:
+        adversarial_start_epoch = IntDistribution(adversarial_start_epoch_min, adversarial_start_epoch_max, step=adversarial_start_epoch_step)
+    elif isinstance(adversarial_start_epoch, list):
+        adversarial_start_epoch = CategoricalDistribution(adversarial_start_epoch)
+
+
+    ##### Format the kwargs #####
+
+    encoder_kwargs = {
+            'activation': activation_func,
+            'latent_size': latent_size,
+            'num_hidden_layers': num_hidden_layers,
+            'dropout_rate': dropout_rate,
+            'use_batch_norm': use_batch_norm,
+            'hidden_size': hidden_size,
+            'hidden_size_mult' : hidden_size_mult,
+            'num_attention_heads': num_attention_heads,
+            'num_decoder_layers': num_decoder_layers,
+            'decoder_embed_dim': decoder_embed_dim,
+            'default_hidden_fraction': default_hidden_fraction
+            }
+
+    fit_kwargs = {
+                    'optimizer_name': 'adamw',
+                    'num_epochs': num_epochs,
+                    'learning_rate': learning_rate,
+                    'weight_decay': weight_decay,
+                    'l1_reg_weight': l1_reg_weight,
+                    'l2_reg_weight': l2_reg_weight,
+                    'encoder_weight': encoder_weight,
+                    'head_weight': head_weight,
+                    'adversary_weight': adv_weight,
+                    'noise_factor': noise_factor,
+                    'early_stopping_patience': early_stopping_patience,
+                    'adversarial_start_epoch': adversarial_start_epoch
+                }
+
+    kwargs = {
+                ################
+                ## General ##
+                'encoder_kind': encoder_kind,
+                'encoder_kwargs': encoder_kwargs,
+                'holdout_frac': 0.2, # each trial the train/val samples will be different, also not stratified?
+                'batch_size': batch_size,
+                'head_kwargs_dict': head_kwargs_dict,
+                'adv_kwargs_dict': adv_kwargs_dict,
+                'fit_kwargs': fit_kwargs
+        }
+    
+    kwargs = round_kwargs_to_sig(kwargs,sig_figs=sig_figs)
+    kwargs = convert_model_kwargs_list_to_dict(kwargs,style=2)
+
+    return kwargs
+
+########################################################################################
+########################################################################################
+########################################################################################
 
 
 ########################################################################################

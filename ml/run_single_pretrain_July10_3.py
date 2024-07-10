@@ -11,19 +11,25 @@ import os
 import pandas as pd
 import anndata as ad
 
-def get_format_for_model(input_data_dir, sample_selection_col, output_dir=None, metadata_cols=[], save_nan=False, use_anndata=False):
+def get_format_for_model(input_data_dir, sample_selection_col, 
+        metadata_df=None,subdir_col='Study ID',
+        output_dir=None, metadata_cols=[], 
+        save_nan=False, use_anndata=False):
+
+
     if output_dir is None:
         output_dir = os.path.join(input_data_dir, 'formatted_data')
         os.makedirs(output_dir, exist_ok=True)
 
-    all_metadata = pd.read_csv(f'{input_data_dir}/metadata.csv', index_col=0)
-    study_id_list = all_metadata['Study ID'].unique()
+    if metadata_df is None:
+        metadata_df = pd.read_csv(f'{input_data_dir}/metadata.csv', index_col=0)
+    subdir_list = metadata_df[subdir_col].unique()
 
-    select_ids = all_metadata[all_metadata[sample_selection_col]].index.to_list()
+    select_ids = metadata_df[metadata_df[sample_selection_col]].index.to_list()
     print(f'Number of samples selected: {len(select_ids)}')
 
     if len(metadata_cols) == 0:
-        metadata_cols = all_metadata.columns.to_list()
+        metadata_cols = metadata_df.columns.to_list()
 
     save_file_id = sample_selection_col.replace(' ', '_')
     h5ad_file = f'{output_dir}/{save_file_id}.h5ad'
@@ -39,26 +45,26 @@ def get_format_for_model(input_data_dir, sample_selection_col, output_dir=None, 
     X_list = []
     obs_list = []
 
-    for study_id in study_id_list:
+    for subdir in subdir_list:
         if save_nan:
-            intensity_file = f'{input_data_dir}/{study_id}/nan_matrix.csv'
+            intensity_file = f'{input_data_dir}/{subdir}/nan_matrix.csv'
         else:
-            intensity_file = f'{input_data_dir}/{study_id}/scaled_intensity_matrix.csv'
+            intensity_file = f'{input_data_dir}/{subdir}/scaled_intensity_matrix.csv'
 
         if os.path.exists(intensity_file):
-            study_ids = all_metadata[all_metadata['Study ID'] == study_id].index.to_list()
-            subset_select_ids = list(set(select_ids).intersection(study_ids))
+            subdirs = metadata_df[metadata_df['Study ID'] == subdir].index.to_list()
+            subset_select_ids = list(set(select_ids).intersection(subdir))
             if len(subset_select_ids) > 0:
                 intensity_df = pd.read_csv(intensity_file, index_col=0)
                 intensity_df = intensity_df.loc[subset_select_ids].copy()
                 X_list.append(intensity_df)
                 obs_list.extend(subset_select_ids)
         else:
-            print(f'{study_id} is missing')
+            print(f'{subdir} is missing')
             continue
 
     X = pd.concat(X_list, axis=0)
-    obs = all_metadata.loc[obs_list, metadata_cols]
+    obs = metadata_df.loc[obs_list, metadata_cols]
 
     if len(obs) != X.shape[0]:
         print('Warning, the number of samples in the metadata and intensity matrix do not match')
@@ -225,17 +231,17 @@ finetune_kwargs['train_name'] = 'Discovery_Train'
 finetune_kwargs['eval_name']  = 'Discovery_Val'
 finetune_kwargs['num_repeats'] = 5
 finetune_kwargs['batch_size'] = 64
-finetune_kwargs['yes_clean_batches'] = False
+finetune_kwargs['yes_clean_batches'] = True
 finetune_kwargs['fit_kwargs'] = {}
 finetune_kwargs['fit_kwargs']['head_weight'] = 1
 finetune_kwargs['fit_kwargs']['encoder_weight'] = 0.0
 finetune_kwargs['fit_kwargs']['adversary_weight'] = 0.0
 finetune_kwargs['fit_kwargs']['num_epochs'] = 30
-finetune_kwargs['fit_kwargs']['learning_rate'] = 0.0001
+finetune_kwargs['fit_kwargs']['learning_rate'] = 0.0005
 finetune_kwargs['fit_kwargs']['weight_decay'] = 0.00001
 finetune_kwargs['fit_kwargs']['clip_grads_with_norm'] = True
 finetune_kwargs['fit_kwargs']['noise_factor'] = 0.1
-# finetune_kwargs['encoder_kwargs'] = {'dropout_rate': 0.1}
+finetune_kwargs['encoder_kwargs'] = {'dropout_rate': 0.2}
 finetune_kwargs['fit_kwargs']['train_name'] = 'Discovery_Train'
 finetune_kwargs['y_head_cols'] = ['Sex','Cohort Label v0', 'Age','BMI','IMDC','OS','OS_Event']
 finetune_kwargs['y_adv_cols'] = ['Treatment']
@@ -259,7 +265,7 @@ finetune_kwargs['head_kwargs_dict'] = {
 
 
 run_id = setup_neptune_run(data_dir,
-                           setup_id='finetune both-OS2',
+                           setup_id='finetune both-OS3',
                            neptune_mode='async',
                         #    neptune_mode='debug',
                            yes_logging = True,

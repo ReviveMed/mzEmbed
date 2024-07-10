@@ -246,6 +246,7 @@ def round_to_even(n):
 def get_clean_batch_sz(len_dataset, org_batch_sz):
     # due to batch normalization, we want the batches to be as clean as possible
     curr_remainder = len_dataset % org_batch_sz
+    print('original batch size:', org_batch_sz, 'dataset size:', len_dataset, 'remainder:', curr_remainder)
     max_iter = 100
     if org_batch_sz >= len_dataset:
         return org_batch_sz
