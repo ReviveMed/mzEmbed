@@ -295,7 +295,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             fit_dataset = CompoundDataset(X_data_train,y_data_train[y_head_cols], y_data_train[y_adv_cols])
             eval_dataset = CompoundDataset(X_data_eval,y_data_eval[y_head_cols], y_data_eval[y_adv_cols])
             if yes_clean_batches:
-                batch_size = get_clean_batch_sz(X_size, batch_size)
+                batch_size = get_clean_batch_sz(X_data_train.shape[1], batch_size)
             # stratify on the adversarial column (stratify=2)
             # this is probably not the most memory effecient method, would be better to do stratification before creating the dataset
             # fit_loader_dct = create_dataloaders(fit_dataset, batch_size, holdout_frac, set_name=train_name, stratify=2)
@@ -849,6 +849,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                     # Get the counts for each instance of the hue column, and the corresponding colormap
                     Z_count_sum = (~Z_embed[hue_col].isnull()).sum()
                     print(f'Number of samples in {eval_name}: {Z_count_sum}')
+                    if Z_count_sum < 10:
+                        print('too few to plot')
+                        continue
                     if Z_embed[hue_col].nunique() > 30:
                         # if more than 30 unique values, then assume its continuous
                         palette = 'flare'

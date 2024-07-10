@@ -225,6 +225,7 @@ finetune_kwargs['train_name'] = 'Discovery_Train'
 finetune_kwargs['eval_name']  = 'Discovery_Val'
 finetune_kwargs['num_repeats'] = 5
 finetune_kwargs['batch_size'] = 64
+finetune_kwargs['yes_clean_batches'] = False
 finetune_kwargs['fit_kwargs'] = {}
 finetune_kwargs['fit_kwargs']['head_weight'] = 1
 finetune_kwargs['fit_kwargs']['encoder_weight'] = 0.0
@@ -258,7 +259,7 @@ finetune_kwargs['head_kwargs_dict'] = {
 
 
 run_id = setup_neptune_run(data_dir,
-                           setup_id='finetune both-OS',
+                           setup_id='finetune both-OS2',
                            neptune_mode='async',
                         #    neptune_mode='debug',
                            yes_logging = True,

@@ -93,20 +93,50 @@ def stratified_split(dataset : torch.utils.data.Dataset, labels, fraction, rando
 def create_dataloaders_old(torch_dataset, batch_size, holdout_frac=0, shuffle=True, set_name='train'):
     
     if holdout_frac == 0:
-        return {set_name: DataLoader(torch_dataset, batch_size=batch_size, shuffle=shuffle)}
+        last_batch_sz = len(torch_dataset) % batch_size
+        print('last_batch_sz', last_batch_sz)
+        if last_batch_sz < 0.2*batch_size:
+            drop_last = True
+            print('dropping last batch')
+        else:
+            drop_last = False
+        return {set_name: DataLoader(torch_dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last)}
 
     train_size = int((1-holdout_frac) * len(torch_dataset))
     holdout_size = len(torch_dataset) - train_size
+    
+    last_batch_sz = train_size % batch_size
+    print('last_batch_sz', last_batch_sz)
+    if last_batch_sz < 0.2*batch_size:
+        drop_last = True
+        print('dropping last batch')
+    else:
+        drop_last = False
+
+    holdout_last_batch_sz = holdout_size % batch_size
+    print('last_batch_sz', holdout_last_batch_sz)
+    if holdout_last_batch_sz < 0.2*batch_size:
+        holdout_drop_last = True
+        print('dropping last batch of holdout')
+    else:
+        holdout_drop_last = False
 
     train_dataset, holdout_dataset = torch.utils.data.random_split(torch_dataset, [train_size, holdout_size])
 
-    return {set_name: DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle),
-            f'{set_name}_holdout': DataLoader(holdout_dataset, batch_size=batch_size, shuffle=False)}
+    return {set_name: DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last),
+            f'{set_name}_holdout': DataLoader(holdout_dataset, batch_size=batch_size, shuffle=False, drop_last=holdout_drop_last)}
 
 
-def create_dataloaders(torch_dataset, batch_size, holdout_frac=0, shuffle=True, set_name='train', stratify=None):
+def create_dataloaders(torch_dataset, batch_size, holdout_frac=0, shuffle=True, set_name='train', stratify=None,drop_last=False):
     if holdout_frac == 0:
-        return {set_name: DataLoader(torch_dataset, batch_size=batch_size, shuffle=shuffle)}
+        last_batch_sz = len(torch_dataset) % batch_size
+        print('last_batch_sz', last_batch_sz)
+        if last_batch_sz < 0.2*batch_size:
+            drop_last = True
+            print('dropping last batch')
+        else:
+            drop_last = False
+        return {set_name: DataLoader(torch_dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last)}
 
     # Get the targets of your dataset if it's available
     if stratify is not None:
@@ -125,8 +155,16 @@ def create_dataloaders(torch_dataset, batch_size, holdout_frac=0, shuffle=True, 
     train_sampler = SubsetRandomSampler(train_indices)
     holdout_sampler = SubsetRandomSampler(holdout_indices)
 
-    return {set_name: DataLoader(torch_dataset, batch_size=batch_size, sampler=train_sampler),
-            f'{set_name}_holdout': DataLoader(torch_dataset, batch_size=batch_size, sampler=holdout_sampler)}
+    last_batch_sz = len(train_indices) % batch_size
+    print('last_batch_sz', last_batch_sz)
+    if last_batch_sz < 0.2*batch_size:
+        drop_last = True
+        print('dropping last batch')
+    else:
+        drop_last = False
+
+    return {set_name: DataLoader(torch_dataset, batch_size=batch_size, sampler=train_sampler, drop_last=drop_last),
+            f'{set_name}_holdout': DataLoader(torch_dataset, batch_size=batch_size, sampler=holdout_sampler, drop_last=False)}
 
 
 def get_optimizer(optimizer_name, model, learning_rate=0.001, weight_decay=0,betas=(0.9, 0.999)):
@@ -461,7 +499,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
 
                     if torch.isnan(head_loss) or torch.isinf(head_loss):
                         print('Head loss is nan/inf!')
-                        print('your learning rate is probably too high, or batch size is too small')
+                        print('your learning rate is probably too high, or issue with batch sizes or nan-values')
                         end_time = time.time()
                         elapsed_minutes = (end_time - start_time) / 60
                         print(f'Training took {elapsed_minutes:.2f} minutes')
