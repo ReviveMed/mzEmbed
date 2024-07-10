@@ -25,7 +25,6 @@ kwargs['run_evaluation'] = True
 #     }
 # }
 
-print(kwargs)
 
 
 kwargs['y_head_cols'] = ['Sex','Cohort Label v0', 'Age']
@@ -121,6 +120,8 @@ kwargs['head_kwargs_dict'] = {
 }
 
 data_dir = '/Users/jonaheaton/ReviveMed Dropbox/Jonah Eaton/development_CohortCombination/alignment_RCC_2024_Feb_27/July_09_Data2/formatted_data'
+
+print(kwargs)
 
 run_id = setup_neptune_run(data_dir,
                            setup_id='pretrain',
