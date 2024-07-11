@@ -21,7 +21,27 @@ def create_selected_data(input_data_dir, sample_selection_col,
         metadata_df=None,subdir_col='Study ID',
         output_dir=None, metadata_cols=[], 
         save_nan=False, use_anndata=False):
+    """
+    Creates selected data based on the given parameters.
 
+    Parameters:
+    - input_data_dir (str): The directory path where the input data is located.
+    - sample_selection_col (str): The column name in the metadata dataframe used for sample selection.
+    - metadata_df (pandas.DataFrame, optional): The metadata dataframe. If not provided, it will be read from 'metadata.csv' in the input_data_dir.
+    - subdir_col (str, optional): The column name in the metadata dataframe used for subdirectory identification. Default is 'Study ID'.
+    - output_dir (str, optional): The directory path where the output data will be saved. If not provided, it will be created as 'formatted_data' in the input_data_dir.
+    - metadata_cols (list, optional): The list of column names to include in the output metadata. If not provided, all columns will be included.
+    - save_nan (bool, optional): Whether to save NaN values in the output files. Default is False.
+    - use_anndata (bool, optional): Whether to use AnnData format for saving the output data. Default is False.
+
+    Returns:
+    - output_dir (str): The directory path where the output data is saved.
+    - save_file_id (str): The identifier used in the output file names.
+
+    Raises:
+    - ValueError: If the number of lost samples is too many compared to the metadata.
+
+    """
 
     if output_dir is None:
         output_dir = os.path.join(input_data_dir, 'formatted_data')
@@ -101,7 +121,24 @@ def create_selected_data(input_data_dir, sample_selection_col,
 
 ########################################################################################
 
-def get_task_head_kwargs(head_kind,y_head_col,y_cols=None,head_name=None,num_classes=0):
+def get_task_head_kwargs(head_kind, y_head_col, y_cols=None, head_name=None, num_classes=0):
+    """
+    Returns the keyword arguments for a task head based on the given parameters.
+
+    Parameters:
+        head_kind (str): The kind of task head. Possible values are 'Cox', 'Binary', 'MultiClass', or 'Ordinal'.
+        y_head_col (str): The name of the target column for the task head.
+        y_cols (list, optional): A list of target columns. Defaults to None.
+        head_name (str, optional): The name of the task head. Defaults to None.
+        num_classes (int, optional): The number of classes for the task head. Defaults to 0.
+
+    Returns:
+        tuple: A tuple containing the task head keyword arguments and the updated list of target columns.
+
+    Raises:
+        ValueError: If the given y_head_col is not recognized for the Cox model.
+        ValueError: If num_classes is not specified for MultiClass and Ordinal heads.
+    """
 
     if head_name is None:
         head_name = y_head_col
@@ -159,37 +196,40 @@ def make_kwargs_set(sig_figs=2,
                     head_kwargs_dict={},
                     adv_kwargs_dict={},
 
-                    latent_size=None, latent_size_min=4, latent_size_max=128, latent_size_step=4,
-                    hidden_size=None, hidden_size_min=16, hidden_size_max=64, hidden_size_step=16,
-                    hidden_size_mult=None, hidden_size_mult_min=0, hidden_size_mult_max=2, hidden_size_mult_step=0.5,
-                    num_hidden_layers=None, num_hidden_layers_min=1, num_hidden_layers_max=10, num_hidden_layers_step=1,
+                    latent_size=64, latent_size_min=4, latent_size_max=128, latent_size_step=4,
+                    hidden_size=96, hidden_size_min=16, hidden_size_max=64, hidden_size_step=16,
+                    hidden_size_mult=1.5, hidden_size_mult_min=0, hidden_size_mult_max=2, hidden_size_mult_step=0.5,
+                    num_hidden_layers=2, num_hidden_layers_min=1, num_hidden_layers_max=10, num_hidden_layers_step=1,
                     
-                    num_attention_heads=None, num_attention_heads_min=1, num_attention_heads_max=5, num_attention_heads_step=1,
-                    num_decoder_layers=None, num_decoder_layers_min=1, num_decoder_layers_max=5, num_decoder_layers_step=1,
-                    decoder_embed_dim=None, decoder_embed_dim_min=4, decoder_embed_dim_max=64, decoder_embed_dim_step=4,
-                    default_hidden_fraction=None, default_hidden_fraction_min=0, default_hidden_fraction_max=0.5, default_hidden_fraction_step=0.1,
+                    num_attention_heads=2, num_attention_heads_min=1, num_attention_heads_max=5, num_attention_heads_step=1,
+                    num_decoder_layers=2, num_decoder_layers_min=1, num_decoder_layers_max=5, num_decoder_layers_step=1,
+                    embed_dim=32, embed_dim_min=4, embed_dim_max=64, embed_dim_step=4,
+                    decoder_embed_dim=8, decoder_embed_dim_min=4, decoder_embed_dim_max=64, decoder_embed_dim_step=4,
+                    default_hidden_fraction=0.2, default_hidden_fraction_min=0, default_hidden_fraction_max=0.5, default_hidden_fraction_step=0.1,
 
-                    dropout_rate=None, dropout_rate_min=0, dropout_rate_max=0.5, dropout_rate_step=0.1,
-                    encoder_weight=None, encoder_weight_min=0, encoder_weight_max=5, encoder_weight_step=0.1,
-                    head_weight=None, head_weight_min=0, head_weight_max=10, head_weight_step=0.1,
-                    adv_weight=None, adv_weight_min=0, adv_weight_max=10, adv_weight_step=0.1,
+                    dropout_rate=0, dropout_rate_min=0, dropout_rate_max=0.5, dropout_rate_step=0.1,
+                    encoder_weight=1.0, encoder_weight_min=0, encoder_weight_max=2, encoder_weight_step=0.5,
+                    head_weight=1.0, head_weight_min=0, head_weight_max=2, head_weight_step=0.5,
+                    adv_weight=1.0, adv_weight_min=0, adv_weight_max=2, adv_weight_step=0.5,
 
-                    task_head_weight=None, task_head_weight_min=0, task_head_weight_max=10, task_head_weight_step=0.1,
-                    task_adv_weight=None, task_adv_weight_min=0, task_adv_weight_max=10, task_adv_weight_step=0.1,
-                    task_hidden_size=None, task_hidden_size_min=4, task_hidden_size_max=64, task_hidden_size_step=4,
-                    task_num_hidden_layers=None, task_num_hidden_layers_min=1, task_num_hidden_layers_max=5, task_num_hidden_layers_step=1,
+                    task_head_weight=-1, task_head_weight_min=0, task_head_weight_max=10, task_head_weight_step=0.1,
+                    task_adv_weight=-1, task_adv_weight_min=0, task_adv_weight_max=10, task_adv_weight_step=0.1,
+                    task_hidden_size=4, task_hidden_size_min=4, task_hidden_size_max=64, task_hidden_size_step=4,
+                    task_num_hidden_layers=1, task_num_hidden_layers_min=1, task_num_hidden_layers_max=3, task_num_hidden_layers_step=1,
 
-                    weight_decay=None, weight_decay_min=0, weight_decay_max=0.0005, weight_decay_step=0.00001, weight_decay_log=False,
-                    l1_reg_weight=None, l1_reg_weight_min=0, l1_reg_weight_max=0.01, l1_reg_weight_step=0.0001, l1_reg_weight_log=False,
-                    l2_reg_weight=None, l2_reg_weight_min=0, l2_reg_weight_max=0.01, l2_reg_weight_step=0.0001, l2_reg_weight_log=False,
+                    weight_decay=0.0001, weight_decay_min=0, weight_decay_max=0.0005, weight_decay_step=0.00001, weight_decay_log=False,
+                    l1_reg_weight=0, l1_reg_weight_min=0, l1_reg_weight_max=0.01, l1_reg_weight_step=0.0001, l1_reg_weight_log=False,
+                    l2_reg_weight=0, l2_reg_weight_min=0, l2_reg_weight_max=0.01, l2_reg_weight_step=0.0001, l2_reg_weight_log=False,
                     
-                    batch_size=None, batch_size_min=16,batch_size_max=64,batch_size_step=16,
-                    noise_factor=None, noise_factor_min=0.01, noise_factor_max=0.1, noise_factor_step=0.01,
-                    num_epochs=None, num_epochs_min=50, num_epochs_max=300, num_epochs_step=10, num_epochs_log=False,
-                    learning_rate=None, learning_rate_min=0.0001, learning_rate_max=0.05, learning_rate_step=None,learning_rate_log=True,
-                    early_stopping_patience=None, early_stopping_patience_min=0, early_stopping_patience_max=50, early_stopping_patience_step=5,
-                    adversarial_start_epoch=None, adversarial_start_epoch_min=-1, adversarial_start_epoch_max=10, adversarial_start_epoch_step=2,
+                    batch_size=32, batch_size_min=16,batch_size_max=64,batch_size_step=16,
+                    noise_factor=0.1, noise_factor_min=0.01, noise_factor_max=0.1, noise_factor_step=0.01,
+                    num_epochs=100, num_epochs_min=50, num_epochs_max=300, num_epochs_step=10, num_epochs_log=False,
+                    learning_rate=0.0005, learning_rate_min=0.0001, learning_rate_max=0.05, learning_rate_step=None,learning_rate_log=True,
+                    early_stopping_patience=0, early_stopping_patience_min=0, early_stopping_patience_max=50, early_stopping_patience_step=5,
+                    adversarial_start_epoch=0, adversarial_start_epoch_min=-1, adversarial_start_epoch_max=10, adversarial_start_epoch_step=2,
                     ):
+
+
 
 
     ##### Encoder Architecture #####
@@ -199,15 +239,15 @@ def make_kwargs_set(sig_figs=2,
         elif isinstance(latent_size, list):
             latent_size = CategoricalDistribution(latent_size)
 
-    if hidden_size is None:
-        hidden_size = IntDistribution(hidden_size_min, hidden_size_max, step=hidden_size_step)
-    elif isinstance(hidden_size, list):
-        hidden_size = CategoricalDistribution(hidden_size)
-    elif hidden_size == -1:
-        if (hidden_size_mult is None):
-            hidden_size_mult = FloatDistribution(hidden_size_mult_min, hidden_size_mult_max, step=hidden_size_mult_step)
-        elif isinstance(hidden_size_mult, list):
-            hidden_size_mult = CategoricalDistribution(hidden_size_mult)
+        if hidden_size is None:
+            hidden_size = IntDistribution(hidden_size_min, hidden_size_max, step=hidden_size_step)
+        elif isinstance(hidden_size, list):
+            hidden_size = CategoricalDistribution(hidden_size)
+        elif hidden_size == -1:
+            if (hidden_size_mult is None):
+                hidden_size_mult = FloatDistribution(hidden_size_mult_min, hidden_size_mult_max, step=hidden_size_mult_step)
+            elif isinstance(hidden_size_mult, list):
+                hidden_size_mult = CategoricalDistribution(hidden_size_mult)
 
     if num_hidden_layers is None:
         num_hidden_layers = IntDistribution(num_hidden_layers_min, num_hidden_layers_max, step=num_hidden_layers_step)
@@ -215,6 +255,8 @@ def make_kwargs_set(sig_figs=2,
         num_hidden_layers = CategoricalDistribution(num_hidden_layers)
 
     if encoder_kind in ['metabFoundation']:
+        hidden_size = -1
+        hidden_size_mult = -1
 
         if num_attention_heads is None:
             num_attention_heads = IntDistribution(num_attention_heads_min, num_attention_heads_max, step=num_attention_heads_step)
@@ -225,7 +267,14 @@ def make_kwargs_set(sig_figs=2,
             num_decoder_layers = IntDistribution(num_decoder_layers_min, num_decoder_layers_max, step=num_decoder_layers_step)
         elif isinstance(num_decoder_layers, list):
             num_decoder_layers = CategoricalDistribution(num_decoder_layers)
+        elif num_decoder_layers == -1:
+            num_decoder_layers = num_hidden_layers
 
+        if embed_dim is None:
+            embed_dim = IntDistribution(embed_dim_min, embed_dim_max, step=embed_dim_step)
+        elif isinstance(embed_dim, list):
+            embed_dim = CategoricalDistribution(embed_dim)
+        
         if decoder_embed_dim is None:
             decoder_embed_dim = IntDistribution(decoder_embed_dim_min, decoder_embed_dim_max, step=decoder_embed_dim_step)
         elif isinstance(decoder_embed_dim, list):
@@ -383,6 +432,7 @@ def make_kwargs_set(sig_figs=2,
             'hidden_size_mult' : hidden_size_mult,
             'num_attention_heads': num_attention_heads,
             'num_decoder_layers': num_decoder_layers,
+            'embed_dim': embed_dim,
             'decoder_embed_dim': decoder_embed_dim,
             'default_hidden_fraction': default_hidden_fraction
             }
