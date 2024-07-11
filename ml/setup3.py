@@ -943,6 +943,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
             if (plot_latent_space=='plotly') or (plot_latent_space=='both') or (plot_latent_space=='px'):
                 for hue_col in plot_latent_space_cols:
+                    marker_sz = 5
                     if yes_plot_pca:
                         plotly_fig = px.scatter(Z_embed, x='PCA1', y='PCA2', color=hue_col, title=f'PCA {hue_col}')
                         plotly_fig.update_traces(marker=dict(size=2*marker_sz))

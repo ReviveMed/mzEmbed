@@ -15,18 +15,189 @@ import anndata as ad
 # import neptune exceptions
 from neptune.exceptions import NeptuneException #, NeptuneServerError
 
+from sklearn.model_selection import train_test_split, StratifiedGroupKFold
+
+
+############################################################
+##### Functions for Creating the Train Val Test Splits #####
+############################################################
+
+
+def smart_trainval_split(metadata, suffix='Pretrain All',stratify_cols=['Study ID','Sex'],test_frac=0.1):
+    metadata.dropna(axis=1, how='all', inplace=True)
+    y = metadata[metadata[f'{suffix}']].copy()
+    y = y[stratify_cols+['Subject ID']].copy()
+
+    if 'Subject ID' in y.columns:
+        y_with_sample_id = y[~y['Subject ID'].isna()].copy()
+        y_with_sample_id['Subject ID'] = y_with_sample_id['Subject ID'].astype(str)
+        y_without_sample_id = y[y['Subject ID'].isna()].copy()
+    else:
+        y_with_sample_id = pd.DataFrame(index=y.index)
+        y_without_sample_id = y
+
+    # fill missing value of numeric columns with -1
+    numeric_cols = y_without_sample_id.select_dtypes(include=[np.number]).columns
+    y_without_sample_id[numeric_cols] = y_without_sample_id[numeric_cols].fillna(-1)
+    y_with_sample_id[numeric_cols] = y_with_sample_id[numeric_cols].fillna(-1)
+
+    # fill missing value of non-numeric columns with 'missing'
+    non_numeric_cols = y_without_sample_id.select_dtypes(exclude=[np.number]).columns
+    y_without_sample_id[non_numeric_cols] = y_without_sample_id[non_numeric_cols].fillna('missing')
+    y_with_sample_id[non_numeric_cols] = y_with_sample_id[non_numeric_cols].fillna('missing')
+
+    n_splits = round(1/test_frac)
+
+    if len(y_with_sample_id) > 0:
+        sgkf = StratifiedGroupKFold(n_splits=n_splits, random_state=42, shuffle=True)
+        # print(y)
+        if len(stratify_cols) > 1:
+            train_inds, val_inds = next(sgkf.split(y_with_sample_id, y_with_sample_id[stratify_cols[0]], groups=y_with_sample_id['Subject ID']))
+        else:
+            train_inds, val_inds = next(sgkf.split(y_with_sample_id, y_with_sample_id[stratify_cols], groups=y_with_sample_id['Subject ID']))
+
+        train_ids1 = y_with_sample_id.index[train_inds].to_list()
+        val_ids1 = y_with_sample_id.index[val_inds].to_list()
+    else:
+        train_ids1 = []
+        val_ids1 = []
+
+
+    if len(y_without_sample_id) > 0:
+        train_ids2, val_ids2 = train_test_split(y_without_sample_id.index, test_size=test_frac, stratify=y_without_sample_id[stratify_cols], random_state=42)
+        train_ids2 = train_ids2.tolist()
+        val_ids2 = val_ids2.tolist()
+    else:
+        train_ids2 = []
+        val_ids2 = []
+
+    train_ids = train_ids1 + train_ids2
+    val_ids = val_ids1 + val_ids2
+
+    return train_ids, val_ids
+
+
+def assign_sets(metadata, preset_finetune_col='Matt Set Label',return_only_sets=False):
+    train_ids, val_ids = smart_trainval_split(metadata, suffix='Pretrain All')
+    metadata['Pretrain Discovery'] = False
+    metadata['Pretrain Test'] = False
+    metadata.loc[train_ids,'Pretrain Discovery'] = True
+    metadata.loc[val_ids,'Pretrain Test'] = True
+
+    train_ids, val_ids = smart_trainval_split(metadata, suffix='Pretrain Discovery')
+    metadata['Pretrain Discovery Train'] = False
+    metadata['Pretrain Discovery Val'] = False
+    metadata.loc[train_ids,'Pretrain Discovery Train'] = True
+    metadata.loc[val_ids,'Pretrain Discovery Val'] = True
+
+    if preset_finetune_col not in metadata.columns:
+        train_ids, val_ids = smart_trainval_split(metadata, suffix='Finetune All', stratify_cols=['IMDC','MSKCC'])
+        metadata['Finetune Discovery'] = False
+        metadata['Finetune Test'] = False
+        metadata.loc[train_ids,'Finetune Discovery'] = True
+        metadata.loc[val_ids,'Finetune Test'] = True
+
+        train_ids, val_ids = smart_trainval_split(metadata, suffix='Finetune Discovery', stratify_cols=['IMDC','MSKCC'])
+        metadata['Finetune Discovery Train'] = False
+        metadata['Finetune Discovery Val'] = False
+        metadata.loc[train_ids,'Finetune Discovery Train'] = True
+        metadata.loc[val_ids,'Finetune Discovery Val'] = True
+    
+    else:
+        print(f'found {preset_finetune_col} in metadata, using this to assign finetune sets')
+        train_ids = metadata[(metadata[preset_finetune_col]=='Train') & (metadata['Finetune All'])].index.to_list()
+        val_ids = metadata[(metadata[preset_finetune_col]=='Val') & (metadata['Finetune All'])].index.to_list()
+        disc_ids = train_ids + val_ids
+        test_ids = metadata[(metadata[preset_finetune_col]=='Test') & (metadata['Finetune All'])].index.to_list()
+        metadata['Finetune Discovery'] = False
+        metadata['Finetune Test'] = False
+        metadata.loc[disc_ids,'Finetune Discovery'] = True
+        metadata.loc[test_ids,'Finetune Test'] = True
+
+        metadata['Finetune Discovery Train'] = False
+        metadata['Finetune Discovery Val'] = False
+        metadata.loc[train_ids,'Finetune Discovery Train'] = True
+        metadata.loc[val_ids,'Finetune Discovery Val'] = True
+
+        
+
+    metadata['Set'] = 'skip'
+    metadata.loc[metadata['Pretrain Discovery Train'],'Set'] = 'Pretrain Discovery Train'
+    metadata.loc[metadata['Pretrain Discovery Val'],'Set'] = 'Pretrain Discovery Val'
+    metadata.loc[metadata['Pretrain Test'],'Set'] = 'Pretrain Test'
+    metadata.loc[metadata['Finetune Discovery Train'],'Set'] = 'Finetune Discovery Train'
+    metadata.loc[metadata['Finetune Discovery Val'],'Set'] = 'Finetune Discovery Val'
+    metadata.loc[metadata['Finetune Test'],'Set'] = 'Finetune Test'
+
+
+    if not (metadata['Set'].value_counts().sum() == metadata.shape[0]):
+        print('Error in assigning the sets, some samples assigned to more than one set')
+        
+    if return_only_sets:
+        return get_selection_df(metadata)
+    return metadata
+
+
+def get_selection_df(metadata):
+    selection_cols = ['Set'] + [x for x in metadata.columns if 'Pretrain' in x or 'Finetune' in x]
+    selection_df = metadata[selection_cols].copy()
+    return selection_df
+
+
+############################################################
+##### Functions Preparing the Data for Training #####
+############################################################
+
+
+def create_full_metadata(input_data_dir, cleaning=True):
+
+    all_study_id_list = os.listdir(input_data_dir)
+    all_study_id_list = [x for x in all_study_id_list if os.path.isdir(f'{input_data_dir}/{x}')]
+    all_metadata_list = []
+    for metab_study_name in all_study_id_list:
+        if metab_study_name in ['nan','.', '..', 'formatted_data','.ipynb_checkpoints']:
+            continue
+        load_dir = f'{input_data_dir}/{metab_study_name}'
+        if not os.path.exists(f'{load_dir}/metadata.csv'):
+            print(f'subdir {metab_study_name} is missing metadata')
+            continue
+        metadata = pd.read_csv(f'{load_dir}/metadata.csv', index_col=0)
+
+        all_metadata_list.append(metadata)
+
+    all_metadata = pd.concat(all_metadata_list)
+
+    if cleaning:
+        all_metadata['BMI'] = pd.to_numeric(all_metadata['BMI'], errors='coerce')
+        all_metadata['Age'] = pd.to_numeric(all_metadata['Age'], errors='coerce')
+        all_metadata['Smoking Status'] = all_metadata['Smoking Status'].map({'Former': 'Current or Former', 'Current': 'Current or Former',
+                                                                    'Never': 'Never', 'Current or Former': 'Current or Former'}, na_action='ignore')
+
+        for col in all_metadata.columns:
+            check_mixed_datatypes(all_metadata,col,verbose=False)
+            # sometimes the nans are important 
+            if check_mixed_datatypes(all_metadata,col):
+                all_metadata[col].fillna(pd.NA,inplace=True)
+                if check_mixed_datatypes(all_metadata,col, verbose=True):
+                    print(f'{col} still has mixed types')
+
+    all_metadata.to_csv(f'{input_data_dir}/metadata.csv')
+    return all_metadata
+
 
 
 def create_selected_data(input_data_dir, sample_selection_col, 
-        metadata_df=None,subdir_col='Study ID',
-        output_dir=None, metadata_cols=[], 
-        save_nan=False, use_anndata=False):
+                         selections_df = None,
+                        metadata_df=None,subdir_col='Study ID',
+                        output_dir=None, metadata_cols=[], 
+                        save_nan=False, use_anndata=False):
     """
     Creates selected data based on the given parameters.
 
     Parameters:
     - input_data_dir (str): The directory path where the input data is located.
     - sample_selection_col (str): The column name in the metadata dataframe used for sample selection.
+    - selections_df (pandas.DataFrame, optional): The dataframe containing the sample selections. If not provided, it will assume metadata_df contains selections dataframe.
     - metadata_df (pandas.DataFrame, optional): The metadata dataframe. If not provided, it will be read from 'metadata.csv' in the input_data_dir.
     - subdir_col (str, optional): The column name in the metadata dataframe used for subdirectory identification. Default is 'Study ID'.
     - output_dir (str, optional): The directory path where the output data will be saved. If not provided, it will be created as 'formatted_data' in the input_data_dir.
@@ -48,10 +219,22 @@ def create_selected_data(input_data_dir, sample_selection_col,
         os.makedirs(output_dir, exist_ok=True)
 
     if metadata_df is None:
-        metadata_df = pd.read_csv(f'{input_data_dir}/metadata.csv', index_col=0)
-    subdir_list = metadata_df[subdir_col].unique()
+        if os.path.exists(f'{input_data_dir}/metadata.csv'):
+            metadata_df = pd.read_csv(f'{input_data_dir}/metadata.csv', index_col=0)
+        else:
+            print(f'complete metadata file not found, generating using data in {input_data_dir}')
+            create_full_metadata(input_data_dir)
+            metadata_df = pd.read_csv(f'{input_data_dir}/metadata.csv', index_col=0)
 
-    select_ids = metadata_df[metadata_df[sample_selection_col]].index.to_list()
+    if selections_df is None:
+        if 'Set' not in metadata_df.columns:
+            selections_df = assign_sets(metadata_df,return_only_sets=True)
+        else:
+            selections_df = get_selection_df(metadata_df)
+
+    subdir_list = selections_df[subdir_col].unique()
+
+    select_ids = selections_df[selections_df[sample_selection_col]].index.to_list()
     print(f'Number of samples selected: {len(select_ids)}')
 
     if len(metadata_cols) == 0:
@@ -60,6 +243,15 @@ def create_selected_data(input_data_dir, sample_selection_col,
     save_file_id = sample_selection_col.replace(' ', '_')
     y_file = f'{output_dir}/y_{save_file_id}.csv'
     if save_nan:
+        # first create the X_file, before creating the nan_file
+        _, _ = create_selected_data(input_data_dir, sample_selection_col, 
+                                    selections_df=selections_df,
+                                    metadata_df=metadata_df,subdir_col=subdir_col,
+                                    output_dir=output_dir, metadata_cols=metadata_cols, 
+                                    save_nan=False, use_anndata=False)
+        print('Saving the mask of NaN values')
+
+    if save_nan:
         X_file = f'{output_dir}/nan_{save_file_id}.csv'
     else:
         X_file = f'{output_dir}/X_{save_file_id}.csv'
@@ -67,10 +259,10 @@ def create_selected_data(input_data_dir, sample_selection_col,
 
     if use_anndata and os.path.exists(h5ad_file):
         print(f'Files already exist at {output_dir}')
-        return output_dir
+        return output_dir, save_file_id
     if not use_anndata and os.path.exists(y_file) and os.path.exists(X_file):
         print(f'Files already exist at {output_dir}')
-        return output_dir
+        return output_dir, save_file_id
 
 
     X_list = []
@@ -83,8 +275,8 @@ def create_selected_data(input_data_dir, sample_selection_col,
             intensity_file = f'{input_data_dir}/{subdir}/scaled_intensity_matrix.csv'
 
         if os.path.exists(intensity_file):
-            select_ids = metadata_df[metadata_df['Study ID'] == subdir].index.to_list()
-            subset_select_ids = list(set(select_ids).intersection(subdir))
+            subset_select_ids = selections_df[selections_df[subdir_col] == subdir].index.to_list()
+            subset_select_ids = list(set(select_ids).intersection(subset_select_ids))
             if len(subset_select_ids) > 0:
                 intensity_df = pd.read_csv(intensity_file, index_col=0)
                 intensity_df = intensity_df.loc[subset_select_ids].copy()
@@ -119,9 +311,15 @@ def create_selected_data(input_data_dir, sample_selection_col,
 
     return output_dir, save_file_id
 
+############################################################
+##### Functions Preparing the Model Architecture #####
+############################################################
+
+
 ########################################################################################
 
-def get_task_head_kwargs(head_kind, y_head_col, y_cols=None, head_name=None, num_classes=0):
+def get_task_head_kwargs(head_kind, y_head_col, y_cols=None, head_name=None, num_classes=0, 
+                         default_weight=1.0, default_hidden_size=4, default_num_hidden_layers=1):
     """
     Returns the keyword arguments for a task head based on the given parameters.
 
@@ -131,6 +329,9 @@ def get_task_head_kwargs(head_kind, y_head_col, y_cols=None, head_name=None, num
         y_cols (list, optional): A list of target columns. Defaults to None.
         head_name (str, optional): The name of the task head. Defaults to None.
         num_classes (int, optional): The number of classes for the task head. Defaults to 0.
+        default_weight (float, optional): The default weight for the task head. Defaults to 1.0.
+        default_hidden_size (int, optional): The default hidden size for the task head. Defaults to 4.
+        default_num_hidden_layers (int, optional): The default number of hidden layers for the task head. Defaults to 1.
 
     Returns:
         tuple: A tuple containing the task head keyword arguments and the updated list of target columns.
@@ -174,10 +375,10 @@ def get_task_head_kwargs(head_kind, y_head_col, y_cols=None, head_name=None, num
     head_kwargs = {
             'kind': head_kind,
             'name': head_name,
-            'weight': 1.0,
+            'weight': default_weight,
             'y_idx': y_idx,
-            'hidden_size': 4,
-            'num_hidden_layers': 1,
+            'hidden_size': default_hidden_size,
+            'num_hidden_layers': default_num_hidden_layers,
             'dropout_rate': 0,
             'activation': 'leakyrelu',
             'use_batch_norm': False,
@@ -472,6 +673,14 @@ def make_kwargs_set(sig_figs=2,
 ########################################################################################
 ########################################################################################
 ########################################################################################
+########################################################################################
+
+
+########################################################################################
+########################################################################################
+# Helper Functions
+########################################################################################
+########################################################################################
 
 
 
@@ -521,11 +730,31 @@ def convert_model_kwargs_list_to_dict(kwargs,style=2):
 
     return kwargs
 
-########################################################################################
-########################################################################################
-# Helper Functions
-########################################################################################
-########################################################################################
+
+
+def check_mixed_datatypes(df, column_name, verbose=False):
+    """
+    Check for mixed datatypes in a pandas DataFrame column.
+    
+    Args:
+        df (pandas.DataFrame): The DataFrame to check.
+        column_name (str): The name of the column to check.
+    
+    Returns:
+        bool: True if mixed datatypes are found, False otherwise.
+    """
+    column = df[column_name]
+    col_types = column.apply(type)
+    unique_types = col_types.unique()
+    # remove the pandas NA type
+    unique_types = [x for x in unique_types if x != pd._libs.missing.NAType]
+    
+    if len(unique_types) > 1:
+        if verbose: print(col_types.value_counts())
+        return True
+    else:
+        return False
+
 
 def convert_distributions_to_json(obj):
     if isinstance(obj, optuna.distributions.BaseDistribution):

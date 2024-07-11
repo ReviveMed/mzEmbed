@@ -24,7 +24,8 @@ output_dir = f'{homedir}/PROCESSED_DATA'
 os.makedirs(output_dir, exist_ok=True)
 subdir_col = 'Study ID'
 fit_subset_col = 'Pretrain Discovery Train'
-eval_subset_col = 'Pretrain Discovery Val'
+# eval_subset_col = 'Pretrain Discovery Val'
+eval_subset_col = 'Pretrain Test'
 setup_id = 'pretrain'
 
 _, fit_file_id = create_selected_data(input_data_dir=input_data_dir,
@@ -39,7 +40,7 @@ _, eval_file_id = create_selected_data(input_data_dir=input_data_dir,
                                                sample_selection_col=eval_subset_col,
                                                subdir_col=subdir_col,
                                                output_dir=output_dir,
-                                               metadata_df=selections_df)
+                                               metadata_df=None)
 
 X_eval_file = f'{output_dir}/X_{eval_file_id}.csv'
 y_eval_file = f'{output_dir}/y_{eval_file_id}.csv'
@@ -54,11 +55,11 @@ y_adv_cols = []
 head_kwargs_dict = {}
 adv_kwargs_dict = {}
 
-# head_kwargs_dict['Cohort Label'], y_head_cols = get_task_head_kwargs(head_kind='MultiClass',
-#                                                      y_head_col='Cohort Label v0',
-#                                                      y_cols=y_head_cols,
-#                                                      head_name='Cohort Label',
-#                                                      num_classes=4)
+head_kwargs_dict['Cohort Label'], y_head_cols = get_task_head_kwargs(head_kind='MultiClass',
+                                                     y_head_col='Cohort Label v0',
+                                                     y_cols=y_head_cols,
+                                                     head_name='Cohort Label',
+                                                     num_classes=4)
 
 head_kwargs_dict['Exact Age'], y_head_cols = get_task_head_kwargs(head_kind='Regression',
                                                      y_head_col='Age',
@@ -70,7 +71,7 @@ head_kwargs_dict['Exact Age'], y_head_cols = get_task_head_kwargs(head_kind='Reg
 #                                                      y_cols=y_head_cols,
 #                                                      head_name='Both OS')
 
-# print(y_head_cols)
+print(y_head_cols)
 # %%
 encoder_kind = 'VAE'
 
@@ -90,6 +91,40 @@ kwargs = make_kwargs_set(sig_figs=2,
 
 plot_latent_space_cols  = list(set(y_head_cols + y_adv_cols))
 
+# run_id = setup_neptune_run(input_data_dir,
+#                             setup_id=setup_id,
+
+#                             neptune_mode='async',
+#                             yes_logging = True,
+#                             neptune_api_token=NEPTUNE_API_TOKEN,
+#                             tags=['v4'],
+#                             y_head_cols=y_head_cols,
+#                             y_adv_cols=y_adv_cols,
+#                             num_repeats=1,
+
+#                             run_training=True,
+#                             X_fit_file=X_fit_file,
+#                             y_fit_file=y_fit_file,
+#                             train_name=fit_file_id,
+
+#                             run_evaluation=True,
+#                             X_eval_file=X_eval_file,
+#                             y_eval_file=y_eval_file,
+#                             eval_name=eval_file_id,
+
+#                             save_latent_space=True,
+#                             plot_latent_space_cols=plot_latent_space_cols,
+#                             plot_latent_space = 'sns',
+                            
+#                             with_run_id=None,
+#                             load_model_from_run_id=None,
+#                             load_model_loc = False,
+#                             load_encoder_loc= False,
+
+#                            **kwargs)
+
+with_run_id = 'RCC-3170'
+
 run_id = setup_neptune_run(input_data_dir,
                             setup_id=setup_id,
 
@@ -101,7 +136,7 @@ run_id = setup_neptune_run(input_data_dir,
                             y_adv_cols=y_adv_cols,
                             num_repeats=1,
 
-                            run_training=True,
+                            run_training=False,
                             X_fit_file=X_fit_file,
                             y_fit_file=y_fit_file,
                             train_name=fit_file_id,
@@ -114,10 +149,11 @@ run_id = setup_neptune_run(input_data_dir,
                             save_latent_space=True,
                             plot_latent_space_cols=plot_latent_space_cols,
                             plot_latent_space = 'sns',
+                            yes_plot_pca=False,
                             
-                            with_run_id=None,
-                            load_model_from_run_id=None,
-                            load_model_loc = False,
+                            with_run_id=with_run_id, #continue existing run
+                            load_model_from_run_id=None, # to start a new run, but load from existing run
+                            load_model_loc = 'pretrain',
                             load_encoder_loc= False,
 
                            **kwargs)
