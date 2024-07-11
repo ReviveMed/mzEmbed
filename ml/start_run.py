@@ -10,7 +10,7 @@ from setup3 import setup_neptune_run
 ## 
 # %% Load the latest data
 
-NEPTUNE_API_TOKEN = ''
+NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
 homedir = os.path.expanduser("~")
 input_data_dir = f'{homedir}/INPUT_DATA'
@@ -20,17 +20,18 @@ input_data_dir = get_latest_dataset(data_dir=input_data_dir,api_token=NEPTUNE_AP
 
 # %%
 selections_df = pd.DataFrame()
-output_dir = ''
+output_dir = f'{homedir}/PROCESSED_DATA'
+os.makedirs(output_dir, exist_ok=True)
 subdir_col = 'Study ID'
-fit_subset_col = 'fit_subset'
-eval_subset_col = 'eval_subset'
+fit_subset_col = 'Pretrain Discovery Train'
+eval_subset_col = 'Pretrain Discovery Val'
 setup_id = 'pretrain'
 
 _, fit_file_id = create_selected_data(input_data_dir=input_data_dir,
                                                sample_selection_col=fit_subset_col,
                                                subdir_col=subdir_col,
                                                output_dir=output_dir,
-                                               metadata_df=selections_df)
+                                               metadata_df=None)
 
 
 
@@ -53,22 +54,23 @@ y_adv_cols = []
 head_kwargs_dict = {}
 adv_kwargs_dict = {}
 
-head_kwargs_dict['Cohort Label'], y_head_cols = get_task_head_kwargs(head_kind='MultiClass',
-                                                     y_head_col='Cohort Label v0',
-                                                     y_cols=y_head_cols,
-                                                     head_name='Cohort Label',
-                                                     num_classes=4)
+# head_kwargs_dict['Cohort Label'], y_head_cols = get_task_head_kwargs(head_kind='MultiClass',
+#                                                      y_head_col='Cohort Label v0',
+#                                                      y_cols=y_head_cols,
+#                                                      head_name='Cohort Label',
+#                                                      num_classes=4)
 
 head_kwargs_dict['Exact Age'], y_head_cols = get_task_head_kwargs(head_kind='Regression',
                                                      y_head_col='Age',
                                                      y_cols=y_head_cols,
                                                      head_name='Exact Age')
 
-head_kwargs_dict['Both OS'], y_head_cols = get_task_head_kwargs(head_kind='Cox',
-                                                     y_head_col='OS',
-                                                     y_cols=y_head_cols,
-                                                     head_name='Both OS')
+# head_kwargs_dict['Both OS'], y_head_cols = get_task_head_kwargs(head_kind='Cox',
+#                                                      y_head_col='OS',
+#                                                      y_cols=y_head_cols,
+#                                                      head_name='Both OS')
 
+# print(y_head_cols)
 # %%
 encoder_kind = 'VAE'
 
@@ -77,7 +79,11 @@ kwargs = make_kwargs_set(sig_figs=2,
                 activation_func= 'leakyrelu',
                 use_batch_norm= False,
                 head_kwargs_dict=head_kwargs_dict,
-                adv_kwargs_dict=adv_kwargs_dict)
+                adv_kwargs_dict=adv_kwargs_dict,
+                num_epochs=10,
+                latent_size=16,
+                hidden_size=24,
+                adv_weight=0.0)
 
 
 # %%

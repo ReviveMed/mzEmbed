@@ -83,7 +83,7 @@ def create_selected_data(input_data_dir, sample_selection_col,
             intensity_file = f'{input_data_dir}/{subdir}/scaled_intensity_matrix.csv'
 
         if os.path.exists(intensity_file):
-            subdirs = metadata_df[metadata_df['Study ID'] == subdir].index.to_list()
+            select_ids = metadata_df[metadata_df['Study ID'] == subdir].index.to_list()
             subset_select_ids = list(set(select_ids).intersection(subdir))
             if len(subset_select_ids) > 0:
                 intensity_df = pd.read_csv(intensity_file, index_col=0)
