@@ -12,35 +12,38 @@ from setup3 import setup_neptune_run
 
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
+project_id = 'revivemed/RCC'
 homedir = os.path.expanduser("~")
 input_data_dir = f'{homedir}/INPUT_DATA'
 os.makedirs(input_data_dir, exist_ok=True)
-input_data_dir = get_latest_dataset(data_dir=input_data_dir,api_token=NEPTUNE_API_TOKEN)
+input_data_dir = get_latest_dataset(data_dir=input_data_dir,api_token=NEPTUNE_API_TOKEN,project=project_id)
 
 
 # %%
-selections_df = pd.DataFrame()
+selections_df = None
 output_dir = f'{homedir}/PROCESSED_DATA'
 os.makedirs(output_dir, exist_ok=True)
 subdir_col = 'Study ID'
 fit_subset_col = 'Pretrain Discovery Train'
-# eval_subset_col = 'Pretrain Discovery Val'
-eval_subset_col = 'Pretrain Test'
+eval_subset_col = 'Pretrain Discovery Val'
+# eval_subset_col = 'Pretrain Test'
 setup_id = 'pretrain'
 
 _, fit_file_id = create_selected_data(input_data_dir=input_data_dir,
                                                sample_selection_col=fit_subset_col,
                                                subdir_col=subdir_col,
                                                output_dir=output_dir,
-                                               metadata_df=None)
+                                               metadata_df=None,
+                                               selections_df=selections_df)
 
 
 
 _, eval_file_id = create_selected_data(input_data_dir=input_data_dir,
-                                               sample_selection_col=eval_subset_col,
-                                               subdir_col=subdir_col,
-                                               output_dir=output_dir,
-                                               metadata_df=None)
+                                                sample_selection_col=eval_subset_col,
+                                                subdir_col=subdir_col,
+                                                output_dir=output_dir,
+                                                metadata_df=None,
+                                                selections_df=selections_df)
 
 X_eval_file = f'{output_dir}/X_{eval_file_id}.csv'
 y_eval_file = f'{output_dir}/y_{eval_file_id}.csv'
@@ -127,6 +130,7 @@ with_run_id = 'RCC-3170'
 
 run_id = setup_neptune_run(input_data_dir,
                             setup_id=setup_id,
+                            project_id=project_id,
 
                             neptune_mode='async',
                             yes_logging = True,

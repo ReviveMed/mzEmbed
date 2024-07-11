@@ -45,10 +45,10 @@ def count_fields(d):
     return sum([count_fields(v) if isinstance(v, dict)
                      else 1 for v in d.values()])
 
-def get_num_fields_in_run(run_id):
+def get_num_fields_in_run(run_id,project_id='revivemed/RCC'):
     # https://docs.neptune.ai/help/error_field_count_limit_exceeded/
     #  The limit for a single run or other Neptune object is 9000 unique fields.
-    run = neptune.init_run(project='revivemed/RCC',
+    run = neptune.init_run(project=project_id,
         api_token= NEPTUNE_API_TOKEN,
         with_id=run_id,
         mode="read-only")    
@@ -89,9 +89,9 @@ def convert_neptune_kwargs(kwargs):
         return kwargs    
 
 
-def get_run_id_list_from_query(query,limit=2000):
+def get_run_id_list_from_query(query,limit=2000,project_id='revivemed/RCC'):
     project = neptune.init_project(
-        project='revivemed/RCC',
+        project=project_id,
         mode="read-only",
         api_token=NEPTUNE_API_TOKEN
     )
@@ -107,10 +107,10 @@ def get_run_id_list_from_query(query,limit=2000):
     return run_id_list
 
 
-def get_run_id_list(encoder_kind='AE',tag=None):
+def get_run_id_list(encoder_kind='AE',tag=None,project_id='revivemed/RCC'):
 
     project = neptune.init_project(
-        project='revivemed/RCC',
+        project=project_id,
         mode="read-only",
         api_token=NEPTUNE_API_TOKEN
     )
@@ -145,18 +145,19 @@ def check_neptune_existance(run,attribute):
 def start_neptune_run(with_run_id=None,tags=['v3.3'],
                       yes_logging=False,
                       api_token = None,
+                      project_id = 'revivemed/RCC',
                       neptune_mode='async'):
     is_run_new = False
     if api_token is None:
         api_token = NEPTUNE_API_TOKEN
     if with_run_id is None:
-        run = neptune.init_run(project='revivemed/RCC',
+        run = neptune.init_run(project=project_id,
             api_token=api_token,
             tags=tags)
         is_run_new = True
     else:
         try:
-            run = neptune.init_run(project='revivemed/RCC',
+            run = neptune.init_run(project=project_id,
                                    api_token=api_token,
                                    with_id=with_run_id,
                                    mode=neptune_mode,
@@ -174,7 +175,7 @@ def start_neptune_run(with_run_id=None,tags=['v3.3'],
 
         except NeptuneException:
             print('RunNotFound')
-            run = neptune.init_run(project='revivemed/RCC',
+            run = neptune.init_run(project=project_id,
                 api_token=api_token,
                 # custom_run_id=with_run_id,
                 capture_stdout=yes_logging,

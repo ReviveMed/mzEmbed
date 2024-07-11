@@ -33,6 +33,7 @@ from neptune.exceptions import NeptuneException
 def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                       neptune_mode='async',
                       yes_logging = False,
+                      project_id = 'revivemed/RCC',
                       save_kwargs_to_neptune=False,
                       restart_run=False,
                       neptune_api_token=None,
@@ -44,6 +45,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         run, is_run_new = start_neptune_run(with_run_id=with_run_id,
                                             neptune_mode=neptune_mode,
                                             tags=tags,
+                                            project_id=project_id,
                                             api_token=neptune_api_token,
                                             yes_logging=yes_logging)
         ret_run_id = True
@@ -96,7 +98,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         y_adv_cols = kwargs.get('y_adv_cols', [])
         
         if load_model_from_run_id:
-            pretrained_run = neptune.init_run(project='revivemed/RCC',
+            pretrained_run = neptune.init_run(project=project_id,
                                             api_token=neptune_api_token,
                                             with_id=load_model_from_run_id,
                                             capture_stdout=False,
@@ -972,110 +974,3 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         print('Returning Neptune Run, it has NOT been stopped')
         return run
 
-
-# Run an example
-
-## Main
-
-def main():
-
-    from sklearn.linear_model import LogisticRegression
-
-
-    data_dir = '/DATA'
-    data_dir = get_latest_dataset(data_dir)
-
-    kwargs = {
-        'X_filename_prefix': 'X_finetune',
-        'y_filename_prefix': 'y_finetune',
-        'y_head_cols' : ['MSKCC BINARY','Benefit ORDINAL'],
-        'y_adv_cols' : ['OS_Event'],
-        # 'load_model_loc': 'pretrain',
-
-        'encoder_kind': 'AE',
-        'encoder_kwargs': {
-            'latent_size': 8,
-            'num_hidden_layers': 2,
-            'hidden_size': 16,
-            'activation': 'leakyrelu',
-            'dropout_rate': 0.2,
-            'use_batch_norm': False,
-            # 'use_skip_connections': False,
-            # 'use_residuals': False,
-            # 'use_layer_norm': False,
-            # 'use_weight_norm': False,
-            # 'use_spectral_norm': False,
-        },
-        'head_kwargs_list': [
-            {
-                'kind': 'Binary',
-                'name': 'MSKCC',
-                'y_idx': 0,
-                'weight': 1,
-                'hidden_size': 4,
-                'num_hidden_layers': 1,
-                'dropout_rate': 0,
-                'activation': 'leakyrelu',
-                'use_batch_norm': False,
-                'num_classes': 2,
-            },
-            {
-                'kind': 'MultiClass',
-                'name': 'Benefit',
-                'y_idx': 1,
-                'weight': 1,
-                'hidden_size': 4,
-                'num_hidden_layers': 1,
-                'dropout_rate': 0,
-                'activation': 'leakyrelu',
-                'use_batch_norm': False,
-                'num_classes': 3,
-            },
-        ],
-        'adv_kwargs_list': [
-            {
-                'kind': 'Binary',
-                'name': 'Adv Event',
-                'y_idx': 0,
-                'weight': 1, 
-                'hidden_size': 4,
-                'num_hidden_layers': 1,
-                'dropout_rate': 0,
-                'activation': 'leakyrelu',
-                'use_batch_norm': False,
-                'num_classes': 2,
-            },
-        ],
-        'fit_kwargs': {
-            'num_epochs': 10,
-            'learning_rate': 0.001,
-            'optimizer_kind': 'Adam',
-            # 'scheduler_kind': 'ReduceLROnPlateau',
-            # 'scheduler_kwargs': {
-            #     'factor': 0.1,
-            #     'patience': 5,
-            #     'threshold': 0.0001,
-            #     'cooldown': 0,
-            #     'min_lr': 0,
-            # },
-            'adversary_weight': 1,
-            'head_weight': 1,
-            'encoder_weight': 1,
-        },
-        'eval_kwargs': {
-            'sklearn_models':  {
-                                'Logistic Regression': LogisticRegression(max_iter=10000, C=1.0, solver='lbfgs')
-                            },
-        },
-        'run_training': True,
-        'run_evaluation': True,
-        'save_latent_space': True,
-        'plot_latent_space': 'both',
-        'plot_latent_space_cols': ['Study ID','Cohort Label'],
-    }
-
-    run_id = setup_neptune_run(data_dir,setup_id='pretrain',**kwargs)
-
-
-if __name__ == '__main__':
-    main()

@@ -149,7 +149,7 @@ def get_selection_df(metadata):
 ############################################################
 
 
-def create_full_metadata(input_data_dir, cleaning=True):
+def create_full_metadata(input_data_dir, cleaning=True, save_file=True):
 
     all_study_id_list = os.listdir(input_data_dir)
     all_study_id_list = [x for x in all_study_id_list if os.path.isdir(f'{input_data_dir}/{x}')]
@@ -180,8 +180,8 @@ def create_full_metadata(input_data_dir, cleaning=True):
                 all_metadata[col].fillna(pd.NA,inplace=True)
                 if check_mixed_datatypes(all_metadata,col, verbose=True):
                     print(f'{col} still has mixed types')
-
-    all_metadata.to_csv(f'{input_data_dir}/metadata.csv')
+    if save_file:
+        all_metadata.to_csv(f'{input_data_dir}/metadata.csv')
     return all_metadata
 
 
