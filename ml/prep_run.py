@@ -78,6 +78,13 @@ def smart_trainval_split(metadata, suffix='Pretrain All',stratify_cols=['Study I
 
 
 def assign_sets(metadata, preset_finetune_col='Matt Set Label',return_only_sets=False):
+    if 'Pretrain All' not in metadata.columns:
+        metadata['Pretrain All'] = True
+        metadata['Finetune All'] = False
+        rcc3_baseline = metadata[(metadata['Study ID'] == 'ST001237') & (metadata['Timepoint']=='baseline')].index.to_list()
+        metadata.loc[rcc3_baseline,'Pretrain All'] = False
+        metadata.loc[rcc3_baseline,'Finetune All'] = True
+
     train_ids, val_ids = smart_trainval_split(metadata, suffix='Pretrain All')
     metadata['Pretrain Discovery'] = False
     metadata['Pretrain Test'] = False
@@ -139,7 +146,7 @@ def assign_sets(metadata, preset_finetune_col='Matt Set Label',return_only_sets=
 
 
 def get_selection_df(metadata):
-    selection_cols = ['Set'] + [x for x in metadata.columns if 'Pretrain' in x or 'Finetune' in x]
+    selection_cols = ['Set','Subject ID','Study ID','Job ID'] + [x for x in metadata.columns if 'Pretrain' in x or 'Finetune' in x]
     selection_df = metadata[selection_cols].copy()
     return selection_df
 
@@ -172,6 +179,10 @@ def create_full_metadata(input_data_dir, cleaning=True, save_file=True):
         all_metadata['Age'] = pd.to_numeric(all_metadata['Age'], errors='coerce')
         all_metadata['Smoking Status'] = all_metadata['Smoking Status'].map({'Former': 'Current or Former', 'Current': 'Current or Former',
                                                                     'Never': 'Never', 'Current or Former': 'Current or Former'}, na_action='ignore')
+        
+        all_metadata['is Pediatric'] = all_metadata['Cohort Label v0'].map(
+            {'adult_other': 0, 'adult_cancer': 0, 'pediatric_CMD': 1, 'pediatric_other': 1})
+        all_metadata['is Female']  = all_metadata['Sex'].map({'F':1, 'M':0})
 
         for col in all_metadata.columns:
             check_mixed_datatypes(all_metadata,col,verbose=False)
@@ -180,6 +191,10 @@ def create_full_metadata(input_data_dir, cleaning=True, save_file=True):
                 all_metadata[col].fillna(pd.NA,inplace=True)
                 if check_mixed_datatypes(all_metadata,col, verbose=True):
                     print(f'{col} still has mixed types')
+                    if col == 'Subject ID':
+                        # change the floats to strings
+                        numeric_rows = (all_metadata['Subject ID'].apply(type) == float) | (all_metadata['Subject ID'].apply(type) == int)
+                        all_metadata.loc[numeric_rows,'Subject ID'] = all_metadata.loc[numeric_rows,'Subject ID'].astype(str)
     if save_file:
         all_metadata.to_csv(f'{input_data_dir}/metadata.csv')
     return all_metadata
@@ -231,6 +246,9 @@ def create_selected_data(input_data_dir, sample_selection_col,
             selections_df = assign_sets(metadata_df,return_only_sets=True)
         else:
             selections_df = get_selection_df(metadata_df)
+
+    if subdir_col not in selections_df.columns:
+        selections_df[subdir_col] = metadata_df[subdir_col]
 
     subdir_list = selections_df[subdir_col].unique()
 

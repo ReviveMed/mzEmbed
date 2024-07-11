@@ -179,6 +179,18 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         save_dir = f'{local_dir}/{run_id}'
         os.makedirs(save_dir, exist_ok=True)
 
+        y_codes = kwargs.get('y_codes', None)
+        if (y_codes is None) and (load_model_loc):
+            y_code_keys = pretrained_run[f'{load_model_loc}/datasets/y_codes_keys'].fetch_values()['value'].to_list()
+            print('existing y_code_keys:', y_code_keys)
+            y_codes = {}
+            for key in y_code_keys:
+                if key in y_codes.keys():
+                    continue
+                y_codes[key] = pretrained_run[f'{load_model_loc}/datasets/y_codes/{key}'].fetch_values()['value'].to_list()
+        else:
+            y_code_keys = []
+
         if load_model_from_run_id:
             pretrain_save_dir = f'{local_dir}/{load_model_from_run_id}'
             os.makedirs(pretrain_save_dir, exist_ok=True)
@@ -288,6 +300,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         early_stopping_patience = fit_kwargs.get('early_stopping_patience', 0)
         scheduler_kind = fit_kwargs.get('scheduler_kind', None)
 
+
         if (holdout_frac > 0) and (early_stopping_patience < 1) and (scheduler_kind is None):
             # raise ValueError('holdout_frac > 0 and early_stopping_patience < 1 is not recommended')
             print('holdout_frac > 0 and early_stopping_patience < 1 is not recommended, set hold out frac to 0')
@@ -295,8 +308,17 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             holdout_frac = 0
 
         if run_training or run_evaluation:
-            fit_dataset = CompoundDataset(X_data_train,y_data_train[y_head_cols], y_data_train[y_adv_cols])
-            eval_dataset = CompoundDataset(X_data_eval,y_data_eval[y_head_cols], y_data_eval[y_adv_cols])
+            fit_dataset = CompoundDataset(X_data_train,y_data_train[y_head_cols], y_data_train[y_adv_cols],y_codes=y_codes)
+            y_codes = fit_dataset.y_codes
+            for key, val in y_codes.items():
+                if key in y_code_keys:
+                    continue
+                if len(val) < 2:
+                    continue
+                run[f'{setup_id}/datasets/y_codes_keys'].append(key)
+                run[f'{setup_id}/datasets/y_codes/{key}'].extend(val)
+                y_code_keys.append(key)
+            eval_dataset = CompoundDataset(X_data_eval,y_data_eval[y_head_cols], y_data_eval[y_adv_cols],y_codes=y_codes)
             if yes_clean_batches:
                 print('attempt to clean batch size so last batch is large')
                 batch_size = get_clean_batch_sz(X_data_train.shape[0], batch_size)
@@ -337,8 +359,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                             # y_head_cols_temp = y_head_cols.copy()
                             #TODO replace the y_head columns that correspond to h with the y_adv columns that correspond to a
                             
-                            fit_dataset2 = CompoundDataset(X_data_train,y_data_train[y_adv_cols], y_data_train[y_adv_cols])
-                            eval_dataset2 = CompoundDataset(X_data_eval,y_data_eval[y_adv_cols], y_data_eval[y_adv_cols])
+                            fit_dataset2 = CompoundDataset(X_data_train,y_data_train[y_adv_cols], y_data_train[y_adv_cols],y_codes=y_codes)
+                            eval_dataset2 = CompoundDataset(X_data_eval,y_data_eval[y_adv_cols], y_data_eval[y_adv_cols],y_codes=y_codes)
                             fit_loader_dct2 = create_dataloaders_old(fit_dataset2, batch_size, set_name=train_name+'_'+adv_name)
                             eval_loader_dct2 = create_dataloaders(eval_dataset2, batch_size, set_name = eval_name+'_'+adv_name)
                             eval_loader_dct.update(fit_loader_dct2)

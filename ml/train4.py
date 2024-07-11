@@ -32,16 +32,28 @@ from neptune.utils import stringify_unsupported
 ######### for training the compound model
 
 class CompoundDataset(Dataset):
-    def __init__(self, X, y_head=None, y_adv=None, other=None):
+    def __init__(self, X, y_head=None, y_adv=None, other=None, y_codes=None):
         self.X = torch.tensor(X.to_numpy(), dtype=torch.float32)
+        self.y_codes = y_codes if y_codes is not None else {}
         
         if (y_head is None) or (y_head.size == 0):
             self.y_head = torch.tensor(np.zeros((len(X), 1)), dtype=torch.float32)
         else:
+            y_head_copy = y_head.copy()
             for col in y_head.columns:
                 if y_head[col].dtype == 'object':
                     print('converting', col, 'to category')
-                    y_head.loc[:, col] = y_head[col].astype('category').cat.codes
+                    if col not in self.y_codes:
+                        # Assign new categories and codes
+                        self.y_codes[col] = y_head[col].astype('category').cat.categories.to_list()
+                        y_head.loc[:, col] = y_head[col].astype('category').cat.codes
+                    else:
+                        print('mapping', col, 'to existing codes')
+                        # Map existing categories to predefined codes
+                        # Unseen categories will be assigned -1
+                        # y_head.loc[:,col] = y_head[col].map(lambda x: self.y_codes[col].get_loc(x) if x in self.y_codes[col] else -1)
+                        y_head.loc[:,col] = y_head[col].map(lambda x: self.y_codes[col].index(x) if x in self.y_codes[col] else -1)
+
             self.y_head = torch.tensor(y_head.astype(float).to_numpy(), dtype=torch.float32)
         
         if (y_adv is None) or (y_adv.size == 0):
@@ -50,7 +62,13 @@ class CompoundDataset(Dataset):
             for col in y_adv.columns:
                 if y_adv[col].dtype == 'object':
                     print('converting', col, 'to category')
-                    y_adv.loc[:, col] = y_adv[col].astype('category').cat.codes
+                    if col not in self.y_codes:
+                        self.y_codes[col] = y_adv[col].astype('category').cat.categories.to_list()
+                        y_adv.loc[:, col] = y_adv[col].astype('category').cat.codes
+                    else:
+                        print('mapping', col, 'to existing codes')
+                        # y_adv.loc[:,col] = y_adv[col].map(lambda x: self.y_codes[col].get_loc(x) if x in self.y_codes[col] else -1)
+                        y_adv.loc[:,col] = y_adv[col].map(lambda x: self.y_codes[col].index(x) if x in self.y_codes[col] else -1)
             self.y_adv = torch.tensor(y_adv.astype(float).to_numpy(), dtype=torch.float32)
 
         if (other is None) or (other.size == 0):
