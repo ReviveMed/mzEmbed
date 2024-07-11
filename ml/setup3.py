@@ -28,8 +28,6 @@ from neptune.exceptions import NeptuneException
 
 
 # set up neptune
-NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
-
 
 
 def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
@@ -37,13 +35,16 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                       yes_logging = False,
                       save_kwargs_to_neptune=False,
                       restart_run=False,
+                      neptune_api_token=None,
                       tags=['v3.3'],**kwargs):
     print(setup_id)
     print(kwargs)
+
     if run is None:
         run, is_run_new = start_neptune_run(with_run_id=with_run_id,
                                             neptune_mode=neptune_mode,
                                             tags=tags,
+                                            api_token=neptune_api_token,
                                             yes_logging=yes_logging)
         ret_run_id = True
     else:
@@ -96,7 +97,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         
         if load_model_from_run_id:
             pretrained_run = neptune.init_run(project='revivemed/RCC',
-                                            api_token=NEPTUNE_API_TOKEN,
+                                            api_token=neptune_api_token,
                                             with_id=load_model_from_run_id,
                                             capture_stdout=False,
                                             capture_stderr=False,
@@ -210,8 +211,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             dataset_hash = open(f'{data_dir}/hash.txt','r').read()
             run[f'{setup_id}/datasets/hash'] = dataset_hash
 
-        X_fit_file = kwargs.get('X_train_file',None)
-        y_fit_file = kwargs.get('y_train_file',None)
+        X_fit_file = kwargs.get('X_fit_file',None)
+        y_fit_file = kwargs.get('y_fit_file',None)
         X_eval_file = kwargs.get('X_eval_file',None)
         y_eval_file = kwargs.get('y_eval_file',None)
         
@@ -307,7 +308,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             ########################################
             ##### Custom Evaluation for OS predictions
             #Eval on the EVER OS data when 
-            #the model is trained on the NEVER OS data
+            #the model is trained on the NIVO OS data
             if len(y_head_cols) == len(y_adv_cols):
 
                 head_kwargs_dict = kwargs.get('head_kwargs_dict', {})

@@ -9,8 +9,10 @@ from misc import unravel_dict, download_data_dir
 import os
 import shutil
 
-def get_latest_dataset(data_dir='/DATA',project='revivemed/RCC'):
-    project = neptune.init_project(project=project, api_token=NEPTUNE_API_TOKEN)
+def get_latest_dataset(data_dir='/DATA',project='revivemed/RCC',api_token=None):
+    if api_token is None:
+        api_token = NEPTUNE_API_TOKEN
+    project = neptune.init_project(project=project, api_token=api_token)
     data_url = project["dataset/latest_link"].fetch()
     latest_hash = project["dataset/latest"].fetch_hash()
     need_to_download = False
@@ -140,17 +142,22 @@ def check_neptune_existance(run,attribute):
     
 
 
-def start_neptune_run(with_run_id=None,tags=['v3.3'],yes_logging=False,neptune_mode='async'):
+def start_neptune_run(with_run_id=None,tags=['v3.3'],
+                      yes_logging=False,
+                      api_token = None,
+                      neptune_mode='async'):
     is_run_new = False
+    if api_token is None:
+        api_token = NEPTUNE_API_TOKEN
     if with_run_id is None:
         run = neptune.init_run(project='revivemed/RCC',
-            api_token=NEPTUNE_API_TOKEN,
+            api_token=api_token,
             tags=tags)
         is_run_new = True
     else:
         try:
             run = neptune.init_run(project='revivemed/RCC',
-                                   api_token=NEPTUNE_API_TOKEN,
+                                   api_token=api_token,
                                    with_id=with_run_id,
                                    mode=neptune_mode,
                                     capture_stdout=yes_logging,
@@ -168,7 +175,7 @@ def start_neptune_run(with_run_id=None,tags=['v3.3'],yes_logging=False,neptune_m
         except NeptuneException:
             print('RunNotFound')
             run = neptune.init_run(project='revivemed/RCC',
-                api_token=NEPTUNE_API_TOKEN,
+                api_token=api_token,
                 # custom_run_id=with_run_id,
                 capture_stdout=yes_logging,
                 capture_stderr=yes_logging,
