@@ -8,9 +8,7 @@ import os
 import json
 from models import get_model, Binary_Head, Dummy_Head, MultiClass_Head, MultiHead, Regression_Head, Cox_Head
 
-# from train3 import CompoundDataset, train_compound_model, get_end_state_eval_funcs, evaluate_compound_model, create_dataloaders, create_dataloaders_old
 from train4 import CompoundDataset, train_compound_model, get_end_state_eval_funcs, evaluate_compound_model, create_dataloaders, create_dataloaders_old
-print('WARNING: using Train4 not Train3')
 
 
 import neptune
@@ -217,6 +215,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     save_latent_space = kwargs.get('save_latent_space', True)
     use_subset_of_features = kwargs.get('use_subset_of_features', False)
     random_seed = kwargs.get('random_seed', 42)
+    remove_y_nans = kwargs.get('remove_y_nans', False)
+    remove_y_nans_strict = kwargs.get('remove_y_nans_strict', False)
     np.random.seed(random_seed)
     
     try:
@@ -270,7 +270,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             run[f'{setup_id}/datasets/y_fit'].track_files(y_fit_file)
         # nan_data = pd.read_csv(f'{data_dir}/{nan_filename}_{train_name}.csv', index_col=0)
         else:
-            X_data_train = None
+            X_data_train = pd.DataFrame()
+            y_data_train = pd.DataFrame()
 
         if run_evaluation or save_latent_space:
             X_data_eval = pd.read_csv(X_eval_file, index_col=0)
@@ -279,15 +280,37 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             run[f'{setup_id}/datasets/y_eval'].track_files(y_eval_file)
             X_size = X_data_eval.shape[1]
         # nan_data = pd.read_csv(f'{data_dir}/{nan_filename}_{eval_name}.csv', index_col=0)
+        else:
+            X_data_eval = pd.DataFrame()
+            y_data_eval = pd.DataFrame()
 
         if use_subset_of_features:
             feature_subset = kwargs.get('feature_subset', 0.25)
             if isinstance(feature_subset, float):
                 # choose random subset of features
                 feature_subset = np.random.choice(X_data_train.columns, int(feature_subset*X_data_train.shape[1]), replace=False)
-            X_data_train = X_data_train[feature_subset]
-            X_data_eval = X_data_eval[feature_subset]
+            if X_data_train.shape[1] > 0:
+                X_data_train = X_data_train[feature_subset]
+            if X_data_eval.shape[1] > 0:
+                X_data_eval = X_data_eval[feature_subset]
             X_size = len(feature_subset)
+
+        if remove_y_nans:
+            print('removing rows with all nan in y')
+            if y_data_train.shape[0] > 0:
+                y_data_train.dropna(subset=y_head_cols+y_adv_cols, how='all', axis=0, inplace=True)
+                X_data_train = X_data_train.loc[y_data_train.index].copy()
+            if y_data_eval.shape[0] > 0:
+                y_data_eval.dropna(subset=y_head_cols+y_adv_cols, how='all', axis=0, inplace=True)
+                X_data_eval = X_data_eval.loc[y_data_eval.index].copy()
+        if remove_y_nans_strict:
+            print('removing rows with any nan in y')
+            if y_data_train.shape[0] > 0:
+                y_data_train.dropna(subset=y_head_cols+y_adv_cols, how='any', axis=0, inplace=True)
+                X_data_train = X_data_train.loc[y_data_train.index].copy()
+            if y_data_eval.shape[0] > 0:
+                y_data_eval.dropna(subset=y_head_cols+y_adv_cols, how='any', axis=0, inplace=True)
+                X_data_eval = X_data_eval.loc[y_data_eval.index].copy()
 
         ####################################
         ##### Create the DataLoaders ######
@@ -390,6 +413,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     encoder_kwargs = kwargs.get('encoder_kwargs', {})
     other_input_size = kwargs.get('other_input_size', 1)
     load_model_weights = kwargs.get('load_model_weights', True)
+    
 
     latent_size = encoder_kwargs.get('latent_size', 8)
     input_size = kwargs.get('input_size', None)
@@ -426,6 +450,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     upload_models_to_neptune = kwargs.get('upload_models_to_neptune', True)
     upload_models_to_gcp = kwargs.get('upload_models_to_gcp', False)
     eval_kwargs = kwargs.get('eval_kwargs', {})
+    
+    if run_random_init:
+        load_model_weights = False
 
     eval_prefix = f'{setup_id}/eval'
     eval_kwargs['prefix'] = eval_prefix

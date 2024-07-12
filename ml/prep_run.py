@@ -541,9 +541,9 @@ def make_kwargs_set(sig_figs=2,
             head_kwargs_dict[head_kwargs_key]['hidden_size'] = task_hidden_size
             head_kwargs_dict[head_kwargs_key]['num_hidden_layers'] = task_num_hidden_layers
 
-            if head_weight is None:
+            if task_head_weight is None:
                 head_kwargs_dict[head_kwargs_key].update({'weight': FloatDistribution(task_head_weight_min, task_head_weight_max, step=task_head_weight_step)})
-            elif isinstance(head_weight, list):
+            elif isinstance(task_head_weight, list):
                 head_kwargs_dict[head_kwargs_key].update({'weight': CategoricalDistribution(task_head_weight)})
             elif task_head_weight > 0:
                 head_kwargs_dict[head_kwargs_key].update({'weight': task_head_weight})
@@ -562,9 +562,9 @@ def make_kwargs_set(sig_figs=2,
             adv_kwargs_dict[adv_kwargs_key]['hidden_size'] = task_hidden_size
             adv_kwargs_dict[adv_kwargs_key]['num_hidden_layers'] = task_num_hidden_layers
 
-            if adv_weight is None:
+            if task_adv_weight is None:
                 adv_kwargs_dict[adv_kwargs_key].update({'weight': FloatDistribution(task_adv_weight_min, task_adv_weight_max, step=task_adv_weight_step)})
-            elif isinstance(adv_weight, list):
+            elif isinstance(task_adv_weight, list):
                 adv_kwargs_dict[adv_kwargs_key].update({'weight': CategoricalDistribution(task_adv_weight)})
             elif task_adv_weight > 0:
                 adv_kwargs_dict[adv_kwargs_key].update({'weight': task_adv_weight})
