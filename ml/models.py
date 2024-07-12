@@ -1421,7 +1421,7 @@ class metabFoundation(Default_EncoderDecoder):
         
         self.embed_dim = kwargs.get('embed_dim', kwargs.get('hidden_size', 1))
         # self.inverse_embed_dim = kwargs.get('inverse_embed_dim', kwargs.get('hidden_size', 1))
-        self.decoder_embed_dim = kwargs.get('decoder_embed_dim', kwargs.get('hidden_size', 1))
+        self.decoder_embed_dim = kwargs.get('decoder_embed_dim', self.embed_dim)
         
         self.latent_size = 2*self.embed_dim
         self.default_hidden_fraction = kwargs.get('default_hidden_fraction', 0.2)

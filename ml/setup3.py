@@ -849,7 +849,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                 Z_embed = pd.read_csv(Z_embed_savepath, index_col=0)
             else:
                 # check if the Z_embed file is in neptune
-                if check_neptune_existance(run,f'{setup_id}/Z_embed_{eval_name}'):
+                if not check_neptune_existance(run,f'{setup_id}/Z_embed_{eval_name}'):
                     raise ValueError(f'No Z_embed_{eval_name} file found in run {run_id}')
 
                 # download the Z_embed file from neptune
