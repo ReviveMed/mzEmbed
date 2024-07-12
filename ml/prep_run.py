@@ -642,6 +642,7 @@ def make_kwargs_set(sig_figs=2,
     ##### Format the kwargs #####
 
     encoder_kwargs = {
+            'kind': encoder_kind,
             'activation': activation_func,
             'latent_size': latent_size,
             'num_hidden_layers': num_hidden_layers,
@@ -668,7 +669,12 @@ def make_kwargs_set(sig_figs=2,
                     'adversary_weight': adv_weight,
                     'noise_factor': noise_factor,
                     'early_stopping_patience': early_stopping_patience,
-                    'adversarial_start_epoch': adversarial_start_epoch
+                    'adversarial_start_epoch': adversarial_start_epoch,
+                    'holdout_frac': 0.2,
+                    'batch_size': batch_size,
+                    'yes_clean_batches': False,
+                    'how_remove_nans': False,
+                    'scheduler_kind': None
                 }
 
     kwargs = {
@@ -700,6 +706,12 @@ def make_kwargs_set(sig_figs=2,
 ########################################################################################
 ########################################################################################
 
+def convert_kwargs_for_optuna(run_kwargs,optuna_trial):
+        run_kwargs = convert_model_kwargs_list_to_dict(run_kwargs)
+        run_kwargs = flatten_dict(run_kwargs) # flatten the dict for optuna compatibility
+        run_kwargs = convert_distributions_to_suggestion(run_kwargs, optuna_trial) # convert the distributions to optuna suggestions
+        run_kwargs = round_kwargs_to_sig(run_kwargs,sig_figs=2)
+        run_kwargs = unflatten_dict(run_kwargs) # unflatten the dict for the setup function
 
 
 def round_kwargs_to_sig(val,sig_figs=2,key=None):

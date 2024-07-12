@@ -9,7 +9,7 @@ from prep_run import convert_neptune_kwargs, dict_diff, dict_diff_cleanup, flatt
 # from optuna.distributions import json_to_distribution, check_distribution_compatibility, distribution_to_json
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 from neptune.utils import stringify_unsupported
-
+from prep_run import make_kwargs_set
 import os
 import pandas as pd
 import anndata as ad
@@ -20,8 +20,87 @@ from neptune.exceptions import NeptuneException #, NeptuneServerError
 #########################################################################################
 
 
+def get_default_study_kwargs(head_kwargs_dict,adv_kwargs_dict,**kwargs):
+    encoder_kind = kwargs.get('encoder_kind','VAE')
+    run_kwargs = make_kwargs_set(encoder_kind=encoder_kind,
+                head_kwargs_dict=head_kwargs_dict,
+                adv_kwargs_dict=adv_kwargs_dict,
 
-def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=None,limit_add=-1):
+                latent_size=None, latent_size_min=96, latent_size_max=128, latent_size_step=4,
+                hidden_size=-1, hidden_size_min=16, hidden_size_max=64, hidden_size_step=16,
+                hidden_size_mult=1.5, hidden_size_mult_min=1.25, hidden_size_mult_max=2, hidden_size_mult_step=0.25,
+                num_hidden_layers=None, num_hidden_layers_min=2, num_hidden_layers_max=3, num_hidden_layers_step=1,
+                
+                num_attention_heads=-1, num_attention_heads_min=1, num_attention_heads_max=5, num_attention_heads_step=1,
+                num_decoder_layers=-1, num_decoder_layers_min=1, num_decoder_layers_max=5, num_decoder_layers_step=1,
+                embed_dim=-1, embed_dim_min=4, embed_dim_max=64, embed_dim_step=4,
+                decoder_embed_dim=-1, decoder_embed_dim_min=4, decoder_embed_dim_max=64, decoder_embed_dim_step=4,
+                default_hidden_fraction=-1, default_hidden_fraction_min=0, default_hidden_fraction_max=0.5, default_hidden_fraction_step=0.1,
+
+                dropout_rate=0, dropout_rate_min=0, dropout_rate_max=0.5, dropout_rate_step=0.1,
+                encoder_weight=1.0, encoder_weight_min=0, encoder_weight_max=2, encoder_weight_step=0.5,
+                head_weight=1.0, head_weight_min=0, head_weight_max=2, head_weight_step=0.5,
+                adv_weight=1.0, adv_weight_min=0, adv_weight_max=2, adv_weight_step=0.5,
+
+                task_head_weight=None, task_head_weight_min=0.25, task_head_weight_max=2, task_head_weight_step=0.25,
+                task_adv_weight=-1, task_adv_weight_min=0, task_adv_weight_max=10, task_adv_weight_step=0.1,
+                task_hidden_size=4, task_hidden_size_min=4, task_hidden_size_max=64, task_hidden_size_step=4,
+                task_num_hidden_layers=1, task_num_hidden_layers_min=1, task_num_hidden_layers_max=3, task_num_hidden_layers_step=1,
+
+                weight_decay=None, weight_decay_min=1e-5, weight_decay_max=1e-2, weight_decay_step=0.00001, weight_decay_log=True,
+                l1_reg_weight=0, l1_reg_weight_min=0, l1_reg_weight_max=0.01, l1_reg_weight_step=0.0001, l1_reg_weight_log=False,
+                l2_reg_weight=0, l2_reg_weight_min=0, l2_reg_weight_max=0.01, l2_reg_weight_step=0.0001, l2_reg_weight_log=False,
+                
+                batch_size=96, batch_size_min=16,batch_size_max=128,batch_size_step=16,
+                noise_factor=0.1, noise_factor_min=0.01, noise_factor_max=0.1, noise_factor_step=0.01,
+                num_epochs=None, num_epochs_min=50, num_epochs_max=400, num_epochs_step=25, num_epochs_log=False,
+                learning_rate=None, learning_rate_min=0.00001, learning_rate_max=0.005, learning_rate_step=None,learning_rate_log=True,
+                early_stopping_patience=0, early_stopping_patience_min=0, early_stopping_patience_max=50, early_stopping_patience_step=5,
+                adversarial_start_epoch=0, adversarial_start_epoch_min=-1, adversarial_start_epoch_max=10, adversarial_start_epoch_step=2,
+                )
+    
+    return run_kwargs
+
+
+def create_optuna_study(study_info_dict,get_kwargs_wrapper,head_kwargs_dict,adv_kwargs_dict,compute_objective):
+    use_webapp_db = study_info_dict.get('use_webapp_db',True)
+    if use_webapp_db:
+        print('using webapp database')
+        storage_name = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
+    else:
+        raise NotImplementedError('Only webapp database is supported')
+
+    encoder_kind = study_info_dict.get('encoder_kind','')
+    add_existing_runs_to_study = study_info_dict.get('add_existing_runs_to_study',False)
+    acceptable_tag = study_info_dict.get('acceptable_tag','v4')
+    limit_add = study_info_dict.get('limit_add',-1)
+
+    if 'study_name' in study_info_dict:
+        if 'encoder_kind' in study_info_dict:
+            study_name = study_info_dict['study_name'] + f' {study_info_dict["encoder_kind"]}'
+        else:
+            study_name = study_info_dict['study_name']
+    else:
+        study_name = f'{encoder_kind} Study'
+
+    study = optuna.create_study(directions=get_study_objective_directions(study_info_dict),
+                    study_name=study_name, 
+                    storage=storage_name, 
+                    load_if_exists=True)
+
+    if (len(study.trials) < 250) and add_existing_runs_to_study:
+        # raise NotImplementedError('ADD_EXISTING_RUNS_TO_STUDY not implemented in this script')
+        add_runs_to_study(study,
+            objective_func=compute_objective,
+            study_kwargs=get_kwargs_wrapper(head_kwargs_dict,adv_kwargs_dict),
+            run_id_list=get_run_id_list(encoder_kind=encoder_kind,tag=acceptable_tag),
+            limit_add=limit_add)
+
+    return study
+
+
+def add_runs_to_study(study,run_id_list=None,study_kwargs=None,
+                      objective_func=None,limit_add=-1):
     if run_id_list is None:
         run_id_list = get_run_id_list()
 
@@ -103,13 +182,16 @@ def add_runs_to_study(study,run_id_list=None,study_kwargs=None,objective_func=No
 
 ########################################################################################
 
+
 def get_default_kwarg_val_dict():
     default_val_dict = {
         'head_kwargs_dict__Regression_Age__weight': 0,
         'head_kwargs_dict__Binary_isFemale__weight': 0,
+        'head_kwargs_dict__BMI__weight': 0,
         'train_kwargs__l1_reg_weight': 0,
         'train_kwargs__optimizer_name': 'adam',
         'train_kwargs__adversarial_start_epoch': -1,
+        'num_repeats': 1,
     }
 
     return default_val_dict
@@ -117,16 +199,16 @@ def get_default_kwarg_val_dict():
 
 
 def reuse_run(run_id,study_kwargs=None,objective_func=None,ignore_keys_list=None,
-              default_kwarg_val_dict=None,verbose=1,setup_id='pretrain',project_id='revivemed/RCC',
+              default_kwarg_val_dict=None,verbose=2,setup_id='pretrain',project_id='revivemed/RCC',
               neptune_api_token=NEPTUNE_API_TOKEN):
     if study_kwargs is None:
         raise ValueError("Study kwargs is None")
 
     if ignore_keys_list is None:
         ignore_keys_list = ['run_evaluation','save_latent_space','plot_latent_space_cols','plot_latent_space',\
-            'eval_kwargs','train_kwargs__eval_funcs','run_training','encoder_kwargs__hidden_size','overwrite_existing_kwargs',\
-            'load_model_loc','y_head_cols','head_kwargs_dict__Binary_isFemale','eval_name','train_name','head_kwargs_dict__Regression_Age',\
-            'study_info_dict']
+            'eval_kwargs','run_training','overwrite_existing_kwargs',\
+            'load_model_loc','y_head_cols','eval_name','train_name','study_info_dict','y_fit_file',
+            'X_fit_file','X_eval_file','y_eval_file','num_repeats','y_adv_cols']
 
 
     if default_kwarg_val_dict is None:
@@ -217,24 +299,34 @@ def get_study_objective_keys(study_info_dict):
     objective_keys = list(study_info_dict['objectives'].keys())
     return sorted(objective_keys)
 
-def get_study_objective_directions(study_info_dict):
+def get_study_objective_directions(study_info_dict,convert_to_int=False):
     objective_keys = get_study_objective_keys(study_info_dict)
     directions = [study_info_dict['objectives'][k]['direction'] for k in objective_keys]
+    if convert_to_int:
+        directions = np.array([1 if d=='minimize' else -1 for d in directions])
     return directions
+
+def get_study_objective_weights(study_info_dict):
+    objective_keys = get_study_objective_keys(study_info_dict)
+    weights = []
+    for k in objective_keys:
+        if 'weight' in study_info_dict['objectives'][k]:
+            weights.append(study_info_dict['objectives'][k]['weight'])
+        else:
+            weights.append(1)
+    weights = np.array(weights)
+    return weights
 
 
 def objective_func4(run_id,study_info_dict,
-                    objective_keys=None,
                     project_id='revivemed/RCC',
                     neptune_api_token=NEPTUNE_API_TOKEN,
                     setup_id='pretrain',
-                    eval_file_id='Pretrain_Discovery_Val'):
+                    eval_file_id='Pretrain_Discovery_Val',
+                    sum_objectives=False):
 
     objectives_info_dict = study_info_dict['objectives']
-
-    if objective_keys is None:
-        objective_keys =  get_study_objective_keys(study_info_dict)
-    objective_keys = sorted(objective_keys)
+    objective_keys =  get_study_objective_keys(study_info_dict)
 
 
     run = neptune.init_run(project=project_id,
@@ -328,6 +420,14 @@ def objective_func4(run_id,study_info_dict,
     # else:
     #     run.stop()
     #     raise ValueError(f"no evaluation results for {run_id}")
+
+    if sum_objectives:
+        obj_dirs = get_study_objective_directions(study_info_dict)
+        obj_weights = get_study_objective_weights(study_info_dict)
+        obj_vals = np.array(obj_vals)
+        obj_sum = np.sum(obj_dirs*obj_weights*obj_vals)
+        run.stop()
+        return obj_sum
 
     run.stop()
     return tuple(obj_vals)

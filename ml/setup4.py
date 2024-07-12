@@ -9,17 +9,17 @@ from utils_neptune import get_latest_dataset,get_run_id_list, check_neptune_exis
 from models import get_encoder, get_head, MultiHead, create_model_wrapper, create_pytorch_model_from_info, CompoundModel
 from train4 import train_compound_model, create_dataloaders_old, CompoundDataset
 import os
-from prep_run import create_selected_data, convert_kwargs_for_optuna, create_full_metadata, get_task_head_kwargs
+from prep_run import create_selected_data, convert_kwargs_for_optuna, create_full_metadata, get_task_head_kwargs, make_kwargs_set
 import shutil
 import optuna
 from collections import defaultdict
 import re
 import argparse
-from prep_study2 import get_study_objective_directions, add_runs_to_study
 
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
+from prep_study2 import get_default_study_kwargs
 
 from viz import generate_latent_space, generate_pca_embedding, generate_umap_embedding
 from misc import assign_color_map
@@ -29,51 +29,9 @@ PROJECT_ID = 'revivemed/Survival-RCC'
 
 # %%
 
-def create_optuna_study(study_info_dict,get_kwargs_wrapper,head_kwargs_dict,adv_kwargs_dict,compute_objective):
-    use_webapp_db = study_info_dict.get('use_webapp_db',True)
-    if use_webapp_db:
-        print('using webapp database')
-        storage_name = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
-    else:
-        raise NotImplementedError('Only webapp database is supported')
-
-    encoder_kind = study_info_dict.get('encoder_kind','')
-    add_existing_runs_to_study = study_info_dict.get('add_existing_runs_to_study',False)
-    acceptable_tag = study_info_dict.get('acceptable_tag','v4')
-    limit_add = study_info_dict.get('limit_add',-1)
-
-    if 'study_name' in study_info_dict:
-        if 'encoder_kind' in study_info_dict:
-            study_name = study_info_dict['study_name'] + f' {study_info_dict["encoder_kind"]}'
-        else:
-            study_name = study_info_dict['study_name']
-    else:
-        study_name = f'{encoder_kind} Study'
-
-    study = optuna.create_study(directions=get_study_objective_directions(study_info_dict),
-                    study_name=study_name, 
-                    storage=storage_name, 
-                    load_if_exists=True)
-
-    if (len(study.trials) < 250) and add_existing_runs_to_study:
-        # raise NotImplementedError('ADD_EXISTING_RUNS_TO_STUDY not implemented in this script')
-        add_runs_to_study(study,
-            objective_func=compute_objective,
-            study_kwargs=get_kwargs_wrapper(head_kwargs_dict,adv_kwargs_dict),
-            run_id_list=get_run_id_list(encoder_kind=encoder_kind,tag=acceptable_tag),
-            limit_add=limit_add)
-
-    return study
 
 
-def get_kwargs_wrapper(head_kwargs_dict,adv_kwargs_dict):
-    raise NotImplementedError('get_kwargs_wrapper not implemented in this script')
-
-def assign_task_head(head_name,all_metadata):
-    raise NotImplementedError('assign_task_head not implemented in this script')
-
-
-def start_wrapper(with_id=None,**kwargs):
+def setup_wrapper(with_id=None,**kwargs):
 
     project_id = kwargs.get('project_id',PROJECT_ID)
     api_token = kwargs.get('api_token',NEPTUNE_API_TOKEN)
@@ -95,6 +53,15 @@ def start_wrapper(with_id=None,**kwargs):
     num_iterations = kwargs.get('num_iterations',1)
     setup_id = kwargs.get('setup_id','')
     optuna_trial = kwargs.get('optuna_trial',None)
+    encoder_kind = kwargs.get('encoder_kind','VAE')
+    
+    if optuna_trial: use_optuna = True
+    else: use_optuna = False
+
+    if use_optuna:
+        get_kwargs_func = kwargs.get('get_kwargs_func',get_default_study_kwargs)
+    else:
+        get_kwargs_func = kwargs.get('get_kwargs_func',make_kwargs_set)
 
 
     input_data_dir = os.path.expanduser("~/INPUT_DATA")
@@ -146,11 +113,11 @@ def start_wrapper(with_id=None,**kwargs):
         plot_latent_space_cols  = list(set(y_head_cols + y_adv_cols))
 
 
-        run_kwargs = get_kwargs_wrapper(head_kwargs_dict,adv_kwargs_dict)
+        run_kwargs = get_kwargs_func(head_kwargs_dict,adv_kwargs_dict,encoder_kind=encoder_kind)
         other_kwargs = {}
         other_kwargs['plot_latent_space_cols'] = plot_latent_space_cols
 
-        if optuna_study_info_dict:
+        if use_optuna:
             run_kwargs = convert_kwargs_for_optuna(run_kwargs,optuna_trial)
             other_kwargs['optuna_study_info_dict'] = optuna_study_info_dict
             optuna_trial.set_user_attr('run_id',run_id)
@@ -185,6 +152,7 @@ def start_wrapper(with_id=None,**kwargs):
 
 
         run['dataset'].track_files(input_data_dir)
+        run['params'] = stringify_unsupported(params)
 
 
 
@@ -210,6 +178,10 @@ def start_wrapper(with_id=None,**kwargs):
     run.stop()
     return run_id, all_metrics
 
+
+
+def assign_task_head(head_name,all_metadata):
+    raise NotImplementedError('assign_task_head not implemented in this script')
 
 
 
@@ -1150,3 +1122,146 @@ def remove_rows_with_y_nans(X_data, y_data, subset_cols=None,how='any'):
     y_data = y_data.loc[~nan_locs,:]
 
     return X_data, y_data
+
+
+###############################################################
+###############################################################
+
+default_eval_params_list = [
+    # {},
+    ###### OS ######
+    {
+        'y_col_name':'NIVO OS',
+        'y_head':'NIVO OS', # which head to apply to the y_col
+        'y_cols': ['NIVO OS','OS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'NIVO OS',
+        'y_head':'EVER OS', # which head to apply to the y_col
+        'y_cols': ['NIVO OS','OS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'NIVO OS',
+        'y_head':'Both OS', # which head to apply to the y_col
+        'y_cols': ['NIVO OS','OS_Event']}, # which columns to use for the y_col
+
+
+    {
+        'y_col_name':'EVER OS',
+        'y_head':'NIVO OS', # which head to apply to the y_col
+        'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'EVER OS',
+        'y_head':'EVER OS', # which head to apply to the y_col
+        'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'EVER OS',
+        'y_head':'Both OS', # which head to apply to the y_col
+        'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
+    
+
+    {
+        'y_col_name':'Both OS',
+        'y_head':'EVER OS', # which head to apply to the y_col
+        'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'Both OS',
+        'y_head':'NIVO OS', # which head to apply to the y_col
+        'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col   
+    {
+        'y_col_name':'Both OS',
+        'y_head':'Both OS', # which head to apply to the y_col
+        'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col             
+    
+    ###### PFS ######
+    {
+        'y_col_name':'NIVO PFS',
+        'y_head':'NIVO PFS', # which head to apply to the y_col
+        'y_cols': ['NIVO PFS','PFS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'NIVO PFS',
+        'y_head':'EVER PFS', # which head to apply to the y_col
+        'y_cols': ['NIVO PFS','PFS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'NIVO PFS',
+        'y_head':'Both PFS', # which head to apply to the y_col
+        'y_cols': ['NIVO PFS','PFS_Event']}, # which columns to use for the y_col
+
+
+    {
+        'y_col_name':'EVER PFS',
+        'y_head':'NIVO PFS', # which head to apply to the y_col
+        'y_cols': ['EVER PFS','PFS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'EVER PFS',
+        'y_head':'EVER PFS', # which head to apply to the y_col
+        'y_cols': ['EVER PFS','PFS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'EVER PFS',
+        'y_head':'Both PFS', # which head to apply to the y_col
+        'y_cols': ['EVER PFS','PFS_Event']}, # which columns to use for the y_col
+    
+
+    {
+        'y_col_name':'Both PFS',
+        'y_head':'EVER PFS', # which head to apply to the y_col
+        'y_cols': ['PFS','PFS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'Both PFS',
+        'y_head':'NIVO PFS', # which head to apply to the y_col
+        'y_cols': ['PFS','PFS_Event']}, # which columns to use for the y_col   
+    {
+        'y_col_name':'Both PFS',
+        'y_head':'Both PFS', # which head to apply to the y_col
+        'y_cols': ['PFS','PFS_Event']}, # which columns to use for the y_col  
+
+    ###### Prognostic Markers ######
+    {
+        'y_col_name':'MSKCC BINARY',
+        'y_head':'MSKCC', # which head to apply to the y_col
+        'y_cols': ['MSKCC BINARY']}, # which columns to use for the y_col
+    {
+        'y_col_name':'IMDC BINARY',
+        'y_head':'IMDC', # which head to apply to the y_col
+        'y_cols': ['IMDC BINARY']}, # which columns to use for the y_col
+
+    {
+        'y_col_name':'MSKCC ORDINAL',
+        'y_head':'MSKCC_Ordinal', # which head to apply to the y_col
+        'y_cols': ['MSKCC ORDINAL']}, # which columns to use for the y_col
+    {
+        'y_col_name':'IMDC ORDINAL',
+        'y_head':'IMDC_Ordinal', # which head to apply to the y_col
+        'y_cols': ['IMDC ORDINAL']}, # which columns to use for the y_col
+
+    {
+        'y_col_name':'MSKCC ORDINAL',
+        'y_head':'MSKCC_MultiClass', # which head to apply to the y_col
+        'y_cols': ['MSKCC ORDINAL']}, # which columns to use for the y_col
+    {
+        'y_col_name':'IMDC ORDINAL',
+        'y_head':'IMDC_MultiClass', # which head to apply to the y_col
+        'y_cols': ['IMDC ORDINAL']}, # which columns to use for the y_col        
+
+    ###### Benefit ######
+
+    {
+        'y_col_name': 'Benefit BINARY',
+        'y_head': 'Benefit',
+        'y_cols': ['Benefit BINARY']},
+
+    ###### LungCancer Binary ######
+    {
+        'y_col_name': 'LungCancer BINARY',
+        'y_head': 'LungCancer',
+        'y_cols': ['LungCancer BINARY']},
+
+    {
+        'y_col_name': 'Cancer',
+        'y_head': 'Cancer',
+        'y_cols': ['Cancer']},
+
+    ###### Stanford BMI ######
+    {
+        'y_col_name': 'BMI',
+        'y_head': 'BMI',
+        'y_cols': ['BMI']},
+]    
