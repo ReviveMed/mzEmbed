@@ -52,7 +52,6 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         ret_run_id = False
     run['sys/failed'] = False
     run["info/state"] = 'Active'
-
     if not is_run_new:
         # setup_is_new = not check_neptune_existance(run,f'{setup_id}/kwargs')
         # if setup_is_new:
@@ -139,7 +138,15 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                 kwargs['encoder_kind'] = load_kwargs['encoder_kind']
             
             encoder_kwargs = load_kwargs.get('encoder_kwargs', {})
-            encoder_kwargs.update(kwargs.get('encoder_kwargs', {}))
+            fit_kwargs = kwargs.get('fit_kwargs', {})
+            if 'dropout_rate' in fit_kwargs:
+                encoder_kwargs['dropout_rate'] = fit_kwargs['dropout_rate']
+            elif 'encoder_kwargs' in kwargs:
+                if 'dropout_rate' in kwargs['encoder_kwargs']:
+                    encoder_kwargs['dropout_rate'] = kwargs['encoder_kwargs']['dropout_rate']
+          
+            # if overwrite_existing_kwargs:
+            # encoder_kwargs.update(kwargs.get('encoder_kwargs', {}))
             kwargs['encoder_kwargs'] = encoder_kwargs
             print('encoder_kwargs:', kwargs['encoder_kwargs'])
 
@@ -445,14 +452,18 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     ############################################
     
     
-    
     run_random_init = kwargs.get('run_random_init', False) # this should be redundant with load_model_weights
     upload_models_to_neptune = kwargs.get('upload_models_to_neptune', True)
     upload_models_to_gcp = kwargs.get('upload_models_to_gcp', False)
     eval_kwargs = kwargs.get('eval_kwargs', {})
     
+
     if run_random_init:
+        print('running with random initialization')
         load_model_weights = False
+
+    print('run_random_init:', run_random_init)
+    print('load_model_weights:', load_model_weights)
 
     eval_prefix = f'{setup_id}/eval'
     eval_kwargs['prefix'] = eval_prefix
@@ -482,7 +493,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     for ii_repeat in range(num_repeats):
         
         if num_repeats > 1:
-            print(f'train/eval repeat: {ii_repeat}')
+            print(f'{setup_id}, train/eval repeat: {ii_repeat}')
             yes_save_model = False
             if (not run_evaluation):
                 print('why are you running training multiple times without any evaluation?')

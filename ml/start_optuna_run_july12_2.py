@@ -20,7 +20,7 @@ project_id = 'revivemed/RCC'
 
 USE_WEBAPP_DB = True
 SAVE_TRIALS = True
-ADD_EXISTING_RUNS_TO_STUDY = True
+ADD_EXISTING_RUNS_TO_STUDY = False
 limit_add = -1 # limit the number of runs added to the study
 
 encoder_kind = 'VAE'
@@ -215,6 +215,19 @@ def main(STUDY_INFO_DICT,num_trials=5):
                                                         default_weight=13)
 
 
+    head_kwargs_dict2 = {}
+    head_kwargs_dict2['Both-OS'], y_head_cols2 = get_task_head_kwargs(head_kind='Cox',
+                                                        y_head_col='OS',
+                                                        y_cols=[],
+                                                        head_name='Both-OS')
+    
+    finetune_kwargs = make_kwargs_set(encoder_kind=encoder_kind,
+                                    num_epochs=70,
+                                    batch_size=64,
+                                    noise_factor=0.2,
+                                    dropout_rate=0.0,
+                                    learning_rate=0.0005)
+
 
     def compute_objective(run_id):
         return objective_func4(run_id,
@@ -313,6 +326,78 @@ def main(STUDY_INFO_DICT,num_trials=5):
             trial.set_user_attr('run_id',run_id)
             trial.set_user_attr('setup_id',setup_id)
 
+
+
+
+
+            _ = setup_neptune_run(input_data_dir,
+                                        setup_id='both-OS finetune v0',
+                                        project_id=project_id,
+
+                                        neptune_mode='async',
+                                        yes_logging = True,
+                                        neptune_api_token=neptune_api_token,
+                                        tags=['v4'],
+                                        y_head_cols=y_head_cols2,
+                                        y_adv_cols=y_adv_cols,
+                                        num_repeats=10,
+
+                                        run_training=True,
+                                        X_fit_file=X_finetune_fit_file,
+                                        y_fit_file=y_finetune_fit_file,
+                                        train_name=finetune_fit_file_id,
+
+                                        run_evaluation=True,
+                                        X_eval_file=X_finetune_eval_file,
+                                        y_eval_file=y_finetune_eval_file,
+                                        eval_name=finetune_eval_file_id,
+
+                                        save_latent_space=False,
+                                        plot_latent_space_cols=plot_latent_space_cols,
+                                        plot_latent_space = '',
+                                        
+                                        with_run_id=run_id,
+                                        # load_model_from_run_id=None,
+                                        # load_model_loc = None,
+                                        load_encoder_loc= 'pretrain',
+
+                                        **finetune_kwargs)
+
+            _ = setup_neptune_run(input_data_dir,
+                                        setup_id='both-OS randinit v0',
+                                        project_id=project_id,
+
+                                        neptune_mode='async',
+                                        yes_logging = True,
+                                        neptune_api_token=neptune_api_token,
+                                        tags=['v4'],
+                                        y_head_cols=y_head_cols2,
+                                        y_adv_cols=y_adv_cols,
+                                        num_repeats=10,
+
+                                        run_training=True,
+                                        X_fit_file=X_finetune_fit_file,
+                                        y_fit_file=y_finetune_fit_file,
+                                        train_name=finetune_fit_file_id,
+
+                                        run_evaluation=True,
+                                        X_eval_file=X_finetune_eval_file,
+                                        y_eval_file=y_finetune_eval_file,
+                                        eval_name=finetune_eval_file_id,
+
+                                        save_latent_space=False,
+                                        plot_latent_space_cols=plot_latent_space_cols,
+                                        plot_latent_space = '',
+                                        
+                                        with_run_id=run_id,
+                                        # load_model_from_run_id=None,
+                                        # load_model_loc = None,
+                                        load_encoder_loc= 'pretrain',
+                                        run_rand_init=True,
+
+                                        **finetune_kwargs)
+
+
             return compute_objective(run_id)
         
         # except Exception as e:
@@ -356,7 +441,7 @@ def main(STUDY_INFO_DICT,num_trials=5):
 if __name__ == '__main__':
 
 
-    main(STUDY_DICT,num_trials=9)
+    main(STUDY_DICT,num_trials=5)
 
     # res = objective_func4('RCC-3188',
     #                 study_info_dict=STUDY_DICT,

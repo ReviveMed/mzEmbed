@@ -2371,6 +2371,8 @@ def get_encoder(**kwargs):
         encoder = AE(**kwargs)
     elif kind == 'VAE':
         encoder = VAE(**kwargs)
+    elif kind == 'metabFoundation':
+        encoder = metabFoundation(**kwargs)
     else:
         raise ValueError(f'Encoder kind {kind} not recognized')
     return encoder

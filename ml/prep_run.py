@@ -674,7 +674,8 @@ def make_kwargs_set(sig_figs=2,
                     'batch_size': batch_size,
                     'yes_clean_batches': False,
                     'how_remove_nans': False,
-                    'scheduler_kind': None
+                    'scheduler_kind': None,
+                    'dropout_rate': dropout_rate,
                 }
 
     kwargs = {
