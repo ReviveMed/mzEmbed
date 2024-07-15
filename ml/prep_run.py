@@ -337,7 +337,7 @@ def create_selected_data(input_data_dir, sample_selection_col,
 ########################################################################################
 
 def get_task_head_kwargs(head_kind, y_head_col, y_cols=None, head_name=None, num_classes=0, 
-                         default_weight=1.0, default_hidden_size=4, default_num_hidden_layers=1):
+                         default_weight=1.0, default_hidden_size=4, default_num_hidden_layers=0):
     """
     Returns the keyword arguments for a task head based on the given parameters.
 

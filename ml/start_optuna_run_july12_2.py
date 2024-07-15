@@ -176,10 +176,6 @@ def main(STUDY_INFO_DICT,num_trials=5):
     X_fit_file = f'{output_dir}/X_{fit_file_id}.csv'
     y_fit_file = f'{output_dir}/y_{fit_file_id}.csv'
 
-    X_finetune_eval_file = f'{output_dir}/X_{finetune_eval_file_id}.csv'
-    y_finetune_eval_file = f'{output_dir}/y_{finetune_eval_file_id}.csv'
-    X_finetune_fit_file = f'{output_dir}/X_{finetune_fit_file_id}.csv'
-    y_finetune_fit_file = f'{output_dir}/y_{finetune_fit_file_id}.csv'
 
     # Determine the Task Heads
     plot_latent_space_cols = []
@@ -215,18 +211,6 @@ def main(STUDY_INFO_DICT,num_trials=5):
                                                         default_weight=13)
 
 
-    head_kwargs_dict2 = {}
-    head_kwargs_dict2['Both-OS'], y_head_cols2 = get_task_head_kwargs(head_kind='Cox',
-                                                        y_head_col='OS',
-                                                        y_cols=[],
-                                                        head_name='Both-OS')
-    
-    finetune_kwargs = make_kwargs_set(encoder_kind=encoder_kind,
-                                    num_epochs=70,
-                                    batch_size=64,
-                                    noise_factor=0.2,
-                                    dropout_rate=0.0,
-                                    learning_rate=0.0005)
 
 
     def compute_objective(run_id):
@@ -242,44 +226,7 @@ def main(STUDY_INFO_DICT,num_trials=5):
 
         try:
             kwargs = get_study_kwargs(head_kwargs_dict,adv_kwargs_dict)
-            # kwargs = make_kwargs_set(encoder_kind=encoder_kind,
-            #                          head_kwargs_dict=head_kwargs_dict,
-            #                         adv_kwargs_dict=adv_kwargs_dict,
-
-            #                         latent_size=None, latent_size_min=96, latent_size_max=128, latent_size_step=4,
-            #                         hidden_size=-1, hidden_size_min=16, hidden_size_max=64, hidden_size_step=16,
-            #                         hidden_size_mult=1.5, hidden_size_mult_min=1.25, hidden_size_mult_max=2, hidden_size_mult_step=0.25,
-            #                         num_hidden_layers=None, num_hidden_layers_min=2, num_hidden_layers_max=3, num_hidden_layers_step=1,
-                                    
-            #                         num_attention_heads=-1, num_attention_heads_min=1, num_attention_heads_max=5, num_attention_heads_step=1,
-            #                         num_decoder_layers=-1, num_decoder_layers_min=1, num_decoder_layers_max=5, num_decoder_layers_step=1,
-            #                         embed_dim=-1, embed_dim_min=4, embed_dim_max=64, embed_dim_step=4,
-            #                         decoder_embed_dim=-1, decoder_embed_dim_min=4, decoder_embed_dim_max=64, decoder_embed_dim_step=4,
-            #                         default_hidden_fraction=-1, default_hidden_fraction_min=0, default_hidden_fraction_max=0.5, default_hidden_fraction_step=0.1,
-
-            #                         dropout_rate=0, dropout_rate_min=0, dropout_rate_max=0.5, dropout_rate_step=0.1,
-            #                         encoder_weight=1.0, encoder_weight_min=0, encoder_weight_max=2, encoder_weight_step=0.5,
-            #                         head_weight=1.0, head_weight_min=0, head_weight_max=2, head_weight_step=0.5,
-            #                         adv_weight=1.0, adv_weight_min=0, adv_weight_max=2, adv_weight_step=0.5,
-
-            #                         task_head_weight=None, task_head_weight_min=0.25, task_head_weight_max=2, task_head_weight_step=0.25,
-            #                         task_adv_weight=-1, task_adv_weight_min=0, task_adv_weight_max=10, task_adv_weight_step=0.1,
-            #                         task_hidden_size=4, task_hidden_size_min=4, task_hidden_size_max=64, task_hidden_size_step=4,
-            #                         task_num_hidden_layers=1, task_num_hidden_layers_min=1, task_num_hidden_layers_max=3, task_num_hidden_layers_step=1,
-
-            #                         weight_decay=None, weight_decay_min=1e-5, weight_decay_max=1e-2, weight_decay_step=0.00001, weight_decay_log=True,
-            #                         l1_reg_weight=0, l1_reg_weight_min=0, l1_reg_weight_max=0.01, l1_reg_weight_step=0.0001, l1_reg_weight_log=False,
-            #                         l2_reg_weight=0, l2_reg_weight_min=0, l2_reg_weight_max=0.01, l2_reg_weight_step=0.0001, l2_reg_weight_log=False,
-                                    
-            #                         batch_size=96, batch_size_min=16,batch_size_max=128,batch_size_step=16,
-            #                         noise_factor=0.1, noise_factor_min=0.01, noise_factor_max=0.1, noise_factor_step=0.01,
-            #                         num_epochs=None, num_epochs_min=50, num_epochs_max=400, num_epochs_step=25, num_epochs_log=False,
-            #                         learning_rate=None, learning_rate_min=0.00001, learning_rate_max=0.005, learning_rate_step=None,learning_rate_log=True,
-            #                         early_stopping_patience=0, early_stopping_patience_min=0, early_stopping_patience_max=50, early_stopping_patience_step=5,
-            #                         adversarial_start_epoch=0, adversarial_start_epoch_min=-1, adversarial_start_epoch_max=10, adversarial_start_epoch_step=2,
-            #                         )
-
-
+  
 
             kwargs = convert_model_kwargs_list_to_dict(kwargs)
             kwargs = flatten_dict(kwargs) # flatten the dict for optuna compatibility
@@ -326,76 +273,6 @@ def main(STUDY_INFO_DICT,num_trials=5):
             trial.set_user_attr('run_id',run_id)
             trial.set_user_attr('setup_id',setup_id)
 
-
-
-
-
-            _ = setup_neptune_run(input_data_dir,
-                                        setup_id='both-OS finetune v0',
-                                        project_id=project_id,
-
-                                        neptune_mode='async',
-                                        yes_logging = True,
-                                        neptune_api_token=neptune_api_token,
-                                        tags=['v4'],
-                                        y_head_cols=y_head_cols2,
-                                        y_adv_cols=y_adv_cols,
-                                        num_repeats=10,
-
-                                        run_training=True,
-                                        X_fit_file=X_finetune_fit_file,
-                                        y_fit_file=y_finetune_fit_file,
-                                        train_name=finetune_fit_file_id,
-
-                                        run_evaluation=True,
-                                        X_eval_file=X_finetune_eval_file,
-                                        y_eval_file=y_finetune_eval_file,
-                                        eval_name=finetune_eval_file_id,
-
-                                        save_latent_space=False,
-                                        plot_latent_space_cols=plot_latent_space_cols,
-                                        plot_latent_space = '',
-                                        
-                                        with_run_id=run_id,
-                                        # load_model_from_run_id=None,
-                                        # load_model_loc = None,
-                                        load_encoder_loc= 'pretrain',
-
-                                        **finetune_kwargs)
-
-            _ = setup_neptune_run(input_data_dir,
-                                        setup_id='both-OS randinit v0',
-                                        project_id=project_id,
-
-                                        neptune_mode='async',
-                                        yes_logging = True,
-                                        neptune_api_token=neptune_api_token,
-                                        tags=['v4'],
-                                        y_head_cols=y_head_cols2,
-                                        y_adv_cols=y_adv_cols,
-                                        num_repeats=10,
-
-                                        run_training=True,
-                                        X_fit_file=X_finetune_fit_file,
-                                        y_fit_file=y_finetune_fit_file,
-                                        train_name=finetune_fit_file_id,
-
-                                        run_evaluation=True,
-                                        X_eval_file=X_finetune_eval_file,
-                                        y_eval_file=y_finetune_eval_file,
-                                        eval_name=finetune_eval_file_id,
-
-                                        save_latent_space=False,
-                                        plot_latent_space_cols=plot_latent_space_cols,
-                                        plot_latent_space = '',
-                                        
-                                        with_run_id=run_id,
-                                        # load_model_from_run_id=None,
-                                        # load_model_loc = None,
-                                        load_encoder_loc= 'pretrain',
-                                        run_rand_init=True,
-
-                                        **finetune_kwargs)
 
 
             return compute_objective(run_id)

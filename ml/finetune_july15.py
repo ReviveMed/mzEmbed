@@ -107,19 +107,21 @@ def main(run_id):
                                                         y_cols=[],
                                                         head_name='Both-OS')
     
-    setup_num = 2
-    num_repeats=10
-    restart_run = False
-    restart_rand_run = False
+    setup_num = 3
+    num_repeats=5
+    restart_run = True
+    restart_rand_run = True
+    remove_y_nans = True
     finetune_kwargs = make_kwargs_set(encoder_kind=encoder_kind,
                                       head_kwargs_dict = head_kwargs_dict2,
-                                    num_epochs=70,
-                                    batch_size=64,
+                                    num_epochs=25,
+                                    batch_size=32,
                                     noise_factor=0.2,
-                                    dropout_rate=0.0,
-                                    encoder_weight=0.0,
+                                    dropout_rate=0.25,
+                                    encoder_weight=0.5,
+                                    task_num_hidden_layers=1,
                                     head_weight=1.0,
-                                    weight_decay=0.0001,
+                                    weight_decay=0.001,
                                     learning_rate=0.0005)
 
 
@@ -156,6 +158,7 @@ def main(run_id):
                                     # load_model_from_run_id=None,
                                     # load_model_loc = None,
                                     load_encoder_loc= 'pretrain',
+                                    remove_y_nans = remove_y_nans,
 
                                     **finetune_kwargs)
 
@@ -192,6 +195,7 @@ def main(run_id):
                                     # load_model_loc = None,
                                     load_encoder_loc= 'pretrain',
                                     run_random_init=True,
+                                    remove_y_nans = remove_y_nans,
 
                                     **finetune_kwargs)
 
@@ -237,6 +241,7 @@ def main(run_id):
                                     # load_model_from_run_id=None,
                                     # load_model_loc = None,
                                     load_encoder_loc= 'pretrain',
+                                    remove_y_nans = remove_y_nans,
 
                                     **finetune_kwargs)
 
@@ -272,6 +277,7 @@ def main(run_id):
                                     # load_model_loc = None,
                                     load_encoder_loc= 'pretrain',
                                     run_random_init=True,
+                                    remove_y_nans = remove_y_nans,
 
                                     **finetune_kwargs)
     except Exception as e:
@@ -286,6 +292,7 @@ if __name__ == '__main__':
     run_id_list = get_run_id_list(encoder_kind='VAE',tag='v4',project_id='revivemed/RCC')
     print(len(run_id_list))
     # run_id_list = ['RCC-3323']
+    run_id_list = ['RCC-3183']
 
     for run_id in run_id_list:
         print('##############################################')

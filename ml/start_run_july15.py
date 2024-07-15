@@ -27,33 +27,12 @@ selections_df = pd.read_csv(f'{input_data_dir}/selection_df.csv',index_col=0)
 output_dir = f'{homedir}/PROCESSED_DATA'
 os.makedirs(output_dir, exist_ok=True)
 subdir_col = 'Study ID'
-# if subdir_col not in selections_df.columns:
-#     metadata_df = pd.read_csv(f'{input_data_dir}/metadata.csv',index_col=0)
-#     selections_df[subdir_col] = metadata_df[subdir_col]
-
-fit_subset_col = 'Pretrain Discovery Train'
-# eval_subset_col = 'Pretrain Discovery Val'
-eval_subset_col = 'Pretrain Discovery Train'
-# eval_subset_col  = 'Pretrain All'
-# eval_subset_col = 'Pretrain Test'
-setup_id = 'pretrain'
 
 # fit_subset_col = 'Finetune Discovery Train'
 # eval_subset_col = 'Finetune Discovery Val'
-# # setup_id = 'IMDC finetune v0'
-# setup_id = 'IMDC randinit v0'
-# use_rand_init = True
 
-remove_y_nans = False
-# remove_y_nans = True
-
-# fit_subset_col = 'Finetune Discovery'
-# eval_subset_col = 'Finetune Test'
-# setup_id = 'IMDC finetune disc v1'
-# use_rand_init = False
-
-# setup_id = 'IMDC randinit dsic v1'
-# use_rand_init = True
+fit_subset_col = 'Finetune Discovery'
+eval_subset_col = 'Finetune Test'
 
 _, fit_file_id = create_selected_data(input_data_dir=input_data_dir,
                                                sample_selection_col=fit_subset_col,
@@ -85,30 +64,30 @@ y_adv_cols = []
 head_kwargs_dict = {}
 adv_kwargs_dict = {}
 
-head_kwargs_dict['Cohort-Label'], y_head_cols = get_task_head_kwargs(head_kind='MultiClass',
-                                                     y_head_col='Cohort Label v0',
-                                                     y_cols=y_head_cols,
-                                                     head_name='Cohort-Label',
-                                                     num_classes=4,
-                                                     default_weight=5.4)
+# head_kwargs_dict['Cohort-Label'], y_head_cols = get_task_head_kwargs(head_kind='MultiClass',
+#                                                      y_head_col='Cohort Label v0',
+#                                                      y_cols=y_head_cols,
+#                                                      head_name='Cohort-Label',
+#                                                      num_classes=4,
+#                                                      default_weight=5.4)
 
-head_kwargs_dict['is-Pediatric'], y_head_cols = get_task_head_kwargs(head_kind='Binary',
-                                                     y_head_col='is Pediatric',
-                                                     y_cols=y_head_cols,
-                                                     head_name='is-Pediatric',
-                                                     default_weight=2.6)
+# head_kwargs_dict['is-Pediatric'], y_head_cols = get_task_head_kwargs(head_kind='Binary',
+#                                                      y_head_col='is Pediatric',
+#                                                      y_cols=y_head_cols,
+#                                                      head_name='is-Pediatric',
+#                                                      default_weight=2.6)
 
-head_kwargs_dict['Age'], y_head_cols = get_task_head_kwargs(head_kind='Regression',
-                                                     y_head_col='Age',
-                                                     y_cols=y_head_cols,
-                                                     head_name='Age',
-                                                     default_weight=7.5)
+# head_kwargs_dict['Age'], y_head_cols = get_task_head_kwargs(head_kind='Regression',
+#                                                      y_head_col='Age',
+#                                                      y_cols=y_head_cols,
+#                                                      head_name='Age',
+#                                                      default_weight=7.5)
 
-head_kwargs_dict['Sex'], y_head_cols = get_task_head_kwargs(head_kind='Binary',
-                                                     y_head_col='Sex',
-                                                     y_cols=y_head_cols,
-                                                     head_name='Sex',
-                                                     default_weight=13)
+# head_kwargs_dict['Sex'], y_head_cols = get_task_head_kwargs(head_kind='Binary',
+#                                                      y_head_col='Sex',
+#                                                      y_cols=y_head_cols,
+#                                                      head_name='Sex',
+#                                                      default_weight=13)
 
 # head_kwargs_dict['BMI'], y_head_cols = get_task_head_kwargs(head_kind='Regression',
 #                                                      y_head_col='BMI',
@@ -123,10 +102,16 @@ head_kwargs_dict['Sex'], y_head_cols = get_task_head_kwargs(head_kind='Binary',
 #                                                      y_cols=y_head_cols,
 #                                                      head_name='IMDC')
 
-# head_kwargs_dict['Both-OS'], y_head_cols = get_task_head_kwargs(head_kind='Cox',
-#                                                      y_head_col='OS',
+# head_kwargs_dict['MSKCC'], y_head_cols = get_task_head_kwargs(head_kind='Binary',
+#                                                      y_head_col='MSKCC BINARY',
 #                                                      y_cols=y_head_cols,
-#                                                      head_name='Both-OS')
+#                                                      head_name='MSKCC')
+
+
+head_kwargs_dict['Both-OS'], y_head_cols = get_task_head_kwargs(head_kind='Cox',
+                                                     y_head_col='OS',
+                                                     y_cols=y_head_cols,
+                                                     head_name='Both-OS')
 
 # head_kwargs_dict['NIVO-OS'], y_head_cols = get_task_head_kwargs(head_kind='Cox',
 #                                                      y_head_col='NIVO OS',
@@ -146,10 +131,11 @@ head_kwargs_dict['Sex'], y_head_cols = get_task_head_kwargs(head_kind='Binary',
 #                                                      y_cols=y_adv_cols,
 #                                                      head_name='EVER-OS')
 
-plot_latent_space_cols = ['Study ID']
-print(y_head_cols)
+
 # %%
-# encoder_kind = 'VAE'
+encoder_kind = 'VAE'
+
+# the previous optimized IMDC
 # kwargs = make_kwargs_set(sig_figs=2,
 #                 encoder_kind=encoder_kind,
 #                 activation_func= 'leakyrelu',
@@ -171,6 +157,31 @@ print(y_head_cols)
 #                 adv_weight=0.0,
 #                 dropout_rate=0.4)
 
+
+# the previous optimized MSKCC
+# kwargs = make_kwargs_set(sig_figs=2,
+#                 encoder_kind=encoder_kind,
+#                 activation_func= 'leakyrelu',
+#                 use_batch_norm= False,
+#                 head_kwargs_dict=head_kwargs_dict,
+#                 adv_kwargs_dict=adv_kwargs_dict,
+#                 num_epochs=81,
+#                 latent_size=108,
+#                 hidden_size_mult=1.5,
+#                 hidden_size=-1,
+#                 num_hidden_layers=3,
+#                 task_head_weight=-1,
+#                 task_num_hidden_layers=1,
+#                 encoder_weight=0.5,
+#                 weight_decay=0,
+#                 head_weight=1,
+#                 learning_rate=0.00098,
+#                 noise_factor=0.2,
+#                 adv_weight=0.0,
+#                 dropout_rate=0.4)
+
+
+# the previous optimized Both-OS
 encoder_kind = 'VAE'
 kwargs = make_kwargs_set(sig_figs=2,
                 encoder_kind=encoder_kind,
@@ -179,17 +190,18 @@ kwargs = make_kwargs_set(sig_figs=2,
                 head_kwargs_dict=head_kwargs_dict,
                 adv_kwargs_dict=adv_kwargs_dict,
                 batch_size=64,
-                num_epochs=210,
+                num_epochs=70,
                 latent_size=108,
                 hidden_size_mult=1.5,
                 hidden_size=-1,
                 num_hidden_layers=3,
+                task_num_hidden_layers=0,
                 task_head_weight=-1,
-                encoder_weight=3,
-                weight_decay=0.00008,
+                encoder_weight=1,
+                weight_decay=0,
                 head_weight=1,
-                learning_rate=0.0011,
-                noise_factor=0.1,
+                learning_rate=0.0005,
+                noise_factor=0.2,
                 adv_weight=0.0)
 
 # head_kwargs_dict = {}
@@ -217,11 +229,17 @@ kwargs = make_kwargs_set(sig_figs=2,
 #                 adv_weight=0.0)
 
 # %%
+with_run_id = 'RCC-3183'
+
+setup_id = 'Both-OS finetune previous-opt'
+
+vnum = 0
+num_repeats = 10
+use_rand_init = False
+remove_y_nans = False
 
 plot_latent_space_cols  = list(set(y_head_cols + y_adv_cols))
-plot_latent_space_cols = ['Study ID']
-
-with_run_id = 'RCC-3183'
+# with_run_id = 'RCC-3188'
 run_id = setup_neptune_run(input_data_dir,
                             setup_id=setup_id,
                             project_id=project_id,
@@ -232,9 +250,9 @@ run_id = setup_neptune_run(input_data_dir,
                             tags=['v4'],
                             y_head_cols=y_head_cols,
                             y_adv_cols=y_adv_cols,
-                            num_repeats=1,
+                            num_repeats=num_repeats,
 
-                            run_training=False,
+                            run_training=True,
                             X_fit_file=X_fit_file,
                             y_fit_file=y_fit_file,
                             train_name=fit_file_id,
@@ -250,49 +268,50 @@ run_id = setup_neptune_run(input_data_dir,
                             
                             with_run_id=with_run_id,
                             # load_model_from_run_id=None,
-                            load_model_loc = 'pretrain',
-                            load_encoder_loc= False,
+                            load_model_loc = None,
+                            load_encoder_loc= 'pretrain',
+                            run_random_init=False,
+                            remove_y_nans=remove_y_nans,
 
                            **kwargs)
 
 
+setup_id = 'Both-OS randinit previous-opt'
 
+plot_latent_space_cols  = list(set(y_head_cols + y_adv_cols))
+# with_run_id = 'RCC-3188'
+run_id = setup_neptune_run(input_data_dir,
+                            setup_id=setup_id,
+                            project_id=project_id,
 
+                            neptune_mode='async',
+                            yes_logging = True,
+                            neptune_api_token=NEPTUNE_API_TOKEN,
+                            tags=['v4'],
+                            y_head_cols=y_head_cols,
+                            y_adv_cols=y_adv_cols,
+                            num_repeats=num_repeats,
 
-# with_run_id = 'RCC-3183'
+                            run_training=True,
+                            X_fit_file=X_fit_file,
+                            y_fit_file=y_fit_file,
+                            train_name=fit_file_id,
 
-# run_id = setup_neptune_run(input_data_dir,
-#                             setup_id=setup_id,
-#                             project_id=project_id,
+                            run_evaluation=True,
+                            X_eval_file=X_eval_file,
+                            y_eval_file=y_eval_file,
+                            eval_name=eval_file_id,
 
-#                             neptune_mode='async',
-#                             yes_logging = True,
-#                             neptune_api_token=NEPTUNE_API_TOKEN,
-#                             tags=['v4'],
-#                             y_head_cols=y_head_cols,
-#                             y_adv_cols=y_adv_cols,
-#                             num_repeats=5,
-#                             remove_y_nans = remove_y_nans,
-
-#                             run_training=True,
-#                             X_fit_file=X_fit_file,
-#                             y_fit_file=y_fit_file,
-#                             train_name=fit_file_id,
-
-#                             run_evaluation=True,
-#                             X_eval_file=X_eval_file,
-#                             y_eval_file=y_eval_file,
-#                             eval_name=eval_file_id,
-
-#                             save_latent_space=False,
-#                             plot_latent_space_cols=plot_latent_space_cols,
-#                             plot_latent_space = False,
-#                             yes_plot_pca=False,
+                            save_latent_space=True,
+                            plot_latent_space_cols=plot_latent_space_cols,
+                            plot_latent_space = 'sns',
                             
-#                             with_run_id=with_run_id, #continue existing run
-#                             load_model_from_run_id=None, # to start a new run, but load from existing run
-#                             load_model_loc = None,
-#                             load_encoder_loc= 'pretrain',
-#                             use_rand_init = use_rand_init,
+                            with_run_id=with_run_id,
+                            # load_model_from_run_id=None,
+                            load_model_loc = None,
+                            load_encoder_loc= 'pretrain',
+                            run_random_init=True,
+                            remove_y_nans=remove_y_nans,
 
-#                            **kwargs)
+                           **kwargs)
+
