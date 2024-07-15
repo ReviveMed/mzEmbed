@@ -183,7 +183,7 @@ def setup_wrapper(with_id=None,**kwargs):
 def assign_task_head(head_name,all_metadata):
     # raise NotImplementedError('assign_task_head not implemented in this script')
 
-
+    print('Assignment of task head:',head_name)
     metadata_cols = all_metadata.columns
     standardized_cols = [col.replace(' ','_').replace('-','_').lower() for col in metadata_cols]
     head_name_std = head_name.replace(' ','_').replace('-','_').lower()
@@ -207,12 +207,14 @@ def assign_task_head(head_name,all_metadata):
     elif head_name == 'Study ID':
         head_kind = 'MultiClass'
         y_head_col = 'Study ID'
-        num_classes = 22
+        num_classes = all_metadata['Cohort Label v0'].nunique() #22
+        # print('num_classes:',num_classes)
         default_weight = 1.0
     elif head_name == 'Cohort-Label':
         head_kind = 'MultiClass'
         y_head_col = 'Cohort Label v0'
-        num_classes = 4
+        num_classes = all_metadata['Cohort Label v0'].nunique() #4
+        # print('num_classes:',num_classes)
         default_weight = 1.0
     elif head_name == 'is-Pediatric':
         head_kind = 'Binary'
@@ -239,7 +241,7 @@ def assign_task_head(head_name,all_metadata):
         num_classes = 2
         default_weight = 1.0
     else:
-
+        print('Head name is not one of the predefined options, searching for a matching column in the metadata to make a best guess')
         possible_cols = []
         for col in standardized_cols:
             if head_name_std in col:
@@ -282,6 +284,10 @@ def assign_task_head(head_name,all_metadata):
             else:
                 raise ValueError(f'No matching head found for {head_name}')
 
+    print('Assigned head kind:',head_kind)
+    print('Assigned y_head_col:',y_head_col)
+    print('Assigned num_classes:',num_classes)
+    print('Assigned default_weight:',default_weight)    
     return head_kind, y_head_col, num_classes, default_weight
             
 

@@ -89,7 +89,7 @@ def get_study_kwargs(head_kwargs_dict,adv_kwargs_dict):
                     head_weight=1.0, head_weight_min=0, head_weight_max=2, head_weight_step=0.5,
                     adv_weight=1.0, adv_weight_min=0, adv_weight_max=2, adv_weight_step=0.5,
 
-                    task_head_weight=None, task_head_weight_min=0.25, task_head_weight_max=10, task_head_weight_step=0.25,
+                    task_head_weight=None, task_head_weight_min=0, task_head_weight_max=10, task_head_weight_step=0.25,
                     task_adv_weight=-1, task_adv_weight_min=0, task_adv_weight_max=10, task_adv_weight_step=0.1,
                     task_hidden_size=4, task_hidden_size_min=4, task_hidden_size_max=64, task_hidden_size_step=4,
                     task_num_hidden_layers=1, task_num_hidden_layers_min=1, task_num_hidden_layers_max=3, task_num_hidden_layers_step=1,
@@ -285,7 +285,7 @@ def main(STUDY_INFO_DICT,num_trials=5):
 if __name__ == '__main__':
 
 
-    main(STUDY_DICT,num_trials=5)
+    main(STUDY_DICT,num_trials=80)
 
     # res = objective_func4('RCC-3188',
     #                 study_info_dict=STUDY_DICT,
