@@ -181,7 +181,111 @@ def setup_wrapper(with_id=None,**kwargs):
 
 
 def assign_task_head(head_name,all_metadata):
-    raise NotImplementedError('assign_task_head not implemented in this script')
+    # raise NotImplementedError('assign_task_head not implemented in this script')
+
+
+    metadata_cols = all_metadata.columns
+    standardized_cols = [col.replace(' ','_').replace('-','_').lower() for col in metadata_cols]
+    head_name_std = head_name.replace(' ','_').replace('-','_').lower()
+
+
+    if head_name == 'Both-OS':
+        head_kind = 'Cox'
+        y_head_col = 'OS'
+        num_classes = 2
+        default_weight = 1.0
+    elif head_name == 'NIVO-OS':
+        head_kind = 'Cox'
+        y_head_col = 'NIVO OS'
+        num_classes = 2
+        default_weight = 1.0
+    elif head_name == 'EVER-OS':
+        head_kind = 'Cox'
+        y_head_col = 'EVER OS'
+        num_classes = 2
+        default_weight = 1.0
+    elif head_name == 'Study ID':
+        head_kind = 'MultiClass'
+        y_head_col = 'Study ID'
+        num_classes = 22
+        default_weight = 1.0
+    elif head_name == 'Cohort-Label':
+        head_kind = 'MultiClass'
+        y_head_col = 'Cohort Label v0'
+        num_classes = 4
+        default_weight = 1.0
+    elif head_name == 'is-Pediatric':
+        head_kind = 'Binary'
+        y_head_col = 'is Pediatric'
+        num_classes = 2
+        default_weight = 1.0
+    elif head_name == 'Age':
+        head_kind = 'Regression'
+        y_head_col = 'Age'
+        num_classes = 1
+        default_weight = 1.0
+    elif head_name == 'Sex':
+        head_kind = 'Binary'
+        y_head_col = 'Sex'
+        num_classes = 2
+    elif head_name == 'BMI':
+        head_kind = 'Regression'
+        y_head_col = 'BMI'
+        num_classes = 1
+        default_weight = 1.0
+    elif head_name == 'IMDC':
+        head_kind = 'Binary'
+        y_head_col = 'IMDC BINARY'
+        num_classes = 2
+        default_weight = 1.0
+    else:
+
+        possible_cols = []
+        for col in standardized_cols:
+            if head_name_std in col:
+                possible_cols.append(col)
+
+        if len(possible_cols) == 0:
+            raise ValueError(f'No matching columns found for {head_name}')
+        
+        if len(possible_cols) > 1:
+            raise ValueError(f'Multiple matching columns found for {head_name}')
+        
+        y_head_col = metadata_cols[standardized_cols.index(possible_cols[0])]
+        y_uniq_vals = all_metadata[y_head_col].unique()
+        y_dtype = all_metadata[y_head_col].dtype
+
+        if y_dtype == 'object':
+            if len(y_uniq_vals) == 2:
+                head_kind = 'Binary'
+                num_classes = 2
+                default_weight = 1.0
+            elif len(y_uniq_vals) > 2:
+                head_kind = 'MultiClass'
+                num_classes = len(y_uniq_vals)
+                default_weight = 1.0
+            else:
+                raise ValueError(f'No matching head found for {head_name}')
+        elif y_dtype == 'float':
+            if len(y_uniq_vals) > 25:
+                head_kind = 'Regression'
+                num_classes = 1
+                default_weight = 1.0
+            elif len(y_uniq_vals) > 2:
+                head_kind = 'MultiClass'
+                num_classes = len(y_uniq_vals)
+                default_weight = 1.0
+            elif len(y_uniq_vals) == 2:
+                head_kind = 'Binary'
+                num_classes = 2
+                default_weight = 1.0
+            else:
+                raise ValueError(f'No matching head found for {head_name}')
+
+    return head_kind, y_head_col, num_classes, default_weight
+            
+
+
 
 
 

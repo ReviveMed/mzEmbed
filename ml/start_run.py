@@ -221,7 +221,8 @@ kwargs = make_kwargs_set(sig_figs=2,
 plot_latent_space_cols  = list(set(y_head_cols + y_adv_cols))
 plot_latent_space_cols = ['Study ID']
 
-with_run_id = 'RCC-3183'
+# with_run_id = 'RCC-3183'
+with_run_id = None
 run_id = setup_neptune_run(input_data_dir,
                             setup_id=setup_id,
                             project_id=project_id,
@@ -234,7 +235,7 @@ run_id = setup_neptune_run(input_data_dir,
                             y_adv_cols=y_adv_cols,
                             num_repeats=1,
 
-                            run_training=False,
+                            run_training=True,
                             X_fit_file=X_fit_file,
                             y_fit_file=y_fit_file,
                             train_name=fit_file_id,
@@ -250,7 +251,7 @@ run_id = setup_neptune_run(input_data_dir,
                             
                             with_run_id=with_run_id,
                             # load_model_from_run_id=None,
-                            load_model_loc = 'pretrain',
+                            load_model_loc = None,
                             load_encoder_loc= False,
 
                            **kwargs)
