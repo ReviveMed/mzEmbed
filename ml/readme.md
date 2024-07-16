@@ -5,6 +5,7 @@
 
 When using an Nvidia T4 GPU, I used GCP's Deep Learning VM image:
 - `c0-deeplearning-common-gpu-v20240613-debian-11-py310`
+    -  Debian 11, Python 3.10. With CUDA 11.8 preinstalled
 - When you create the VM and login, it will ask you to install the Nvidia driver. Do it:
     - "This VM requires Nvidia drivers to function correctly.   Installation takes ~1 minute.
     Would you like to install the Nvidia driver? [y/n]"

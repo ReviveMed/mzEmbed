@@ -285,12 +285,14 @@ def create_selected_data(input_data_dir, sample_selection_col,
 
     X_list = []
     obs_list = []
+    y_list = []
 
     for subdir in subdir_list:
         if save_nan:
             intensity_file = f'{input_data_dir}/{subdir}/nan_matrix.csv'
         else:
             intensity_file = f'{input_data_dir}/{subdir}/scaled_intensity_matrix.csv'
+        sub_metadata_file = f'{input_data_dir}/{subdir}/metadata.csv'
 
         if os.path.exists(intensity_file):
             subset_select_ids = selections_df[selections_df[subdir_col] == subdir].index.to_list()
@@ -300,6 +302,11 @@ def create_selected_data(input_data_dir, sample_selection_col,
                 intensity_df = intensity_df.loc[subset_select_ids].copy()
                 X_list.append(intensity_df)
                 obs_list.extend(subset_select_ids)
+                
+                # if os.path.exists(sub_metadata_file):
+                #     sub_metadata_df = pd.read_csv(sub_metadata_file, index_col=0)
+                #     sub_metadata_df[subdir_col] = subdir
+                #     y_list.append(sub_metadata_df.loc[subset_select_ids, metadata_cols].copy())
         else:
             print(f'{subdir} is missing')
             continue
