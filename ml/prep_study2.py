@@ -192,6 +192,9 @@ def get_default_kwarg_val_dict():
         'train_kwargs__optimizer_name': 'adam',
         'train_kwargs__adversarial_start_epoch': -1,
         'num_repeats': 1,
+        'head_kwargs_dict__Smoking__weight': 0,
+        'head_kwargs_dict__Cohort-Label__weight': 0,
+        'head_kwargs_dict__is-Pediatric__weight': 0,
     }
 
     return default_val_dict
@@ -199,7 +202,7 @@ def get_default_kwarg_val_dict():
 
 
 def reuse_run(run_id,study_kwargs=None,objective_func=None,ignore_keys_list=None,
-              default_kwarg_val_dict=None,verbose=2,setup_id='pretrain',project_id='revivemed/RCC',
+              default_kwarg_val_dict=None,verbose=1,setup_id='pretrain',project_id='revivemed/RCC',
               neptune_api_token=NEPTUNE_API_TOKEN):
     if study_kwargs is None:
         raise ValueError("Study kwargs is None")
@@ -207,8 +210,8 @@ def reuse_run(run_id,study_kwargs=None,objective_func=None,ignore_keys_list=None
     if ignore_keys_list is None:
         ignore_keys_list = ['run_evaluation','save_latent_space','plot_latent_space_cols','plot_latent_space',\
             'eval_kwargs','run_training','overwrite_existing_kwargs',\
-            'load_model_loc','y_head_cols','eval_name','train_name','study_info_dict','y_fit_file',
-            'X_fit_file','X_eval_file','y_eval_file','num_repeats','y_adv_cols']
+            'load_model_loc','y_head_cols','eval_name','train_name','study_info_dict','y_fit_file','source run_id',
+            'X_fit_file','X_eval_file','y_eval_file','num_repeats','y_adv_cols','head_kwargs_dict','adv_kwargs_dict','fit_kwargs__dropout_rate']
 
 
     if default_kwarg_val_dict is None:
