@@ -314,7 +314,7 @@ def main(STUDY_INFO_DICT,num_trials=5):
 if __name__ == '__main__':
 
 
-    main(STUDY_DICT,num_trials=1)
+    main(STUDY_DICT,num_trials=20)
 
     # res = objective_func4('RCC-3188',
     #                 study_info_dict=STUDY_DICT,
