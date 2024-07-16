@@ -3,7 +3,7 @@ import os
 import optuna
 import pandas as pd
 from prep_run import create_selected_data, make_kwargs_set, get_task_head_kwargs, round_kwargs_to_sig, flatten_dict, unflatten_dict
-from utils_neptune import get_latest_dataset, get_run_id_list
+from utils_neptune import get_latest_dataset, get_run_id_list, get_run_id_list_from_query
 from setup3 import setup_neptune_run
 import time
 from prep_study2 import objective_func4, reuse_run, get_study_objective_keys, get_study_objective_directions, add_runs_to_study
@@ -107,21 +107,39 @@ def main(run_id):
                                                         y_cols=[],
                                                         head_name='Both-OS')
     
-    setup_num = 3
-    num_repeats=5
-    restart_run = True
-    restart_rand_run = True
-    remove_y_nans = True
+    # setup_num = 3
+    # num_repeats=5
+    # restart_run = True
+    # restart_rand_run = True
+    # remove_y_nans = True
+    # finetune_kwargs = make_kwargs_set(encoder_kind=encoder_kind,
+    #                                   head_kwargs_dict = head_kwargs_dict2,
+    #                                 num_epochs=25,
+    #                                 batch_size=32,
+    #                                 noise_factor=0.2,
+    #                                 dropout_rate=0.25,
+    #                                 encoder_weight=0.5,
+    #                                 task_num_hidden_layers=1,
+    #                                 head_weight=1.0,
+    #                                 weight_decay=0.001,
+    #                                 learning_rate=0.0005)
+
+
+    setup_num = 1
+    num_repeats=10
+    restart_run = False
+    restart_rand_run = False
+    remove_y_nans = False
     finetune_kwargs = make_kwargs_set(encoder_kind=encoder_kind,
                                       head_kwargs_dict = head_kwargs_dict2,
-                                    num_epochs=25,
-                                    batch_size=32,
+                                    num_epochs=70,
+                                    batch_size=64,
                                     noise_factor=0.2,
-                                    dropout_rate=0.25,
-                                    encoder_weight=0.5,
+                                    dropout_rate=0.0,
+                                    encoder_weight=0,
                                     task_num_hidden_layers=1,
                                     head_weight=1.0,
-                                    weight_decay=0.001,
+                                    weight_decay=0.0001,
                                     learning_rate=0.0005)
 
 
@@ -289,10 +307,20 @@ def main(run_id):
 
 if __name__ == '__main__':
 
-    run_id_list = get_run_id_list(encoder_kind='VAE',tag='v4',project_id='revivemed/RCC')
-    print(len(run_id_list))
+
+    query1 = '(`pretrain/original_kwargs/source run_id`:string = "RCC-3213") OR (`pretrain/original_kwargs/source run_id`:string = "RCC-3276")'
+    query2 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Recon Minimize July15 v0") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.38)'
+    
+    
+    run_id_list1 = get_run_id_list_from_query(query=query1,limit=100,project_id=project_id)
+    run_id_list2 = get_run_id_list_from_query(query=query2,limit=100,project_id=project_id)
+    # run_id_list = get_run_id_list(encoder_kind='VAE',tag='v4',project_id='revivemed/RCC')
+    print(len(run_id_list1))
+    print(len(run_id_list2))
     # run_id_list = ['RCC-3323']
-    run_id_list = ['RCC-3183']
+    # run_id_list = ['RCC-3183']
+
+    run_id_list = run_id_list1 + run_id_list2
 
     for run_id in run_id_list:
         print('##############################################')
