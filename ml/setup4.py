@@ -42,11 +42,12 @@ def setup_wrapper(with_id=None,**kwargs):
     fit_subset_col = kwargs.get('fit_subset_col','train')
     eval_subset_col_list = kwargs.get('eval_subset_col_list',[])
     eval_params_list = kwargs.get('eval_params_list',None)
+    tags = kwargs.get('tags',[])
+    
     encoder_project_id = kwargs.get('encoder_project_id',project_id)
     encoder_model_id = kwargs.get('encoder_model_id',None)
     encoder_is_a_run = kwargs.get('encoder_is_a_run',True)
     encoder_load_dir = kwargs.get('encoder_load_dir',None)
-    tags = kwargs.get('tags',[])
     head_name_list = kwargs.get('head_name_list',[])
     adv_name_list = kwargs.get('adv_name_list',[])
     optuna_study_info_dict = kwargs.get('optuna_study_info_dict',None)
@@ -54,9 +55,16 @@ def setup_wrapper(with_id=None,**kwargs):
     setup_id = kwargs.get('setup_id','')
     optuna_trial = kwargs.get('optuna_trial',None)
     encoder_kind = kwargs.get('encoder_kind','VAE')
+
+    overwrite_default_params = kwargs.get('overwrite_existing_params',False)
+    overwrite_params_fit_kwargs = kwargs.get('overwrite_params_fit_kwargs',{})
+    overwrite_params_task_kwargs = kwargs.get('overwrite_params_task_kwargs',{})
+    overwrite_params_other_kwargs = kwargs.get('overwrite_params_other_kwargs',{})
     
     if optuna_trial: use_optuna = True
     else: use_optuna = False
+
+    assign_task_head_func = kwargs.get('assign_task_head_func',assign_task_head)
 
     if use_optuna:
         get_kwargs_func = kwargs.get('get_kwargs_func',get_default_study_kwargs)
@@ -71,6 +79,9 @@ def setup_wrapper(with_id=None,**kwargs):
     all_metadata = create_full_metadata(input_data_dir, cleaning=True, save_file=True)
 
 
+    if output_dir is None:
+        output_dir = os.path.expanduser("~/TEMP_MODELS")
+
     run = neptune.init_run(project=project_id,
                     api_token=api_token,
                     with_id=with_id,
@@ -83,6 +94,16 @@ def setup_wrapper(with_id=None,**kwargs):
             params = convert_neptune_kwargs(original_params)
             # original_sweep_kwargs = run['sweep_kwargs'].fetch()
             # original_sweep_kwargs = convert_neptune_kwargs(original_sweep_kwargs)
+            if overwrite_default_params:
+                print('WARNING: Overwriting existing params, are you sure you want to do this? this could lead to messy data')
+                params['fit_kwargs'].update(overwrite_params_fit_kwargs)
+                params['task_kwargs'].update(overwrite_params_task_kwargs)
+                params['other_kwargs'].update(overwrite_params_other_kwargs)
+                # params['encoder_desc']['encoder_kwargs'].update(encoder_kwargs)
+                # params['encoder_desc']['encoder_load_dir'] = encoder_load_dir
+                # params['encoder_desc']['encoder_project_id'] = encoder_project_id
+                # params['encoder_desc']['encoder_model_id'] = encoder_model_id
+                # params['encoder_desc']['encoder_is_a_run'] = encoder_is_a_run
 
     else:
         plot_latent_space_cols = []
@@ -92,7 +113,7 @@ def setup_wrapper(with_id=None,**kwargs):
         adv_kwargs_dict = {}
 
         for head_name in head_name_list:
-            head_kind,y_head_col,num_classes,default_weight = assign_task_head(head_name,all_metadata)
+            head_kind,y_head_col,num_classes,default_weight = assign_task_head_func(head_name,all_metadata)
 
             head_kwargs_dict[head_name], y_head_cols = get_task_head_kwargs(head_kind=head_kind,
                                                 y_head_col=y_head_col,
@@ -102,7 +123,7 @@ def setup_wrapper(with_id=None,**kwargs):
                                                 default_weight=default_weight)
             
         for adv_name in adv_name_list:
-            adv_kind,y_adv_col,num_classes,default_weight = assign_task_head(adv_name,all_metadata)
+            adv_kind,y_adv_col,num_classes,default_weight = assign_task_head_func(adv_name,all_metadata)
             adv_kwargs_dict[adv_name], y_adv_cols = get_task_head_kwargs(head_kind=adv_kind,
                                                 y_head_col=y_adv_col,
                                                 y_cols=y_adv_cols,
@@ -147,9 +168,14 @@ def setup_wrapper(with_id=None,**kwargs):
                 'encoder_is_a_run': encoder_is_a_run
             },
             'fit_kwargs': run_kwargs['fit_kwargs'],
-            'other_kwargs': {}
+            'other_kwargs': other_kwargs
         }
 
+        if overwrite_default_params:
+            print('WARNING: Overwriting existing params, are you sure you want to do this? this could lead to messy data')
+            params['fit_kwargs'].update(overwrite_params_fit_kwargs)
+            params['task_kwargs'].update(overwrite_params_task_kwargs)
+            params['other_kwargs'].update(overwrite_params_other_kwargs)
 
         run['dataset'].track_files(input_data_dir)
         run['params'] = stringify_unsupported(params)
@@ -162,6 +188,9 @@ def setup_wrapper(with_id=None,**kwargs):
     print('eval_params_list',eval_params_list)
     run_output_dir = f'{output_dir}/{run_id}'
     os.makedirs(run_output_dir,exist_ok=True)
+
+    if setup_id:
+        prefix = f'{setup_id}/{prefix}'
     
     run, all_metrics = run_multiple_iterations(input_data_dir=input_data_dir,
                                 params=params,
