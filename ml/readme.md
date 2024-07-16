@@ -14,7 +14,7 @@ When using an Nvidia T4 GPU, I used GCP's Deep Learning VM image:
 - Once the gpu has been set up, run the following command to install some dependencies:
     - `sudo apt-get install -y git screen htop build-essential pkg-config libmariadb-dev-compat wget vim`
 - Update the settings for screen:
-    - echo "escape ^Jj" > .screenrc
+    - `echo "escape ^Jj" > .screenrc`
 - (Optional) set up an ssh connection to bitbucket:
     - `ssh -T jonaheaton@bitbucket.org`
     - If you get an error, you may need to add the bitbucket ssh key to your ssh
