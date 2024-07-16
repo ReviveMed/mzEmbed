@@ -45,6 +45,7 @@ leidenalg>=0.8.10
 llvmlite
 networkx>=2.6.3
 numba>=0.55.2
+fonttools=4.53.0
 # scanpy>=1.9.1
 # scvi-tools>=0.16.4
 # scikit-misc #used for loess regression, but I don't think it is used
