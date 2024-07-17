@@ -191,6 +191,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         save_dir = f'{local_dir}/{run_id}'
         os.makedirs(save_dir, exist_ok=True)
 
+        y_code_keys = []
         y_codes = kwargs.get('y_codes', None)
         if (y_codes is None) and (load_model_loc):
             if 'y_codes_keys' in pretrained_run[f'{load_model_loc}/datasets'].fetch():
@@ -465,7 +466,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     upload_models_to_neptune = kwargs.get('upload_models_to_neptune', True)
     upload_models_to_gcp = kwargs.get('upload_models_to_gcp', False)
     eval_kwargs = kwargs.get('eval_kwargs', {})
-    
+    plot_latent_space = kwargs.get('plot_latent_space', '')
+
 
     if run_random_init:
         print('running with random initialization')
@@ -514,7 +516,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         ####################################
         ###### Create the Encoder Models ######
         try:
-            if run_training or run_evaluation or save_latent_space:
+            if run_training or run_evaluation or save_latent_space or plot_latent_space:
                 print('creating models')
                 
                 encoder = get_model(encoder_kind, input_size, **encoder_kwargs)
@@ -884,8 +886,6 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
             run.wait()
 
-
-        plot_latent_space = kwargs.get('plot_latent_space', '')
         plot_latent_space_cols = kwargs.get('plot_latent_space_cols', y_head_cols+y_adv_cols)
         yes_plot_pca = kwargs.get('yes_plot_pca', False)
         print('plot_latent_space:', plot_latent_space)

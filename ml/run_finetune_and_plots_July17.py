@@ -319,11 +319,13 @@ if __name__ == '__main__':
     query5 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Recon Minimize July16 v0") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.4)'
 
     # query_list = [query2,query3,query4,query5]
-    query_list = [query3,query5]
-    run_id_list = []
-    for query in query_list:
-        run_id_list += get_run_id_list_from_query(query=query,limit=100,project_id=project_id)
+    # query_list = [query3,query5]
+    # run_id_list = []
+    # for query in query_list:
+    #     run_id_list += get_run_id_list_from_query(query=query,limit=100,project_id=project_id)
 
+
+    run_id_list = ['RCC-3610','RCC-3537','RCC-3597','RCC-3370','RCC-3345']
 
     print('number of models to finetune: ',len(run_id_list))
     # exit()
@@ -333,10 +335,10 @@ if __name__ == '__main__':
         print('Running: ',run_id)
         start_time  = time.time()
         main(run_id,
-            yes_plot_latent_space=False,
-            # which_finetune_nums=[],
-            which_finetune_nums=[4,5,6],
-            # task_name_list=[])
-            task_name_list=['Both-OS','IMDC'])        
+            yes_plot_latent_space=True,
+            which_finetune_nums=[],
+            # which_finetune_nums=[4,5,6],
+            task_name_list=[])
+            # task_name_list=['Both-OS','IMDC'])        
         print('Minutes elapsed: ',(time.time()-start_time)/60)
         # break
