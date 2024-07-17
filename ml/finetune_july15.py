@@ -94,6 +94,49 @@ def main(run_id):
     X_finetune_fit_file = f'{output_dir}/X_{finetune_fit_file_id}.csv'
     y_finetune_fit_file = f'{output_dir}/y_{finetune_fit_file_id}.csv'
 
+
+
+    plot_latent_space_cols = ['Cohort Label v0','Study ID','is Pediatric','Age','Sex','BMI','Smoker Status']
+    _ = setup_neptune_run(input_data_dir,
+                                setup_id=f'pretrain',
+                                project_id=project_id,
+
+                                neptune_mode='async',
+                                yes_logging = True,
+                                neptune_api_token=neptune_api_token,
+                                tags=['v4'],
+                                y_head_cols=y_head_cols2,
+                                y_adv_cols=y_adv_cols,
+                                num_repeats=num_repeats,
+                                restart_run = restart_run,
+
+                                run_training=False,
+                                X_fit_file=X_finetune_fit_file,
+                                y_fit_file=y_finetune_fit_file,
+                                train_name=finetune_fit_file_id,
+
+                                run_evaluation=True,
+                                X_eval_file=X_finetune_eval_file,
+                                y_eval_file=y_finetune_eval_file,
+                                eval_name=finetune_eval_file_id,
+
+                                save_latent_space=True,
+                                plot_latent_space_cols=plot_latent_space_cols,
+                                plot_latent_space = '',
+                                
+                                with_run_id=run_id,
+                                # load_model_from_run_id=None,
+                                # load_model_loc = None,
+                                load_encoder_loc= 'pretrain',
+                                remove_y_nans = remove_y_nans,
+
+                                **finetune_kwargs)
+
+
+
+
+
+
     # Determine the Task Heads
     plot_latent_space_cols = []
     y_head_cols = []
