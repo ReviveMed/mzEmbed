@@ -497,7 +497,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     for ii_repeat in range(num_repeats):
         
         if num_repeats > 1:
-            print(f'{setup_id}, train/eval repeat: {ii_repeat}')
+            print(f'{setup_id}, train/eval repeat: {num_existing_repeats+ii_repeat}')
             yes_save_model = False
             if (not run_evaluation):
                 print('why are you running training multiple times without any evaluation?')

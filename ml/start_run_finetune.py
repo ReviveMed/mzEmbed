@@ -172,26 +172,31 @@ run_id = setup_neptune_run(input_data_dir,
                             tags=['v4'],
                             y_head_cols=y_head_cols,
                             y_adv_cols=y_adv_cols,
-                            num_repeats=10, #number of times to repeat the finetune/eval process
+                            num_repeats=1, #number of times to repeat the finetune/eval process. model is only saved at the last iteration
 
-                            run_training=True,
+                            ### Training ###
+                            run_training=True, #finetune the model
                             X_fit_file=X_fit_file,
                             y_fit_file=y_fit_file,
                             train_name=fit_file_id,
 
-                            run_evaluation=True,
+                            ### Evaluation ###
+                            run_evaluation=True, #evaluate the model
                             X_eval_file=X_eval_file,
                             y_eval_file=y_eval_file,
                             eval_name=eval_file_id,
 
-                            save_latent_space=True,
-                            plot_latent_space_cols=plot_latent_space_cols,
-                            plot_latent_space = 'sns',
+                            ### latent space representations of the evaluation dataset ###
+                            save_latent_space=True, # save a csv file of the umap latent space coordinates
+                            plot_latent_space_cols=plot_latent_space_cols, # which columns of the metadata to color the latent space by
+                            plot_latent_space = 'sns', # which plotting library to use, options are 'sns' or 'plotly' or 'both'
                             
-                            with_run_id=with_run_id, #continue an existing run
-                            load_model_from_run_id=None, #create a new neptune run, but load data from an existing run
-                            load_model_loc = None, #where to load the full model
-                            load_encoder_loc= 'pretrain', #where to load the encoder model from "with_run_id"
+                            ### Load pre-existing model ###
+                            with_run_id=None, #continue an existing run
+                            load_model_from_run_id=with_run_id, #create a new neptune run, but load data from an existing run
+                            load_model_loc = None, #from where to load the full model (which directory in a run, for example "pretrain")
+                            load_encoder_loc= 'pretrain', #from where to load the encoder model (which directory in a run for example "pretrain")
+                            run_random_init = True, # if true, it will load the model architecture from the run, but random intialize the weights
                            **finetune_kwargs)
                             
 
