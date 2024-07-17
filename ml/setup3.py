@@ -227,7 +227,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     ##### Load the Data ######
     run_training = kwargs.get('run_training', True)
     run_evaluation = kwargs.get('run_evaluation', True)
-    save_latent_space = kwargs.get('save_latent_space', True)
+    save_latent_space = kwargs.get('save_latent_space', False)
     use_subset_of_features = kwargs.get('use_subset_of_features', False)
     random_seed = kwargs.get('random_seed', 42)
     remove_y_nans = kwargs.get('remove_y_nans', False)
@@ -831,10 +831,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             else:
                 raise ValueError('Encoder is None, no saves were found, cannot generate latent space plots')
 
-        save_latent_space = kwargs.get('save_latent_space', True)
         Z_embed_savepath = os.path.join(save_dir, f'Z_embed_{eval_name}.csv')
 
-        if save_latent_space:
+        if save_latent_space or plot_latent_space:
             
             if check_neptune_existance(run,f'{setup_id}/Z_{eval_name}'):
                 print(f'Z_{eval_name} already exists in {setup_id} of run {run_id}')
