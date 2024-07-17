@@ -172,7 +172,7 @@ run_id = setup_neptune_run(input_data_dir,
                             tags=['v4'],
                             y_head_cols=y_head_cols,
                             y_adv_cols=y_adv_cols,
-                            num_repeats=5, #number of times to repeat the finetune/eval process
+                            num_repeats=10, #number of times to repeat the finetune/eval process
 
                             run_training=True,
                             X_fit_file=X_fit_file,

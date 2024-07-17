@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 import os
 import json
-from models import get_model, Binary_Head, Dummy_Head, MultiClass_Head, MultiHead, Regression_Head, Cox_Head
+from models import get_model, Binary_Head, Dummy_Head, MultiClass_Head, MultiHead, Regression_Head, Cox_Head, get_encoder
 
 from train4 import CompoundDataset, train_compound_model, get_end_state_eval_funcs, evaluate_compound_model, create_dataloaders, create_dataloaders_old
 
@@ -89,6 +89,9 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         load_model_from_run_id = kwargs.get('load_model_from_run_id', None)
         load_model_loc = kwargs.get('load_model_loc', False)
         load_encoder_loc = kwargs.get('load_encoder_loc', load_model_loc)
+        if load_model_loc:
+            print('override the load_encoder_loc with load_model_loc')
+            load_encoder_loc = load_model_loc
         load_head_loc = kwargs.get('load_head_loc', load_model_loc)
         load_adv_loc = kwargs.get('load_adv_loc', load_model_loc)
         y_head_cols = kwargs.get('y_head_cols', [])
