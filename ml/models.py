@@ -1566,19 +1566,19 @@ class metabFoundation(Default_EncoderDecoder):
         x_enc_pooled = self.get_embedding(x_enc)
         return x_enc_pooled, total_loss
     
-    def generate(self, x_enc, x_pos_ids=None,as_seq=False):
-        if x_pos_ids is None:
-            x_pos_ids = torch.arange(self.max_seq_len, device=z.device).repeat(z.shape[0], 1)
+    # def generate(self, x_enc, x_pos_ids=None,as_seq=False):
+    #     if x_pos_ids is None:
+    #         x_pos_ids = torch.arange(self.max_seq_len, device=z.device).repeat(z.shape[0], 1)
 
-        position_emb = self.seq_to_embed.get_pos_embedding(x_pos_ids)
-        x_enc_w_pos = x_enc + position_emb
-        # x_enc += position_emb
-        x_out_seq = self.decoder(x_enc_w_pos).squeeze(-1)
+    #     position_emb = self.seq_to_embed.get_pos_embedding(x_pos_ids)
+    #     x_enc_w_pos = x_enc + position_emb
+    #     # x_enc += position_emb
+    #     x_out_seq = self.decoder(x_enc_w_pos).squeeze(-1)
         
-        if as_seq:
-            return x_out_seq
-        x_out = self.metab_to_seq.inverse_transform(x_out_seq,x_pos_ids)
-        return x_out
+    #     if as_seq:
+    #         return x_out_seq
+    #     x_out = self.metab_to_seq.inverse_transform(x_out_seq,x_pos_ids)
+    #     return x_out
 
 
 

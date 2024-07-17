@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
 from prep_study2 import get_default_study_kwargs
+from prep_run import assign_sets, get_selection_df
 
 from viz import generate_latent_space, generate_pca_embedding, generate_umap_embedding
 from misc import assign_color_map
@@ -31,12 +32,13 @@ PROJECT_ID = 'revivemed/Survival-RCC'
 
 
 
-def setup_wrapper(with_id=None,**kwargs):
+def setup_wrapper(**kwargs):
 
     project_id = kwargs.get('project_id',PROJECT_ID)
     api_token = kwargs.get('api_token',NEPTUNE_API_TOKEN)
     prefix = kwargs.get('prefix','training_run')
     subdir_col = kwargs.get('subdir_col','Study ID')
+    selections_df = kwargs.get('selections_df',None)
     output_dir = kwargs.get('output_dir',None)
     yes_plot_latent_space = kwargs.get('yes_plot_latent_space',False)
     fit_subset_col = kwargs.get('fit_subset_col','train')
@@ -44,10 +46,11 @@ def setup_wrapper(with_id=None,**kwargs):
     eval_params_list = kwargs.get('eval_params_list',None)
     tags = kwargs.get('tags',[])
     
+    resume_with_id = kwargs.get('resume_with_id',None)
     encoder_project_id = kwargs.get('encoder_project_id',project_id)
     encoder_model_id = kwargs.get('encoder_model_id',None)
-    encoder_is_a_run = kwargs.get('encoder_is_a_run',True)
-    encoder_load_dir = kwargs.get('encoder_load_dir',None)
+    encoder_is_a_run = kwargs.get('encoder_is_a_run',True) #is the encoder coming from a Neptune Model or Neptune Run object?
+    encoder_load_dir = kwargs.get('encoder_load_dir',None) 
     head_name_list = kwargs.get('head_name_list',[])
     adv_name_list = kwargs.get('adv_name_list',[])
     optuna_study_info_dict = kwargs.get('optuna_study_info_dict',None)
@@ -64,7 +67,7 @@ def setup_wrapper(with_id=None,**kwargs):
     if optuna_trial: use_optuna = True
     else: use_optuna = False
 
-    assign_task_head_func = kwargs.get('assign_task_head_func',assign_task_head)
+    assign_task_head_func = kwargs.get('assign_task_head_func',assign_task_head_default)
 
     if use_optuna:
         get_kwargs_func = kwargs.get('get_kwargs_func',get_default_study_kwargs)
@@ -74,9 +77,22 @@ def setup_wrapper(with_id=None,**kwargs):
 
     input_data_dir = os.path.expanduser("~/INPUT_DATA")
     os.makedirs(input_data_dir, exist_ok=True)
-    input_data_dir = get_latest_dataset(data_dir=input_data_dir,api_token=NEPTUNE_API_TOKEN,project=project_id)
-    selections_df = pd.read_csv(f'{input_data_dir}/selection_df.csv',index_col=0)
+    input_data_dir = get_latest_dataset(data_dir=input_data_dir,
+                                        api_token=NEPTUNE_API_TOKEN,
+                                        project=project_id)
+
     all_metadata = create_full_metadata(input_data_dir, cleaning=True, save_file=True)
+
+    if selections_df is None:
+        if os.path.exists(f'{input_data_dir}/selection_df.csv'):
+            selections_df = pd.read_csv(f'{input_data_dir}/selection_df.csv',index_col=0)
+        else:
+            print('Selections dataframe not found, creating a new one using default assignments')
+            if 'Set' not in all_metadata.columns:
+                selections_df = assign_sets(all_metadata,return_only_sets=True)
+            else:
+                selections_df = get_selection_df(all_metadata)
+
 
 
     if output_dir is None:
@@ -84,11 +100,11 @@ def setup_wrapper(with_id=None,**kwargs):
 
     run = neptune.init_run(project=project_id,
                     api_token=api_token,
-                    with_id=with_id,
+                    with_id=resume_with_id,
                     tags=tags)
 
     run_id = run["sys/id"].fetch()
-    if with_id:
+    if resume_with_id:
             # desc_str = run['desc_str'].fetch()
             original_params = run['params'].fetch()
             params = convert_neptune_kwargs(original_params)
@@ -146,8 +162,10 @@ def setup_wrapper(with_id=None,**kwargs):
 
 
         if encoder_model_id:
+            print(f'Attempt to load encoder from Neptune {encoder_project_id}/{encoder_model_id}')
             encoder_kwargs = {}
         elif encoder_load_dir:
+            print(f'Attempt to load encoder from {encoder_load_dir}')
             encoder_kwargs = {}
         else:
             encoder_kwargs = kwargs['encoder_kwargs']
@@ -209,7 +227,7 @@ def setup_wrapper(with_id=None,**kwargs):
 
 
 
-def assign_task_head(head_name,all_metadata):
+def assign_task_head_default(head_name,all_metadata):
     # raise NotImplementedError('assign_task_head not implemented in this script')
 
     print('Assignment of task head:',head_name)
@@ -391,7 +409,9 @@ def run_model_wrapper(data_dir, params, output_dir=None, prefix='training_run',
                       fit_subset_col='train',subdir_col='subdir', selections_df=None,
                       eval_subset_col_list=['val'], eval_params_list=None, 
                       run_dict=None,
-                      yes_plot_latent_space=False):
+                      yes_plot_latent_space=False,
+                      download_models_from_gcp=False,
+                      upload_models_to_gcp=False):
     """
     Runs the model training and evaluation pipeline.
 
@@ -428,7 +448,8 @@ def run_model_wrapper(data_dir, params, output_dir=None, prefix='training_run',
         use_neptune= True
         #TODO: check if the models are already trained on neptune
         run_struc = run_dict.get_structure()
-        download_models_from_neptune = check_if_path_in_struc(run_struc,f'{prefix}/models/encoder_info')
+        if not download_models_from_gcp:
+            download_models_from_neptune = check_if_path_in_struc(run_struc,f'{prefix}/models/encoder_info')
         # download_models_from_neptune = check_neptune_existance(run_dict,f'{prefix}/models/encoder_info')
 
 
@@ -489,8 +510,11 @@ def run_model_wrapper(data_dir, params, output_dir=None, prefix='training_run',
     task_components_dict = params['task_kwargs']
     fit_kwargs = params['fit_kwargs']
     encoder_info_dict = params['encoder_desc']
+    
+    if (not os.path.exists(f'{saved_model_dir}/encoder_info.json')) and (use_neptune) and (download_models_from_gcp):
+        raise NotImplementedError('Downloading models from GCP not yet implemented')
 
-    if (not os.path.exists(f'{saved_model_dir}/encoder_info.json')) and (use_neptune) and (download_models_from_neptune): 
+    elif (not os.path.exists(f'{saved_model_dir}/encoder_info.json')) and (use_neptune) and (download_models_from_neptune): 
         run_dict[f'{prefix}/models/encoder_state'].download(f'{saved_model_dir}/encoder_state.pt')
         run_dict[f'{prefix}/models/encoder_info'].download(f'{saved_model_dir}/encoder_info.json')
         run_dict[f'{prefix}/models/head_state'].download(f'{saved_model_dir}/head_state.pt')
@@ -522,7 +546,8 @@ def run_model_wrapper(data_dir, params, output_dir=None, prefix='training_run',
             save_model_wrapper(encoder, head, adv, 
                             save_dir=saved_model_dir,
                             run_dict=run_dict,
-                            prefix=prefix)
+                            prefix=prefix,
+                            upload_models_to_gcp=upload_models_to_gcp)
         except ValueError as e:
             print(f'Error: {e}')
             return None
@@ -606,7 +631,7 @@ def create_latentspace_plots(X_data_eval,y_data_eval, encoder,save_dir,eval_name
         Z = generate_latent_space(X_data_eval, encoder)
         Z.to_csv(os.path.join(save_dir, f'Z_{eval_name}.csv'))
 
-        Z_pca = generate_pca_embedding(Z)
+        Z_pca = generate_pca_embedding(Z, n_components=4)
         Z_pca.to_csv(os.path.join(save_dir, f'Z_pca_{eval_name}.csv'))
         Z_pca.columns = [f'PCA{i+1}' for i in range(Z_pca.shape[1])]
 
@@ -615,7 +640,7 @@ def create_latentspace_plots(X_data_eval,y_data_eval, encoder,save_dir,eval_name
         Z_umap.columns = [f'UMAP{i+1}' for i in range(Z_umap.shape[1])]
 
         Z_embed = pd.concat([Z_pca, Z_umap], axis=1)
-        Z_embed = Z_embed.join(y_data_eval)
+        # Z_embed = Z_embed.join(y_data_eval)
         Z_embed.to_csv(Z_embed_savepath)
         run[f'{prefix}/Z_embed_{eval_name}'].upload(Z_embed_savepath)
     run.wait()
@@ -642,10 +667,10 @@ def create_latentspace_plots(X_data_eval,y_data_eval, encoder,save_dir,eval_name
 
         missing_cols = [col for col in y_data_eval.columns if col not in Z_embed.columns]
         if len(missing_cols) > 0:
-            print(f'Adding missing columns to Z_embed: {missing_cols}')
+            print(f'Adding metadata columns to Z_embed: {missing_cols}')
             Z_embed = Z_embed.join(y_data_eval[missing_cols])
-            Z_embed.to_csv(Z_embed_savepath)
-            run[f'{prefix}/Z_embed_{eval_name}'].upload(Z_embed_savepath)
+            # Z_embed.to_csv(Z_embed_savepath)
+            # run[f'{prefix}/Z_embed_{eval_name}'].upload(Z_embed_savepath)
 
 
 
@@ -767,9 +792,9 @@ def create_latentspace_plots(X_data_eval,y_data_eval, encoder,save_dir,eval_name
 
 
 ### Function to get the encoder
-def get_pretrained_encoder(dropout_rate=None, use_rand_init=False, load_dir=None, verbose=False,
+def get_encoder_model(dropout_rate=None, use_rand_init=False, load_dir=None, verbose=False,
                         project_id='revivemed/Survival-RCC',neptune_api_token=NEPTUNE_API_TOKEN,
-                        model_id='SUR-MOD', model_is_a_run=False):
+                        model_id='SUR-MOD', model_is_a_run=False, encoder_model_loc='', download_models_from_gcp=False):
     """
     Creates an encoder model.
 
@@ -798,19 +823,47 @@ def get_pretrained_encoder(dropout_rate=None, use_rand_init=False, load_dir=None
     if (not os.path.exists(encoder_kwargs_path)) or (not os.path.exists(encoder_state_path)):
 
         if model_is_a_run:
-            neptune_model = neptune.init_run(project=project_id,
+            neptune_obj = neptune.init_run(project=project_id,
                 api_token= neptune_api_token,
                 with_id=model_id,
                 mode = 'read-only')
         else:
-            neptune_model = neptune.init_model(project=project_id,
+            neptune_obj = neptune.init_model(project=project_id,
                 api_token= neptune_api_token,
                 with_id=model_id,
                 mode="read-only")
+            
+        neptune_obj_struc = neptune_obj.get_structure()
+
+        if encoder_model_loc:
+            neptune_model = neptune_obj[encoder_model_loc]
+            neptune_obj_struc = neptune_obj_struc[encoder_model_loc]
+        else:
+            neptune_model = neptune_obj
+    
 
         if not os.path.exists(encoder_state_path):
             #TODO add option to download from GCP
-            neptune_model['model/encoder_state'].download(encoder_state_path)
+            if download_models_from_gcp:
+                raise NotImplementedError('Downloading models from GCP not yet implemented')
+            
+            if 'models' in neptune_obj_struc.keys():
+                if 'encoder_state' in neptune_obj_struc['models'].keys():
+                    neptune_model['models/encoder_state'].download(encoder_state_path)
+                elif 'encoder_state_dict' in neptune_obj_struc['models'].keys():
+                    neptune_model['models/encoder_state_dict'].download(encoder_state_path)
+                else:
+                    raise ValueError('No encoder_state or encoder_state_dict found in Neptune')
+            elif 'model' in neptune_obj_struc.keys():
+                if 'encoder_state' in neptune_obj_struc['model'].keys():
+                    neptune_model['model/encoder_state'].download(encoder_state_path)
+                elif 'encoder_state_dict' in neptune_obj_struc['model'].keys():
+                    neptune_model['model/encoder_state_dict'].download(encoder_state_path)
+                else:
+                    raise ValueError('No encoder_state or encoder_state_dict found in Neptune')
+            else:
+                raise ValueError('No model or models found in Neptune')
+
             # neptune_model['model/encoder_kwargs'].download(encoder_kwargs_path)
         if not os.path.exists(encoder_kwargs_path):
             print('WARNING: encoder_kwargs.json not found, attempt to get from Neptune')
@@ -829,7 +882,7 @@ def get_pretrained_encoder(dropout_rate=None, use_rand_init=False, load_dir=None
                 encoder_kwargs.pop('hidden_size_mult')
             save_json(encoder_kwargs,encoder_kwargs_path)
 
-        neptune_model.stop()
+        neptune_obj.stop()
 
     encoder_kwargs = load_json(encoder_kwargs_path)
     if (dropout_rate is not None):
@@ -903,7 +956,8 @@ def get_model_heads(head_kwargs_dict, backup_input_size=None, verbose=False):
 
 ### Function to build the model components for fine-tuning
 def build_model_components(head_kwargs_dict, adv_kwargs_dict=None, dropout_rate=None, use_rand_init=False,
-                           encoder=None,encoder_info_dict=None,verbose=0,neptune_api_token=NEPTUNE_API_TOKEN):
+                           encoder=None,encoder_info_dict=None,verbose=0,neptune_api_token=NEPTUNE_API_TOKEN,
+                           download_models_from_gcp=False):
     """
     Builds the model components for fine-tuning.
 
@@ -922,16 +976,21 @@ def build_model_components(head_kwargs_dict, adv_kwargs_dict=None, dropout_rate=
     encoder_project_id = encoder_info_dict.get('encoder_project_id',None)
     encoder_model_id = encoder_info_dict.get('encoder_model_id',None)
     encoder_is_a_run = encoder_info_dict.get('encoder_is_a_run',False)
+    encoder_model_loc = encoder_info_dict.get('encoder_model_loc','')
+    download_models_from_gcp = encoder_info_dict.get('download_models_from_gcp',False)
 
     if (encoder is None) and (encoder_kwargs is None):
-        encoder = get_pretrained_encoder(dropout_rate=dropout_rate, 
-                                         use_rand_init=use_rand_init,
-                                         load_dir=encoder_load_dir, 
-                                         verbose=False,
+        encoder = get_encoder_model(dropout_rate=dropout_rate, 
+                                        use_rand_init=use_rand_init,
+                                        load_dir=encoder_load_dir, 
+                                        verbose=False,
                                         project_id=encoder_project_id,
                                         neptune_api_token=neptune_api_token,
                                         model_id=encoder_model_id,
-                                        model_is_a_run=encoder_is_a_run)
+                                        model_is_a_run=encoder_is_a_run,
+                                        encoder_model_loc=encoder_model_loc,
+                                        download_models_from_gcp=download_models_from_gcp)
+        
     elif encoder_kwargs is not None:
         encoder = get_encoder(**encoder_kwargs)
         if (dropout_rate is not None):
@@ -987,6 +1046,8 @@ def fit_model_wrapper(X, y, task_components_dict={}, encoder_info_dict={}, run_d
     y_adv_cols = task_components_dict.get('y_adv_cols',None)
     head_kwargs_dict = task_components_dict.get('head_kwargs_dict',None)
     adv_kwargs_dict = task_components_dict.get('adv_kwargs_dict',None)
+    use_pretrained_head = task_components_dict.get('use_pretrained_head',False)
+    use_pretrained_adv = task_components_dict.get('use_pretrained_adv',False)
 
     if y_head_cols is None:
         # by default just select all of the numeric columns
@@ -1070,6 +1131,12 @@ def fit_model_wrapper(X, y, task_components_dict={}, encoder_info_dict={}, run_d
                                                 use_rand_init=use_rand_init,
                                                 encoder_info_dict=encoder_info_dict)
 
+    if use_pretrained_head:
+        raise NotImplementedError('use_pretrained_head not implemented')
+    
+    if use_pretrained_adv:
+        raise NotImplementedError('use_pretrained_adv not implemented')
+
     if fit_dataset is not None:
         #TODO load the class weights from the model info json
         head.update_class_weights(fit_dataset.y_head)
@@ -1090,7 +1157,7 @@ def fit_model_wrapper(X, y, task_components_dict={}, encoder_info_dict={}, run_d
 
 
 
-def save_model_wrapper(encoder, head, adv, save_dir=None, run_dict={}, prefix='training_run'):
+def save_model_wrapper(encoder, head, adv, save_dir=None, run_dict={}, prefix='training_run',upload_models_to_gcp = False):
     """
     Saves the encoder, head, and adversary models to the specified directory.
 
@@ -1132,7 +1199,6 @@ def save_model_wrapper(encoder, head, adv, save_dir=None, run_dict={}, prefix='t
         os.makedirs(save_dir,exist_ok=True)
 
 
-    upload_models_to_gcp = False    
 
     encoder.save_state_to_path(save_dir,save_name='encoder_state.pt')
     encoder.save_info(save_dir,save_name='encoder_info.json')
@@ -1144,13 +1210,14 @@ def save_model_wrapper(encoder, head, adv, save_dir=None, run_dict={}, prefix='t
     # torch.save(head.state_dict(), f'{save_dir}/{setup_id}_head_state_dict.pth')
     # torch.save(adv.state_dict(), f'{save_dir}/{setup_id}_adv_state_dict.pth')
     if use_neptune:
-        run_dict[f'{prefix}/models/encoder_state'].upload(f'{save_dir}/encoder_state.pt')
-        run_dict[f'{prefix}/models/encoder_info'].upload(f'{save_dir}/encoder_info.json')
-        run_dict[f'{prefix}/models/head_state'].upload(f'{save_dir}/head_state.pt')
-        run_dict[f'{prefix}/models/head_info'].upload(f'{save_dir}/head_info.json')
-        run_dict[f'{prefix}/models/adv_state'].upload(f'{save_dir}/adv_state.pt')
-        run_dict[f'{prefix}/models/adv_info'].upload(f'{save_dir}/adv_info.json')
-        run_dict.wait()
+        if not upload_models_to_gcp:
+            run_dict[f'{prefix}/models/encoder_state'].upload(f'{save_dir}/encoder_state.pt')
+            run_dict[f'{prefix}/models/encoder_info'].upload(f'{save_dir}/encoder_info.json')
+            run_dict[f'{prefix}/models/head_state'].upload(f'{save_dir}/head_state.pt')
+            run_dict[f'{prefix}/models/head_info'].upload(f'{save_dir}/head_info.json')
+            run_dict[f'{prefix}/models/adv_state'].upload(f'{save_dir}/adv_state.pt')
+            run_dict[f'{prefix}/models/adv_info'].upload(f'{save_dir}/adv_info.json')
+            run_dict.wait()
 
     if upload_models_to_gcp:
         raise NotImplementedError('upload_models_to_gcp not implemented')
