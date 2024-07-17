@@ -446,6 +446,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     if (encoder_kind == 'TGEM_Encoder'): # or (encoder_kind == 'metabFoundation'):
         latent_size = input_size
     elif encoder_kind == 'metabFoundation':
+        hidden_size = encoder_kwargs.get('embed_dim',encoder_kwargs.get('hidden_size', -1))
         latent_size = 2*hidden_size
         # encoder_kwargs['latent_size'] = latent_size
 
