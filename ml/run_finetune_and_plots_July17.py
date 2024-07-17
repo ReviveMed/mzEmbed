@@ -318,11 +318,12 @@ if __name__ == '__main__':
 
     for run_id in run_id_list:
         print('##############################################')
+        print('##############################################')
         print('Running: ',run_id)
         start_time  = time.time()
         main(run_id,
             yes_plot_latent_space=False,
             which_finetune_nums=[4,5,6],
-            task_name_list=['Both-OS'])
+            task_name_list=['IMDC'])
         print('Minutes elapsed: ',(time.time()-start_time)/60)
         # break
