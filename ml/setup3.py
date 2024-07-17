@@ -852,7 +852,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                 Z_umap.columns = [f'UMAP{i+1}' for i in range(Z_umap.shape[1])]
 
                 Z_embed = pd.concat([Z_pca, Z_umap], axis=1)
-                Z_embed = Z_embed.join(y_data_eval)
+                # Z_embed = Z_embed.join(y_data_eval)
                 Z_embed.to_csv(Z_embed_savepath)
                 run[f'{setup_id}/Z_embed_{eval_name}'].upload(Z_embed_savepath)
             run.wait()
@@ -879,7 +879,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                     Z_umap.columns = [f'UMAP{i+1}' for i in range(Z_umap.shape[1])]
 
                     Z_embed = pd.concat([Z_pca, Z_umap], axis=1)
-                    Z_embed = Z_embed.join(y_data_train)
+                    # Z_embed = Z_embed.join(y_data_train)
                     Z_embed.to_csv(Z_embed_train_savepath)
                     run[f'{setup_id}/Z_embed_{train_name}'].upload(Z_embed_train_savepath)
 
@@ -905,10 +905,10 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
             missing_cols = [col for col in y_data_eval.columns if col not in Z_embed.columns]
             if len(missing_cols) > 0:
-                print(f'Adding missing columns to Z_embed: {missing_cols}')
+                print(f'Adding metadata columns to Z_embed: {missing_cols}')
                 Z_embed = Z_embed.join(y_data_eval[missing_cols])
-                Z_embed.to_csv(Z_embed_savepath)
-                run[f'{setup_id}/Z_embed_{eval_name}'].upload(Z_embed_savepath)
+                # Z_embed.to_csv(Z_embed_savepath)
+                # run[f'{setup_id}/Z_embed_{eval_name}'].upload(Z_embed_savepath)
 
 
 
