@@ -159,6 +159,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             kwargs['head_kwargs_dict'] = load_kwargs.get('head_kwargs_dict', {})
             kwargs['head_kwargs_list'] = eval(load_kwargs.get('head_kwargs_list', '[]'))
             # assert len(kwargs['head_kwargs_list']) <= len(y_head_cols)
+            kwargs['y_head_cols'] = eval(load_kwargs.get('y_head_cols', []))
+            y_head_cols = kwargs['y_head_cols']
 
         if load_adv_loc:
             print('loading pretrained advs, overwriting adv_kwargs_list')
@@ -166,6 +168,8 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
             kwargs['adv_kwargs_dict'] = load_kwargs.get('adv_kwargs_dict', {})
             kwargs['adv_kwargs_list'] = eval(load_kwargs.get('adv_kwargs_list', '[]'))
             # assert len(kwargs['adv_kwargs_list']) <= len(y_adv_cols)
+            kwargs['y_adv_cols'] = eval(load_kwargs.get('y_adv_cols', []))
+            y_adv_cols = kwargs['y_adv_cols']
 
         if save_kwargs_to_neptune:
             #Set to True for debugging
