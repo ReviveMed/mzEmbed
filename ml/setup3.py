@@ -193,13 +193,14 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
 
         y_codes = kwargs.get('y_codes', None)
         if (y_codes is None) and (load_model_loc):
-            y_code_keys = pretrained_run[f'{load_model_loc}/datasets/y_codes_keys'].fetch_values()['value'].to_list()
-            print('existing y_code_keys:', y_code_keys)
-            y_codes = {}
-            for key in y_code_keys:
-                if key in y_codes.keys():
-                    continue
-                y_codes[key] = pretrained_run[f'{load_model_loc}/datasets/y_codes/{key}'].fetch_values()['value'].to_list()
+            if 'y_codes_keys' in pretrained_run[f'{load_model_loc}/datasets'].fetch():
+                y_code_keys = pretrained_run[f'{load_model_loc}/datasets/y_codes_keys'].fetch_values()['value'].to_list()
+                print('existing y_code_keys:', y_code_keys)
+                y_codes = {}
+                for key in y_code_keys:
+                    if key in y_codes.keys():
+                        continue
+                    y_codes[key] = pretrained_run[f'{load_model_loc}/datasets/y_codes/{key}'].fetch_values()['value'].to_list()
         else:
             y_code_keys = []
 
@@ -842,7 +843,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                 Z = generate_latent_space(X_data_eval, encoder)
                 Z.to_csv(os.path.join(save_dir, f'Z_{eval_name}.csv'))
 
-                Z_pca = generate_pca_embedding(Z)
+                Z_pca = generate_pca_embedding(Z,n_components=4)
                 Z_pca.to_csv(os.path.join(save_dir, f'Z_pca_{eval_name}.csv'))
                 Z_pca.columns = [f'PCA{i+1}' for i in range(Z_pca.shape[1])]
 
@@ -869,7 +870,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                     Z = generate_latent_space(X_data_train, encoder)
                     Z.to_csv(os.path.join(save_dir, f'Z_{train_name}.csv'))
 
-                    Z_pca = generate_pca_embedding(Z)
+                    Z_pca = generate_pca_embedding(Z,n_components=4)
                     Z_pca.to_csv(os.path.join(save_dir, f'Z_pca_{train_name}.csv'))
                     Z_pca.columns = [f'PCA{i+1}' for i in range(Z_pca.shape[1])]
 

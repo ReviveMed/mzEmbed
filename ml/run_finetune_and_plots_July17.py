@@ -47,8 +47,8 @@ def main(run_id,yes_plot_latent_space=False,which_finetune_nums=[],task_name_lis
     subdir_col = 'Study ID'
 
     fit_subset_col = 'Pretrain Discovery Train'
-    eval_subset_col = 'Pretrain All'
-    setup_id = 'pretrain'
+    # eval_subset_col = 'Pretrain All'
+    eval_subset_col = 'Pretrain Discovery Train'
 
     finetune_fit_subset_col = 'Finetune Discovery Train'
     finetune_eval_subset_col = 'Finetune Discovery Val'
@@ -96,7 +96,7 @@ def main(run_id,yes_plot_latent_space=False,which_finetune_nums=[],task_name_lis
 
 
     if yes_plot_latent_space:
-        plot_latent_space_cols = ['Cohort Label v0','Study ID','is Pediatric','Age','Sex','BMI','Smoker Status']
+        plot_latent_space_cols = ['Cohort Label v0','Study ID','is Pediatric','Age','Sex','BMI','Smoking Status']
         _ = setup_neptune_run(input_data_dir,
                                     setup_id=f'pretrain',
                                     project_id=project_id,
@@ -111,7 +111,8 @@ def main(run_id,yes_plot_latent_space=False,which_finetune_nums=[],task_name_lis
                                     y_fit_file=y_fit_file,
                                     train_name=fit_file_id,
 
-                                    run_evaluation=True,
+                                    # run_evaluation=True,
+                                    run_evaluation=False,
                                     X_eval_file=X_eval_file,
                                     y_eval_file=y_eval_file,
                                     eval_name=eval_file_id,
@@ -308,7 +309,14 @@ if __name__ == '__main__':
     query3 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Multi Obj July12v1") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.38)'
     query4 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "MultiObj Minimize July16 v0") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.38)'
     query5 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Recon Minimize July16 v0") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.38)'
-    query_list = [query2,query3,query4,query5]
+    
+    # query2 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Recon Minimize July15 v0") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float > 0.39) AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.4)'
+    # query3 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Multi Obj July12v1") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float > 0.39) AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.4)'
+    # query4 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "MultiObj Minimize July16 v0") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float > 0.39) AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.4)'
+    # query5 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Recon Minimize July16 v0") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float > 0.39) AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.4)'
+
+    # query_list = [query2,query3,query4,query5]
+    query_list = [query4,query5]
     run_id_list = []
     for query in query_list:
         run_id_list += get_run_id_list_from_query(query=query,limit=100,project_id=project_id)
@@ -322,8 +330,10 @@ if __name__ == '__main__':
         print('Running: ',run_id)
         start_time  = time.time()
         main(run_id,
-            yes_plot_latent_space=False,
-            which_finetune_nums=[4,5,6],
-            task_name_list=['IMDC'])
+            yes_plot_latent_space=True,
+            which_finetune_nums=[],
+            # which_finetune_nums=[4,5,6],
+            task_name_list=[])
+            # task_name_list=['Both-OS','IMDC'])        
         print('Minutes elapsed: ',(time.time()-start_time)/60)
         # break
