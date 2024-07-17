@@ -138,6 +138,7 @@ def main(run_id,yes_plot_latent_space=False,which_finetune_nums=[],task_name_lis
     restart_run = False
     restart_rand_run = False
     num_repeats = 5
+    upload_models_to_neptune = False
 
     for task_name in task_name_list:
 
@@ -243,6 +244,7 @@ def main(run_id,yes_plot_latent_space=False,which_finetune_nums=[],task_name_lis
                                             X_fit_file=X_finetune_fit_file,
                                             y_fit_file=y_finetune_fit_file,
                                             train_name=finetune_fit_file_id,
+                                            upload_models_to_neptune = upload_models_to_neptune,
 
                                             run_evaluation=True,
                                             X_eval_file=X_finetune_eval_file,
@@ -276,6 +278,7 @@ def main(run_id,yes_plot_latent_space=False,which_finetune_nums=[],task_name_lis
                                             X_fit_file=X_finetune_fit_file,
                                             y_fit_file=y_finetune_fit_file,
                                             train_name=finetune_fit_file_id,
+                                            upload_models_to_neptune = upload_models_to_neptune,
 
                                             run_evaluation=True,
                                             X_eval_file=X_finetune_eval_file,
@@ -306,14 +309,14 @@ if __name__ == '__main__':
 
     # query1 = '(`pretrain/original_kwargs/source run_id`:string = "RCC-3213") OR (`pretrain/original_kwargs/source run_id`:string = "RCC-3276")'
     # query2 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Recon Minimize July15 v0") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.38)'
-    query3 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Multi Obj July12v1") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.39)'
+    # query3 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Multi Obj July12v1") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.39)'
     # query4 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "MultiObj Minimize July16 v0") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.39)'
-    query5 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Recon Minimize July16 v0") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.39)'
+    # query5 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Recon Minimize July16 v0") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.39)'
     
     # query2 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Recon Minimize July15 v0") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float > 0.39) AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.4)'
-    # query3 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Multi Obj July12v1") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float > 0.39) AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.4)'
+    query3 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Multi Obj July12v1") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float > 0.39) AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.4)'
     # query4 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "MultiObj Minimize July16 v0") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float > 0.39) AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.4)'
-    # query5 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Recon Minimize July16 v0") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float > 0.39) AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.4)'
+    query5 = '(`pretrain/original_kwargs/study_info_dict/study_name`:string = "Recon Minimize July16 v0") AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float > 0.39) AND (`pretrain/avg/Pretrain_Discovery_Val reconstruction_loss`:float < 0.4)'
 
     # query_list = [query2,query3,query4,query5]
     query_list = [query3,query5]
@@ -323,7 +326,7 @@ if __name__ == '__main__':
 
 
     print('number of models to finetune: ',len(run_id_list))
-
+    # exit()
     for run_id in run_id_list:
         print('##############################################')
         print('##############################################')
