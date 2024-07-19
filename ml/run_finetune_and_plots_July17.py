@@ -49,25 +49,12 @@ def main(run_id,yes_plot_latent_space=False,which_finetune_nums=[],task_name_lis
     fit_subset_col = 'Pretrain Discovery Train'
     # eval_subset_col = 'Pretrain All'
     eval_subset_col = 'Pretrain Discovery Train'
+    eval_subset_col1 = 'Pretrain Discovery Val'
+    eval_subset_col2 = 'Pretrain Test'
 
     finetune_fit_subset_col = 'Finetune Discovery Train'
     finetune_eval_subset_col = 'Finetune Discovery Val'
 
-    _, fit_file_id = create_selected_data(input_data_dir=input_data_dir,
-                                                sample_selection_col=fit_subset_col,
-                                                subdir_col=subdir_col,
-                                                output_dir=output_dir,
-                                                metadata_df=None,
-                                                selections_df=selections_df)
-
-
-
-    _, eval_file_id = create_selected_data(input_data_dir=input_data_dir,
-                                                    sample_selection_col=eval_subset_col,
-                                                    subdir_col=subdir_col,
-                                                    output_dir=output_dir,
-                                                    metadata_df=None,
-                                                    selections_df=selections_df)
     
     _, finetune_fit_file_id = create_selected_data(input_data_dir=input_data_dir,
                                                 sample_selection_col=finetune_fit_subset_col,
@@ -84,10 +71,6 @@ def main(run_id,yes_plot_latent_space=False,which_finetune_nums=[],task_name_lis
                                                     metadata_df=None,
                                                     selections_df=selections_df)
 
-    X_eval_file = f'{output_dir}/X_{eval_file_id}.csv'
-    y_eval_file = f'{output_dir}/y_{eval_file_id}.csv'
-    X_fit_file = f'{output_dir}/X_{fit_file_id}.csv'
-    y_fit_file = f'{output_dir}/y_{fit_file_id}.csv'
 
     X_finetune_eval_file = f'{output_dir}/X_{finetune_eval_file_id}.csv'
     y_finetune_eval_file = f'{output_dir}/y_{finetune_eval_file_id}.csv'
@@ -96,6 +79,50 @@ def main(run_id,yes_plot_latent_space=False,which_finetune_nums=[],task_name_lis
 
 
     if yes_plot_latent_space:
+
+
+        _, fit_file_id = create_selected_data(input_data_dir=input_data_dir,
+                                                    sample_selection_col=fit_subset_col,
+                                                    subdir_col=subdir_col,
+                                                    output_dir=output_dir,
+                                                    metadata_df=None,
+                                                    selections_df=selections_df)
+
+
+
+        _, eval_file_id = create_selected_data(input_data_dir=input_data_dir,
+                                                        sample_selection_col=eval_subset_col,
+                                                        subdir_col=subdir_col,
+                                                        output_dir=output_dir,
+                                                        metadata_df=None,
+                                                        selections_df=selections_df)
+
+        _, eval_file_id2 = create_selected_data(input_data_dir=input_data_dir,
+                                                        sample_selection_col=eval_subset_col2,
+                                                        subdir_col=subdir_col,
+                                                        output_dir=output_dir,
+                                                        metadata_df=None,
+                                                        selections_df=selections_df)
+        
+        _, eval_file_id1 = create_selected_data(input_data_dir=input_data_dir,
+                                                        sample_selection_col=eval_subset_col1,
+                                                        subdir_col=subdir_col,
+                                                        output_dir=output_dir,
+                                                        metadata_df=None,
+                                                        selections_df=selections_df)
+
+        X_eval_file = f'{output_dir}/X_{eval_file_id}.csv'
+        y_eval_file = f'{output_dir}/y_{eval_file_id}.csv'
+
+        X_eval_file1 = f'{output_dir}/X_{eval_file_id1}.csv'
+        y_eval_file1 = f'{output_dir}/y_{eval_file_id1}.csv'
+
+        X_eval_file2 = f'{output_dir}/X_{eval_file_id2}.csv'
+        y_eval_file2 = f'{output_dir}/y_{eval_file_id2}.csv'
+
+        X_fit_file = f'{output_dir}/X_{fit_file_id}.csv'
+        y_fit_file = f'{output_dir}/y_{fit_file_id}.csv'
+
         plot_latent_space_cols = ['Cohort Label v0','Study ID','is Pediatric','Age','Sex','BMI','Smoking Status']
         _ = setup_neptune_run(input_data_dir,
                                     setup_id=f'pretrain',
@@ -125,6 +152,61 @@ def main(run_id,yes_plot_latent_space=False,which_finetune_nums=[],task_name_lis
                                     # load_model_from_run_id=None,
                                     load_model_loc = 'pretrain')
 
+        _ = setup_neptune_run(input_data_dir,
+                                    setup_id=f'pretrain',
+                                    project_id=project_id,
+
+                                    neptune_mode='async',
+                                    yes_logging = True,
+                                    neptune_api_token=neptune_api_token,
+                                    tags=['v4'],
+
+                                    run_training=False,
+                                    X_fit_file=X_fit_file,
+                                    y_fit_file=y_fit_file,
+                                    train_name=fit_file_id,
+
+                                    run_evaluation=True,
+                                    # run_evaluation=False,
+                                    X_eval_file=X_eval_file1,
+                                    y_eval_file=y_eval_file1,
+                                    eval_name=eval_file_id1,
+
+                                    save_latent_space=True,
+                                    plot_latent_space_cols=plot_latent_space_cols,
+                                    plot_latent_space = 'sns',
+                                    
+                                    with_run_id=run_id,
+                                    # load_model_from_run_id=None,
+                                    load_model_loc = 'pretrain')
+
+        _ = setup_neptune_run(input_data_dir,
+                                    setup_id=f'pretrain',
+                                    project_id=project_id,
+
+                                    neptune_mode='async',
+                                    yes_logging = True,
+                                    neptune_api_token=neptune_api_token,
+                                    tags=['v4'],
+
+                                    run_training=False,
+                                    X_fit_file=X_fit_file,
+                                    y_fit_file=y_fit_file,
+                                    train_name=fit_file_id,
+
+                                    run_evaluation=True,
+                                    # run_evaluation=False,
+                                    X_eval_file=X_eval_file2,
+                                    y_eval_file=y_eval_file2,
+                                    eval_name=eval_file_id2,
+
+                                    save_latent_space=True,
+                                    plot_latent_space_cols=plot_latent_space_cols,
+                                    plot_latent_space = 'sns',
+                                    
+                                    with_run_id=run_id,
+                                    # load_model_from_run_id=None,
+                                    load_model_loc = 'pretrain')
 
 
 
@@ -307,7 +389,7 @@ def main(run_id,yes_plot_latent_space=False,which_finetune_nums=[],task_name_lis
 if __name__ == '__main__':
 
 
-    run_id_list = ['RCC-3967','RCC-3839']
+    run_id_list = ['RCC-3828','RCC-3967','RCC-3839','RCC-3610','RCC-3597','RCC-3537']
     for run_id in run_id_list:
         print('##############################################')
         print('##############################################')
