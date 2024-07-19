@@ -352,17 +352,21 @@ class VAE(nn.Module):
         # print('kl_loss', kl_loss)
         return torch.add(recon_loss, self.kl_weight*kl_loss)
     
-    def forward_to_loss(self, x):
+    def forward_to_loss(self, x,y=None):
+        if y is None:
+            y = x
         mu, log_var = self.encoder(x).chunk(2, dim=1)
         z = self.reparameterize(mu, log_var)
         x_recon = self.decoder(z)
-        return self.loss(x, x_recon, mu, log_var)
+        return self.loss(y, x_recon, mu, log_var)
 
-    def transform_with_loss(self, x):
+    def transform_with_loss(self, x, y=None):
+        if y is None:
+            y = x
         mu, log_var = self.encoder(x).chunk(2, dim=1)
         z = self.reparameterize(mu, log_var)
         x_recon = self.decoder(z)
-        return mu, self.loss(x, x_recon, mu, log_var)
+        return mu, self.loss(y, x_recon, mu, log_var)
 
     def generate(self, z):
         return self.decoder(z)
@@ -370,6 +374,14 @@ class VAE(nn.Module):
     # def reset_weights(self):
     #     self.encoder.apply(self._reset_weights)
     #     self.decoder.apply(self._reset_weights)
+
+    def score(self, x, y=None):
+        if y is None:
+            y = x
+        mu, log_var = self.encoder(x).chunk(2, dim=1)
+        z = self.reparameterize(mu, log_var)
+        x_recon = self.decoder(z)
+        return {'Reconstruction MSE' : F.mse_loss(x_recon, y, reduction='mean').item()}
 
     def reset_params(self):
         _reset_params(self)
@@ -509,15 +521,19 @@ class AE(nn.Module):
         # return F.mse_loss(x_recon, x, reduction='sum')
         return F.mse_loss(x_recon, x, reduction='mean')
     
-    def forward_to_loss(self, x):
+    def forward_to_loss(self, x,y=None):
+        if y is None:
+            y = x
         z = self.encoder(x)
         x_recon = self.decoder(z)
-        return self.loss(x, x_recon)
+        return self.loss(y, x_recon)
 
-    def transform_with_loss(self, x):
+    def transform_with_loss(self, x,y=None):
+        if y is None:
+            y = x
         z = self.encoder(x)
         x_recon = self.decoder(z)
-        return z, self.loss(x, x_recon)
+        return z, self.loss(y, x_recon)
 
     def generate(self, z):
         return self.decoder(z)
@@ -1520,10 +1536,13 @@ class metabFoundation(Default_EncoderDecoder):
     def loss(self, x, x_recon):
         return F.mse_loss(x_recon, x, reduction='mean')
     
-    def forward_to_loss(self, x, mask_loss_weight=10.0,x_hidden=None):
+    def forward_to_loss(self, x, y=None, mask_loss_weight=10.0,x_hidden=None):
         if x_hidden is None:
             x_hidden = torch.rand_like(x) < self.default_hidden_fraction
-       
+
+        if y is None:
+            y = x
+        y_seq, _, _, _ = self.metab_to_seq.transform(y,x_hidden=x_hidden)
         # encode
         x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x,x_hidden=x_hidden)
         x_emb = self.seq_to_embed(x_seq, x_pos_ids, x_mask, x_pad)
@@ -1535,15 +1554,18 @@ class metabFoundation(Default_EncoderDecoder):
         x_out_seq = self.decoder(x_enc).squeeze(-1)
 
         # loss
-        all_loss = self.loss(x_seq[~x_pad], x_out_seq[~x_pad])
-        masked_loss = self.loss(x_seq[x_mask], x_out_seq[x_mask])
+        all_loss = self.loss(y_seq[~x_pad], x_out_seq[~x_pad])
+        masked_loss = self.loss(y_seq[x_mask], x_out_seq[x_mask])
         total_loss = all_loss + mask_loss_weight * masked_loss
 
         return total_loss
     
-    def transform_with_loss(self, x, mask_loss_weight=10.0,x_hidden=None, as_seq=False):
+    def transform_with_loss(self, x, y=None, mask_loss_weight=10.0,x_hidden=None, as_seq=False):
         if x_hidden is None:
             x_hidden = torch.rand_like(x) < self.default_hidden_fraction
+        if y is None:
+            y = x
+        y_seq, _, _, _ = self.metab_to_seq.transform(y,x_hidden=x_hidden)
         # encode
         x_seq, x_pos_ids, x_mask, x_pad = self.metab_to_seq.transform(x,x_hidden=x_hidden)
         x_emb = self.seq_to_embed(x_seq, x_pos_ids, x_mask, x_pad)
@@ -1556,8 +1578,8 @@ class metabFoundation(Default_EncoderDecoder):
         x_out_seq = self.decoder(x_enc_w_pos).squeeze(-1)
 
         # loss
-        all_loss = self.loss(x_seq[~x_pad], x_out_seq[~x_pad])
-        masked_loss = self.loss(x_seq[x_mask], x_out_seq[x_mask])
+        all_loss = self.loss(y_seq[~x_pad], x_out_seq[~x_pad])
+        masked_loss = self.loss(y_seq[x_mask], x_out_seq[x_mask])
         total_loss = all_loss + mask_loss_weight * masked_loss
         
         if as_seq:

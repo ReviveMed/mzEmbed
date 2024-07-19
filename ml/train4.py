@@ -31,6 +31,19 @@ from neptune.utils import stringify_unsupported
 ##################################################################################
 ######### for training the compound model
 
+
+def convert_y_data_by_codes(y_data, y_codes):
+    for col in y_data.columns:
+        if y_data[col].dtype == 'object':
+            print('converting', col, 'to category')
+            if col not in y_codes:
+                y_codes[col] = y_data[col].astype('category').cat.categories.to_list()
+                y_data.loc[:, col] = y_data[col].astype('category').cat.codes
+            else:
+                print('mapping', col, 'to existing codes')
+                y_data.loc[:,col] = y_data[col].map(lambda x: y_codes[col].index(x) if x in y_codes[col] else -1)
+    return y_data, y_codes
+
 class CompoundDataset(Dataset):
     def __init__(self, X, y_head=None, y_adv=None, other=None, y_codes=None):
         self.X = torch.tensor(X.to_numpy(), dtype=torch.float32)
@@ -220,6 +233,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
     prefix = kwargs.get('prefix', 'fit')
     train_name = kwargs.get(f'train_name', 'train')
     freeze_encoder = kwargs.get('freeze_encoder', False)
+    encoder_reconstructs_noise = kwargs.get('encoder_reconstructs_noise', True) # Set to True for backwards compatibility with all models run before 2024-July-19th, but this should probably be False
     
     optimizer_name = kwargs.get('optimizer_name', 'adamw')
     head_optimizer_name = kwargs.get('head_optimizer_name', optimizer_name)
@@ -412,8 +426,13 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                 clin_vars = clin_vars.to(device)
 
                 # noise injection for training to make model more robust
-                if (noise_factor>0) and (phase == f'{train_name}'):
+                if (noise_factor>0) and (phase == f'{train_name}') and (encoder_reconstructs_noise):
                     X = X + noise_factor * torch.randn_like(X)
+                    X_with_noise = X
+                elif (noise_factor>0) and (phase == f'{train_name}'):
+                    X_with_noise = X + noise_factor * torch.randn_like(X)
+                else:
+                    X_with_noise = X
 
 
                 # Train the Adversarial Head First
@@ -451,9 +470,10 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                     adversary_optimizer.zero_grad()
                 with torch.set_grad_enabled(phase == f'{train_name}'):
                     if encoder_weight > 0:
-                        z, encoder_loss = encoder.transform_with_loss(X)
+                        # z, encoder_loss = encoder.transform_with_loss(X)
+                        z, encoder_loss = encoder.transform_with_loss(X_with_noise, X)
                     else:
-                        z = encoder.transform(X)
+                        z = encoder.transform(X_with_noise)
                         encoder_loss = torch.tensor(0)
                     
 

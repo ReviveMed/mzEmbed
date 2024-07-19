@@ -7,7 +7,7 @@ from neptune.utils import stringify_unsupported
 from misc import save_json, load_json, get_clean_batch_sz
 from utils_neptune import get_latest_dataset,get_run_id_list, check_neptune_existance, check_if_path_in_struc, convert_neptune_kwargs
 from models import get_encoder, get_head, MultiHead, create_model_wrapper, create_pytorch_model_from_info, CompoundModel
-from train4 import train_compound_model, create_dataloaders_old, CompoundDataset
+from train4 import train_compound_model, create_dataloaders_old, CompoundDataset, convert_y_data_by_codes
 import os
 from prep_run import create_selected_data, convert_kwargs_for_optuna, create_full_metadata, get_task_head_kwargs, make_kwargs_set
 import shutil
@@ -36,12 +36,13 @@ def setup_wrapper(**kwargs):
 
     project_id = kwargs.get('project_id',PROJECT_ID)
     api_token = kwargs.get('api_token',NEPTUNE_API_TOKEN)
-    prefix = kwargs.get('prefix','training_run')
+    setup_id = kwargs.get('setup_id','example')
+    # prefix = kwargs.get('prefix','training_run')
     subdir_col = kwargs.get('subdir_col','Study ID')
     selections_df = kwargs.get('selections_df',None)
     output_dir = kwargs.get('output_dir',None)
     yes_plot_latent_space = kwargs.get('yes_plot_latent_space',False)
-    fit_subset_col = kwargs.get('fit_subset_col','train')
+    fit_subset_col = kwargs.get('fit_subset_col',None)
     eval_subset_col_list = kwargs.get('eval_subset_col_list',[])
     eval_params_list = kwargs.get('eval_params_list',None)
     tags = kwargs.get('tags',[])
@@ -55,15 +56,16 @@ def setup_wrapper(**kwargs):
     adv_name_list = kwargs.get('adv_name_list',[])
     optuna_study_info_dict = kwargs.get('optuna_study_info_dict',None)
     num_iterations = kwargs.get('num_iterations',1)
-    setup_id = kwargs.get('setup_id','')
     optuna_trial = kwargs.get('optuna_trial',None)
-    encoder_kind = kwargs.get('encoder_kind','VAE')
 
     overwrite_default_params = kwargs.get('overwrite_existing_params',False)
     overwrite_params_fit_kwargs = kwargs.get('overwrite_params_fit_kwargs',{})
     overwrite_params_task_kwargs = kwargs.get('overwrite_params_task_kwargs',{})
     overwrite_params_other_kwargs = kwargs.get('overwrite_params_other_kwargs',{})
     
+    if fit_subset_col is None:
+        raise ValueError('fit_subset_col must be provided')
+
     if optuna_trial: use_optuna = True
     else: use_optuna = False
 
@@ -81,7 +83,10 @@ def setup_wrapper(**kwargs):
                                         api_token=NEPTUNE_API_TOKEN,
                                         project=project_id)
 
-    all_metadata = create_full_metadata(input_data_dir, cleaning=True, save_file=True)
+    if os.path.exists(f'{input_data_dir}/metadata.csv'):
+        all_metadata = pd.read_csv(f'{input_data_dir}/metadata.csv',index_col=0)
+    else:
+        all_metadata = create_full_metadata(input_data_dir, cleaning=True, save_file=True)
 
     if selections_df is None:
         if os.path.exists(f'{input_data_dir}/selection_df.csv'):
@@ -150,7 +155,7 @@ def setup_wrapper(**kwargs):
         plot_latent_space_cols  = list(set(y_head_cols + y_adv_cols))
 
 
-        run_kwargs = get_kwargs_func(head_kwargs_dict,adv_kwargs_dict,encoder_kind=encoder_kind)
+        run_kwargs = get_kwargs_func(head_kwargs_dict=head_kwargs_dict,adv_kwargs_dict=adv_kwargs_dict)
         other_kwargs = {}
         other_kwargs['plot_latent_space_cols'] = plot_latent_space_cols
 
@@ -168,7 +173,7 @@ def setup_wrapper(**kwargs):
             print(f'Attempt to load encoder from {encoder_load_dir}')
             encoder_kwargs = {}
         else:
-            encoder_kwargs = kwargs['encoder_kwargs']
+            encoder_kwargs = run_kwargs['encoder_kwargs']
 
 
         params = {
@@ -199,21 +204,22 @@ def setup_wrapper(**kwargs):
         run['params'] = stringify_unsupported(params)
 
 
-
-    # eval_params_list = [x for x in default_eval_params_list if x['y_cols'][0] in params['task_kwargs']['y_head_cols']]
-    # eval_params_list = [x for x in default_eval_params_list if x['y_head'][0].replace('-',' ').replace('_',' ') in desc_str_simplified]
-    # eval_params_list = default_eval_params_list
+    if eval_params_list is None:
+        eval_params_list = [x for x in default_eval_params_list if x['y_cols'][0] in params['task_kwargs']['y_head_cols']]
+        # eval_params_list = [x for x in default_eval_params_list if x['y_head'][0].replace('-',' ').replace('_',' ') in desc_str_simplified]
+        # eval_params_list = default_eval_params_list
+    
+    eval_params_list.append(default_eval_params_list[0]) # always add the reconstruction evaluation
+    
     print('eval_params_list',eval_params_list)
     run_output_dir = f'{output_dir}/{run_id}'
     os.makedirs(run_output_dir,exist_ok=True)
 
-    if setup_id:
-        prefix = f'{setup_id}/{prefix}'
     
     run, all_metrics = run_multiple_iterations(input_data_dir=input_data_dir,
                                 params=params,
                                 output_dir=run_output_dir,
-                                prefix=prefix,
+                                prefix=setup_id,
                                 fit_subset_col=fit_subset_col,
                                 subdir_col=subdir_col,
                                 selections_df=selections_df,
@@ -227,7 +233,7 @@ def setup_wrapper(**kwargs):
 
 
 
-def assign_task_head_default(head_name,all_metadata):
+def assign_task_head_default(head_name,all_metadata,default_weight=1.0):
     # raise NotImplementedError('assign_task_head not implemented in this script')
 
     print('Assignment of task head:',head_name)
@@ -277,6 +283,7 @@ def assign_task_head_default(head_name,all_metadata):
         head_kind = 'Binary'
         y_head_col = 'Sex'
         num_classes = 2
+        default_weight = 1.0
     elif head_name == 'BMI':
         head_kind = 'Regression'
         y_head_col = 'BMI'
@@ -392,10 +399,11 @@ def run_multiple_iterations(input_data_dir,
     
     
     # run[f'all_training_{prefix_name}/metrics/{key}'] = []
-    for key,val in metrics.items():
+    for key,val in record_metrics.items():
         # run[f'all_training_{prefix_name}/metrics/{key}'].extend(val)
         run[f'avg_{prefix}/metrics/{key}'] = np.mean(val)
-        run[f'avg_{prefix}/metrics/std_{key}'] = np.std(val)
+        if len(val) > 1:
+            run[f'avg_{prefix}/metrics/std_{key}'] = np.std(val)
     run[f'avg_{prefix}/num_success'] = num_train_success
 
 
@@ -409,6 +417,8 @@ def run_model_wrapper(data_dir, params, output_dir=None, prefix='training_run',
                       fit_subset_col='train',subdir_col='subdir', selections_df=None,
                       eval_subset_col_list=['val'], eval_params_list=None, 
                       run_dict=None,
+                      y_codes=None,
+                      processed_data_dir=None,
                       yes_plot_latent_space=False,
                       download_models_from_gcp=False,
                       upload_models_to_gcp=False):
@@ -541,6 +551,7 @@ def run_model_wrapper(data_dir, params, output_dir=None, prefix='training_run',
                                                     task_components_dict=task_components_dict,
                                                     encoder_info_dict=encoder_info_dict,
                                                     run_dict=run_dict[prefix],
+                                                    train_name = fit_file_id,
                                                     **fit_kwargs)
 
             save_model_wrapper(encoder, head, adv, 
@@ -554,7 +565,11 @@ def run_model_wrapper(data_dir, params, output_dir=None, prefix='training_run',
 
 
     metrics = defaultdict(dict)
-    
+    if y_codes is None:
+        y_codes = {}
+        if use_neptune:
+            y_codes = run_dict[f'{prefix}/datasets/y_codes'].fetch()
+            y_codes = convert_neptune_kwargs(y_codes)
 
     for eval_subset_col in eval_subset_col_list:
         _, eval_file_id = create_selected_data(input_data_dir=data_dir,
@@ -585,11 +600,13 @@ def run_model_wrapper(data_dir, params, output_dir=None, prefix='training_run',
                 if y_col_name is None:
                     metrics[f'{eval_file_id}' ].update(evaluate_model_wrapper(encoder, head, adv, X_data_eval, y_data_eval,
                                                                         y_cols=y_cols,
-                                                                        y_head=y_head))
+                                                                        y_head=y_head,
+                                                                        y_codes=y_codes))
                 else:
                     metrics[f'{eval_file_id}__head_{y_head}__on_{y_col_name}'].update(evaluate_model_wrapper(encoder, head, adv, X_data_eval, y_data_eval,
                                                                                         y_cols=y_cols,
-                                                                                        y_head=y_head))
+                                                                                        y_head=y_head,
+                                                                                        y_codes=y_codes))
                     # metrics[f'{eval_name}__{y_col_name}'].update(evaluate_model_wrapper(encoder, head, adv, X_data_eval, y_data_eval,
                     #                                                 y_cols=y_cols,
                     #                                                 y_head=y_head)
@@ -957,7 +974,7 @@ def get_model_heads(head_kwargs_dict, backup_input_size=None, verbose=False):
 ### Function to build the model components for fine-tuning
 def build_model_components(head_kwargs_dict, adv_kwargs_dict=None, dropout_rate=None, use_rand_init=False,
                            encoder=None,encoder_info_dict=None,verbose=0,neptune_api_token=NEPTUNE_API_TOKEN,
-                           download_models_from_gcp=False):
+                           download_models_from_gcp=False,input_size=2736):
     """
     Builds the model components for fine-tuning.
 
@@ -992,10 +1009,14 @@ def build_model_components(head_kwargs_dict, adv_kwargs_dict=None, dropout_rate=
                                         download_models_from_gcp=download_models_from_gcp)
         
     elif encoder_kwargs is not None:
+        if 'input_size' not in encoder_kwargs:
+            encoder_kwargs['input_size'] = input_size
+        assert encoder_kwargs['input_size'] == input_size, 'Encoder input size does not match the provided input size'
         encoder = get_encoder(**encoder_kwargs)
         if (dropout_rate is not None):
             if verbose: print('Setting dropout rate to',dropout_rate)
             encoder_kwargs['dropout_rate'] = dropout_rate
+
 
     # TODO: We need better handling of head input size to account for the size of the other_vars
     head = get_model_heads(head_kwargs_dict, backup_input_size=encoder.latent_size + 1)
@@ -1048,6 +1069,7 @@ def fit_model_wrapper(X, y, task_components_dict={}, encoder_info_dict={}, run_d
     adv_kwargs_dict = task_components_dict.get('adv_kwargs_dict',None)
     use_pretrained_head = task_components_dict.get('use_pretrained_head',False)
     use_pretrained_adv = task_components_dict.get('use_pretrained_adv',False)
+    input_size = X.shape[1]
 
     if y_head_cols is None:
         # by default just select all of the numeric columns
@@ -1129,7 +1151,8 @@ def fit_model_wrapper(X, y, task_components_dict={}, encoder_info_dict={}, run_d
                                                 adv_kwargs_dict=adv_kwargs_dict,
                                                 dropout_rate=dropout_rate,
                                                 use_rand_init=use_rand_init,
-                                                encoder_info_dict=encoder_info_dict)
+                                                encoder_info_dict=encoder_info_dict,
+                                                input_size=input_size)
 
     if use_pretrained_head:
         raise NotImplementedError('use_pretrained_head not implemented')
@@ -1230,7 +1253,7 @@ def save_model_wrapper(encoder, head, adv, save_dir=None, run_dict={}, prefix='t
 
 
 
-def evaluate_model_wrapper(encoder, head, adv, X_data_eval, y_data_eval, y_cols, y_head=None):
+def evaluate_model_wrapper(encoder, head, adv, X_data_eval, y_data_eval, y_cols, y_head=None, y_codes={}):
     """
     Wrapper function to evaluate a model.
 
@@ -1252,6 +1275,16 @@ def evaluate_model_wrapper(encoder, head, adv, X_data_eval, y_data_eval, y_cols,
 
     if y_head is None:
         chosen_head = head
+    
+    elif y_head in ['Encoder','Autoencoder','Reconstruction','Recon','Decoder']:
+        X = torch.tensor(X_data_eval.to_numpy(),dtype=torch.float32)
+        # device = next(encoder.parameters()).device
+        # X.to(device)
+        encoder.eval()
+        with torch.inference_mode():
+            recon_score = encoder.score(X,X)
+        return recon_score
+    
     else:
         multihead_name_list = head.heads_names
         if y_head not in multihead_name_list:
@@ -1279,11 +1312,19 @@ def evaluate_model_wrapper(encoder, head, adv, X_data_eval, y_data_eval, y_cols,
         #     chosen_head.y_idx = 0
         # else:
         #     chosen_head.y_idx = list(range(len(y_cols)))
-        
+    encoder.to('cpu')
+    chosen_head.to('cpu')
+
+    if (chosen_head.kind == 'Dummy'):
+        return {}
+    if (chosen_head.kind == 'MultiHead') and (len(chosen_head.heads)==0):
+        return {}
+    
     model = CompoundModel(encoder, chosen_head)
     skmodel = create_pytorch_model_from_info(full_model=model)
 
-    return skmodel.score(X_data_eval.to_numpy(),y_data_eval[y_cols].to_numpy())
+    y_data, _ = convert_y_data_by_codes(y_data_eval[y_cols], y_codes)
+    return skmodel.score(X_data_eval.to_numpy(),y_data.to_numpy())
 
 
 ############################################################
@@ -1335,6 +1376,38 @@ def remove_rows_with_y_nans(X_data, y_data, subset_cols=None,how='any'):
 
 default_eval_params_list = [
     # {},
+
+    ###### Pretraining Tasks ######
+    {
+        'y_col_name':None, 
+        'y_head': 'Encoder',
+        'y_cols':['']},
+    {
+        'y_col_name':'Sex', 
+        'y_head': 'Sex',
+        'y_cols':['Sex']},
+    {
+        'y_col_name':'Age',
+        'y_head':'Age',
+        'y_cols':['Age']},
+    {
+        'y_col_name':'Study ID',
+        'y_head':'Study ID',
+        'y_cols':['Study ID']},
+    {
+        'y_col_name':'Cohort Label',
+        'y_head':'Cohort Label',
+        'y_cols':['Cohort Label v0']},
+    {
+        'y_col_name':'is Pediatric',
+        'y_head':'is Pediatric',
+        'y_cols':['is Pediatric']},
+    {
+        'y_col_name':'Smoking',
+        'y_head':'Smoking',
+        'y_cols':['Smoking Status']},
+
+
     ###### OS ######
     {
         'y_col_name':'NIVO OS',
