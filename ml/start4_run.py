@@ -85,7 +85,7 @@ setup_wrapper(
     pretrained_loc='pretrain',
     overwrite_params_fit_kwargs={'num_epochs':10},
     num_iterations = 5,
-    head_name_list=['IMDC'])
+    head_name_list=['Both-OS'])
     # eval_param_list = eval_param_list)
 
 
