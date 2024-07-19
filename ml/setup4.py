@@ -1729,6 +1729,49 @@ default_eval_params_list = [
         'y_head':'Both OS', # which head to apply to the y_col
         'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col             
     
+        ###### OS Alt ######
+    {
+        'y_col_name':'NIVO-OS',
+        'y_head':'NIVO-OS', # which head to apply to the y_col
+        'y_cols': ['NIVO-OS','OS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'NIVO-OS',
+        'y_head':'EVER-OS', # which head to apply to the y_col
+        'y_cols': ['NIVO-OS','OS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'NIVO-OS',
+        'y_head':'Both-OS', # which head to apply to the y_col
+        'y_cols': ['NIVO-OS','OS_Event']}, # which columns to use for the y_col
+
+
+    {
+        'y_col_name':'EVER-OS',
+        'y_head':'NIVO-OS', # which head to apply to the y_col
+        'y_cols': ['EVER-OS','OS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'EVER-OS',
+        'y_head':'EVER-OS', # which head to apply to the y_col
+        'y_cols': ['EVER-OS','OS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'EVER-OS',
+        'y_head':'Both-OS', # which head to apply to the y_col
+        'y_cols': ['EVER-OS','OS_Event']}, # which columns to use for the y_col
+    
+
+    {
+        'y_col_name':'Both-OS',
+        'y_head':'EVER-OS', # which head to apply to the y_col
+        'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col
+    {
+        'y_col_name':'Both-OS',
+        'y_head':'NIVO-OS', # which head to apply to the y_col
+        'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col   
+    {
+        'y_col_name':'Both-OS',
+        'y_head':'Both-OS', # which head to apply to the y_col
+        'y_cols': ['OS','OS_Event']}, # which columns to use for the y_col     
+
+
     ###### PFS ######
     {
         'y_col_name':'NIVO PFS',
