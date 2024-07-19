@@ -34,18 +34,61 @@ subdir_col = 'Study ID'
 
 
 
+
+# setup_wrapper(
+#     project_id = 'revivemed/RCC',
+#     api_token = NEPTUNE_API_TOKEN,
+#     setup_id = 'pretrain',
+#     tags = 'setup4-test',
+#     fit_subset_col = 'Pretrain Discovery Train',
+#     eval_subset_col_list = ['Pretrain Discovery Val','Pretrain Test'],
+#     selections_df = selections_df,
+#     output_dir = output_dir,
+#     head_name_list=['Sex','Age'])
+
+
+
+# eval_param_list = [
+#     {'y_col_name': 'MSKCC',
+#      'y_head': 'IMDC',
+#      'y_cols' ['MSKCC']
+#     }
+# ]
+
+# setup_wrapper(
+#     project_id = 'revivemed/RCC',
+#     api_token = NEPTUNE_API_TOKEN,
+#     setup_id = 'finetune v0',
+#     tags = 'setup4-test',
+#     fit_subset_col = 'Finetune Discovery Train',
+#     eval_subset_col_list = ['Finetune Discovery Val','Finetune Test'],
+#     selections_df = selections_df,
+#     output_dir = output_dir,
+#     pretrained_model_id = 'RCC-4201',
+#     pretrained_loc='pretrain',
+#     overwrite_params_fit_kwargs={'num_epochs':10},
+#     num_iterations = 5,
+#     head_name_list=['IMDC'])
+#     # eval_param_list = eval_param_list)
+
+
 setup_wrapper(
     project_id = 'revivemed/RCC',
     api_token = NEPTUNE_API_TOKEN,
-    setup_id = 'pretrain',
+    setup_id = 'finetune v0',
     tags = 'setup4-test',
-    fit_subset_col = 'Pretrain Discovery Train',
-    eval_subset_col_list = ['Pretrain Discovery Val'],
+    fit_subset_col = 'Finetune Discovery Train',
+    eval_subset_col_list = ['Finetune Discovery Val','Finetune Test'],
     selections_df = selections_df,
     output_dir = output_dir,
-    head_name_list=['Sex','Age'],
+    pretrained_model_id = 'RCC-4214',
+    pretrained_loc='pretrain',
     overwrite_params_fit_kwargs={'num_epochs':10},
-    overwrite_existing_params=True)
+    num_iterations = 5,
+    head_name_list=['IMDC'])
+    # eval_param_list = eval_param_list)
+
+
 
 
 # setup_wrapper(
@@ -54,41 +97,52 @@ setup_wrapper(
 #     setup_id = 'pretrain',
 #     tags = 'setup4-test',
 #     fit_subset_col = 'Pretrain Discovery Train',
-#     eval_subset_col_list = ['Pretrain Discovery Val'],
+#     eval_subset_col_list = ['Pretrain Discovery Val','Pretrain Test'],
 #     selections_df = selections_df,
 #     output_dir = output_dir,
 #     head_name_list=['Sex','Age'],
-#     encoder_model_id = 'RCC-4090'
-#     overwrite_params_fit_kwargs={'num_epochs':100},
+#     overwrite_params_fit_kwargs={'num_epochs':10},
 #     overwrite_existing_params=True)
 
+# def main(STUDY_INFO_DICT,num_trials=5):
 
-    # project_id = kwargs.get('project_id',PROJECT_ID)
-    # api_token = kwargs.get('api_token',NEPTUNE_API_TOKEN)
-    # prefix = kwargs.get('prefix','training_run')
-    # subdir_col = kwargs.get('subdir_col','Study ID')
-    # selections_df = kwargs.get('selections_df',None)
-    # output_dir = kwargs.get('output_dir',None)
-    # yes_plot_latent_space = kwargs.get('yes_plot_latent_space',False)
-    # fit_subset_col = kwargs.get('fit_subset_col','train')
-    # eval_subset_col_list = kwargs.get('eval_subset_col_list',[])
-    # eval_params_list = kwargs.get('eval_params_list',None)
-    # tags = kwargs.get('tags',[])
+#     def compute_objective(run_id):
+#         return objective_func4(run_id,
+#                                 study_info_dict=STUDY_INFO_DICT,
+#                                 project_id=project_id,
+#                                 neptune_api_token=neptune_api_token,
+#                                 setup_id=setup_id,
+#                                 eval_file_id=eval_file_id)
+
+
+#     def objective(trial):
+
+#         trial.set_user_attr('run_id',run_id)
+#         trial.set_user_attr('setup_id',setup_id)
+
+#         try:
+
+#             setup_wrapper(
+#                 project_id = 'revivemed/RCC',
+#                 api_token = NEPTUNE_API_TOKEN,
+#                 setup_id = 'finetune v0',
+#                 tags = 'setup4-test',
+#                 fit_subset_col = 'Finetune Discovery Train',
+#                 eval_subset_col_list = ['Finetune Discovery Val','Finetune Test'],
+#                 selections_df = selections_df,
+#                 output_dir = output_dir,
+#                 pretrained_model_id = 'RCC-4201',
+#                 pretrained_loc='pretrain',
+#                 overwrite_params_fit_kwargs={'num_epochs':10},
+#                 num_iterations = 5,
+#                 optuna_trial=trial,
+#                 optuna_study_info_dict = STUDY_INFO_DICT,
+#                 head_name_list=['IMDC'])
+
+#             return compute_objective(run_id)
     
-    # resume_with_id = kwargs.get('resume_with_id',None)
-    # encoder_project_id = kwargs.get('encoder_project_id',project_id)
-    # encoder_model_id = kwargs.get('encoder_model_id',None)
-    # encoder_is_a_run = kwargs.get('encoder_is_a_run',True) #is the encoder coming from a Neptune Model or Neptune Run object?
-    # encoder_load_dir = kwargs.get('encoder_load_dir',None) 
-    # head_name_list = kwargs.get('head_name_list',[])
-    # adv_name_list = kwargs.get('adv_name_list',[])
-    # optuna_study_info_dict = kwargs.get('optuna_study_info_dict',None)
-    # num_iterations = kwargs.get('num_iterations',1)
-    # setup_id = kwargs.get('setup_id','')
-    # optuna_trial = kwargs.get('optuna_trial',None)
-    # encoder_kind = kwargs.get('encoder_kind','VAE')
-
-    # overwrite_default_params = kwargs.get('overwrite_existing_params',False)
-    # overwrite_params_fit_kwargs = kwargs.get('overwrite_params_fit_kwargs',{})
-    # overwrite_params_task_kwargs = kwargs.get('overwrite_params_task_kwargs',{})
-    # overwrite_params_other_kwargs = kwargs.get('overwrite_params_other_kwargs',{})
+#     # except Exception as e:
+#         except ValueError as e:
+#             print(e)
+#             # return float('nan')
+#             raise optuna.TrialPruned()

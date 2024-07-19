@@ -47,21 +47,19 @@ def setup_wrapper(**kwargs):
     eval_params_list = kwargs.get('eval_params_list',None)
     tags = kwargs.get('tags',[])
     
-    resume_with_id = kwargs.get('resume_with_id',None)
+    resume_with_id = kwargs.get('resume_with_id',None) # resume run with id
     download_models_from_gcp = kwargs.get('download_models_from_gcp',False)
     
     pretrained_project_id = kwargs.get('pretrained_project_id',project_id)
     pretrained_model_id = kwargs.get('pretrained_model_id',None)
-    pretrained_is_registered = kwargs.get('pretrained_is_registered',True) #is the encoder coming from a Neptune Model or Neptune Run object?
+    pretrained_is_registered = kwargs.get('pretrained_is_registered',False) #is the encoder coming from a Neptune Model or Neptune Run object?
     pretrained_loc = kwargs.get('pretrained_loc',None) 
     use_pretrained_head= kwargs.get('use_pretrained_head',False)
     use_pretrained_adv= kwargs.get('use_pretrained_adv',False)
     
     head_name_list = kwargs.get('head_name_list',[])
     adv_name_list = kwargs.get('adv_name_list',[])
-    optuna_study_info_dict = kwargs.get('optuna_study_info_dict',None)
     num_iterations = kwargs.get('num_iterations',1)
-    optuna_trial = kwargs.get('optuna_trial',None)
 
     overwrite_default_params = kwargs.get('overwrite_existing_params',False)
     overwrite_params_fit_kwargs = kwargs.get('overwrite_params_fit_kwargs',{})
@@ -71,6 +69,8 @@ def setup_wrapper(**kwargs):
     if fit_subset_col is None:
         raise ValueError('fit_subset_col must be provided')
 
+    optuna_study_info_dict = kwargs.get('optuna_study_info_dict',None)
+    optuna_trial = kwargs.get('optuna_trial',None)
     if optuna_trial: use_optuna = True
     else: use_optuna = False
 
@@ -81,6 +81,8 @@ def setup_wrapper(**kwargs):
     else:
         get_kwargs_func = kwargs.get('get_kwargs_func',make_kwargs_set)
 
+
+    #################################
 
     input_data_dir = os.path.expanduser("~/INPUT_DATA")
     os.makedirs(input_data_dir, exist_ok=True)
@@ -270,7 +272,7 @@ def assign_task_head_default(head_name,all_metadata,default_weight=1.0):
     elif head_name == 'Study ID':
         head_kind = 'MultiClass'
         y_head_col = 'Study ID'
-        num_classes = all_metadata['Cohort Label v0'].nunique() #22
+        num_classes = all_metadata['Study ID'].nunique() #22
         # print('num_classes:',num_classes)
         default_weight = 1.0
     elif head_name == 'Cohort-Label':
@@ -474,7 +476,8 @@ def run_model_wrapper(data_dir, params, output_dir=None, prefix='training_run',
         if not download_models_from_gcp:
             download_models_from_neptune = check_if_path_in_struc(run_struc,f'{prefix}/models/encoder_info')
         # download_models_from_neptune = check_neptune_existance(run_dict,f'{prefix}/models/encoder_info')
-
+        else:
+            raise NotImplementedError('Downloading models from GCP not yet implemented')
 
     if use_neptune:
     #     run_dict[f'{prefix}/dataset'].track_files(data_dir)
@@ -582,8 +585,9 @@ def run_model_wrapper(data_dir, params, output_dir=None, prefix='training_run',
     if y_codes is None:
         y_codes = {}
         if use_neptune:
-            y_codes = run_dict[f'{prefix}/datasets/y_codes'].fetch()
-            y_codes = convert_neptune_kwargs(y_codes)
+            if check_neptune_existance(run_dict,f'{prefix}/datasets/y_codes'):
+                y_codes = run_dict[f'{prefix}/datasets/y_codes'].fetch()
+                y_codes = convert_neptune_kwargs(y_codes)
 
     for eval_subset_col in eval_subset_col_list:
         _, eval_file_id = create_selected_data(input_data_dir=data_dir,
@@ -853,6 +857,7 @@ def get_specific_model(model_id,
     os.makedirs(local_dir,exist_ok=True)
 
     load_dir = os.path.join(local_dir,model_id,model_loc)
+    os.makedirs(load_dir,exist_ok=True)
     model_info_path = os.path.join(load_dir,f'{model_name}_info.json')
     model_state_path =  os.path.join(load_dir,f'{model_name}_state.pt')
     neptune_was_used = False
@@ -887,10 +892,26 @@ def get_specific_model(model_id,
             if download_models_from_gcp:
                 raise NotImplementedError('Downloading models from GCP not yet implemented')
             else:
+                neptune_obj_struc = neptune_obj.get_structure()
                 if model_loc:
-                    neptune_obj[f'{model_loc}/models/{model_name}_state'].download(model_state_path)
-                else:
-                    neptune_obj[f'model/{model_name}_state'].download(model_state_path)
+                    neptune_obj_struc = neptune_obj_struc[model_loc]
+                    if f'models' in neptune_obj_struc.keys():
+                        if f'{model_name}_state' in neptune_obj_struc['models'].keys():
+                            neptune_obj[f'{model_loc}/models/{model_name}_state'].download(model_state_path)
+                        elif f'{model_name}_state_dict' in neptune_obj_struc['models'].keys():
+                            neptune_obj[f'{model_loc}/models/{model_name}_state_dict'].download(model_state_path)
+                        else:
+                            raise ValueError(f'No {model_name}_state or {model_name}_state_dict found in Neptune')
+                    elif 'model' in neptune_obj_struc.keys():
+                        if f'{model_name}_state' in neptune_obj_struc['model'].keys():
+                            neptune_obj[f'{model_loc}/model/{model_name}_state'].download(model_state_path)
+                        elif f'{model_name}_state_dict' in neptune_obj_struc['model'].keys():
+                            neptune_obj[f'{model_loc}/model/{model_name}_state_dict'].download(model_state_path)
+                        else:
+                            raise ValueError(f'No {model_name}_state or {model_name}_state_dict found in Neptune')
+                    else:
+                        raise ValueError(f'No model or models found in Neptune')
+
 
         model.load_state_dict(torch.load(model_state_path))
     else:
@@ -1269,6 +1290,8 @@ def fit_model_wrapper(X, y, task_components_dict={}, encoder_info_dict={}, run_d
     encoder_model_id = encoder_info_dict.get('model_id',None)
     if encoder_model_id is None:
         use_pretrained_encoder = False
+    else:
+        use_pretrained_encoder= True
 
     if y_head_cols is None:
         # by default just select all of the numeric columns

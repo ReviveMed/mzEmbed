@@ -109,15 +109,15 @@ head_kwargs_dict['IMDC'], y_head_cols = get_task_head_kwargs(head_kind='Binary',
                                                      y_cols=y_head_cols,
                                                      head_name='IMDC')
 
-# head_kwargs_dict['Both-OS'], y_head_cols = get_task_head_kwargs(head_kind='Cox',
-#                                                      y_head_col='OS',
-#                                                      y_cols=y_head_cols,
-#                                                      head_name='Both-OS')
+head_kwargs_dict['Both-OS'], y_head_cols = get_task_head_kwargs(head_kind='Cox',
+                                                     y_head_col='OS',
+                                                     y_cols=y_head_cols,
+                                                     head_name='Both-OS')
 
-# head_kwargs_dict['NIVO-OS'], y_head_cols = get_task_head_kwargs(head_kind='Cox',
-#                                                      y_head_col='NIVO OS',
-#                                                      y_cols=y_head_cols,
-#                                                      head_name='NIVO-OS')
+head_kwargs_dict['NIVO-OS'], y_head_cols = get_task_head_kwargs(head_kind='Cox',
+                                                     y_head_col='NIVO OS',
+                                                     y_cols=y_head_cols,
+                                                     head_name='NIVO-OS')
 
 
 
