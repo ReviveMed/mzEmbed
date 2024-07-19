@@ -221,7 +221,8 @@ def setup_wrapper(**kwargs):
         # eval_params_list = default_eval_params_list
     
     eval_params_list.append(default_eval_params_list[0]) # always add the reconstruction evaluation
-    
+    eval_params_list.append({})
+
     print('eval_params_list',eval_params_list)
     run_output_dir = f'{output_dir}/{run_id}'
     os.makedirs(run_output_dir,exist_ok=True)
@@ -1733,29 +1734,29 @@ default_eval_params_list = [
     {
         'y_col_name':'NIVO-OS',
         'y_head':'NIVO-OS', # which head to apply to the y_col
-        'y_cols': ['NIVO-OS','OS_Event']}, # which columns to use for the y_col
+        'y_cols': ['NIVO OS','OS_Event']}, # which columns to use for the y_col
     {
         'y_col_name':'NIVO-OS',
         'y_head':'EVER-OS', # which head to apply to the y_col
-        'y_cols': ['NIVO-OS','OS_Event']}, # which columns to use for the y_col
+        'y_cols': ['NIVO OS','OS_Event']}, # which columns to use for the y_col
     {
         'y_col_name':'NIVO-OS',
         'y_head':'Both-OS', # which head to apply to the y_col
-        'y_cols': ['NIVO-OS','OS_Event']}, # which columns to use for the y_col
+        'y_cols': ['NIVO OS','OS_Event']}, # which columns to use for the y_col
 
 
     {
         'y_col_name':'EVER-OS',
         'y_head':'NIVO-OS', # which head to apply to the y_col
-        'y_cols': ['EVER-OS','OS_Event']}, # which columns to use for the y_col
+        'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
     {
         'y_col_name':'EVER-OS',
         'y_head':'EVER-OS', # which head to apply to the y_col
-        'y_cols': ['EVER-OS','OS_Event']}, # which columns to use for the y_col
+        'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
     {
         'y_col_name':'EVER-OS',
         'y_head':'Both-OS', # which head to apply to the y_col
-        'y_cols': ['EVER-OS','OS_Event']}, # which columns to use for the y_col
+        'y_cols': ['EVER OS','OS_Event']}, # which columns to use for the y_col
     
 
     {
