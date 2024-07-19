@@ -216,7 +216,12 @@ def setup_wrapper(**kwargs):
 
 
     if eval_params_list is None:
-        eval_params_list = [x for x in default_eval_params_list if x['y_cols'][0] in params['task_kwargs']['y_head_cols']]
+        # eval_params_list0 = [x for x in default_eval_params_list if x['y_cols'][0] in params['task_kwargs']['y_head_cols']]
+        # eval_params_list1 = [x for x in default_eval_params_list if x['y_head'][0] in head_name_list]
+        # eval_params_list = eval_params_list0 + eval_params_list1
+
+        eval_params_list = [x for x in default_eval_params_list if x['y_head'] in head_name_list]
+
         # eval_params_list = [x for x in default_eval_params_list if x['y_head'][0].replace('-',' ').replace('_',' ') in desc_str_simplified]
         # eval_params_list = default_eval_params_list
     
