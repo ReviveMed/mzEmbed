@@ -44,8 +44,23 @@ setup_wrapper(
     selections_df = selections_df,
     output_dir = output_dir,
     head_name_list=['Sex','Age'],
-    overwrite_params_fit_kwargs={'num_epochs':100},
+    overwrite_params_fit_kwargs={'num_epochs':10},
     overwrite_existing_params=True)
+
+
+# setup_wrapper(
+#     project_id = 'revivemed/RCC',
+#     api_token = NEPTUNE_API_TOKEN,
+#     setup_id = 'pretrain',
+#     tags = 'setup4-test',
+#     fit_subset_col = 'Pretrain Discovery Train',
+#     eval_subset_col_list = ['Pretrain Discovery Val'],
+#     selections_df = selections_df,
+#     output_dir = output_dir,
+#     head_name_list=['Sex','Age'],
+#     encoder_model_id = 'RCC-4090'
+#     overwrite_params_fit_kwargs={'num_epochs':100},
+#     overwrite_existing_params=True)
 
 
     # project_id = kwargs.get('project_id',PROJECT_ID)

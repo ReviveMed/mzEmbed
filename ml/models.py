@@ -20,6 +20,37 @@ from lifelines.utils import concordance_index
 
 ####################################################################################
 # Helper functions
+
+def initialize_model(**kwargs):
+    kind = kwargs.get('kind','UNKOWN')
+    if kind == 'AE':
+        model = AE(**kwargs)
+    elif kind == 'VAE':
+        model = VAE(**kwargs)
+    elif kind == 'metabFoundation':
+        model = metabFoundation(**kwargs)
+    elif kind == 'NA' or kind == 'Dummy':
+        model = Dummy_Head()
+    elif kind == 'Binary':
+        model = Binary_Head(**kwargs)
+    elif kind == 'MultiClass':
+        model = MultiClass_Head(**kwargs)
+    # elif kind == 'MultiHead':
+    #     model = MultiHead(**kwargs)
+    elif kind == 'Regression':
+        model = Regression_Head(**kwargs)
+    elif kind == 'Cox':
+        model = Cox_Head(**kwargs)
+    elif kind == 'Ordinal':
+        model = Ordinal_Head(**kwargs)
+    elif kind == 'Decoder':
+        raise NotImplementedError('Decoder head not tested')
+        model = Decoder_Head(**kwargs)
+    else:
+        raise ValueError(f'model kind {kind} not recognized')
+    return model
+
+
 def get_model(model_kind, input_size, **kwargs):
 
     if model_kind == 'NA':

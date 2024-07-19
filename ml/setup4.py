@@ -6,7 +6,7 @@ import torch
 from neptune.utils import stringify_unsupported
 from misc import save_json, load_json, get_clean_batch_sz
 from utils_neptune import get_latest_dataset,get_run_id_list, check_neptune_existance, check_if_path_in_struc, convert_neptune_kwargs
-from models import get_encoder, get_head, MultiHead, create_model_wrapper, create_pytorch_model_from_info, CompoundModel
+from models import initialize_model, get_encoder, get_head, MultiHead, create_model_wrapper, create_pytorch_model_from_info, CompoundModel
 from train4 import train_compound_model, create_dataloaders_old, CompoundDataset, convert_y_data_by_codes
 import os
 from prep_run import create_selected_data, convert_kwargs_for_optuna, create_full_metadata, get_task_head_kwargs, make_kwargs_set
@@ -48,10 +48,15 @@ def setup_wrapper(**kwargs):
     tags = kwargs.get('tags',[])
     
     resume_with_id = kwargs.get('resume_with_id',None)
-    encoder_project_id = kwargs.get('encoder_project_id',project_id)
-    encoder_model_id = kwargs.get('encoder_model_id',None)
-    encoder_is_a_run = kwargs.get('encoder_is_a_run',True) #is the encoder coming from a Neptune Model or Neptune Run object?
-    encoder_load_dir = kwargs.get('encoder_load_dir',None) 
+    download_models_from_gcp = kwargs.get('download_models_from_gcp',False)
+    
+    pretrained_project_id = kwargs.get('pretrained_project_id',project_id)
+    pretrained_model_id = kwargs.get('pretrained_model_id',None)
+    pretrained_is_registered = kwargs.get('pretrained_is_registered',True) #is the encoder coming from a Neptune Model or Neptune Run object?
+    pretrained_loc = kwargs.get('pretrained_loc',None) 
+    use_pretrained_head= kwargs.get('use_pretrained_head',False)
+    use_pretrained_adv= kwargs.get('use_pretrained_adv',False)
+    
     head_name_list = kwargs.get('head_name_list',[])
     adv_name_list = kwargs.get('adv_name_list',[])
     optuna_study_info_dict = kwargs.get('optuna_study_info_dict',None)
@@ -166,11 +171,8 @@ def setup_wrapper(**kwargs):
             optuna_trial.set_user_attr('setup_id',setup_id)
 
 
-        if encoder_model_id:
-            print(f'Attempt to load encoder from Neptune {encoder_project_id}/{encoder_model_id}')
-            encoder_kwargs = {}
-        elif encoder_load_dir:
-            print(f'Attempt to load encoder from {encoder_load_dir}')
+        if pretrained_model_id:
+            print(f'Attempt to load encoder from Neptune {pretrained_project_id}/{pretrained_model_id}/{pretrained_loc}')
             encoder_kwargs = {}
         else:
             encoder_kwargs = run_kwargs['encoder_kwargs']
@@ -185,10 +187,11 @@ def setup_wrapper(**kwargs):
             },
             'encoder_desc': {
                 'encoder_kwargs': encoder_kwargs,
-                'encoder_load_dir': encoder_load_dir,
-                'encoder_project_id': encoder_project_id,
-                'encoder_model_id': encoder_model_id,
-                'encoder_is_a_run': encoder_is_a_run
+                'model_id': pretrained_model_id,
+                'project_id': pretrained_project_id,
+                'model_is_registered': pretrained_is_registered,
+                'model_loc': pretrained_loc,
+                'download_models_from_gcp': download_models_from_gcp
             },
             'fit_kwargs': run_kwargs['fit_kwargs'],
             'other_kwargs': other_kwargs
@@ -199,6 +202,12 @@ def setup_wrapper(**kwargs):
             params['fit_kwargs'].update(overwrite_params_fit_kwargs)
             params['task_kwargs'].update(overwrite_params_task_kwargs)
             params['other_kwargs'].update(overwrite_params_other_kwargs)
+        
+        if (use_pretrained_head):
+            raise NotImplementedError('use_pretrained_head not implemented in this script')
+
+        if (use_pretrained_adv):
+            raise NotImplementedError('use_pretrained_adv not implemented in this script')
 
         run['dataset'].track_files(input_data_dir)
         run['params'] = stringify_unsupported(params)
@@ -423,6 +432,7 @@ def run_model_wrapper(data_dir, params, output_dir=None, prefix='training_run',
                       y_codes=None,
                       processed_data_dir=None,
                       yes_plot_latent_space=False,
+                      neptune_api_token = NEPTUNE_API_TOKEN,
                       download_models_from_gcp=False,
                       upload_models_to_gcp=False):
     """
@@ -553,6 +563,7 @@ def run_model_wrapper(data_dir, params, output_dir=None, prefix='training_run',
                                                     y=y_data_fit,
                                                     task_components_dict=task_components_dict,
                                                     encoder_info_dict=encoder_info_dict,
+                                                    neptune_api_token=neptune_api_token,
                                                     run_dict=run_dict[prefix],
                                                     train_name = fit_file_id,
                                                     **fit_kwargs)
@@ -809,12 +820,95 @@ def create_latentspace_plots(X_data_eval,y_data_eval, encoder,save_dir,eval_name
     return Z_embed
 
 
+def get_model_neptune_object(model_id,project_id,neptune_api_token,model_is_registered):
+    if model_is_registered:
+        neptune_obj = neptune.init_model(project=project_id,
+            api_token= neptune_api_token,
+            with_id=model_id,
+            mode="read-only")
+    else:
+        neptune_obj = neptune.init_run(project=project_id,
+            api_token= neptune_api_token,
+            with_id=model_id,
+            mode = 'read-only')
+    return neptune_obj
+
+
+def get_specific_model(model_id,
+                       model_loc='pretrain',
+                       model_name='encoder',
+                       local_dir=None,
+                       project_id='revivemed/RCC',
+                       neptune_api_token=NEPTUNE_API_TOKEN,
+                       model_is_registered=False,
+                       download_models_from_gcp=False,
+                       use_rand_init=False,
+                       overwrite_model_kwargs={}):
+    
+    if model_id is None:
+        raise ValueError('model_id must be provided')
+    
+    if local_dir is None:
+        local_dir = os.path.expanduser('~/PRETRAINED_MODELS')
+    os.makedirs(local_dir,exist_ok=True)
+
+    load_dir = os.path.join(local_dir,model_id,model_loc)
+    model_info_path = os.path.join(load_dir,f'{model_name}_info.json')
+    model_state_path =  os.path.join(load_dir,f'{model_name}_state.pt')
+    neptune_was_used = False
+
+    if os.path.exists(model_info_path):
+        print(f'Loading model kwargs from {model_info_path}')
+    else:
+        neptune_was_used = True
+        neptune_obj = get_model_neptune_object(model_id,project_id,neptune_api_token,model_is_registered)
+        if model_loc:
+            neptune_obj[f'{model_loc}/models/{model_name}_info'].download(model_info_path)
+    model_kwargs = load_json(model_info_path)
+
+    if overwrite_model_kwargs:
+        for k,v in overwrite_model_kwargs.items():
+            if k in model_kwargs:
+                print(f'In {model_name}, Overwriting {k} with {v}')
+                model_kwargs[k] = v
+        # model_kwargs.update(overwrite_model_kwargs)
+
+    model = initialize_model(**model_kwargs)
+
+    if not use_rand_init:
+
+        if os.path.exists(model_state_path):
+            print(f'Loading model state from {model_state_path}')
+        else:
+            if not neptune_was_used:
+                neptune_obj = get_model_neptune_object(model_id,project_id,neptune_api_token,model_is_registered)
+                neptune_was_used = True
+
+            if download_models_from_gcp:
+                raise NotImplementedError('Downloading models from GCP not yet implemented')
+            else:
+                if model_loc:
+                    neptune_obj[f'{model_loc}/models/{model_name}_state'].download(model_state_path)
+                else:
+                    neptune_obj[f'model/{model_name}_state'].download(model_state_path)
+
+        model.load_state_dict(torch.load(model_state_path))
+    else:
+        print(f'Using random initialization for {model_name}')
+
+    if neptune_was_used:
+        neptune_obj.stop()
+
+    return model
+
+
 
 
 ### Function to get the encoder
 def get_encoder_model(dropout_rate=None, use_rand_init=False, load_dir=None, verbose=False,
                         project_id='revivemed/Survival-RCC',neptune_api_token=NEPTUNE_API_TOKEN,
-                        model_id='SUR-MOD', model_is_a_run=False, encoder_model_loc='', download_models_from_gcp=False):
+                        model_id='SUR-MOD', model_is_a_run=False, encoder_model_loc='', 
+                        download_models_from_gcp=False):
     """
     Creates an encoder model.
 
@@ -833,7 +927,7 @@ def get_encoder_model(dropout_rate=None, use_rand_init=False, load_dir=None, ver
     """
     
     
-    if load_dir is None:
+    if (load_dir is None) and (model_id):
         load_dir = os.path.expanduser('~/PRETRAINED_MODELS/2925')
         os.makedirs(load_dir,exist_ok=True)
 
@@ -974,6 +1068,103 @@ def get_model_heads(head_kwargs_dict, backup_input_size=None, verbose=False):
     return head
 
 
+### 
+def build_components_of_model(head_desc_dict=None, 
+                                adv_desc_dict=None,
+                                encoder_desc_dict=None,
+                                backup_input_size=2736,
+                                local_dir=None,
+                                neptune_api_token=NEPTUNE_API_TOKEN,
+                                verbose = 0):
+    """
+    Builds the model components
+
+    Args:
+
+
+    Returns:
+        tuple: A tuple containing the encoder model, head model, and adversary model.
+    """
+    
+
+    encoder_kwargs = encoder_desc_dict.get('encoder_kwargs',encoder_desc_dict.get('kwargs',None))
+    encoder_pretrained_info = encoder_desc_dict.get('encoder_pretrained_info',encoder_desc_dict.get('pretrained_info',None))
+
+    head_kwargs_dict = head_desc_dict.get('head_kwargs_dict',head_desc_dict.get('head_kwargs',head_desc_dict.get('kwargs',None)))
+    head_pretrained_info = head_desc_dict.get('head_pretrained_info',head_desc_dict.get('pretrained_info',None))
+
+    adv_kwargs_dict = adv_desc_dict.get('adv_kwargs_dict',adv_desc_dict.get('adv_kwargs',adv_desc_dict.get('kwargs',None)))
+    adv_pretrained_info = adv_desc_dict.get('adv_pretrained_info',adv_desc_dict.get('pretrained_info',None))
+
+    if encoder_pretrained_info:
+        if encoder_kwargs:
+            print('WARNING: encoder_kwargs provided, this might cause errors when using a pretrained model')
+
+
+        encoder = get_specific_model(model_id = encoder_pretrained_info.get('model_id',None),
+                                    model_loc = encoder_pretrained_info.get('model_loc','pretrain'),
+                                    model_name = encoder_pretrained_info.get('model_name','encoder'),
+                                    local_dir=local_dir,
+                                    project_id=encoder_pretrained_info.get('project_id','revivemed/RCC'),
+                                    neptune_api_token=neptune_api_token,
+                                    model_is_registered=encoder_pretrained_info.get('model_is_registered',False),
+                                    download_models_from_gcp=encoder_pretrained_info.get('download_models_from_gcp',False),
+                                    use_rand_init=encoder_pretrained_info.get('use_rand_init',False),
+                                    overwrite_model_kwargs=encoder_kwargs)
+    else:
+        if 'input_size' not in encoder_kwargs:
+            encoder_kwargs['input_size'] = backup_input_size
+        encoder = initialize_model(**encoder_kwargs)
+
+    if head_pretrained_info:
+        if head_kwargs_dict:
+            print('WARNING: head_kwargs_dict provided, this might cause errors when using a pretrained model')
+
+        head = get_specific_model(model_id = head_pretrained_info.get('model_id',None),
+                                    model_loc = head_pretrained_info.get('model_loc','pretrain'),
+                                    model_name = head_pretrained_info.get('model_name','head'),
+                                    local_dir=local_dir,
+                                    project_id=head_pretrained_info.get('project_id','revivemed/RCC'),
+                                    neptune_api_token=neptune_api_token,
+                                    model_is_registered=head_pretrained_info.get('model_is_registered',False),
+                                    download_models_from_gcp=head_pretrained_info.get('download_models_from_gcp',False),
+                                    use_rand_init=head_pretrained_info.get('use_rand_init',False),
+                                    overwrite_model_kwargs=head_kwargs_dict)
+    else:
+        # TODO: We need better handling of head input size to account for the size of the other_vars
+        head = get_model_heads(head_kwargs_dict, backup_input_size=encoder.latent_size + 1)
+
+    if adv_pretrained_info:
+        if adv_kwargs_dict:
+            print('WARNING: adv_kwargs_dict provided, this might cause errors when using a pretrained model')
+
+        adv = get_specific_model(model_id = adv_pretrained_info.get('model_id',None),
+                                    model_loc = adv_pretrained_info.get('model_loc','pretrain'),
+                                    model_name = adv_pretrained_info.get('model_name','adv'),
+                                    local_dir=local_dir,
+                                    project_id=adv_pretrained_info.get('project_id','revivemed/RCC'),
+                                    neptune_api_token=neptune_api_token,
+                                    model_is_registered=adv_pretrained_info.get('model_is_registered',False),
+                                    download_models_from_gcp=adv_pretrained_info.get('download_models_from_gcp',False),
+                                    use_rand_init=adv_pretrained_info.get('use_rand_init',False),
+                                    overwrite_model_kwargs=adv_kwargs_dict)
+    else:
+        adv = get_model_heads(adv_kwargs_dict, backup_input_size=encoder.latent_size)
+
+    if head.kind == 'MultiHead':
+        head.name = 'HEAD'
+
+    if adv.kind == 'MultiHead':
+        adv.name = 'ADVERSARY'
+
+    return encoder, head, adv
+
+
+
+
+
+
+
 ### Function to build the model components for fine-tuning
 def build_model_components(head_kwargs_dict, adv_kwargs_dict=None, dropout_rate=None, use_rand_init=False,
                            encoder=None,encoder_info_dict=None,verbose=0,neptune_api_token=NEPTUNE_API_TOKEN,
@@ -1037,7 +1228,8 @@ def build_model_components(head_kwargs_dict, adv_kwargs_dict=None, dropout_rate=
 
 
 
-def fit_model_wrapper(X, y, task_components_dict={}, encoder_info_dict={}, run_dict={}, **fit_kwargs):
+def fit_model_wrapper(X, y, task_components_dict={}, encoder_info_dict={}, run_dict={},
+                      neptune_api_token=NEPTUNE_API_TOKEN, local_dir=None, **fit_kwargs):
     """
     Fits a compound model using the provided data and model components.
 
@@ -1073,6 +1265,10 @@ def fit_model_wrapper(X, y, task_components_dict={}, encoder_info_dict={}, run_d
     use_pretrained_head = task_components_dict.get('use_pretrained_head',False)
     use_pretrained_adv = task_components_dict.get('use_pretrained_adv',False)
     input_size = X.shape[1]
+    encoder_kwargs = encoder_info_dict.get('encoder_kwargs',None)
+    encoder_model_id = encoder_info_dict.get('model_id',None)
+    if encoder_model_id is None:
+        use_pretrained_encoder = False
 
     if y_head_cols is None:
         # by default just select all of the numeric columns
@@ -1097,6 +1293,54 @@ def fit_model_wrapper(X, y, task_components_dict={}, encoder_info_dict={}, run_d
     y_codes = fit_kwargs.get('y_codes', {})
     y_code_keys = fit_kwargs.get('y_code_keys', [])
 
+    if use_pretrained_encoder:
+        encoder_pretrained_info ={ 
+            'model_id': encoder_info_dict.get('model_id',None),
+            'model_loc': encoder_info_dict.get('model_loc','pretrain'),
+            'model_name': 'encoder',
+            'project_id': encoder_info_dict.get('project_id','revivemed/RCC'),
+            'model_is_registered': encoder_info_dict.get('model_is_registered',False),
+            'download_models_from_gcp': encoder_info_dict.get('download_models_from_gcp',False),
+            'use_rand_init':use_rand_init
+        }
+
+        encoder_desc_dict = {'encoder_kwargs':None, 'encoder_pretrained_info':encoder_pretrained_info}
+        if dropout_rate is not None:
+            encoder_desc_dict['encoder_kwargs'] = {'dropout_rate':dropout_rate}
+        else:
+            encoder_desc_dict['encoder_kwargs'] = None
+
+    else:
+        encoder_desc_dict = {'encoder_kwargs':encoder_kwargs, 'encoder_pretrained_info':None}
+        
+
+    if use_pretrained_head and use_pretrained_encoder:
+        head_pretrained_info ={ 
+            'model_id': encoder_info_dict.get('model_id',None),
+            'model_loc': encoder_info_dict.get('model_loc','pretrain'),
+            'model_name': 'head',
+            'project_id': encoder_info_dict.get('project_id','revivemed/RCC'),
+            'model_is_registered': encoder_info_dict.get('model_is_registered',False),
+            'download_models_from_gcp': encoder_info_dict.get('download_models_from_gcp',False),
+            'use_rand_init':use_rand_init
+        }
+        head_desc_dict = {'head_kwargs_dict':None, 'head_pretrained_info':head_pretrained_info}
+    else:
+        head_desc_dict = {'head_kwargs_dict':head_kwargs_dict, 'head_pretrained_info':None}
+
+    if use_pretrained_adv and use_pretrained_encoder:
+        adv_pretrained_info ={ 
+            'model_id': encoder_info_dict.get('model_id',None),
+            'model_loc': encoder_info_dict.get('model_loc','pretrain'),
+            'model_name': 'adv',
+            'project_id': encoder_info_dict.get('project_id','revivemed/RCC'),
+            'model_is_registered': encoder_info_dict.get('model_is_registered',False),
+            'download_models_from_gcp': encoder_info_dict.get('download_models_from_gcp',False),
+            'use_rand_init': use_rand_init
+        }
+        adv_desc_dict = {'adv_kwargs_dict':None, 'adv_pretrained_info':adv_pretrained_info}
+    else:
+        adv_desc_dict = {'adv_kwargs_dict':adv_kwargs_dict, 'adv_pretrained_info':None}
 
     ### Prepare the Data Loader
     X_size = X.shape[1]
@@ -1150,12 +1394,21 @@ def fit_model_wrapper(X, y, task_components_dict={}, encoder_info_dict={}, run_d
 
 
     ### Build the Model Components
-    encoder, head, adv = build_model_components(head_kwargs_dict=head_kwargs_dict,
-                                                adv_kwargs_dict=adv_kwargs_dict,
-                                                dropout_rate=dropout_rate,
-                                                use_rand_init=use_rand_init,
-                                                encoder_info_dict=encoder_info_dict,
-                                                input_size=input_size)
+    encoder, head, adv = build_components_of_model(encoder_desc_dict=encoder_desc_dict,
+                                                    head_desc_dict=head_desc_dict,
+                                                    adv_desc_dict=adv_desc_dict,
+                                                    backup_input_size=input_size,
+                                                    local_dir=local_dir,
+                                                    neptune_api_token=neptune_api_token,
+                                                    verbose=0)
+
+
+    # encoder, head, adv = build_model_components(head_kwargs_dict=head_kwargs_dict,
+    #                                             adv_kwargs_dict=adv_kwargs_dict,
+    #                                             dropout_rate=dropout_rate,
+    #                                             use_rand_init=use_rand_init,
+    #                                             encoder_info_dict=encoder_info_dict,
+    #                                             input_size=input_size)
 
     if use_pretrained_head:
         raise NotImplementedError('use_pretrained_head not implemented')
