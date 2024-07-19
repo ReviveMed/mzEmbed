@@ -224,6 +224,7 @@ def setup_wrapper(**kwargs):
                                 subdir_col=subdir_col,
                                 selections_df=selections_df,
                                 eval_subset_col_list=eval_subset_col_list,
+                                eval_params_list=eval_params_list,
                                 run=run,
                                 yes_plot_latent_space=yes_plot_latent_space,
                                 num_iterations=num_iterations)
@@ -357,6 +358,7 @@ def run_multiple_iterations(input_data_dir,
                                 subdir_col,
                                 selections_df,
                                 eval_subset_col_list,
+                                eval_params_list,
                                 run,
                                 yes_plot_latent_space,
                                 num_iterations=1):
@@ -376,6 +378,7 @@ def run_multiple_iterations(input_data_dir,
                             fit_subset_col=fit_subset_col,
                             subdir_col=subdir_col,
                             selections_df=selections_df,
+                            eval_params_list=eval_params_list,
                             eval_subset_col_list=eval_subset_col_list,
                             run_dict=run,
                             yes_plot_latent_space=(yes_plot_latent_space and iter==num_iterations-1))
@@ -1324,7 +1327,7 @@ def evaluate_model_wrapper(encoder, head, adv, X_data_eval, y_data_eval, y_cols,
     skmodel = create_pytorch_model_from_info(full_model=model)
 
     y_data, _ = convert_y_data_by_codes(y_data_eval[y_cols], y_codes)
-    return skmodel.score(X_data_eval.to_numpy(),y_data.to_numpy())
+    return skmodel.score(X_data_eval.to_numpy(),y_data.to_numpy().astype(np.float32))
 
 
 ############################################################

@@ -42,6 +42,7 @@ def convert_y_data_by_codes(y_data, y_codes):
             else:
                 print('mapping', col, 'to existing codes')
                 y_data.loc[:,col] = y_data[col].map(lambda x: y_codes[col].index(x) if x in y_codes[col] else -1)
+    y_data = y_data.astype(float)
     return y_data, y_codes
 
 class CompoundDataset(Dataset):

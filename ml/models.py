@@ -2619,7 +2619,8 @@ class PytorchModel(BaseEstimator):
                                      use_predict=False)
             if isinstance(y_outputs, dict):
                 y_outputs = {k: torch.tensor(v) for k, v in y_outputs.items()}
-                return self.model.score(y_outputs, torch.tensor(y))
+                return self.model.score(y_outputs, torch.tensor(y.astype(float)))
+                # return self.model.score(y_outputs, torch.tensor(y))
             else:
                 return self.model.score(torch.tensor(y_outputs),torch.tensor(y))
         else:
