@@ -30,7 +30,7 @@ subdir_col = 'Study ID'
 
 # fit_subset_col = 'Pretrain Discovery Train'
 # eval_subset_col = 'Pretrain Discovery Val'
-# eval_subset_col  = 'Pretrain All'
+eval_subset_col  = 'Pretrain All'
 # eval_subset_col = 'Pretrain Test'
 # setup_id = 'pretrain'
 
@@ -104,15 +104,15 @@ adv_kwargs_dict = {}
 
                                                      
 
-head_kwargs_dict['IMDC'], y_head_cols = get_task_head_kwargs(head_kind='Binary',
-                                                     y_head_col='IMDC BINARY',
-                                                     y_cols=y_head_cols,
-                                                     head_name='IMDC')
+# head_kwargs_dict['IMDC'], y_head_cols = get_task_head_kwargs(head_kind='Binary',
+#                                                      y_head_col='IMDC BINARY',
+#                                                      y_cols=y_head_cols,
+#                                                      head_name='IMDC')
 
-head_kwargs_dict['Both-OS'], y_head_cols = get_task_head_kwargs(head_kind='Cox',
-                                                     y_head_col='OS',
-                                                     y_cols=y_head_cols,
-                                                     head_name='Both-OS')
+# head_kwargs_dict['Both-OS'], y_head_cols = get_task_head_kwargs(head_kind='Cox',
+#                                                      y_head_col='OS',
+#                                                      y_cols=y_head_cols,
+#                                                      head_name='Both-OS')
 
 head_kwargs_dict['NIVO-OS'], y_head_cols = get_task_head_kwargs(head_kind='Cox',
                                                      y_head_col='NIVO OS',
@@ -127,15 +127,16 @@ head_kwargs_dict['NIVO-OS'], y_head_cols = get_task_head_kwargs(head_kind='Cox',
 #                                                      head_name='Study ID',
 #                                                      num_classes=22)
 
-# adv_kwargs_dict['EVER-OS'], y_adv_cols = get_task_head_kwargs(head_kind='Cox',
-#                                                      y_head_col='EVER OS',
-#                                                      y_cols=y_adv_cols,
-#                                                      head_name='EVER-OS')
+adv_kwargs_dict['EVER-OS'], y_adv_cols = get_task_head_kwargs(head_kind='Cox',
+                                                     y_head_col='EVER OS',
+                                                     y_cols=y_adv_cols,
+                                                     head_name='EVER-OS')
 
 print(y_head_cols)
 # %%
 
 encoder_kind = 'VAE'
+# encoder_kind = 'metabFoundation'
 finetune_kwargs = make_kwargs_set(sig_figs=2,
                 encoder_kind=encoder_kind,
                 activation_func= 'leakyrelu',
@@ -150,6 +151,7 @@ finetune_kwargs = make_kwargs_set(sig_figs=2,
                 # num_hidden_layers=3,
                 task_head_weight=1,
                 encoder_weight=0,
+                adv_weight=None,
                 weight_decay=0.00008,
                 head_weight=1,
                 learning_rate=0.0011,

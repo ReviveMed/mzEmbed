@@ -62,7 +62,8 @@ def get_default_study_kwargs(head_kwargs_dict,adv_kwargs_dict,**kwargs):
     return run_kwargs
 
 
-def create_optuna_study(study_info_dict,get_kwargs_wrapper,head_kwargs_dict,adv_kwargs_dict,compute_objective):
+def create_optuna_study(study_info_dict,get_kwargs_wrapper,compute_objective,
+                        head_kwargs_dict={},adv_kwargs_dict={}):
     use_webapp_db = study_info_dict.get('use_webapp_db',True)
     if use_webapp_db:
         print('using webapp database')
@@ -302,6 +303,12 @@ def get_study_objective_keys(study_info_dict):
     objective_keys = list(study_info_dict['objectives'].keys())
     return sorted(objective_keys)
 
+
+def get_study_objective_eval_loc(study_info_dict):
+    objective_keys = list(study_info_dict['objectives'].keys())
+    eval_locs = [study_info_dict['objectives'][k]['eval_loc'] for k in objective_keys]
+    return eval_locs
+
 def get_study_objective_directions(study_info_dict,convert_to_int=False):
     objective_keys = get_study_objective_keys(study_info_dict)
     directions = [study_info_dict['objectives'][k]['direction'] for k in objective_keys]
@@ -436,3 +443,64 @@ def objective_func4(run_id,study_info_dict,
     return tuple(obj_vals)
 
 
+
+
+def objective_func5(run_id,study_info_dict,
+                    project_id='revivemed/RCC',
+                    neptune_api_token=NEPTUNE_API_TOKEN):
+
+    objectives_info_dict = study_info_dict['objectives']
+    objective_keys =  get_study_objective_keys(study_info_dict)
+    sum_objectives = study_info_dict.get('sum objectives',False)
+    
+
+
+    run = neptune.init_run(project=project_id,
+                    api_token=neptune_api_token,
+                    with_id=run_id,
+                    capture_stdout=False,
+                    capture_stderr=False,
+                    capture_hardware_metrics=False,
+                    mode='read-only')
+
+
+    obj_vals = []
+    run_struc = run.get_structure()
+    
+
+    for objective_key in objective_keys:
+
+        if check_neptune_existance(run_struc,eval_loc):
+
+            eval_loc = study_info_dict['objectives'][objective_key]['eval_loc']
+            try:                               
+                obj_val = run[eval_loc].fetch_last()
+            except NeptuneException:
+                obj_val = run[eval_loc].fetch()                 
+
+            if 'transform' in objectives_info_dict[objective_key]:
+                transform_str = objectives_info_dict[objective_key]['transform']
+                if transform_str == 'log10':
+                    obj_val = np.log10(obj_val)
+                elif transform_str == 'neg':
+                    obj_val = -1*obj_val 
+                elif transform_str == 'neglog10':
+                    obj_val = -1*np.log10(obj_val)
+
+            obj_vals.append(obj_val)
+        else:
+            print(f"Objective {objective_key} not in eval results at the expected location ({eval_loc}), use default value")
+            obj_val = objectives_info_dict[objective_key]['default_value']
+            obj_vals.append(obj_val)
+
+
+    if sum_objectives:
+        obj_dirs = get_study_objective_directions(study_info_dict)
+        obj_weights = get_study_objective_weights(study_info_dict)
+        obj_vals = np.array(obj_vals)
+        obj_sum = np.sum(obj_dirs*obj_weights*obj_vals)
+        run.stop()
+        return obj_sum
+
+    run.stop()
+    return tuple(obj_vals)

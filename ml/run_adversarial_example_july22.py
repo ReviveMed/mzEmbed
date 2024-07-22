@@ -1,6 +1,4 @@
 
-# Finetune the top pretrained models using 3 sets of finetuning hyper-parameters
-
 import os
 import optuna
 import pandas as pd
@@ -393,7 +391,6 @@ def main(run_id,yes_plot_latent_space=False,which_finetune_nums=[],task_name_lis
 if __name__ == '__main__':
 
 
-    # plot the latent space representation for a few top models
     run_id_list = ['RCC-3828','RCC-3967','RCC-3839','RCC-3610','RCC-3597','RCC-3537']
     for run_id in run_id_list:
         print('##############################################')
