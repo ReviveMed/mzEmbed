@@ -26,7 +26,7 @@ limit_add = -1  # limit the number of runs added to the study
 encoder_kind = 'VAE'
 
 STUDY_DICT = {
-    'study_name': 'Min entry point 3 optuna test',
+    'study_name': 'Shanghai (ST002773) removed fine tune',
     'encoder_kind': encoder_kind,
     'objectives': {
         'reconstruction_loss': {
@@ -78,13 +78,15 @@ def get_study_kwargs(head_kwargs_dict, adv_kwargs_dict):
                              head_kwargs_dict=head_kwargs_dict,
                              adv_kwargs_dict=adv_kwargs_dict,
 
-                             latent_size=None, latent_size_min=96, latent_size_max=128, latent_size_step=4,
+                             # vae model paremeters
+                             latent_size=None, latent_size_min=96, latent_size_max=192, latent_size_step=4,
                              hidden_size=-1, hidden_size_min=16, hidden_size_max=64, hidden_size_step=16,
                              hidden_size_mult=1.5, hidden_size_mult_min=1.25, hidden_size_mult_max=2,
                              hidden_size_mult_step=0.25,
-                             num_hidden_layers=None, num_hidden_layers_min=2, num_hidden_layers_max=3,
+                             num_hidden_layers=None, num_hidden_layers_min=2, num_hidden_layers_max=4,
                              num_hidden_layers_step=1,
 
+                             # metabol-transformer model parameters
                              num_attention_heads=-1, num_attention_heads_min=1, num_attention_heads_max=5,
                              num_attention_heads_step=1,
                              num_decoder_layers=-1, num_decoder_layers_min=1, num_decoder_layers_max=5,
@@ -100,8 +102,8 @@ def get_study_kwargs(head_kwargs_dict, adv_kwargs_dict):
                              head_weight=1.0, head_weight_min=0, head_weight_max=2, head_weight_step=0.5,
                              adv_weight=1.0, adv_weight_min=0, adv_weight_max=2, adv_weight_step=0.5,
 
-                             task_head_weight=None, task_head_weight_min=0.25, task_head_weight_max=10,
-                             task_head_weight_step=0.25,
+                             task_head_weight=None, task_head_weight_min=0, task_head_weight_max=15,
+                             task_head_weight_step=0.05,
                              task_adv_weight=-1, task_adv_weight_min=0, task_adv_weight_max=10,
                              task_adv_weight_step=0.1,
                              task_hidden_size=4, task_hidden_size_min=4, task_hidden_size_max=64,
@@ -116,8 +118,8 @@ def get_study_kwargs(head_kwargs_dict, adv_kwargs_dict):
                              l2_reg_weight=0, l2_reg_weight_min=0, l2_reg_weight_max=0.01, l2_reg_weight_step=0.0001,
                              l2_reg_weight_log=False,
 
-                             batch_size=96, batch_size_min=16, batch_size_max=128, batch_size_step=16,
-                             noise_factor=0.1, noise_factor_min=0.01, noise_factor_max=0.1, noise_factor_step=0.01,
+                             batch_size=96, batch_size_min=32, batch_size_max=128, batch_size_step=32,
+                             noise_factor=None, noise_factor_min=0, noise_factor_max=0.25, noise_factor_step=0.05,
                              num_epochs=None, num_epochs_min=50, num_epochs_max=400, num_epochs_step=25,
                              num_epochs_log=False,
                              learning_rate=None, learning_rate_min=0.00001, learning_rate_max=0.005,
@@ -233,7 +235,7 @@ def main(STUDY_INFO_DICT, num_trials=5):
                                        neptune_mode='async',
                                        yes_logging=True,
                                        neptune_api_token=neptune_api_token,
-                                       tags=['min_test'],
+                                       tags=['shanghai (ST002773) removed pretrain'],
                                        y_head_cols=y_head_cols,
                                        y_adv_cols=y_adv_cols,
                                        num_repeats=1,
@@ -291,7 +293,7 @@ def main(STUDY_INFO_DICT, num_trials=5):
 
 
 if __name__ == '__main__':
-    main(STUDY_DICT, num_trials=5)
+    main(STUDY_DICT, num_trials=100)
 
     # res = objective_func4('RCC-3188',
     #                 study_info_dict=STUDY_DICT,
