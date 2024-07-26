@@ -69,6 +69,8 @@ _, eval_file_id = create_selected_data(input_data_dir=input_data_dir,
                                        metadata_df=None,
                                        selections_df=selections_df)
 """
+eval_file_id = 'pretrain_train'
+fit_file_id = 'pretrain_val'
 X_eval_file = f'{output_dir}/X_{eval_file_id}.csv'
 y_eval_file = f'{output_dir}/y_{eval_file_id}.csv'
 X_fit_file = f'{output_dir}/X_{fit_file_id}.csv'
@@ -201,7 +203,7 @@ run_id = setup_neptune_run(input_data_dir,
                            neptune_mode='async',
                            yes_logging=True,
                            neptune_api_token=NEPTUNE_API_TOKEN,
-                           tags=['min_test'],
+                           tags=['rcc-2925 neptune test'],
                            y_head_cols=y_head_cols,
                            y_adv_cols=y_adv_cols,
                            num_repeats=1,
