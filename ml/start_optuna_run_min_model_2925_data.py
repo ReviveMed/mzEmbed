@@ -149,6 +149,7 @@ def main(STUDY_INFO_DICT, num_trials=5):
     eval_subset_col = 'Pretrain Discovery Val'
     setup_id = 'pretrain'
 
+    """
     _, fit_file_id = create_selected_data(input_data_dir=input_data_dir,
                                           sample_selection_col=fit_subset_col,
                                           subdir_col=subdir_col,
@@ -162,7 +163,11 @@ def main(STUDY_INFO_DICT, num_trials=5):
                                            output_dir=output_dir,
                                            metadata_df=None,
                                            selections_df=selections_df)
-
+    """
+    # y_pretrain_train
+    # y_pretrain_val
+    eval_file_id = 'pretrain_train'
+    fit_file_id = 'pretrain_val'
     X_eval_file = f'{output_dir}/X_{eval_file_id}.csv'
     y_eval_file = f'{output_dir}/y_{eval_file_id}.csv'
     X_fit_file = f'{output_dir}/X_{fit_file_id}.csv'
@@ -293,7 +298,7 @@ def main(STUDY_INFO_DICT, num_trials=5):
 
 
 if __name__ == '__main__':
-    main(STUDY_DICT, num_trials=100)
+    main(STUDY_DICT, num_trials=200)
 
     # res = objective_func4('RCC-3188',
     #                 study_info_dict=STUDY_DICT,
