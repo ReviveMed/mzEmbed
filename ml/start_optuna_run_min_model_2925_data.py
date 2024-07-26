@@ -205,11 +205,11 @@ def main(STUDY_INFO_DICT, num_trials=5):
                                                                 head_name='Sex',
                                                                 default_weight=13)
 
-    head_kwargs_dict['BMI'], y_head_cols = get_task_head_kwargs(head_kind='Regression',
-                                                                y_head_col='BMI',
-                                                                y_cols=y_head_cols,
-                                                                head_name='BMI',
-                                                                default_weight=7.5)
+    # head_kwargs_dict['BMI'], y_head_cols = get_task_head_kwargs(head_kind='Regression',
+    #                                                             y_head_col='BMI',
+    #                                                             y_cols=y_head_cols,
+    #                                                             head_name='BMI',
+    #                                                             default_weight=7.5)
 
     def compute_objective(run_id):
         return objective_func4(run_id,

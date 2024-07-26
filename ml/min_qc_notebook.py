@@ -337,8 +337,11 @@ meta_data_df = pd.read_csv(f'{homedir}/latest_metadata.csv', index_col=0)
 print(meta_data_df)
 
 # loop through all files to update
+failed_match_files = []
 for file in os.listdir(f'{PROCESSED_DATA_dir}/old_data'):
-    if file.endswith(".csv"):
+    new_y_df = pd.DataFrame()
+    # if the file is a .csv file and start with y
+    if file.endswith(".csv") and file.startswith('y'):
         print(f'file name is {file}')
         # load the data
         df = pd.read_csv(f'{PROCESSED_DATA_dir}/old_data/{file}', index_col=0)
@@ -348,11 +351,13 @@ for file in os.listdir(f'{PROCESSED_DATA_dir}/old_data'):
             idx = row.name
             # check if the row is in the index of the meta_data_df
             if idx in meta_data_df.index:
-                # if it is update the row with the new values
-                df.loc[idx] = meta_data_df.loc[idx]
+                print("there is a match in latest metadata")
+                # save this new row from meta_data_df to the new_y_df
+                new_y_df = pd.concat([new_y_df, meta_data_df.loc[[idx]]])
             # else printout the idx
             else:
                 print(f'idx {idx} not in meta_data_df')
+                failed_match_files.append(file)
         # save the updated df
-        df.to_csv(f'{PROCESSED_DATA_dir}/{file}')
+        new_y_df.to_csv(f'{PROCESSED_DATA_dir}/{file}')
 
