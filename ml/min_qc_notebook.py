@@ -325,3 +325,34 @@ for handle in handles:
 plt.legend(handles, new_labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., title=hue_col)
 
 plt.title(plot_title)
+
+
+########################################################################################################################
+# code to use old RCC 2925 data but with latest code and latest meta-data
+# load from /PROCESSED_DATA folder and load in each .csv file
+homedir = os.path.expanduser("~")
+PROCESSED_DATA_dir = f'{homedir}/PROCESSED_DATA'
+# load the latest_metadata
+meta_data_df = pd.read_csv(f'{homedir}/latest_metadata.csv', index_col=0)
+print(meta_data_df)
+
+# loop through all files to update
+for file in os.listdir(f'{PROCESSED_DATA_dir}/old_data'):
+    if file.endswith(".csv"):
+        print(f'file name is {file}')
+        # load the data
+        df = pd.read_csv(f'{PROCESSED_DATA_dir}/old_data/{file}', index_col=0)
+        # go through each row of the the df
+        for index, row in df.iterrows():
+            # get the index of the row
+            idx = row.name
+            # check if the row is in the index of the meta_data_df
+            if idx in meta_data_df.index:
+                # if it is update the row with the new values
+                df.loc[idx] = meta_data_df.loc[idx]
+            # else printout the idx
+            else:
+                print(f'idx {idx} not in meta_data_df')
+        # save the updated df
+        df.to_csv(f'{PROCESSED_DATA_dir}/{file}')
+
