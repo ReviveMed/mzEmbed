@@ -30,7 +30,7 @@ subdir_col = 'Study ID'
 
 
 # skip generating the dataset, use the original RCC-2925 data
-"""
+
 fit_subset_col = 'Pretrain Discovery Train'
 eval_subset_col = 'Pretrain Discovery Val'
 # eval_subset_col = 'Pretrain Discovery Train'
@@ -51,7 +51,7 @@ remove_y_nans = False
 # eval_subset_col = 'Finetune Test'
 # setup_id = 'IMDC finetune disc v1'
 # use_rand_init = False
-
+"""
 # setup_id = 'IMDC randinit dsic v1'
 # use_rand_init = True
 
