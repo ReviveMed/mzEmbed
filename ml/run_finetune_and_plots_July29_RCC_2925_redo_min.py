@@ -118,8 +118,7 @@ def main(run_id, yes_plot_latent_space=False, which_finetune_nums=[], task_name_
         X_fit_file = f'{output_dir}/X_pretrain_train.csv'
         y_fit_file = f'{output_dir}/y_pretrain_train.csv'
 
-        # plot_latent_space_cols = ['Cohort Label v0', 'Study ID', 'is Pediatric', 'Age', 'Sex']
-        plot_latent_space_cols = []
+        plot_latent_space_cols = ['Cohort Label v0', 'Study ID', 'is Pediatric', 'Age', 'Sex']
         _ = setup_neptune_run(input_data_dir,
                               setup_id=f'pretrain',
                               project_id=project_id,
