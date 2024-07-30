@@ -69,6 +69,12 @@ STUDY_DICT = {
             'transform': 'log10',
             'default_value': 9999
         },
+        'Binary_Smoking__AUROC (micro)':{
+            'weight': 1,
+            'name': 'Smoking Prediction',
+            'direction': 'maximize',
+            'default_value': 0
+        }
     }
 }
 
@@ -205,6 +211,12 @@ def main(STUDY_INFO_DICT, num_trials=5):
                                                                 y_cols=y_head_cols,
                                                                 head_name='BMI',
                                                                 default_weight=7.5)
+
+    head_kwargs_dict['Smoking'], y_head_cols = get_task_head_kwargs(head_kind='Binary',
+                                                                    y_head_col='Smoking Status',
+                                                                    y_cols=y_head_cols,
+                                                                    head_name='Smoking',
+                                                                    default_weight=0)
 
     def compute_objective(run_id):
         return objective_func4(run_id,
