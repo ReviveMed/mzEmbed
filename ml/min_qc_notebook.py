@@ -361,3 +361,36 @@ for file in os.listdir(f'{PROCESSED_DATA_dir}/old_data'):
         # save the updated df
         new_y_df.to_csv(f'{PROCESSED_DATA_dir}/{file}')
 
+# plot sns umap
+# remove 'nan' from palette
+if 'nan' in palette:
+    palette.remove('nan')
+
+print(f"palette is {palette}")
+fig = sns.scatterplot(data=Z_embed, x='UMAP1', y='UMAP2', hue=hue_col, palette=palette,s=marker_sz)
+# place the legend outside the plot
+plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+
+
+# build meta data for RCC all data with shanghai data removed and with train/test/val split changed
+# remove all rows from shanghai study (ST002773)
+# remove all rows from original_metadata with 'Study ID' == 'ST002773'
+original_metadata = pd.read_csv(f'{homedir}/original_metadata.csv', index_col=0)
+original_metadata = original_metadata[original_metadata['Study ID'] != 'ST002773']
+
+original_metadata['Pretrain All'] = True
+original_metadata['Finetune All'] = False
+
+rcc3_baseline = original_metadata[(original_metadata['Study ID'] == 'ST001237') & (original_metadata['Timepoint']=='baseline')].index.to_list()
+original_metadata.loc[rcc3_baseline,'Pretrain All'] = False
+original_metadata.loc[rcc3_baseline,'Finetune All'] = True
+
+qc_samples = original_metadata[(original_metadata['Sample_Class']=='NIST1950') |
+                            (original_metadata['Sample_Class']=='NIST_1950') |
+                            (original_metadata['Sample_Class']=='Study_QC_Sample') |
+                            (original_metadata['Sample_Class']=='Study_QAQC')].index.to_list()
+
+original_metadata.loc[qc_samples,'Pretrain All'] = False
+original_metadata.loc[qc_samples,'Finetune All'] = False
+
+new_metadata = assign_sets(original_metadata)

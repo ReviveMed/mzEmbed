@@ -127,7 +127,7 @@ def main(run_id, yes_plot_latent_space=False, which_finetune_nums=[], task_name_
                               neptune_mode='async',
                               yes_logging=True,
                               neptune_api_token=neptune_api_token,
-                              tags=['RCC-2925 redo using original data'],
+                              tags=['RCC-2925 re-run model using latest code'],
 
                               run_training=False,
                               X_fit_file=X_fit_file,
@@ -155,7 +155,7 @@ def main(run_id, yes_plot_latent_space=False, which_finetune_nums=[], task_name_
                               neptune_mode='async',
                               yes_logging=True,
                               neptune_api_token=neptune_api_token,
-                              tags=['RCC-2925 redo using original data'],
+                              tags=['RCC-2925 re-run model using latest code'],
 
                               run_training=False,
                               X_fit_file=X_fit_file,
@@ -183,7 +183,7 @@ def main(run_id, yes_plot_latent_space=False, which_finetune_nums=[], task_name_
                               neptune_mode='async',
                               yes_logging=True,
                               neptune_api_token=neptune_api_token,
-                              tags=['RCC-2925 redo using original data'],
+                              tags=['RCC-2925 re-run model using latest code'],
 
                               run_training=False,
                               X_fit_file=X_fit_file,
@@ -306,7 +306,7 @@ def main(run_id, yes_plot_latent_space=False, which_finetune_nums=[], task_name_
                                       neptune_mode='async',
                                       yes_logging=True,
                                       neptune_api_token=neptune_api_token,
-                                      tags=['RCC-2925 redo using original data finetune'],
+                                      tags=['RCC-2925 re-run model using latest code'],
                                       y_head_cols=y_head_cols,
                                       y_adv_cols=y_adv_cols,
                                       restart_run=restart_run,
@@ -339,7 +339,7 @@ def main(run_id, yes_plot_latent_space=False, which_finetune_nums=[], task_name_
                                       neptune_mode='async',
                                       yes_logging=True,
                                       neptune_api_token=neptune_api_token,
-                                      tags=['RCC-2925 redo using original data finetune'],
+                                      tags=['RCC-2925 re-run model using latest code'],
                                       y_head_cols=y_head_cols,
                                       y_adv_cols=y_adv_cols,
                                       # overwrite_existing_kwargs=True,
@@ -377,8 +377,7 @@ def main(run_id, yes_plot_latent_space=False, which_finetune_nums=[], task_name_
 if __name__ == '__main__':
 
     # plot the latent space representation for a few top models
-    run_id_list = ['RCC-5062', 'RCC-5024', 'RCC-5031', 'RCC-5067', 'RCC-5013', 'RCC-5042', 'RCC-4992', 'RCC-4836',
-                   'RCC-4873', 'RCC-5023', 'RCC-5063', 'RCC-4920', 'RCC-4945', 'RCC-5000', 'RCC-4879']
+    run_id_list = ['RCC-2925']
     for run_id in run_id_list:
         print('##############################################')
         print('##############################################')
