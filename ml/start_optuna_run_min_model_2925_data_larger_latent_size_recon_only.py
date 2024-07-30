@@ -26,7 +26,7 @@ limit_add = -1  # limit the number of runs added to the study
 encoder_kind = 'VAE'
 
 STUDY_DICT = {
-    'study_name': 'RCC-2925 redo using original data larger latent size',
+    'study_name': 'RCC-2925 redo using original data larger latent size recon only',
     'encoder_kind': encoder_kind,
     'objectives': {
         'reconstruction_loss': {
@@ -240,7 +240,7 @@ def main(STUDY_INFO_DICT, num_trials=5):
                                        neptune_mode='async',
                                        yes_logging=True,
                                        neptune_api_token=neptune_api_token,
-                                       tags=['RCC-2925 redo using original data larger latent size pretrain recon only'],
+                                       tags=['RCC-2925 redo using original data larger latent size recon only pretrain'],
                                        y_head_cols=y_head_cols,
                                        y_adv_cols=y_adv_cols,
                                        num_repeats=1,
