@@ -375,8 +375,47 @@ if __name__ == '__main__':
     exclude_tag = "training failed"
 
     # Create a query to filter by the specified tags
-    run_id_list = get_filtered_run_ids_by_tag(include_tag, exclude_tag, project_id=project_id)
-    # run_id_list = ['RCC-5238', 'RCC-5141', 'RCC-4823', 'RCC-5296', 'RCC-5122', 'RCC-4876', 'RCC-5211', 'RCC-5284']
+    # run_id_list = get_filtered_run_ids_by_tag(include_tag, exclude_tag, project_id=project_id)
+    run_id_list = [
+        'RCC-6979', 'RCC-6976', 'RCC-6971', 'RCC-6968', 'RCC-6964', 'RCC-6961',
+        'RCC-6957', 'RCC-6953', 'RCC-6949', 'RCC-6946', 'RCC-6941', 'RCC-6938',
+        'RCC-6934', 'RCC-6930', 'RCC-6925', 'RCC-6922', 'RCC-6917', 'RCC-6913',
+        'RCC-6906', 'RCC-6901', 'RCC-6896', 'RCC-6892', 'RCC-6887', 'RCC-6883',
+        'RCC-6879', 'RCC-6875', 'RCC-6871', 'RCC-6867', 'RCC-6860', 'RCC-6857',
+        'RCC-6849', 'RCC-6846', 'RCC-6841', 'RCC-6835', 'RCC-6831', 'RCC-6827',
+        'RCC-6822', 'RCC-6816', 'RCC-6810', 'RCC-6807', 'RCC-6802', 'RCC-6796',
+        'RCC-6793', 'RCC-6789', 'RCC-6787', 'RCC-6784', 'RCC-6779', 'RCC-6775',
+        'RCC-6772', 'RCC-6768', 'RCC-6763', 'RCC-6759', 'RCC-6755', 'RCC-6750',
+        'RCC-6746', 'RCC-6741', 'RCC-6738', 'RCC-6731', 'RCC-6729', 'RCC-6722',
+        'RCC-6720', 'RCC-6712', 'RCC-6705', 'RCC-6696', 'RCC-6687', 'RCC-6678',
+        'RCC-6670', 'RCC-6661', 'RCC-6653', 'RCC-6643', 'RCC-6636', 'RCC-6625',
+        'RCC-6617', 'RCC-6607', 'RCC-6600', 'RCC-6592', 'RCC-6586', 'RCC-6576',
+        'RCC-6568', 'RCC-6560', 'RCC-6551', 'RCC-6543', 'RCC-6535', 'RCC-6532',
+        'RCC-6523', 'RCC-6514', 'RCC-6507', 'RCC-6497', 'RCC-6492', 'RCC-6483',
+        'RCC-6473', 'RCC-6464', 'RCC-6454', 'RCC-6444', 'RCC-6436', 'RCC-6428',
+        'RCC-6420', 'RCC-6412', 'RCC-6405', 'RCC-6398', 'RCC-6389', 'RCC-6382',
+        'RCC-6374', 'RCC-6367', 'RCC-6361', 'RCC-6353', 'RCC-6347', 'RCC-6339',
+        'RCC-6332', 'RCC-6325', 'RCC-6317', 'RCC-6310', 'RCC-6307', 'RCC-6304',
+        'RCC-6303', 'RCC-6299', 'RCC-6297', 'RCC-6292', 'RCC-6289', 'RCC-6284',
+        'RCC-6279', 'RCC-6274', 'RCC-6270', 'RCC-6265', 'RCC-6261', 'RCC-6257',
+        'RCC-6252', 'RCC-6248', 'RCC-6244', 'RCC-6238', 'RCC-6234', 'RCC-6230',
+        'RCC-6226', 'RCC-6223', 'RCC-6218', 'RCC-6215', 'RCC-6208', 'RCC-6206',
+        'RCC-6200', 'RCC-6188', 'RCC-6182', 'RCC-6171', 'RCC-6162', 'RCC-6152',
+        'RCC-6146', 'RCC-6137', 'RCC-6130', 'RCC-6125', 'RCC-6118', 'RCC-6107',
+        'RCC-6101', 'RCC-6092', 'RCC-6083', 'RCC-6070', 'RCC-6053', 'RCC-6040',
+        'RCC-6025', 'RCC-6009', 'RCC-5994', 'RCC-5979', 'RCC-5963', 'RCC-5948',
+        'RCC-5938', 'RCC-5925', 'RCC-5913', 'RCC-5901', 'RCC-5891', 'RCC-5879',
+        'RCC-5869', 'RCC-5858', 'RCC-5849', 'RCC-5841', 'RCC-5836', 'RCC-5827',
+        'RCC-5815', 'RCC-5804', 'RCC-5795', 'RCC-5785', 'RCC-5770', 'RCC-5755',
+        'RCC-5746', 'RCC-5738', 'RCC-5731', 'RCC-5716', 'RCC-5708', 'RCC-5697',
+        'RCC-5687', 'RCC-5677', 'RCC-5663', 'RCC-5653', 'RCC-5643', 'RCC-5636',
+        'RCC-5624', 'RCC-5617', 'RCC-5606', 'RCC-5597', 'RCC-5590', 'RCC-5580',
+        'RCC-5566', 'RCC-5554', 'RCC-5549', 'RCC-5543', 'RCC-5535', 'RCC-5521',
+        'RCC-5506', 'RCC-5499', 'RCC-5491', 'RCC-5472', 'RCC-5450', 'RCC-5442',
+        'RCC-5441', 'RCC-5430', 'RCC-5416', 'RCC-5412', 'RCC-5401', 'RCC-5400',
+        'RCC-5381', 'RCC-5364', 'RCC-5353', 'RCC-5347'
+    ]
+
     for run_id in run_id_list:
         print('##############################################')
         print('##############################################')
