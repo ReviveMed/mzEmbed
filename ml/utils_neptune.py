@@ -109,6 +109,40 @@ def get_run_id_list_from_query(query,limit=2000,project_id='revivemed/RCC'):
     return run_id_list
 
 
+def get_filtered_run_ids_by_tag(include_tag, exclude_tag, project_id='revivemed/RCC'):
+    """
+    Initialize Neptune project, fetch all runs, and filter by tags.
+
+    Parameters:
+    include_tag (str): Tag to include in the filter.
+    exclude_tag (str): Tag to exclude in the filter.
+
+    Returns:
+    list: IDs of the filtered runs.
+    """
+    # Initialize your Neptune project
+    project = neptune.init_project(
+        project=project_id,
+        mode="read-only",
+        api_token=NEPTUNE_API_TOKEN
+    )
+
+    # Fetch all runs
+    runs_table = project.fetch_runs_table()
+
+    # Convert to a DataFrame for easier manipulation
+    runs_df = runs_table.to_pandas()
+
+    # Apply the filter to select rows that include the tag 'include_tag' and do not have the tag 'exclude_tag'
+    filtered_df = runs_df[runs_df['tags'].apply(lambda tags: include_tag in tags and exclude_tag not in tags)]
+
+    # Select the IDs of the filtered runs
+    filtered_ids = filtered_df['sys/id'].tolist()
+
+    project.stop()
+    return filtered_ids
+
+
 def get_run_id_list(encoder_kind='AE',tag=None,project_id='revivemed/RCC'):
 
     project = neptune.init_project(
