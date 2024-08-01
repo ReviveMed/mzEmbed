@@ -415,18 +415,24 @@ if __name__ == '__main__':
         'RCC-5370', 'RCC-5344', 'RCC-5339'
     ]
 
+    failed_run_id_error = {}
     for run_id in run_id_list:
         print('##############################################')
         print('##############################################')
         print('Running: ', run_id)
         start_time = time.time()
-        main(run_id,
-             yes_plot_latent_space=True,
-             which_finetune_nums=[],
-             # which_finetune_nums=[4,5,6],
-             task_name_list=[])
-        # task_name_list=['IMDC'])
-        print('Minutes elapsed: ', (time.time() - start_time) / 60)
+        try:
+            main(run_id,
+                 yes_plot_latent_space=True,
+                 which_finetune_nums=[],
+                 # which_finetune_nums=[4,5,6],
+                 task_name_list=[])
+            # task_name_list=['IMDC'])
+            print('Minutes elapsed: ', (time.time() - start_time) / 60)
+        except Exception as e:
+            print('Error: ', e)
+            failed_run_id_error[run_id] = e
+    print(failed_run_id_error)
 
     """
     # query to select models to finetune
