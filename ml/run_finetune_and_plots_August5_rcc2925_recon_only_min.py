@@ -53,24 +53,24 @@ def main(run_id, yes_plot_latent_space=False, which_finetune_nums=[], task_name_
     finetune_fit_subset_col = 'Finetune Discovery Train'
     finetune_eval_subset_col = 'Finetune Discovery Val'
 
-    _, finetune_fit_file_id = create_selected_data(input_data_dir=input_data_dir,
-                                                   sample_selection_col=finetune_fit_subset_col,
-                                                   subdir_col=subdir_col,
-                                                   output_dir=output_dir,
-                                                   metadata_df=None,
-                                                   selections_df=selections_df)
+    # _, finetune_fit_file_id = create_selected_data(input_data_dir=input_data_dir,
+    #                                                sample_selection_col=finetune_fit_subset_col,
+    #                                                subdir_col=subdir_col,
+    #                                                output_dir=output_dir,
+    #                                                metadata_df=None,
+    #                                                selections_df=selections_df)
+    #
+    # _, finetune_eval_file_id = create_selected_data(input_data_dir=input_data_dir,
+    #                                                 sample_selection_col=finetune_eval_subset_col,
+    #                                                 subdir_col=subdir_col,
+    #                                                 output_dir=output_dir,
+    #                                                 metadata_df=None,
+    #                                                 selections_df=selections_df)
 
-    _, finetune_eval_file_id = create_selected_data(input_data_dir=input_data_dir,
-                                                    sample_selection_col=finetune_eval_subset_col,
-                                                    subdir_col=subdir_col,
-                                                    output_dir=output_dir,
-                                                    metadata_df=None,
-                                                    selections_df=selections_df)
-
-    X_finetune_eval_file = f'{output_dir}/X_{finetune_eval_file_id}.csv'
-    y_finetune_eval_file = f'{output_dir}/y_{finetune_eval_file_id}.csv'
-    X_finetune_fit_file = f'{output_dir}/X_{finetune_fit_file_id}.csv'
-    y_finetune_fit_file = f'{output_dir}/y_{finetune_fit_file_id}.csv'
+    X_finetune_eval_file = f'{output_dir}/X_finetune_val.csv'
+    y_finetune_eval_file = f'{output_dir}/y_finetune_val.csv'
+    X_finetune_fit_file = f'{output_dir}/X_finetune_train.csv'
+    y_finetune_fit_file = f'{output_dir}/y_finetune_train.csv'
 
     if yes_plot_latent_space:
         _, fit_file_id = create_selected_data(input_data_dir=input_data_dir,
@@ -308,13 +308,13 @@ def main(run_id, yes_plot_latent_space=False, which_finetune_nums=[], task_name_
                                       run_training=True,
                                       X_fit_file=X_finetune_fit_file,
                                       y_fit_file=y_finetune_fit_file,
-                                      train_name=finetune_fit_file_id,
+                                      train_name='finetune_train',
                                       upload_models_to_neptune=upload_models_to_neptune,
 
                                       run_evaluation=True,
                                       X_eval_file=X_finetune_eval_file,
                                       y_eval_file=y_finetune_eval_file,
-                                      eval_name=finetune_eval_file_id,
+                                      eval_name='finetune_val',
 
                                       save_latent_space=False,
                                       plot_latent_space_cols=plot_latent_space_cols,
@@ -342,13 +342,13 @@ def main(run_id, yes_plot_latent_space=False, which_finetune_nums=[], task_name_
                                       run_training=True,
                                       X_fit_file=X_finetune_fit_file,
                                       y_fit_file=y_finetune_fit_file,
-                                      train_name=finetune_fit_file_id,
+                                      train_name='finetune_train',
                                       upload_models_to_neptune=upload_models_to_neptune,
 
                                       run_evaluation=True,
                                       X_eval_file=X_finetune_eval_file,
                                       y_eval_file=y_finetune_eval_file,
-                                      eval_name=finetune_eval_file_id,
+                                      eval_name='finetune_val',
 
                                       save_latent_space=False,
                                       plot_latent_space_cols=plot_latent_space_cols,
