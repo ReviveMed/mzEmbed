@@ -394,3 +394,101 @@ original_metadata.loc[qc_samples,'Pretrain All'] = False
 original_metadata.loc[qc_samples,'Finetune All'] = False
 
 new_metadata = assign_sets(original_metadata)
+
+
+########################################################################################################################
+metadata_path = "/home/min/INPUT_DATA/metadata.csv"
+sample_info = pd.read_csv(metadata_path, index_col=0)
+# add a index column that is the same as the index
+sample_info['index'] = sample_info.index
+
+########################################################################################################################
+# compare old selection df and new selection df
+old_selection_df_path = f'{homedir}/INPUT_DATA/selection_df.csv'
+new_selection_df_path = f'{homedir}/data_rcc_all_studies/selection_df.csv'
+
+# find the difference beteween the two selection dfs
+old_selection_df = pd.read_csv(old_selection_df_path, index_col=0)
+new_selection_df = pd.read_csv(new_selection_df_path, index_col=0)
+
+# drop Study ID and Job ID from new_selection_df
+new_selection_df.drop(['Study ID', 'Job ID'], axis=1, inplace=True)
+
+# find the difference in Finetune test column between the old and the new selection dfs
+diff = old_selection_df['Finetune Test'] != new_selection_df['Finetune Test']
+print(f'Number of differences in Finetune Test column: {diff.sum()}')
+
+########################################################################################################################
+metadata_path = "/home/min/INPUT_DATA/metadata.csv"
+selection_df_path = "/home/min/INPUT_DATA/selection_df.csv"
+sample_info = pd.read_csv(metadata_path, index_col=0)
+selection_df = pd.read_csv(selection_df_path, index_col=0)
+# add a index column that is the same as the index
+sample_info['index'] = sample_info.index
+print(f"all samples {len(sample_info)}")
+# only select a subset from sample_info that has index from selection_df with Pretrain All == True
+sample_info = sample_info[sample_info['index'].isin(selection_df[selection_df['Pretrain All'] == True].index)]
+# fill ["Cohort Label v0", "is Pediatric", "Sex", "Smoking Status", "IMDC BINARY"] columns from sample_info NaN with 'NA'
+# Define the columns to fill NaN values
+columns_to_fill = ["Cohort Label v0", "is Pediatric", "Sex", "Smoking Status", "IMDC BINARY"]
+# Fill NaN values in the specified columns with 'NA'
+sample_info[columns_to_fill] = sample_info[columns_to_fill].fillna('NA')
+# Optionally, you can check if the NaN values have been filled
+print(sample_info[columns_to_fill].isna().sum())
+print(f"pretrain samples {len(sample_info)}")
+
+########################################################################################################################
+bs, ss = optimize_splits(
+    sample_info=sample_info,
+    vars_to_balance=["Cohort Label v0", "is Pediatric", "Sex", "Smoking Status", "IMDC BINARY"],
+    num_cols =  ["OS", "Age", "BMI"],
+    subject_id_col='index',
+    tt_frac = 0.15,
+    tv_frac = 0.176
+)
+
+# save bs to file
+bs.to_csv('bs.csv')
+
+########################################################################################################################
+# edit the existing selection_df to use the updated split from splited_metadata.csv
+
+# loop through all rows from splited_metadata.csv
+splited_metadata = pd.read_csv('splited_metadata.csv', index_col=0)
+selection_df = pd.read_csv('selection_df.csv', index_col=0)
+
+# loop through all rows from splited_metadata.csv
+for index, row in splited_metadata.iterrows():
+    # get the index of the row
+    idx = row.name
+    # get the assignment from the row
+    assignment = row['tvt_split']
+    # check if the row is in the index of the selection_df
+    if idx in selection_df.index:
+        print("there is a match in selection_df, edit the row")
+        # update the selection_df with the new values
+        # if the assignment is 'test'
+        if assignment == 'test':
+            selection_df.loc[idx, 'Pretrain Discovery'] = False
+            selection_df.loc[idx, 'Pretrain Test'] = True
+            selection_df.loc[idx, 'Pretrain Discovery Train'] = False
+            selection_df.loc[idx, 'Pretrain Discovery Val'] = False
+            selection_df.loc[idx, 'Set'] = 'Pretrain Test'
+        if assignment == 'val':
+            selection_df.loc[idx, 'Pretrain Discovery'] = True
+            selection_df.loc[idx, 'Pretrain Test'] = False
+            selection_df.loc[idx, 'Pretrain Discovery Train'] = False
+            selection_df.loc[idx, 'Pretrain Discovery Val'] = True
+            selection_df.loc[idx, 'Set'] = 'Pretrain Discovery Val'
+        if assignment == 'train':
+            selection_df.loc[idx, 'Pretrain Discovery'] = True
+            selection_df.loc[idx, 'Pretrain Test'] = False
+            selection_df.loc[idx, 'Pretrain Discovery Train'] = True
+            selection_df.loc[idx, 'Pretrain Discovery Val'] = False
+            selection_df.loc[idx, 'Set'] = 'Pretrain Discovery Train'
+    # else printout the idx
+    else:
+        print(f'idx {idx} not in selection_df')
+
+# save selection_df to file
+selection_df.to_csv('selection_df.csv')
