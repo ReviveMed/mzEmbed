@@ -492,3 +492,57 @@ for index, row in splited_metadata.iterrows():
 
 # save selection_df to file
 selection_df.to_csv('selection_df.csv')
+
+
+########################################################################################################################
+# based on processed y_pretrain_test.csv, y_pretrain_val.csv, and y_pretrain_train.csv
+# to get the split for rcc2925 data
+homedir = os.path.expanduser("~")
+PROCESSED_DATA_DIR = f'{homedir}/PROCESSED_DATA'
+print(f'PROCESSED_DATA is {PROCESSED_DATA_DIR}')
+
+test_data_path = f'{PROCESSED_DATA_DIR}/y_pretrain_test.csv'
+train_data_path = f'{PROCESSED_DATA_DIR}/y_pretrain_train.csv'
+val_data_path = f'{PROCESSED_DATA_DIR}/y_pretrain_val.csv'
+
+meta_data_path = f'{homedir}/INPUT_DATA/metadata.csv'
+
+# read in the test data
+test_data = pd.read_csv(test_data_path, index_col=0)
+train_data = pd.read_csv(train_data_path, index_col=0)
+val_data = pd.read_csv(val_data_path, index_col=0)
+
+# read in the metadata
+meta_data = pd.read_csv(meta_data_path, index_col=0)
+
+# add a new column to the metadata called tvt split
+meta_data['tvt_split'] = 'NA'
+
+# loop through all rows from meta_data
+for index, row in meta_data.iterrows():
+    # get the index of the row
+    idx = row.name
+    # check if the row is in the index of the test_data
+    if idx in test_data.index:
+        print("there is a match in test_data")
+        # update the meta_data with the new values
+        meta_data.loc[idx, 'tvt_split'] = 'test'
+    # check if the row is in the index of the train_data
+    elif idx in train_data.index:
+        print("there is a match in train_data")
+        # update the meta_data with the new values
+        meta_data.loc[idx, 'tvt_split'] = 'train'
+    # check if the row is in the index of the val_data
+    elif idx in val_data.index:
+        print("there is a match in val_data")
+        # update the meta_data with the new values
+        meta_data.loc[idx, 'tvt_split'] = 'val'
+    # else printout the idx
+    else:
+        print(f'idx {idx} not in test_data, train_data, or val_data')
+
+# drop rows from meta_data with tvt_split == 'NA'
+meta_data = meta_data[meta_data['tvt_split'] != 'NA']
+
+# save meta_data to file
+meta_data.to_csv('rcc2925_splited_metadata.csv')
