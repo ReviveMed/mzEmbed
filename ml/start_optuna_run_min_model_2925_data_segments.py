@@ -173,8 +173,8 @@ def main(STUDY_INFO_DICT, num_trials=5,
     """
     # y_pretrain_train
     # y_pretrain_val
-    eval_file_id = 'pretrain_train'
-    fit_file_id = 'pretrain_val'
+    eval_file_id = 'pretrain_val'
+    fit_file_id = 'pretrain_train'
     X_eval_file = f'{output_dir}/X_{eval_file_id}.csv'
     y_eval_file = f'{output_dir}/y_{eval_file_id}.csv'
     X_fit_file = f'{output_dir}/X_{fit_file_id}.csv'
