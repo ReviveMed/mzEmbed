@@ -313,55 +313,55 @@ if __name__ == '__main__':
     main(STUDY_DICT, num_trials=50,
          latent_size_min=120, latent_size_max=140,
          num_hidden_layers_min=2, num_hidden_layers_max=2,
-         tag='2925 segmented pretrain recon only Aug 10'
+         tag='2925 segmented pretrain recon only Aug 13'
          )
     # 140-160
     main(STUDY_DICT, num_trials=50,
          latent_size_min=120, latent_size_max=160,
          num_hidden_layers_min=2, num_hidden_layers_max=2,
-         tag='2925 segmented pretrain recon only Aug 10'
+         tag='2925 segmented pretrain recon only Aug 13'
          )
     # 160-180
     main(STUDY_DICT, num_trials=50,
          latent_size_min=160, latent_size_max=180,
          num_hidden_layers_min=2, num_hidden_layers_max=2,
-         tag='2925 segmented pretrain recon only Aug 10'
+         tag='2925 segmented pretrain recon only Aug 13'
          )
     # 180-200
     main(STUDY_DICT, num_trials=50,
          latent_size_min=180, latent_size_max=200,
          num_hidden_layers_min=2, num_hidden_layers_max=2,
-         tag='2925 segmented pretrain recon only Aug 10'
+         tag='2925 segmented pretrain recon only Aug 13'
          )
     # 200-220
     main(STUDY_DICT, num_trials=50,
          latent_size_min=200, latent_size_max=220,
          num_hidden_layers_min=2, num_hidden_layers_max=2,
-         tag='2925 segmented pretrain recon only Aug 10'
+         tag='2925 segmented pretrain recon only Aug 13'
          )
     # 220-240
     main(STUDY_DICT, num_trials=50,
          latent_size_min=220, latent_size_max=240,
          num_hidden_layers_min=2, num_hidden_layers_max=2,
-         tag='2925 segmented pretrain recon only Aug 10'
+         tag='2925 segmented pretrain recon only Aug 13'
          )
     # 240-260
     main(STUDY_DICT, num_trials=50,
          latent_size_min=240, latent_size_max=260,
          num_hidden_layers_min=2, num_hidden_layers_max=2,
-         tag='2925 segmented pretrain recon only Aug 10'
+         tag='2925 segmented pretrain recon only Aug 13'
          )
     # 260-280
     main(STUDY_DICT, num_trials=50,
          latent_size_min=260, latent_size_max=280,
          num_hidden_layers_min=2, num_hidden_layers_max=2,
-         tag='2925 segmented pretrain recon only Aug 10'
+         tag='2925 segmented pretrain recon only Aug 13'
          )
     # 280-300
     main(STUDY_DICT, num_trials=50,
          latent_size_min=280, latent_size_max=300,
          num_hidden_layers_min=2, num_hidden_layers_max=2,
-         tag='2925 segmented pretrain recon only Aug 10'
+         tag='2925 segmented pretrain recon only Aug 13'
          )
 
     # res = objective_func4('RCC-3188',
