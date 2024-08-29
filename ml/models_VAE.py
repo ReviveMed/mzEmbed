@@ -380,8 +380,6 @@ class VAE(nn.Module):
         recon_loss = F.mse_loss(x_recon, x, reduction='mean')
         # print('recon_loss', recon_loss) 
         kl_loss = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
-        # print('kl_loss', kl_loss)
-        #return torch.add(recon_loss, self.kl_weight*kl_loss)
 
         # Latent size penalty
         latent_size_penalty = self.latent_size * 0.01  # Adjust the penalty coefficient as needed
@@ -392,8 +390,6 @@ class VAE(nn.Module):
 
         # print('kl_loss', kl_loss)
         return total_loss_with_penalty
-    
-
     
     def forward_to_loss(self, x,y=None):
         if y is None:
@@ -492,6 +488,8 @@ class VAE(nn.Module):
                 save_name = self.file_id + '_info.json'
         save_json(self.get_info(), os.path.join(save_path, save_name))   
     
+
+
     
 ### Autoencoder
 class AE(nn.Module):
