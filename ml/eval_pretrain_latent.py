@@ -130,7 +130,8 @@ def evalute_pretrain_latent_extra_task(model_id_list, input_data_location, pretr
 def main():
 
     #input data
-    model_id_list=['RCC-10290']
+    model_id_list=['RCC-10290', 'RCC-11291', 'RCC-10290', 'RCC-11291', 'RCC-11472', 'RCC-11517', 'RCC-11147', 'RCC-11174', 'RCC-7620', 'RCC-10860', 'RCC-10737', 'RCC-11381', 'RCC-10830', 'RCC-10256', 'RCC-11222', 'RCC-11511', 'RCC-10662', 'RCC-11037', 'RCC-10473', 'RCC-10121', 'RCC-7426', 'RCC-10192', 'RCC-9566', 'RCC-10343']
+
     input_data_location='/home/leilapirhaji/PROCESSED_DATA_2'
     pretrain_save_dir='/home/leilapirhaji/pretrained_models' 
 
