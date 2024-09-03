@@ -20,10 +20,10 @@ When using an Intel CPU without any gpu, use the GCP's deep learning VM image
 - Update the settings for screen:
     - `echo "escape ^Jj" > .screenrc`
 - (Optional) set up an ssh connection to bitbucket:
-    - `ssh -T jonaheaton@bitbucket.org`
+    - `ssh -T leilapirhaji@bitbucket.org`
     - If you get an error, you may need to add the bitbucket ssh key to your ssh
 - Clone the repo and enter the directory:
-    - `git clone jonaheaton@bitbucket.org:revivemed/mz_embed_engine.git`
+    - `git clone lpirhaji@bitbucket.org:revivemed/mz_embed_engine.git`
     - `cd mz_embed_engine`
 - (optional) Checkout the branch you want to work on
     - `git checkout <branch_name>`

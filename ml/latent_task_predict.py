@@ -7,7 +7,14 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
-from sklearn.model_selection import RandomizedSearchCV
+
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import Ridge
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import mean_squared_error, r2_score
+
+
 
 
 def log_reg_multi_class(x_train, y_train, x_val, y_val, x_test, y_test):
@@ -57,13 +64,6 @@ def log_reg_multi_class(x_train, y_train, x_val, y_val, x_test, y_test):
 
 
 
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, r2_score
-
-from sklearn.linear_model import Ridge
-from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import mean_squared_error, r2_score
-
 
 def ridge_regression_predict(x_train, y_train, x_val, y_val, x_test, y_test):
     """
@@ -88,26 +88,37 @@ def ridge_regression_predict(x_train, y_train, x_val, y_val, x_test, y_test):
     
     # Define a range of alpha values to search over
     alpha_range = [0.001, 0.01, 0.1, 1, 10, 100]
-    param_grid = {'alpha': alpha_range}
     
-    # Initialize Ridge regression model
-    ridge = Ridge()
+    best_alpha = None
+    best_val_mse = float('inf')
+    best_model = None
     
-    # Use GridSearchCV to find the best alpha value
-    grid_search = GridSearchCV(ridge, param_grid, cv=5, scoring='neg_mean_squared_error', n_jobs=-1)
-    grid_search.fit(x_train, y_train)
+    # Iterate over the range of alpha values
+    for alpha in alpha_range:
+        # Initialize and train Ridge regression model with the current alpha
+        ridge = Ridge(alpha=alpha)
+        ridge.fit(x_train, y_train)
+        
+        # Evaluate on the validation set
+        y_val_pred = ridge.predict(x_val)
+        val_mse = mean_squared_error(y_val, y_val_pred)
+        
+        # If the current model has the lowest validation MSE, save it
+        if val_mse < best_val_mse:
+            best_val_mse = val_mse
+            best_alpha = alpha
+            best_model = ridge
+
+
+    # Evaluate the best model on the validation set using MAE
+    y_val_pred = best_model.predict(y_val)
+    val_mae = mean_absolute_error(y_val, y_val_pred)
+    val_r2 = r2_score(y_val, y_val_pred)
     
-    # Get the best model and its alpha value
-    best_model = grid_search.best_estimator_
-    best_alpha = grid_search.best_params_['alpha']
-    
-    # Evaluate on validation set
-    y_val_pred = best_model.predict(x_val)
-    val_mse = mean_squared_error(y_val, y_val_pred)
-    
-    # Evaluate on test set
+    # Evaluate the best model on the test set
     y_test_pred = best_model.predict(x_test)
     test_mse = mean_squared_error(y_test, y_test_pred)
+    test_mae = mean_absolute_error(y_test, y_test_pred)
     test_r2 = r2_score(y_test, y_test_pred)
     
-    return best_model, val_mse, test_mse, test_r2, best_alpha
+    return best_model, best_val_mse, val_mae, val_r2, test_mse, test_mae, test_r2, best_alpha
