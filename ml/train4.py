@@ -31,6 +31,9 @@ from neptune.utils import stringify_unsupported
 ##################################################################################
 ######### for training the compound model
 
+def kl_annealing(current_epoch, total_epochs, max_kl_weight=1.0):
+    return min(max_kl_weight, current_epoch / total_epochs)
+
 
 def convert_y_data_by_codes(y_data, y_codes):
     for col in y_data.columns:
@@ -392,6 +395,9 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
             adversary.load_state_dict(best_wts['adversary'])
             break
 
+        # Calculate the KL annealing weight for the current epoch
+        if encoder_type == 'VAE':
+            encoder.kl_weight = kl_annealing(epoch, num_epochs, max_kl_weight=1.0)
 
         for phase in [f'{train_name}', f'{train_name}_holdout']:
             if phase not in dataloaders:
@@ -472,6 +478,7 @@ def train_compound_model(dataloaders,encoder,head,adversary, run, **kwargs):
                 with torch.set_grad_enabled(phase == f'{train_name}'):
                     if encoder_weight > 0:
                         # z, encoder_loss = encoder.transform_with_loss(X)
+                        # Pass the KL weight to the encoder's loss function
                         z, encoder_loss = encoder.transform_with_loss(X_with_noise, X)
                     else:
                         z = encoder.transform(X_with_noise)
