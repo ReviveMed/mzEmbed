@@ -23,9 +23,10 @@ import seaborn as sns
 import plotly.express as px
 
 from neptune.exceptions import NeptuneException
-import torch_cpu_loader
+#import torch_cpu_loader
 
 # set up neptune
+
 
 
 def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
@@ -234,6 +235,15 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     remove_y_nans = kwargs.get('remove_y_nans', False)
     remove_y_nans_strict = kwargs.get('remove_y_nans_strict', False)
     np.random.seed(random_seed)
+
+    #### setting the same seed for everything
+    torch.manual_seed(random_seed)
+    torch.cuda.manual_seed_all(random_seed)
+    np.random.seed(random_seed)
+    random.seed(random_seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     
     try:
         print('loading data')

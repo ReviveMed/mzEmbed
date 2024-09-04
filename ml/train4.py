@@ -790,6 +790,7 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
         head = head.to(device)
         adversary = adversary.to(device)
         recon_loss = torch.tensor(0.0).to(device)
+        recon_loss_only = torch.tensor(0.0).to(device)
         head_loss = torch.tensor(0.0).to(device)
         adversary_loss = torch.tensor(0.0).to(device)
         
@@ -818,9 +819,22 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
                     # compute only the masked value reconstruction
                     recon_loss += F.mse_loss(x_seq[x_mask], z_recon[x_mask])* X.size(0)
                 else:
-                    z = encoder.transform(X)
+                    z = encoder.transform(X) #return mu
                     X_recon = encoder.generate(z)
-                    recon_loss += F.mse_loss(X_recon, X)* X.size(0)
+                    recon_loss_only += F.mse_loss(X_recon, X)* X.size(0)
+
+                    log_var = encoder.transform_2(X) #return log_var
+                    
+                    # Minimum threshold for recon_loss to avoid large penalties
+                    #min_recon_loss = 1.0
+                    #effective_recon_loss = max(recon_loss_only.detach(), min_recon_loss)
+                
+                    latent_size_loss = (encoder.latent_size * encoder.latent_weight) #/ effective_recon_loss
+                
+                    kl_loss = -0.5 * torch.mean(1 + log_var - z.pow(2) - log_var.exp())
+                    kl_loss= encoder.kl_weight * kl_loss
+                    
+                    recon_loss= recon_loss_only + latent_size_loss + kl_loss
 
                 if sklearn_models:
                     latent_outputs = torch.cat((latent_outputs, z), 0)
@@ -869,6 +883,9 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
             # recon_loss.to("cpu")
             latent_outputs_by_phase[phase] = latent_outputs
             adversary_targets_by_phase[phase] = adversary_targets
+            latent_size_loss = latent_size_loss / len(dataloaders[phase].dataset)
+            kl_loss = kl_loss / len(dataloaders[phase].dataset)
+            recon_loss_only = recon_loss_only / len(dataloaders[phase].dataset)
             recon_loss = recon_loss / len(dataloaders[phase].dataset)
             head_loss = head_loss / len(dataloaders[phase].dataset)
             adversary_loss = adversary_loss / len(dataloaders[phase].dataset)
@@ -905,6 +922,9 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
                 adversary_loss = torch.tensor(0.0)
 
             # We now append the losses, so we can have a history over multiple iterations of evaluation
+            run[f'{prefix}/{phase}/latnet_size_loss'].append(latent_size_loss)
+            run[f'{prefix}/{phase}/KL_divergance_loss'].append(kl_loss)
+            run[f'{prefix}/{phase}/reconstruction_loss_true'].append(recon_loss_only)
             run[f'{prefix}/{phase}/reconstruction_loss'].append(recon_loss)
             run[f'{prefix}/{phase}/head_loss'].append(head_loss)
             run[f'{prefix}/{phase}/adversary_loss'].append(adversary_loss)

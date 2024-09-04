@@ -317,7 +317,7 @@ class VAE(nn.Module):
         self.act_on_latent_layer = act_on_latent_layer
         # self.kl_weight = 1.0/np.sqrt(num_hidden_layers)
         self.kl_weight = 1.0
-        self.latent_weight = 0.001
+        self.latent_weight = 0.5
 
         self.encoder = Dense_Layers(input_size=input_size, 
                                     hidden_size=hidden_size, 
@@ -365,6 +365,10 @@ class VAE(nn.Module):
     def transform(self, x):
         mu, log_var = self.encoder(x).chunk(2, dim=1)
         return mu
+    
+    def transform_2(self, x):
+        mu, log_var = self.encoder(x).chunk(2, dim=1)
+        return log_var
 
 
     def loss(self, x, x_recon, mu, log_var):
@@ -389,10 +393,10 @@ class VAE(nn.Module):
         # latent size penalty is normalized by Recon loss to make it scale invariant
         
         # Minimum threshold for recon_loss to avoid large penalties
-        min_recon_loss = 1.0
-        effective_recon_loss = max(recon_loss.detach(), min_recon_loss)
+        # min_recon_loss = 1.0
+        # effective_recon_loss = max(recon_loss.detach(), min_recon_loss)
     
-        latent_size_penalty = (self.latent_size * self.latent_weight) / effective_recon_loss
+        latent_size_penalty = (self.latent_size * self.latent_weight) #/ effective_recon_loss
     
 
         # Total loss

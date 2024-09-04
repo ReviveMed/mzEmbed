@@ -9,7 +9,7 @@ from setup3 import setup_neptune_run
 from prep_study2 import objective_func4, reuse_run, get_study_objective_keys, get_study_objective_directions, \
     add_runs_to_study
 from prep_run import get_selection_df, convert_model_kwargs_list_to_dict, convert_distributions_to_suggestion
-import torch_cpu_loader
+# import torch_cpu_loader
 
 ## 
 # %% Load the latest data
@@ -25,59 +25,20 @@ ADD_EXISTING_RUNS_TO_STUDY = False
 limit_add = -1  # limit the number of runs added to the study
 
 encoder_kind = 'VAE'
+tag_study='pretrain latent penalty w=1, corrected, not norm, KL-annealing'
 
 STUDY_DICT = {
     # oputuna study parameters
     # study name is the optuna optimization study name
-    'study_name': 'pretrain latent penalty w=0.001, KL annealing',
+    'study_name': tag_study,
     'encoder_kind': encoder_kind,
     'objectives': {
         'reconstruction_loss': {
             'weight': 3,
             'name': 'Reconstruction Loss',
             'direction': 'minimize',
-            'transform': 'log10',
             'default_value': 9999
-        },
-        # 'Binary_is-Pediatric__AUROC (micro)': {
-        #     'weight': 1,
-        #     'name': 'Pediatric Prediction',
-        #     'direction': 'maximize',
-        #     'default_value': 0,
-        # },
-        # 'MultiClass_Cohort-Label__AUROC (ovo, macro)': {
-        #     'weight': 1,
-        #     'name': 'Cohort Label Prediction',
-        #     'direction': 'maximize',
-        #     'default_value': 0
-        # },
-        #
-        # 'Binary_Sex__AUROC (micro)': {
-        #     'weight': 2,
-        #     'name': 'Gender Prediction',
-        #     'direction': 'maximize',
-        #     'default_value': 0
-        # },
-        # 'Regression_Age__MAE': {
-        #     'weight': 2,
-        #     'name': 'Age Prediction',
-        #     'direction': 'minimize',
-        #     'transform': 'log10',
-        #     'default_value': 9999
-        # },
-        # 'Regression_BMI__MAE': {
-        #     'weight': 2,
-        #     'name': 'BMI Prediction',
-        #     'direction': 'minimize',
-        #     'transform': 'log10',
-        #     'default_value': 9999
-        # },
-        # 'Binary_Smoking__AUROC (micro)': {
-        #     'weight': 1,
-        #     'name': 'Smoking Prediction',
-        #     'direction': 'maximize',
-        #     'default_value': 0
-        # }
+        }
     }
 }
 
@@ -136,7 +97,7 @@ def get_study_kwargs(head_kwargs_dict, adv_kwargs_dict,
 
                              batch_size=96, batch_size_min=32, batch_size_max=128, batch_size_step=32,
                              noise_factor=None, noise_factor_min=0, noise_factor_max=0.25, noise_factor_step=0.05,
-                             num_epochs=None, num_epochs_min=50, num_epochs_max=400, num_epochs_step=25,
+                             num_epochs=100, num_epochs_min=50, num_epochs_max=400, num_epochs_step=25,
                              num_epochs_log=False,
                              learning_rate=None, learning_rate_min=0.00001, learning_rate_max=0.005,
                              learning_rate_step=None, learning_rate_log=True,
@@ -193,43 +154,6 @@ def main(STUDY_INFO_DICT, num_trials=5,
     y_adv_cols = []
     head_kwargs_dict = {}
     adv_kwargs_dict = {}
-
-    # head_kwargs_dict['Cohort-Label'], y_head_cols = get_task_head_kwargs(head_kind='MultiClass',
-    #                                                                      y_head_col='Cohort Label v0',
-    #                                                                      y_cols=y_head_cols,
-    #                                                                      head_name='Cohort-Label',
-    #                                                                      num_classes=4,
-    #                                                                      default_weight=5.4)
-    #
-    # head_kwargs_dict['is-Pediatric'], y_head_cols = get_task_head_kwargs(head_kind='Binary',
-    #                                                                      y_head_col='is Pediatric',
-    #                                                                      y_cols=y_head_cols,
-    #                                                                      head_name='is-Pediatric',
-    #                                                                      default_weight=2.6)
-    #
-    # head_kwargs_dict['Age'], y_head_cols = get_task_head_kwargs(head_kind='Regression',
-    #                                                             y_head_col='Age',
-    #                                                             y_cols=y_head_cols,
-    #                                                             head_name='Age',
-    #                                                             default_weight=7.5)
-    #
-    # head_kwargs_dict['Sex'], y_head_cols = get_task_head_kwargs(head_kind='Binary',
-    #                                                             y_head_col='Sex',
-    #                                                             y_cols=y_head_cols,
-    #                                                             head_name='Sex',
-    #                                                             default_weight=13)
-    #
-    # head_kwargs_dict['BMI'], y_head_cols = get_task_head_kwargs(head_kind='Regression',
-    #                                                             y_head_col='BMI',
-    #                                                             y_cols=y_head_cols,
-    #                                                             head_name='BMI',
-    #                                                             default_weight=7.5)
-    #
-    # head_kwargs_dict['Smoking'], y_head_cols = get_task_head_kwargs(head_kind='Binary',
-    #                                                                 y_head_col='Smoking Status',
-    #                                                                 y_cols=y_head_cols,
-    #                                                                 head_name='Smoking',
-    #                                                                 default_weight=0)
 
     def compute_objective(run_id):
         return objective_func4(run_id,
@@ -322,9 +246,9 @@ def main(STUDY_INFO_DICT, num_trials=5,
 
 if __name__ == '__main__':
     # 250-350
-    main(STUDY_DICT, num_trials=100,
+    main(STUDY_DICT, num_trials=50,
          latent_size_min=100, latent_size_max=300,
          num_hidden_layers_min=2, num_hidden_layers_max=4,
          # change neptune run tag to keep track of the runs
-         tag='pretrain latent penalty w=0.001, KL-annealing'
+         tag=tag_study
          )

@@ -27,7 +27,7 @@ from misc import assign_color_map
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 
 PROJECT_ID = 'revivemed/Survival-RCC'
-import torch_cpu_loader
+#import torch_cpu_loader
 # %%
 
 

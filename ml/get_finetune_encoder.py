@@ -95,8 +95,11 @@ def get_finetune_encoder_from_modelID(model_id, path_to_proccessed_data, output_
     encoder = get_model(encoder_kind, **encoder_kwargs)
 
     # Load the model and map it to CPU
+    #encoder_state_dict = torch.load(model_encoder_file, map_location=torch.device('cpu') )
 
-    encoder_state_dict = torch.load(model_encoder_file, map_location=torch.device('cpu') )
+    # Load the model and map it to GPU
+    encoder_state_dict = torch.load(model_encoder_file )
+
     encoder.load_state_dict(encoder_state_dict)
     encoder.to(torch.device('cpu'))  # Explicitly move the model to CPU
 
