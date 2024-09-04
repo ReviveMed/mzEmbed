@@ -97,7 +97,7 @@ def get_study_kwargs(head_kwargs_dict, adv_kwargs_dict,
 
                              batch_size=96, batch_size_min=32, batch_size_max=128, batch_size_step=32,
                              noise_factor=None, noise_factor_min=0, noise_factor_max=0.25, noise_factor_step=0.05,
-                             num_epochs=100, num_epochs_min=50, num_epochs_max=400, num_epochs_step=25,
+                             num_epochs=20, num_epochs_min=50, num_epochs_max=400, num_epochs_step=25,
                              num_epochs_log=False,
                              learning_rate=None, learning_rate_min=0.00001, learning_rate_max=0.005,
                              learning_rate_step=None, learning_rate_log=True,
@@ -122,6 +122,7 @@ def main(STUDY_INFO_DICT, num_trials=5,
     selections_df = pd.read_csv(f'{input_data_dir}/selection_df.csv', index_col=0)
 
     output_dir = f'{homedir}/PROCESSED_DATA'
+    PROCESSED_DATA_dir=output_dir
     os.makedirs(output_dir, exist_ok=True)
     subdir_col = 'Study ID'
 
@@ -180,7 +181,7 @@ def main(STUDY_INFO_DICT, num_trials=5,
 
             kwargs['study_info_dict'] = STUDY_INFO_DICT
 
-            run_id = setup_neptune_run(input_data_dir,
+            run_id = setup_neptune_run(PROCESSED_DATA_dir, input_data_dir,
                                        setup_id=setup_id,
                                        project_id=project_id,
 

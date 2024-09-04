@@ -21,6 +21,7 @@ import uuid
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
+import random
 
 from neptune.exceptions import NeptuneException
 #import torch_cpu_loader
@@ -28,8 +29,25 @@ from neptune.exceptions import NeptuneException
 # set up neptune
 
 
+import os
+ml_code_path='/home/leilapirhaji/mz_embed_engine/ml'
+os.chdir(ml_code_path)
 
-def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
+import pandas as pd
+import importlib
+from sklearn.preprocessing import LabelEncoder
+label_encoder = LabelEncoder()
+
+
+from get_pretrain_encoder import get_pretrain_encoder_from_modelID
+from latent_task_predict_pretrain import log_reg_multi_class, ridge_regression_predict
+from eval_pretrain_latent import evalute_pretrain_latent_extra_task
+
+
+
+
+
+def setup_neptune_run(PROCESSED_DATA_dir, data_dir,setup_id,with_run_id=None,run=None,
                       neptune_mode='async',
                       yes_logging = False,
                       project_id = 'revivemed/RCC',
@@ -40,6 +58,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     print(setup_id)
     print(kwargs)
 
+ 
     if run is None:
         run, is_run_new = start_neptune_run(with_run_id=with_run_id,
                                             neptune_mode=neptune_mode,
@@ -234,6 +253,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
     random_seed = kwargs.get('random_seed', 42)
     remove_y_nans = kwargs.get('remove_y_nans', False)
     remove_y_nans_strict = kwargs.get('remove_y_nans_strict', False)
+    eval_latent = kwargs.get('eval_latent', True)
     np.random.seed(random_seed)
 
     #### setting the same seed for everything
@@ -1040,7 +1060,7 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
                     plt.close()
 
             run.wait()
-
+    
     except Exception as e:
         run['sys/tags'].add('plotting failed')
         run["info/state"] = 'Inactive'
@@ -1048,11 +1068,31 @@ def setup_neptune_run(data_dir,setup_id,with_run_id=None,run=None,
         raise e
 
     run['sys/failed'] = False
+    
+
+    ####################################
+    ###### Evaluting latent space on extra tasks
+ 
+    if eval_latent:
+        print('Evaluting latent space on extra tasks')
+        #tasks to predict using encoder
+        task_list_cat=[ 'Study ID', 'is Female', 'is Pediatric', 'Cohort Label v0','Smoking Status', 'Cancer Risk' ]
+
+        task_list_num=[ 'BMI', 'Age' ] 
+
+        model_results = evalute_pretrain_latent_extra_task(run_id, PROCESSED_DATA_dir, pretrain_save_dir, task_list_cat, task_list_num)
+
+        for key, value in model_results.items():  
+            if 'Val' in key:
+                run[f'{setup_id}/eval/Pretrain_Discovery_Val/{key}'].append(str(value))
+            elif 'Test' in key:
+                run[f'{setup_id}/eval/Pretrain_Discovery_Test/{key}'].append(str(value))
+
+
     if ret_run_id:
-        run["info/state"] = 'Inactive'
-        run.stop()
-        return run_id
+            run["info/state"] = 'Inactive'
+            run.stop()
+            return run_id
     else:
         print('Returning Neptune Run, it has NOT been stopped')
-        return run
-
+    return run

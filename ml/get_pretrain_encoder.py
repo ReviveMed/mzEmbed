@@ -30,7 +30,6 @@ import torch
 #importing Jonha's funtions 
 from models import get_model, Binary_Head, Dummy_Head, MultiClass_Head, MultiHead, Regression_Head, Cox_Head, get_encoder
 
-from viz import generate_latent_space, generate_umap_embedding, generate_pca_embedding
 
 from utils_neptune import check_neptune_existance, start_neptune_run, convert_neptune_kwargs, neptunize_dict_keys, get_latest_dataset
 
@@ -41,7 +40,64 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 
 
 
-def get_pretrain_encoder_from_modelID(model_id, path_to_proccessed_data, output_path, ml_code_path, setup_id='pretrain', project_id = 'revivemed/RCC', X_size=None, encoder_kind='VAE'):
+def get_input_data(data_location):
+
+    #defining the input datasets
+    pretrain_X_all=f'{data_location}/X_Pretrain_All.csv'
+    pretrain_y_all=f'{data_location}/y_Pretrain_All.csv'
+
+    pretrain_X_train=f'{data_location}/X_Pretrain_Discovery_Train.csv'
+    pretrain_y_train=f'{data_location}/y_Pretrain_Discovery_Train.csv'
+
+    pretrain_X_val=f'{data_location}/X_Pretrain_Discovery_Val.csv'
+    pretrain_y_val=f'{data_location}/y_Pretrain_Discovery_Val.csv'
+
+    pretrain_X_test=f'{data_location}/X_Pretrain_Test.csv'
+    pretrain_y_test=f'{data_location}/y_Pretrain_Test.csv'
+
+    #loading the data
+    X_data_all = pd.read_csv(pretrain_X_all, index_col=0)
+    y_data_all = pd.read_csv(pretrain_y_all, index_col=0)
+
+    X_data_train = pd.read_csv(pretrain_X_train, index_col=0)
+    y_data_train = pd.read_csv(pretrain_y_train, index_col=0)
+
+    X_data_val = pd.read_csv(pretrain_X_val, index_col=0)
+    y_data_val = pd.read_csv(pretrain_y_val, index_col=0)
+
+    X_data_test = pd.read_csv(pretrain_X_test, index_col=0)
+    y_data_test = pd.read_csv(pretrain_y_test, index_col=0)
+
+    #returning the data
+    return(X_data_all, y_data_all, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test)
+
+
+
+
+def generate_latent_space(X_data, encoder, batch_size=128):
+    if isinstance(X_data, pd.DataFrame):
+        x_index = X_data.index
+        X_data = torch.tensor(X_data.to_numpy(), dtype=torch.float32)
+    Z = torch.tensor([])
+    encoder.eval()
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    encoder.to(device)
+    with torch.inference_mode():
+        for i in range(0, len(X_data), batch_size):
+            # print(i, len(X_data))
+            X_batch = X_data[i:i+batch_size].to(device)
+            Z_batch = encoder.transform(X_batch)
+            Z_batch = Z_batch.cpu()
+            Z = torch.cat((Z, Z_batch), dim=0)
+        Z = Z.detach().numpy()
+        Z = pd.DataFrame(Z, index=x_index)
+    encoder.to('cpu')
+    return Z
+
+
+
+
+def get_pretrain_encoder_from_modelID(model_id, path_to_proccessed_data, output_path, ml_code_path, setup_id='pretrain', project_id = 'revivemed/RCC', X_size=None, encoder_kind='VAE', latent_passes=10):
 
     #changing the directory to the ml code path
     os.chdir(ml_code_path)
@@ -118,11 +174,41 @@ def get_pretrain_encoder_from_modelID(model_id, path_to_proccessed_data, output_
     encoder.load_state_dict(encoder_state_dict)
 
 
-    #getting the latent sapce
-    Z_all=generate_latent_space(X_data_all, encoder)
-    Z_train = generate_latent_space(X_data_train, encoder)
-    Z_val = generate_latent_space(X_data_val, encoder)
-    Z_test = generate_latent_space(X_data_test, encoder)
+    #getting the latent sapce by avergaing 
+    # Latent averaging with fine-tuning of the last encoder layer
+
+    # Getting the latent space by averaging 
+    Z_all = []
+    Z_train = []
+    Z_val = []
+    Z_test = []
+
+    for _ in range(latent_passes):  # Generate multiple latent representations
+        
+        # Convert DataFrames to Tensors
+        latent_rep_all = torch.tensor(generate_latent_space(X_data_all, encoder).values, dtype=torch.float32)
+        Z_all.append(latent_rep_all)
+
+        latent_rep_train = torch.tensor(generate_latent_space(X_data_train, encoder).values, dtype=torch.float32)
+        Z_train.append(latent_rep_train)
+
+        latent_rep_val = torch.tensor(generate_latent_space(X_data_val, encoder).values, dtype=torch.float32)
+        Z_val.append(latent_rep_val)
+
+        latent_rep_test = torch.tensor(generate_latent_space(X_data_test, encoder).values, dtype=torch.float32)
+        Z_test.append(latent_rep_test)
+
+    # Averaging the latent spaces
+    Z_all = torch.mean(torch.stack(Z_all), dim=0)
+    Z_train = torch.mean(torch.stack(Z_train), dim=0)
+    Z_val = torch.mean(torch.stack(Z_val), dim=0)
+    Z_test = torch.mean(torch.stack(Z_test), dim=0)
+
+    #now converting the latent space to dataframe
+    Z_all = pd.DataFrame(Z_all, index=X_data_all.index)
+    Z_train = pd.DataFrame(Z_train, index=X_data_train.index)
+    Z_val = pd.DataFrame(Z_val, index=X_data_val.index)
+    Z_test = pd.DataFrame(Z_test, index=X_data_test.index)
 
 
     #save to csv
@@ -139,33 +225,4 @@ def get_pretrain_encoder_from_modelID(model_id, path_to_proccessed_data, output_
 
 
 
-def get_input_data(data_location):
 
-    #defining the input datasets
-    pretrain_X_all=f'{data_location}/X_Pretrain_All.csv'
-    pretrain_y_all=f'{data_location}/y_Pretrain_All.csv'
-
-    pretrain_X_train=f'{data_location}/X_Pretrain_Discovery_Train.csv'
-    pretrain_y_train=f'{data_location}/y_Pretrain_Discovery_Train.csv'
-
-    pretrain_X_val=f'{data_location}/X_Pretrain_Discovery_Val.csv'
-    pretrain_y_val=f'{data_location}/y_Pretrain_Discovery_Val.csv'
-
-    pretrain_X_test=f'{data_location}/X_Pretrain_Test.csv'
-    pretrain_y_test=f'{data_location}/y_Pretrain_Test.csv'
-
-    #loading the data
-    X_data_all = pd.read_csv(pretrain_X_all, index_col=0)
-    y_data_all = pd.read_csv(pretrain_y_all, index_col=0)
-
-    X_data_train = pd.read_csv(pretrain_X_train, index_col=0)
-    y_data_train = pd.read_csv(pretrain_y_train, index_col=0)
-
-    X_data_val = pd.read_csv(pretrain_X_val, index_col=0)
-    y_data_val = pd.read_csv(pretrain_y_val, index_col=0)
-
-    X_data_test = pd.read_csv(pretrain_X_test, index_col=0)
-    y_data_test = pd.read_csv(pretrain_y_test, index_col=0)
-
-    #returning the data
-    return(X_data_all, y_data_all, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test)
