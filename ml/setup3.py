@@ -275,9 +275,12 @@ def setup_neptune_run(PROCESSED_DATA_dir, data_dir,setup_id,with_run_id=None,run
         y_fit_file = kwargs.get('y_fit_file',None)
         X_eval_file = kwargs.get('X_eval_file',None)
         y_eval_file = kwargs.get('y_eval_file',None)
+        X_test_file = kwargs.get('X_test_file',None)
+        y_test_file = kwargs.get('y_test_file',None)
         
         train_name = kwargs.get('train_name', 'train')
         eval_name = kwargs.get('eval_name', 'val')
+        test_name = kwargs.get('test_name', 'val')
 
         X_filename_prefix = kwargs.get('X_filename_prefix',None)
         if (X_filename_prefix is None) and ('X_filename' in kwargs):
@@ -302,6 +305,10 @@ def setup_neptune_run(PROCESSED_DATA_dir, data_dir,setup_id,with_run_id=None,run
             X_eval_file = f'{data_dir}/{X_filename_prefix}_{eval_name}.csv'
         if y_eval_file is None:
             y_eval_file = f'{data_dir}/{y_filename_prefix}_{eval_name}.csv'
+        if X_test_file is None:
+            X_test_file = f'{data_dir}/{X_filename_prefix}_{test_name}.csv'
+        if y_test_file is None:
+            y_test_file = f'{data_dir}/{y_filename_prefix}_{test_name}.csv'
         
         # nan_filename = kwargs.get('nan_filename', 'nans')
         X_size = None
@@ -322,6 +329,8 @@ def setup_neptune_run(PROCESSED_DATA_dir, data_dir,setup_id,with_run_id=None,run
         if run_evaluation or save_latent_space:
             X_data_eval = pd.read_csv(X_eval_file, index_col=0)
             y_data_eval = pd.read_csv(y_eval_file, index_col=0)
+            X_data_test = pd.read_csv(X_test_file, index_col=0)
+            y_data_test = pd.read_csv(y_test_file, index_col=0)
             run[f'{setup_id}/datasets/X_eval'].track_files(X_eval_file)
             run[f'{setup_id}/datasets/y_eval'].track_files(y_eval_file)
             X_size = X_data_eval.shape[1]
@@ -349,6 +358,9 @@ def setup_neptune_run(PROCESSED_DATA_dir, data_dir,setup_id,with_run_id=None,run
             if y_data_eval.shape[0] > 0:
                 y_data_eval.dropna(subset=y_head_cols+y_adv_cols, how='all', axis=0, inplace=True)
                 X_data_eval = X_data_eval.loc[y_data_eval.index].copy()
+            if y_data_test.shape[0] > 0:
+                y_data_test.dropna(subset=y_head_cols+y_adv_cols, how='all', axis=0, inplace=True)
+                X_data_test = X_data_test.loc[y_data_test.index].copy()
         if remove_y_nans_strict:
             print('removing rows with any nan in y')
             if y_data_train.shape[0] > 0:
@@ -357,6 +369,9 @@ def setup_neptune_run(PROCESSED_DATA_dir, data_dir,setup_id,with_run_id=None,run
             if y_data_eval.shape[0] > 0:
                 y_data_eval.dropna(subset=y_head_cols+y_adv_cols, how='any', axis=0, inplace=True)
                 X_data_eval = X_data_eval.loc[y_data_eval.index].copy()
+            if y_data_test.shape[0] > 0:
+                y_data_test.dropna(subset=y_head_cols+y_adv_cols, how='any', axis=0, inplace=True)
+                X_data_test = X_data_test.loc[y_data_test.index].copy()
 
         ####################################
         ##### Create the DataLoaders ######
@@ -388,6 +403,7 @@ def setup_neptune_run(PROCESSED_DATA_dir, data_dir,setup_id,with_run_id=None,run
                 run[f'{setup_id}/datasets/y_codes/{key}'].extend(val)
                 y_code_keys.append(key)
             eval_dataset = CompoundDataset(X_data_eval,y_data_eval[y_head_cols], y_data_eval[y_adv_cols],y_codes=y_codes)
+            test_dataset = CompoundDataset(X_data_test,y_data_test[y_head_cols], y_data_test[y_adv_cols],y_codes=y_codes)
             if yes_clean_batches:
                 print('attempt to clean batch size so last batch is large')
                 batch_size = get_clean_batch_sz(X_data_train.shape[0], batch_size)
@@ -397,6 +413,8 @@ def setup_neptune_run(PROCESSED_DATA_dir, data_dir,setup_id,with_run_id=None,run
             fit_loader_dct = create_dataloaders_old(fit_dataset, batch_size, holdout_frac, set_name=train_name)
             eval_loader_dct = create_dataloaders(eval_dataset, batch_size, set_name = eval_name)
             eval_loader_dct.update(fit_loader_dct)
+            test_loader_dct = create_dataloaders(test_dataset, batch_size, set_name = test_name)
+            test_loader_dct.update(fit_loader_dct)
 
             ########################################
             ##### Custom Evaluation for OS predictions
@@ -798,6 +816,10 @@ def setup_neptune_run(PROCESSED_DATA_dir, data_dir,setup_id,with_run_id=None,run
                 evaluate_compound_model(eval_loader_dct, 
                                         encoder, head, adv, 
                                         run=run, **eval_kwargs)
+                
+                evaluate_compound_model(test_loader_dct, 
+                                        encoder, head, adv, 
+                                        run=run, **eval_kwargs)
 
                 # save a history of evaluation results
                 # As of April 11th, the history is saved in the eval function
@@ -833,7 +855,80 @@ def setup_neptune_run(PROCESSED_DATA_dir, data_dir,setup_id,with_run_id=None,run
         #     run[f'{setup_id}/avg/{train_name} {key}'] = round(val_array['value'].mean(),5)
 
         run[f'{setup_id}/avg/iter_count'] = avg_iter_count
+
+        
+        # for key in run_struc[setup_id]['eval'][train_name].keys():
+        #     val_array = run[f'{setup_id}/eval/{train_name}/{key}'].fetch_values()
+        #     run[f'{setup_id}/avg/{train_name} {key}'] = round(val_array['value'].mean(),5)
+
+
+        if run_evaluation:
+            try:
+                print('evaluating models')
+                evaluate_compound_model(eval_loader_dct, 
+                                        encoder, head, adv, 
+                                        run=run, **eval_kwargs)
+                
+                # save a history of evaluation results
+                # As of April 11th, the history is saved in the eval function
+                # run.wait()
+                # eval_res = run[f'{setup_id}/eval'].fetch()
+                # eval_dict = neptunize_dict_keys(eval_res, f'eval')
+                # for key, val in eval_dict.items():
+                #     run[f'{setup_id}/history/{key}'].append(val)
+                
+
+            except Exception as e:
+                run['sys/tags'].add('evaluation failed')
+                run["info/state"] = 'Inactive'
+                run.stop()
+                raise e
+
+    ####################################
+    ##### Create an evaluation summary that averages ######
+    run_struc = run.get_structure()
+    avg_iter_count = 0
+
+    if run_evaluation:
+        run.wait()
+        for set_name in test_loader_dct.keys():
+            for key in run_struc[setup_id]['eval'][set_name].keys():
+                test_array = run[f'{setup_id}/eval/{set_name}/{key}'].fetch_values()
+                run[f'{setup_id}/avg/{set_name} {key}'] = round(test_array['value'].mean(),5)
+                if avg_iter_count == 0:
+                    avg_iter_count = len(val_array['value'])
+
+        # for key in run_struc[setup_id]['eval'][train_name].keys():
+        #     val_array = run[f'{setup_id}/eval/{train_name}/{key}'].fetch_values()
+        #     run[f'{setup_id}/avg/{train_name} {key}'] = round(val_array['value'].mean(),5)
+
+        run[f'{setup_id}/avg/iter_count'] = avg_iter_count
     
+        if run_evaluation:
+            try:
+                print('evaluating test models')
+                evaluate_compound_model(test_loader_dct, 
+                                        encoder, head, adv, 
+                                        run=run, **eval_kwargs)
+
+                # save a history of evaluation results
+                # As of April 11th, the history is saved in the eval function
+                # run.wait()
+                # eval_res = run[f'{setup_id}/eval'].fetch()
+                # eval_dict = neptunize_dict_keys(eval_res, f'eval')
+                # for key, val in eval_dict.items():
+                #     run[f'{setup_id}/history/{key}'].append(val)
+                
+
+            except Exception as e:
+                run['sys/tags'].add('evaluation failed')
+                run["info/state"] = 'Inactive'
+                run.stop()
+                raise e
+
+
+
+
     ####################################
     ###### Generate the Latent Space ######
     print('generating latent space plots')
@@ -1086,7 +1181,7 @@ def setup_neptune_run(PROCESSED_DATA_dir, data_dir,setup_id,with_run_id=None,run
             if 'Val' in key:
                 run[f'{setup_id}/eval/Pretrain_Discovery_Val/{key}'].append(str(value))
             elif 'Test' in key:
-                run[f'{setup_id}/eval/Pretrain_Discovery_Test/{key}'].append(str(value))
+                run[f'{setup_id}/eval/Pretrain_Test/{key}'].append(str(value))
 
 
     if ret_run_id:

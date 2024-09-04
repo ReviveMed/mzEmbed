@@ -36,8 +36,9 @@ def evalute_pretrain_latent_extra_task(model_id, input_data_location, pretrain_s
 
     print (Z_all.shape, Z_train.shape, Z_val.shape, Z_test.shape, y_data_all.shape, y_data_train.shape, y_data_val.shape, y_data_test.shape)
 
+    # evaluating the avg latent space for the reconstruction loss
+
     # Now use the latnet space to predict the tasks
-    
     model_results = {'Model ID': model_id}
 
     # Predict the categorical tasks

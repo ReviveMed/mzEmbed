@@ -128,6 +128,7 @@ def main(STUDY_INFO_DICT, num_trials=5,
 
     fit_subset_col = 'Pretrain Discovery Train'
     eval_subset_col = 'Pretrain Discovery Val'
+    test_subset_col = 'Pretrain Test'
     setup_id = 'pretrain'
 
     _, fit_file_id = create_selected_data(input_data_dir=input_data_dir,
@@ -143,11 +144,22 @@ def main(STUDY_INFO_DICT, num_trials=5,
                                            output_dir=output_dir,
                                            metadata_df=None,
                                            selections_df=selections_df)
+    
+    _, test_file_id = create_selected_data(input_data_dir=input_data_dir,
+                                           sample_selection_col=test_subset_col,
+                                           subdir_col=subdir_col,
+                                           output_dir=output_dir,
+                                           metadata_df=None,
+                                           selections_df=selections_df)
+    
+
 
     X_eval_file = f'{output_dir}/X_{eval_file_id}.csv'
     y_eval_file = f'{output_dir}/y_{eval_file_id}.csv'
     X_fit_file = f'{output_dir}/X_{fit_file_id}.csv'
     y_fit_file = f'{output_dir}/y_{fit_file_id}.csv'
+    X_test_file = f'{output_dir}/X_{test_file_id}.csv'
+    y_test_file = f'{output_dir}/y_{test_file_id}.csv'
 
     # Determine the Task Heads
     plot_latent_space_cols = []
@@ -202,6 +214,10 @@ def main(STUDY_INFO_DICT, num_trials=5,
                                        X_eval_file=X_eval_file,
                                        y_eval_file=y_eval_file,
                                        eval_name=eval_file_id,
+
+                                       X_test_file=X_test_file,
+                                       y_test_file=y_test_file,
+                                       test_name=test_file_id,
 
                                        save_latent_space=True,
                                        plot_latent_space_cols=plot_latent_space_cols,
