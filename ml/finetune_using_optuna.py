@@ -17,7 +17,7 @@ input_data_dir = get_latest_dataset(data_dir=input_data_dir, api_token=NEPTUNE_A
 # Load the selection dataframe
 selections_df = pd.read_csv(f'{input_data_dir}/selection_df.csv', index_col=0)
 
-model_id_names = [36991, 37133]
+model_id_names = [37133]
 for model_id_name in model_id_names:
 
     output_dir = f'{homedir}/PROCESSED_DATA'
