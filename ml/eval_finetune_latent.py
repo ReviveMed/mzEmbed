@@ -10,8 +10,10 @@ output: evaluation results of the new tasks saved in csv file
 '''
 
 import os
-ml_code_path='/home/leilapirhaji/mz_embed_engine/ml'
+# ml_code_path='/home/leilapirhaji/mz_embed_engine/ml'
+ml_code_path = os.path.dirname(os.path.realpath(__file__))
 os.chdir(ml_code_path)
+
 
 import pandas as pd
 import importlib
