@@ -225,7 +225,7 @@ def setup_wrapper(**kwargs):
 
         run['dataset'].track_files(input_data_dir)
         run['params'] = stringify_unsupported(params)
-
+        run['model_id'] = pretrained_model_id
 
     if eval_params_list is None:
         # eval_params_list0 = [x for x in default_eval_params_list if x['y_cols'][0] in params['task_kwargs']['y_head_cols']]

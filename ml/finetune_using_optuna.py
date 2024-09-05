@@ -35,7 +35,7 @@ for model_id_name in model_id_names:
 
     # Define the Optuna objective function
     def objective(trial):
-        setup_id = 'finetune-optuna-RCC-recon-only-Sep5'
+        setup_id = 'finetune-optuna'
 
         # Hyperparameters to optimize
         # num_epochs use fixed
@@ -88,30 +88,6 @@ for model_id_name in model_id_names:
 
         trial.set_user_attr('run_id', run_id)
         trial.set_user_attr('setup_id', setup_id)
-
-        # all_metrics: {
-        #     'finetune-optuna-RCC-recon-only-Sep5__Finetune_Discovery_Val__head_Both-OS__on_NIVO-OS_Concordance Index': [
-        #         0.5780559646539027, 0.5780559646539027, 0.5780559646539027, 0.5780559646539027, 0.5780559646539027,
-        #         0.5780559646539027, 0.5780559646539027, 0.5780559646539027, 0.5780559646539027, 0.5780559646539027],
-        #     'finetune-optuna-RCC-recon-only-Sep5__Finetune_Discovery_Val__head_Both-OS__on_EVER-OS_Concordance Index': [
-        #         0.532139577594123, 0.532139577594123, 0.532139577594123, 0.532139577594123, 0.532139577594123,
-        #         0.532139577594123, 0.532139577594123, 0.532139577594123, 0.532139577594123, 0.532139577594123],
-        #     'finetune-optuna-RCC-recon-only-Sep5__Finetune_Discovery_Val__head_Both-OS__on_Both-OS_Concordance Index': [
-        #         0.5647142422089128, 0.5647142422089128, 0.5647142422089128, 0.5647142422089128, 0.5647142422089128,
-        #         0.5647142422089128, 0.5647142422089128, 0.5647142422089128, 0.5647142422089128, 0.5647142422089128],
-        #     'finetune-optuna-RCC-recon-only-Sep5__Finetune_Discovery_Val_Reconstruction MSE': [0.9439538717269897,
-        #                                                                                        0.9437312483787537,
-        #                                                                                        0.949599027633667,
-        #                                                                                        0.9446458220481873,
-        #                                                                                        0.9481667280197144,
-        #                                                                                        0.9489354491233826,
-        #                                                                                        0.947763204574585,
-        #                                                                                        0.9469485878944397,
-        #                                                                                        0.950096607208252,
-        #                                                                                        0.9446855187416077],
-        #     'finetune-optuna-RCC-recon-only-Sep5__Finetune_Discovery_Val_Cox_Both-OS_Concordance Index': [
-        #         0.5647142422089128, 0.5647142422089128, 0.5647142422089128, 0.5647142422089128, 0.5647142422089128,
-        #         0.5647142422089128, 0.5647142422089128, 0.5647142422089128, 0.5647142422089128, 0.5647142422089128]}
 
         print(f"all_metrics: {all_metrics}")
         # get the loss from the all_metrics
