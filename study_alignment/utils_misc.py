@@ -29,7 +29,7 @@ def clean_for_json(data):
 def save_json(data, file_path):
     data = clean_for_json(data)
     with open(file_path, 'w') as f:
-        json.dump(data, f)
+        json.dump(data, f, indent=4)
 
 def unravel_dict(d, prefix='a'):
     unravel = {}
