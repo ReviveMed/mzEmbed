@@ -15,7 +15,7 @@ import optuna
 from collections import defaultdict
 import re
 import argparse
-
+import random
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
@@ -65,6 +65,16 @@ def setup_wrapper(**kwargs):
     overwrite_params_fit_kwargs = kwargs.get('overwrite_params_fit_kwargs',{})
     overwrite_params_task_kwargs = kwargs.get('overwrite_params_task_kwargs',{})
     overwrite_params_other_kwargs = kwargs.get('overwrite_params_other_kwargs',{})
+
+    #### setting the same seed for everything
+    random_seed = kwargs.get('random_seed', 42)
+    np.random.seed(random_seed)
+    torch.manual_seed(random_seed)
+    torch.cuda.manual_seed_all(random_seed)
+    np.random.seed(random_seed)
+    random.seed(random_seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
     
     if fit_subset_col is None:
         raise ValueError('fit_subset_col must be provided')
@@ -179,6 +189,8 @@ def setup_wrapper(**kwargs):
         else:
             encoder_kwargs = run_kwargs['encoder_kwargs']
 
+        # TODO: quick fix for optuna, no need to pass the head_kwargs_dict and adv_kwargs_dict (min)
+        run_kwargs['adv_kwargs_dict'] = {}
 
         params = {
             'task_kwargs': {
@@ -213,7 +225,7 @@ def setup_wrapper(**kwargs):
 
         run['dataset'].track_files(input_data_dir)
         run['params'] = stringify_unsupported(params)
-
+        run['model_id'] = pretrained_model_id
 
     if eval_params_list is None:
         # eval_params_list0 = [x for x in default_eval_params_list if x['y_cols'][0] in params['task_kwargs']['y_head_cols']]

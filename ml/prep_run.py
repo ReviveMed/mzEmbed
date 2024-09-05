@@ -715,11 +715,12 @@ def make_kwargs_set(sig_figs=2,
 ########################################################################################
 
 def convert_kwargs_for_optuna(run_kwargs,optuna_trial):
-        run_kwargs = convert_model_kwargs_list_to_dict(run_kwargs)
-        run_kwargs = flatten_dict(run_kwargs) # flatten the dict for optuna compatibility
-        run_kwargs = convert_distributions_to_suggestion(run_kwargs, optuna_trial) # convert the distributions to optuna suggestions
-        run_kwargs = round_kwargs_to_sig(run_kwargs,sig_figs=2)
-        run_kwargs = unflatten_dict(run_kwargs) # unflatten the dict for the setup function
+    run_kwargs = convert_model_kwargs_list_to_dict(run_kwargs)
+    run_kwargs = flatten_dict(run_kwargs) # flatten the dict for optuna compatibility
+    run_kwargs = convert_distributions_to_suggestion(run_kwargs, optuna_trial) # convert the distributions to optuna suggestions
+    run_kwargs = round_kwargs_to_sig(run_kwargs,sig_figs=2)
+    run_kwargs = unflatten_dict(run_kwargs) # unflatten the dict for the setup function
+    return run_kwargs
 
 
 def round_kwargs_to_sig(val,sig_figs=2,key=None):
