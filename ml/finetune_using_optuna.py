@@ -130,7 +130,7 @@ for model_id_name in model_id_names:
         return val_loss
 
     # Run the optimization
-    num_trials = 10
+    num_trials = 50
     study = optuna.create_study(direction='minimize',  # corrected this line
                                 study_name=optua_study_name,
                                 storage=WEBAPP_DB_LOC,
