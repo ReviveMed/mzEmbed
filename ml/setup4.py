@@ -179,6 +179,8 @@ def setup_wrapper(**kwargs):
         else:
             encoder_kwargs = run_kwargs['encoder_kwargs']
 
+        # TODO: quick fix for optuna, no need to pass the head_kwargs_dict and adv_kwargs_dict (min)
+        run_kwargs['adv_kwargs_dict'] = {}
 
         params = {
             'task_kwargs': {
