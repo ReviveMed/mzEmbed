@@ -151,18 +151,17 @@ def get_pretrain_encoder_from_modelID(model_id, path_to_proccessed_data, output_
 
     os.makedirs(f'{pretrain_save_dir}/{model_id}',  exist_ok=True)
     
-
     #download the encoder state dict
-    #if not os.path.exists(local_path):
-    #    run['pretrain/models/encoder_state_dict'].download(local_path)
+    if not os.path.exists(model_local_path):
+       # Download the encoder state dict
+        run['pretrain/models/encoder_state_dict'].download(model_encoder_file)
+    
 
-    # Check if the file exists and remove it if necessary
-    if os.path.exists(model_encoder_file):
-        os.remove(model_encoder_file)
-        print(f"Deleted existing file at {model_encoder_file}")
+    # # Check if the file exists and remove it if necessary
+    # if os.path.exists(model_encoder_file):
+    #     os.remove(model_encoder_file)
+    #     print(f"Deleted existing file at {model_encoder_file}")
 
-    # Download the encoder state dict
-    run['pretrain/models/encoder_state_dict'].download(model_encoder_file)
     # stop the run
     run.stop()
     

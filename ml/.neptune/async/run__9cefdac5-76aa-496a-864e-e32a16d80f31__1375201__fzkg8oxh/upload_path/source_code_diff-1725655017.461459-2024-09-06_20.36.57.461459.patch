@@ -1,0 +1,682 @@
+diff --git a/ml/.neptune/async/run__9ceeab57-075e-49e4-83fd-9651b5360655__485412__f1cbfno6/last_ack_version b/ml/.neptune/async/run__9ceeab57-075e-49e4-83fd-9651b5360655__485412__f1cbfno6/last_ack_version
+deleted file mode 100644
+index 72a5d6d..0000000
+--- a/ml/.neptune/async/run__9ceeab57-075e-49e4-83fd-9651b5360655__485412__f1cbfno6/last_ack_version
++++ /dev/null
+@@ -1 +0,0 @@
+-12388
+\ No newline at end of file
+diff --git a/ml/.neptune/async/run__9ceeab57-075e-49e4-83fd-9651b5360655__485412__f1cbfno6/last_put_version b/ml/.neptune/async/run__9ceeab57-075e-49e4-83fd-9651b5360655__485412__f1cbfno6/last_put_version
+deleted file mode 100644
+index 72a5d6d..0000000
+--- a/ml/.neptune/async/run__9ceeab57-075e-49e4-83fd-9651b5360655__485412__f1cbfno6/last_put_version
++++ /dev/null
+@@ -1 +0,0 @@
+-12388
+\ No newline at end of file
+diff --git a/ml/.neptune/async/run__9ceeab57-075e-49e4-83fd-9651b5360655__485412__f1cbfno6/metadata.json b/ml/.neptune/async/run__9ceeab57-075e-49e4-83fd-9651b5360655__485412__f1cbfno6/metadata.json
+deleted file mode 100644
+index fda0c93..0000000
+--- a/ml/.neptune/async/run__9ceeab57-075e-49e4-83fd-9651b5360655__485412__f1cbfno6/metadata.json
++++ /dev/null
+@@ -1,10 +0,0 @@
+-{
+-  "mode": "async",
+-  "containerId": "9ceeab57-075e-49e4-83fd-9651b5360655",
+-  "containerType": "run",
+-  "structureVersion": 3,
+-  "os": "Linux-5.10.0-32-cloud-amd64-x86_64-with-glibc2.31",
+-  "pythonVersion": "3.10.14 | packaged by conda-forge | (main, Mar 20 2024, 12:45:18) [GCC 12.3.0]",
+-  "neptuneClientVersion": "1.10.4",
+-  "createdAt": "2024-09-04T22:28:27.642255+00:00"
+-}
+\ No newline at end of file
+diff --git a/ml/LP_notebooks/pretrain_latnet_task_predict.ipynb b/ml/LP_notebooks/pretrain_latnet_task_predict.ipynb
+index 35f7a82..6f9befb 100644
+--- a/ml/LP_notebooks/pretrain_latnet_task_predict.ipynb
++++ b/ml/LP_notebooks/pretrain_latnet_task_predict.ipynb
+@@ -55,6 +55,350 @@
+     "\n"
+    ]
+   },
++  {
++   "cell_type": "code",
++   "execution_count": 8,
++   "metadata": {},
++   "outputs": [
++    {
++     "name": "stderr",
++     "output_type": "stream",
++     "text": [
++      "/home/leilapirhaji/mz_embed_engine/ml/get_pretrain_encoder.py:60: DtypeWarning: Columns (1,8,28,30,31,32,33,34,46,50,51,52,53,54,55,56,57,58) have mixed types. Specify dtype option on import or set low_memory=False.\n",
++      "  y_data_all = pd.read_csv(pretrain_y_all, index_col=0)\n"
++     ]
++    },
++    {
++     "name": "stdout",
++     "output_type": "stream",
++     "text": [
++      "[neptune] [info   ] Neptune initialized. Open in the app: https://app.neptune.ai/revivemed/RCC/e/RCC-36657\n",
++      "Deleted existing file at /home/leilapirhaji/pretrained_models/pretrained_models/RCC-36657/encoder_state_dict.pth\n"
++     ]
++    },
++    {
++     "data": {
++      "application/vnd.jupyter.widget-view+json": {
++       "model_id": "ed9172eb82c541988bd8d0f17cb45690",
++       "version_major": 2,
++       "version_minor": 0
++      },
++      "text/plain": [
++       "Fetching file...: 0 [00:00, ?/s]"
++      ]
++     },
++     "metadata": {},
++     "output_type": "display_data"
++    },
++    {
++     "name": "stdout",
++     "output_type": "stream",
++     "text": [
++      "[neptune] [info   ] Shutting down background jobs, please wait a moment...\n",
++      "[neptune] [info   ] Done!\n",
++      "[neptune] [info   ] All 0 operations synced, thanks for waiting!\n",
++      "[neptune] [info   ] Explore the metadata in the Neptune app: https://app.neptune.ai/revivemed/RCC/e/RCC-36657/metadata\n"
++     ]
++    },
++    {
++     "name": "stderr",
++     "output_type": "stream",
++     "text": [
++      "/home/leilapirhaji/mz_embed_engine/ml/get_pretrain_encoder.py:173: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.\n",
++      "  encoder_state_dict = torch.load(model_encoder_file)\n"
++     ]
++    }
++   ],
++   "source": [
++    "import get_pretrain_encoder\n",
++    "importlib.reload(get_pretrain_encoder)\n",
++    "from get_pretrain_encoder import get_pretrain_encoder_from_modelID\n",
++    "# getting the latent space for the model\n",
++    "(encoder, Z_all, Z_train, Z_val, Z_test, y_data_all, y_data_train, y_data_val, y_data_test)=get_pretrain_encoder_from_modelID(model_id, input_data_location, pretrain_save_dir, ml_code_path)\n",
++    "\n"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 9,
++   "metadata": {},
++   "outputs": [
++    {
++     "name": "stdout",
++     "output_type": "stream",
++     "text": [
++      "(20548, 200) (14391, 200) (3074, 200) (3083, 200) (20548, 58) (14391, 58) (3074, 58) (3083, 58)\n"
++     ]
++    }
++   ],
++   "source": [
++    "print (Z_all.shape, Z_train.shape, Z_val.shape, Z_test.shape, y_data_all.shape, y_data_train.shape, y_data_val.shape, y_data_test.shape)"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 10,
++   "metadata": {},
++   "outputs": [
++    {
++     "name": "stdout",
++     "output_type": "stream",
++     "text": [
++      "model_id is RCC-36657\n",
++      "Study ID Val Accuracy: 0.9525\n",
++      "Study ID Test Accuracy: 0.9458\n",
++      "is Female Val Accuracy: 0.8043\n",
++      "is Female Test Accuracy: 0.7567\n",
++      "is Pediatric Val Accuracy: 0.9808\n",
++      "is Pediatric Test Accuracy: 0.9818\n",
++      "Cohort Label v0 Val Accuracy: 0.9619\n",
++      "Cohort Label v0 Test Accuracy: 0.9578\n",
++      "Smoking Status Val Accuracy: 0.9311\n",
++      "Smoking Status Test Accuracy: 0.9314\n",
++      "Cancer Risk Val Accuracy: 0.9233\n",
++      "Cancer Risk Test Accuracy: 0.9190\n",
++      "BMI Val MAE : 3.9232\n",
++      "BMI Test MAE : 3.9238\n"
++     ]
++    },
++    {
++     "name": "stderr",
++     "output_type": "stream",
++     "text": [
++      "/home/leilapirhaji/.local/lib/python3.9/site-packages/sklearn/linear_model/_ridge.py:216: LinAlgWarning: Ill-conditioned matrix (rcond=3.93296e-08): result may not be accurate.\n",
++      "  return linalg.solve(A, Xy, assume_a=\"pos\", overwrite_a=True).T\n",
++      "/home/leilapirhaji/.local/lib/python3.9/site-packages/sklearn/linear_model/_ridge.py:216: LinAlgWarning: Ill-conditioned matrix (rcond=5.43836e-08): result may not be accurate.\n",
++      "  return linalg.solve(A, Xy, assume_a=\"pos\", overwrite_a=True).T\n"
++     ]
++    },
++    {
++     "name": "stdout",
++     "output_type": "stream",
++     "text": [
++      "Age Val MAE : 9.9546\n",
++      "Age Test MAE : 9.7178\n"
++     ]
++    }
++   ],
++   "source": [
++    "#def evalute_pretrain_latent_extra_task(model_id, input_data_location, pretrain_save_dir, task_list_cat, task_list_num):\n",
++    "input_data_location='/home/leilapirhaji/PROCESSED_DATA_2'\n",
++    "pretrain_save_dir='/home/leilapirhaji/pretrained_models' \n",
++    "\n",
++    "\n",
++    "\n",
++    "#tasks to predict using encoder\n",
++    "task_list_cat=[ 'Study ID', 'is Female', 'is Pediatric', 'Cohort Label v0','Smoking Status', 'Cancer Risk' ]\n",
++    "\n",
++    "task_list_num=[ 'BMI', 'Age' ]\n",
++    "\n",
++    "model_id='RCC-36657'\n",
++    "\n",
++    "print (f'model_id is {model_id}')\n",
++    "\n",
++    "\n",
++    "# getting the latent space for the model\n",
++    "#(encoder, Z_all, Z_train, Z_val, Z_test, y_data_all, y_data_train, y_data_val, y_data_test)=get_pretrain_encoder_from_modelID(model_id, input_data_location, pretrain_save_dir, ml_code_path)\n",
++    "\n",
++    "\n",
++    "\n",
++    "\n",
++    "# Now use the latnet space to predict the tasks\n",
++    "\n",
++    "model_results = {'Model ID': model_id}\n",
++    "\n",
++    "# Predict the categorical tasks\n",
++    "\n",
++    "for task in task_list_cat:\n",
++    "\n",
++    "    (val_accuracy, test_accuracy) = log_reg_multi_class(task, Z_train, y_data_train, Z_val, y_data_val, Z_test, y_data_test)\n",
++    "\n",
++    "    # Store the results in the dictionary\n",
++    "    model_results[f'{task} Val Accuracy'] = val_accuracy\n",
++    "    model_results[f'{task} Test Accuracy'] = test_accuracy\n",
++    "\n",
++    "    print(f'{task} Val Accuracy: {val_accuracy:.4f}')\n",
++    "    print(f'{task} Test Accuracy: {test_accuracy:.4f}')\n",
++    "\n",
++    "\n",
++    "#now evaluting numercal task predictions\n",
++    "for task in task_list_num:\n",
++    "\n",
++    "    (val_mse, val_mae, val_r2, test_mse, test_mae, test_r2)= ridge_regression_predict(task, Z_train, y_data_train, Z_val, y_data_val, Z_test, y_data_test)\n",
++    "\n",
++    "    # Store the results in the dictionary\n",
++    "    # model_results[f'{task} Val MSE'] = val_mse\n",
++    "    model_results[f'{task} Val MAE'] = val_mae\n",
++    "    # model_results[f'{task} Val R2'] = val_r2\n",
++    "    # model_results[f'{task} Test MSE'] = test_mse\n",
++    "    model_results[f'{task} Test MAE'] = test_mae\n",
++    "    # model_results[f'{task} Test R2'] = test_r2\n",
++    "\n",
++    "    print(f'{task} Val MAE : {val_mae:.4f}')\n",
++    "    print(f'{task} Test MAE : {test_mae:.4f}')\n",
++    "    \n",
++    "\n",
++    "\n",
++    "#return model_results\n"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 11,
++   "metadata": {},
++   "outputs": [
++    {
++     "data": {
++      "text/plain": [
++       "{'Model ID': 'RCC-36657',\n",
++       " 'Study ID Val Accuracy': 0.9525048796356539,\n",
++       " 'Study ID Test Accuracy': 0.9458319818358741,\n",
++       " 'is Female Val Accuracy': 0.8043478260869565,\n",
++       " 'is Female Test Accuracy': 0.7566666666666667,\n",
++       " 'is Pediatric Val Accuracy': 0.9808067664281067,\n",
++       " 'is Pediatric Test Accuracy': 0.9818358741485566,\n",
++       " 'Cohort Label v0 Val Accuracy': 0.9619388418998048,\n",
++       " 'Cohort Label v0 Test Accuracy': 0.957833279273435,\n",
++       " 'Smoking Status Val Accuracy': 0.9311475409836065,\n",
++       " 'Smoking Status Test Accuracy': 0.9313725490196079,\n",
++       " 'Cancer Risk Val Accuracy': 0.9233067729083665,\n",
++       " 'Cancer Risk Test Accuracy': 0.9190444591904446,\n",
++       " 'BMI Val MAE': 3.9232283557165877,\n",
++       " 'BMI Test MAE': 3.923811241793968,\n",
++       " 'Age Val MAE': 9.95463990170786,\n",
++       " 'Age Test MAE': 9.717826384024695}"
++      ]
++     },
++     "execution_count": 11,
++     "metadata": {},
++     "output_type": "execute_result"
++    }
++   ],
++   "source": [
++    "model_results"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 2,
++   "metadata": {},
++   "outputs": [
++    {
++     "name": "stderr",
++     "output_type": "stream",
++     "text": [
++      "[neptune] [warning] NeptuneDeprecationWarning: You're importing the Neptune client library via the deprecated `neptune.new` module, which will be removed in a future release. Import directly from `neptune` instead.\n"
++     ]
++    }
++   ],
++   "source": [
++    "import os\n",
++    "ml_code_path='/home/leilapirhaji/mz_embed_engine/ml'\n",
++    "os.chdir(ml_code_path)\n",
++    "\n",
++    "import pandas as pd\n",
++    "import importlib\n",
++    "from sklearn.preprocessing import LabelEncoder\n",
++    "label_encoder = LabelEncoder()\n",
++    "\n",
++    "\n",
++    "from get_pretrain_encoder import get_pretrain_encoder_from_modelID\n",
++    "from latent_task_predict_pretrain import log_reg_multi_class, ridge_regression_predict\n",
++    "\n",
++    "\n"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 3,
++   "metadata": {},
++   "outputs": [
++    {
++     "name": "stdout",
++     "output_type": "stream",
++     "text": [
++      "model_id is RCC-36657\n"
++     ]
++    },
++    {
++     "name": "stderr",
++     "output_type": "stream",
++     "text": [
++      "/home/leilapirhaji/mz_embed_engine/ml/get_pretrain_encoder.py:60: DtypeWarning: Columns (1,8,28,30,31,32,33,34,46,50,51,52,53,54,55,56,57,58) have mixed types. Specify dtype option on import or set low_memory=False.\n",
++      "  y_data_all = pd.read_csv(pretrain_y_all, index_col=0)\n",
++      "[neptune] [warning] NeptuneWarning: By default, these monitoring options are disabled in interactive sessions: 'capture_stdout', 'capture_stderr', 'capture_traceback', 'capture_hardware_metrics'. You can set them to 'True' when initializing the run and the monitoring will continue until you call run.stop() or the kernel stops. NOTE: To track the source files, pass their paths to the 'source_code' argument. For help, see: https://docs.neptune.ai/logging/source_code/\n"
++     ]
++    },
++    {
++     "name": "stdout",
++     "output_type": "stream",
++     "text": [
++      "[neptune] [info   ] Neptune initialized. Open in the app: https://app.neptune.ai/revivemed/RCC/e/RCC-36657\n",
++      "Deleted existing file at /home/leilapirhaji/pretrained_models/pretrained_models/RCC-36657/encoder_state_dict.pth\n"
++     ]
++    },
++    {
++     "data": {
++      "application/vnd.jupyter.widget-view+json": {
++       "model_id": "bba22a58c3ee4585b369466b79a0e358",
++       "version_major": 2,
++       "version_minor": 0
++      },
++      "text/plain": [
++       "Fetching file...: 0 [00:00, ?/s]"
++      ]
++     },
++     "metadata": {},
++     "output_type": "display_data"
++    },
++    {
++     "name": "stdout",
++     "output_type": "stream",
++     "text": [
++      "[neptune] [info   ] Shutting down background jobs, please wait a moment...\n",
++      "[neptune] [info   ] Done!\n",
++      "[neptune] [info   ] All 0 operations synced, thanks for waiting!\n",
++      "[neptune] [info   ] Explore the metadata in the Neptune app: https://app.neptune.ai/revivemed/RCC/e/RCC-36657/metadata\n"
++     ]
++    },
++    {
++     "name": "stderr",
++     "output_type": "stream",
++     "text": [
++      "/home/leilapirhaji/mz_embed_engine/ml/get_pretrain_encoder.py:173: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.\n",
++      "  encoder_state_dict = torch.load(model_encoder_file)\n"
++     ]
++    },
++    {
++     "ename": "TypeError",
++     "evalue": "expected Tensor as element 0 in argument 0, but got DataFrame",
++     "output_type": "error",
++     "traceback": [
++      "\u001b[0;31m---------------------------------------------------------------------------\u001b[0m",
++      "\u001b[0;31mTypeError\u001b[0m                                 Traceback (most recent call last)",
++      "Cell \u001b[0;32mIn[3], line 13\u001b[0m\n\u001b[1;32m      9\u001b[0m task_list_num\u001b[39m=\u001b[39m[ \u001b[39m'\u001b[39m\u001b[39mBMI\u001b[39m\u001b[39m'\u001b[39m, \u001b[39m'\u001b[39m\u001b[39mAge\u001b[39m\u001b[39m'\u001b[39m ]\n\u001b[1;32m     11\u001b[0m model_id\u001b[39m=\u001b[39m\u001b[39m'\u001b[39m\u001b[39mRCC-36657\u001b[39m\u001b[39m'\u001b[39m\n\u001b[0;32m---> 13\u001b[0m model_results\u001b[39m=\u001b[39mevalute_pretrain_latent_extra_task(model_id, input_data_location, pretrain_save_dir, task_list_cat, task_list_num)\n",
++      "Cell \u001b[0;32mIn[1], line 7\u001b[0m, in \u001b[0;36mevalute_pretrain_latent_extra_task\u001b[0;34m(model_id, input_data_location, pretrain_save_dir, task_list_cat, task_list_num)\u001b[0m\n\u001b[1;32m      3\u001b[0m \u001b[39mprint\u001b[39m (\u001b[39mf\u001b[39m\u001b[39m'\u001b[39m\u001b[39mmodel_id is \u001b[39m\u001b[39m{\u001b[39;00mmodel_id\u001b[39m}\u001b[39;00m\u001b[39m'\u001b[39m)\n\u001b[1;32m      6\u001b[0m \u001b[39m# getting the latent space for the model\u001b[39;00m\n\u001b[0;32m----> 7\u001b[0m (encoder, Z_all, Z_train, Z_val, Z_test, y_data_all, y_data_train, y_data_val, y_data_test)\u001b[39m=\u001b[39mget_pretrain_encoder_from_modelID(model_id, input_data_location, pretrain_save_dir, ml_code_path)\n\u001b[1;32m     10\u001b[0m \u001b[39mprint\u001b[39m (Z_all\u001b[39m.\u001b[39mshape, Z_train\u001b[39m.\u001b[39mshape, Z_val\u001b[39m.\u001b[39mshape, Z_test\u001b[39m.\u001b[39mshape, y_data_all\u001b[39m.\u001b[39mshape, y_data_train\u001b[39m.\u001b[39mshape, y_data_val\u001b[39m.\u001b[39mshape, y_data_test\u001b[39m.\u001b[39mshape)\n\u001b[1;32m     12\u001b[0m \u001b[39m# Now use the latnet space to predict the tasks\u001b[39;00m\n",
++      "File \u001b[0;32m~/mz_embed_engine/ml/get_pretrain_encoder.py:199\u001b[0m, in \u001b[0;36mget_pretrain_encoder_from_modelID\u001b[0;34m(model_id, path_to_proccessed_data, output_path, ml_code_path, setup_id, project_id, X_size, encoder_kind, latent_passes)\u001b[0m\n\u001b[1;32m    195\u001b[0m     latent_rep_test \u001b[39m=\u001b[39m generate_latent_space(X_data_test, encoder)\n\u001b[1;32m    196\u001b[0m     Z_test\u001b[39m.\u001b[39mappend(latent_rep_test)\n\u001b[0;32m--> 199\u001b[0m Z_all \u001b[39m=\u001b[39m torch\u001b[39m.\u001b[39mmean(torch\u001b[39m.\u001b[39;49mstack(Z_all), dim\u001b[39m=\u001b[39m\u001b[39m0\u001b[39m)\n\u001b[1;32m    200\u001b[0m Z_train \u001b[39m=\u001b[39m torch\u001b[39m.\u001b[39mmean(torch\u001b[39m.\u001b[39mstack(Z_train), dim\u001b[39m=\u001b[39m\u001b[39m0\u001b[39m)\n\u001b[1;32m    201\u001b[0m Z_val \u001b[39m=\u001b[39m torch\u001b[39m.\u001b[39mmean(torch\u001b[39m.\u001b[39mstack(Z_val), dim\u001b[39m=\u001b[39m\u001b[39m0\u001b[39m)\n",
++      "\u001b[0;31mTypeError\u001b[0m: expected Tensor as element 0 in argument 0, but got DataFrame"
++     ]
++    }
++   ],
++   "source": [
++    "input_data_location='/home/leilapirhaji/PROCESSED_DATA_2'\n",
++    "pretrain_save_dir='/home/leilapirhaji/pretrained_models' \n",
++    "\n",
++    "\n",
++    "\n",
++    "#tasks to predict using encoder\n",
++    "task_list_cat=[ 'Study ID', 'is Female', 'is Pediatric', 'Cohort Label v0','Smoking Status', 'Cancer Risk' ]\n",
++    "\n",
++    "task_list_num=[ 'BMI', 'Age' ]\n",
++    "\n",
++    "model_id='RCC-36657'\n",
++    "\n",
++    "model_results=evalute_pretrain_latent_extra_task(model_id, input_data_location, pretrain_save_dir, task_list_cat, task_list_num)"
++   ]
++  },
+   {
+    "attachments": {},
+    "cell_type": "markdown",
+@@ -722,27 +1066,7 @@
+   },
+   {
+    "cell_type": "code",
+-   "execution_count": 52,
+-   "metadata": {},
+-   "outputs": [
+-    {
+-     "data": {
+-      "text/plain": [
+-       "'RCC-36657'"
+-      ]
+-     },
+-     "execution_count": 52,
+-     "metadata": {},
+-     "output_type": "execute_result"
+-    }
+-   ],
+-   "source": [
+-    "model_id"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 53,
++   "execution_count": 12,
+    "metadata": {},
+    "outputs": [
+     {
+@@ -771,7 +1095,7 @@
+     {
+      "data": {
+       "application/vnd.jupyter.widget-view+json": {
+-       "model_id": "bf7b566989404198b532a5708e6c43c3",
++       "model_id": "42e50f8e38024c9097403675e0745986",
+        "version_major": 2,
+        "version_minor": 0
+       },
+@@ -800,80 +1124,32 @@
+       "  encoder_state_dict = torch.load(model_encoder_file)\n"
+      ]
+     },
+-    {
+-     "ename": "TypeError",
+-     "evalue": "expected Tensor as element 0 in argument 0, but got DataFrame",
+-     "output_type": "error",
+-     "traceback": [
+-      "\u001b[0;31m---------------------------------------------------------------------------\u001b[0m",
+-      "\u001b[0;31mTypeError\u001b[0m                                 Traceback (most recent call last)",
+-      "Cell \u001b[0;32mIn[53], line 4\u001b[0m\n\u001b[1;32m      2\u001b[0m importlib\u001b[39m.\u001b[39mreload(eval_pretrain_latent)\n\u001b[1;32m      3\u001b[0m \u001b[39mfrom\u001b[39;00m \u001b[39meval_pretrain_latent\u001b[39;00m \u001b[39mimport\u001b[39;00m evalute_pretrain_latent_extra_task\n\u001b[0;32m----> 4\u001b[0m model_results \u001b[39m=\u001b[39m evalute_pretrain_latent_extra_task(model_id, input_data_location, pretrain_save_dir, task_list_cat, task_list_num)\n",
+-      "File \u001b[0;32m~/mz_embed_engine/ml/eval_pretrain_latent.py:34\u001b[0m, in \u001b[0;36mevalute_pretrain_latent_extra_task\u001b[0;34m(model_id, input_data_location, pretrain_save_dir, task_list_cat, task_list_num)\u001b[0m\n\u001b[1;32m     31\u001b[0m \u001b[39mprint\u001b[39m (\u001b[39mf\u001b[39m\u001b[39m'\u001b[39m\u001b[39mmodel_id is \u001b[39m\u001b[39m{\u001b[39;00mmodel_id\u001b[39m}\u001b[39;00m\u001b[39m'\u001b[39m)\n\u001b[1;32m     33\u001b[0m \u001b[39m# getting the latent space for the model\u001b[39;00m\n\u001b[0;32m---> 34\u001b[0m (encoder, Z_all, Z_train, Z_val, Z_test, y_data_all, y_data_train, y_data_val, y_data_test)\u001b[39m=\u001b[39mget_pretrain_encoder_from_modelID(model_id, input_data_location, pretrain_save_dir, ml_code_path)\n\u001b[1;32m     37\u001b[0m \u001b[39mprint\u001b[39m (Z_all\u001b[39m.\u001b[39mshape, Z_train\u001b[39m.\u001b[39mshape, Z_val\u001b[39m.\u001b[39mshape, Z_test\u001b[39m.\u001b[39mshape, y_data_all\u001b[39m.\u001b[39mshape, y_data_train\u001b[39m.\u001b[39mshape, y_data_val\u001b[39m.\u001b[39mshape, y_data_test\u001b[39m.\u001b[39mshape)\n\u001b[1;32m     39\u001b[0m \u001b[39m# Now use the latnet space to predict the tasks\u001b[39;00m\n",
+-      "File \u001b[0;32m~/mz_embed_engine/ml/get_pretrain_encoder.py:199\u001b[0m, in \u001b[0;36mget_pretrain_encoder_from_modelID\u001b[0;34m(model_id, path_to_proccessed_data, output_path, ml_code_path, setup_id, project_id, X_size, encoder_kind, latent_passes)\u001b[0m\n\u001b[1;32m    195\u001b[0m     latent_rep_test \u001b[39m=\u001b[39m generate_latent_space(X_data_test, encoder)\n\u001b[1;32m    196\u001b[0m     Z_test\u001b[39m.\u001b[39mappend(latent_rep_test)\n\u001b[0;32m--> 199\u001b[0m Z_all \u001b[39m=\u001b[39m torch\u001b[39m.\u001b[39mmean(torch\u001b[39m.\u001b[39;49mstack(Z_all), dim\u001b[39m=\u001b[39m\u001b[39m0\u001b[39m)\n\u001b[1;32m    200\u001b[0m Z_train \u001b[39m=\u001b[39m torch\u001b[39m.\u001b[39mmean(torch\u001b[39m.\u001b[39mstack(Z_train), dim\u001b[39m=\u001b[39m\u001b[39m0\u001b[39m)\n\u001b[1;32m    201\u001b[0m Z_val \u001b[39m=\u001b[39m torch\u001b[39m.\u001b[39mmean(torch\u001b[39m.\u001b[39mstack(Z_val), dim\u001b[39m=\u001b[39m\u001b[39m0\u001b[39m)\n",
+-      "\u001b[0;31mTypeError\u001b[0m: expected Tensor as element 0 in argument 0, but got DataFrame"
+-     ]
+-    }
+-   ],
+-   "source": [
+-    "import eval_pretrain_latent\n",
+-    "importlib.reload(eval_pretrain_latent)\n",
+-    "from eval_pretrain_latent import evalute_pretrain_latent_extra_task\n",
+-    "\n",
+-    "model_results = evalute_pretrain_latent_extra_task(model_id, input_data_location, pretrain_save_dir, task_list_cat, task_list_num)\n",
+-    "\n",
+-    "model_results\n"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 56,
+-   "metadata": {},
+-   "outputs": [
+     {
+      "name": "stdout",
+      "output_type": "stream",
+      "text": [
+-      "Study ID Val Accuracy: 0.9512\n",
+-      "Study ID Test Accuracy: 0.9445\n",
++      "(20548, 200) (14391, 200) (3074, 200) (3083, 200) (20548, 58) (14391, 58) (3074, 58) (3083, 58)\n",
++      "Study ID Val Accuracy: 0.9525\n",
++      "Study ID Test Accuracy: 0.9458\n",
+       "is Female Val Accuracy: 0.8043\n",
+       "is Female Test Accuracy: 0.7567\n",
+-      "is Pediatric Val Accuracy: 0.9792\n",
+-      "is Pediatric Test Accuracy: 0.9825\n",
++      "is Pediatric Val Accuracy: 0.9808\n",
++      "is Pediatric Test Accuracy: 0.9818\n",
+       "Cohort Label v0 Val Accuracy: 0.9619\n",
+-      "Cohort Label v0 Test Accuracy: 0.9588\n",
+-      "Smoking Status Val Accuracy: 0.9344\n",
++      "Cohort Label v0 Test Accuracy: 0.9578\n",
++      "Smoking Status Val Accuracy: 0.9311\n",
+       "Smoking Status Test Accuracy: 0.9314\n",
+       "Cancer Risk Val Accuracy: 0.9233\n",
+       "Cancer Risk Test Accuracy: 0.9190\n"
+      ]
+-    }
+-   ],
+-   "source": [
+-    "model_results = {'Model ID': model_id}\n",
+-    "for task in task_list_cat:\n",
+-    "\n",
+-    "        (val_accuracy, test_accuracy) = log_reg_multi_class(task, Z_train, y_data_train, Z_val, y_data_val, Z_test, y_data_test)\n",
+-    "\n",
+-    "        # Store the results in the dictionary\n",
+-    "        model_results[f'{task} Val Accuracy'] = val_accuracy\n",
+-    "        model_results[f'{task} Test Accuracy'] = test_accuracy\n",
+-    "\n",
+-    "        print(f'{task} Val Accuracy: {val_accuracy:.4f}')\n",
+-    "        print(f'{task} Test Accuracy: {test_accuracy:.4f}')\n"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 60,
+-   "metadata": {},
+-   "outputs": [
++    },
+     {
+      "name": "stderr",
+      "output_type": "stream",
+      "text": [
+-      "/home/leilapirhaji/.local/lib/python3.9/site-packages/sklearn/linear_model/_ridge.py:216: LinAlgWarning: Ill-conditioned matrix (rcond=3.93355e-08): result may not be accurate.\n",
++      "/home/leilapirhaji/.local/lib/python3.9/site-packages/sklearn/linear_model/_ridge.py:216: LinAlgWarning: Ill-conditioned matrix (rcond=3.93296e-08): result may not be accurate.\n",
+       "  return linalg.solve(A, Xy, assume_a=\"pos\", overwrite_a=True).T\n",
+-      "/home/leilapirhaji/.local/lib/python3.9/site-packages/sklearn/linear_model/_ridge.py:216: LinAlgWarning: Ill-conditioned matrix (rcond=5.43877e-08): result may not be accurate.\n",
++      "/home/leilapirhaji/.local/lib/python3.9/site-packages/sklearn/linear_model/_ridge.py:216: LinAlgWarning: Ill-conditioned matrix (rcond=5.43836e-08): result may not be accurate.\n",
+       "  return linalg.solve(A, Xy, assume_a=\"pos\", overwrite_a=True).T\n"
+      ]
+     },
+@@ -886,64 +1162,72 @@
+       "Age Val MAE : 9.9546\n",
+       "Age Test MAE : 9.7178\n"
+      ]
++    },
++    {
++     "data": {
++      "text/plain": [
++       "{'Model ID': 'RCC-36657',\n",
++       " 'Study ID Val Accuracy': 0.9525048796356539,\n",
++       " 'Study ID Test Accuracy': 0.9458319818358741,\n",
++       " 'is Female Val Accuracy': 0.8043478260869565,\n",
++       " 'is Female Test Accuracy': 0.7566666666666667,\n",
++       " 'is Pediatric Val Accuracy': 0.9808067664281067,\n",
++       " 'is Pediatric Test Accuracy': 0.9818358741485566,\n",
++       " 'Cohort Label v0 Val Accuracy': 0.9619388418998048,\n",
++       " 'Cohort Label v0 Test Accuracy': 0.957833279273435,\n",
++       " 'Smoking Status Val Accuracy': 0.9311475409836065,\n",
++       " 'Smoking Status Test Accuracy': 0.9313725490196079,\n",
++       " 'Cancer Risk Val Accuracy': 0.9233067729083665,\n",
++       " 'Cancer Risk Test Accuracy': 0.9190444591904446,\n",
++       " 'BMI Val MAE': 3.9232283557165877,\n",
++       " 'BMI Test MAE': 3.923811241793968,\n",
++       " 'Age Val MAE': 9.95463990170786,\n",
++       " 'Age Test MAE': 9.717826384024695}"
++      ]
++     },
++     "execution_count": 12,
++     "metadata": {},
++     "output_type": "execute_result"
+     }
+    ],
+    "source": [
+-    "#now evaluting numercal task predictions\n",
+-    "for task in task_list_num:\n",
+-    "\n",
+-    "    (val_mse, val_mae, val_r2, test_mse, test_mae, test_r2)= ridge_regression_predict(task, Z_train, y_data_train, Z_val, y_data_val, Z_test, y_data_test)\n",
++    "import eval_pretrain_latent\n",
++    "importlib.reload(eval_pretrain_latent)\n",
++    "from eval_pretrain_latent import evalute_pretrain_latent_extra_task\n",
+     "\n",
+-    "    # Store the results in the dictionary\n",
+-    "    model_results[f'{task} Val MSE'] = val_mse\n",
+-    "    model_results[f'{task} Val MAE'] = val_mae\n",
+-    "    model_results[f'{task} Val R2'] = val_r2\n",
+-    "    model_results[f'{task} Test MSE'] = test_mse\n",
+-    "    model_results[f'{task} Test MAE'] = test_mae\n",
+-    "    model_results[f'{task} Test R2'] = test_r2\n",
++    "model_results = evalute_pretrain_latent_extra_task(model_id, input_data_location, pretrain_save_dir, task_list_cat, task_list_num)\n",
+     "\n",
+-    "    print(f'{task} Val MAE : {val_mae:.4f}')\n",
+-    "    print(f'{task} Test MAE : {test_mae:.4f}')"
++    "model_results\n"
+    ]
+   },
+   {
+    "cell_type": "code",
+-   "execution_count": 61,
++   "execution_count": 13,
+    "metadata": {},
+    "outputs": [
+     {
+      "data": {
+       "text/plain": [
+        "{'Model ID': 'RCC-36657',\n",
+-       " 'Study ID Val Accuracy': 0.9512036434612883,\n",
+-       " 'Study ID Test Accuracy': 0.9445345442750568,\n",
++       " 'Study ID Val Accuracy': 0.9525048796356539,\n",
++       " 'Study ID Test Accuracy': 0.9458319818358741,\n",
+        " 'is Female Val Accuracy': 0.8043478260869565,\n",
+        " 'is Female Test Accuracy': 0.7566666666666667,\n",
+-       " 'is Pediatric Val Accuracy': 0.9791802212101497,\n",
+-       " 'is Pediatric Test Accuracy': 0.9824845929289653,\n",
++       " 'is Pediatric Val Accuracy': 0.9808067664281067,\n",
++       " 'is Pediatric Test Accuracy': 0.9818358741485566,\n",
+        " 'Cohort Label v0 Val Accuracy': 0.9619388418998048,\n",
+-       " 'Cohort Label v0 Test Accuracy': 0.958806357444048,\n",
+-       " 'Smoking Status Val Accuracy': 0.9344262295081968,\n",
++       " 'Cohort Label v0 Test Accuracy': 0.957833279273435,\n",
++       " 'Smoking Status Val Accuracy': 0.9311475409836065,\n",
+        " 'Smoking Status Test Accuracy': 0.9313725490196079,\n",
+        " 'Cancer Risk Val Accuracy': 0.9233067729083665,\n",
+        " 'Cancer Risk Test Accuracy': 0.9190444591904446,\n",
+-       " 'BMI Val MSE': 31.474254022919432,\n",
+-       " 'BMI Val MAE': 3.923244522162404,\n",
+-       " 'BMI Val R2': 0.16234745248223503,\n",
+-       " 'BMI Test MSE': 33.136116736617716,\n",
+-       " 'BMI Test MAe': 3.9238094311236593,\n",
+-       " 'BMI Test R2': 0.21686598261764212,\n",
+-       " 'Age Val MSE': 156.20674821325835,\n",
+-       " 'Age Val MAE': 9.954631767943313,\n",
+-       " 'Age Val R2': 0.6196750943013511,\n",
+-       " 'Age Test MSE': 147.36208627765836,\n",
+-       " 'Age Test MAe': 9.717814025494553,\n",
+-       " 'Age Test R2': 0.6423280776614397,\n",
+-       " 'BMI Test MAE': 3.9238094311236593,\n",
+-       " 'Age Test MAE': 9.717814025494553}"
++       " 'BMI Val MAE': 3.9232283557165877,\n",
++       " 'BMI Test MAE': 3.923811241793968,\n",
++       " 'Age Val MAE': 9.95463990170786,\n",
++       " 'Age Test MAE': 9.717826384024695}"
+       ]
+      },
+-     "execution_count": 61,
++     "execution_count": 13,
+      "metadata": {},
+      "output_type": "execute_result"
+     }
+diff --git a/ml/get_finetune_encoder.py b/ml/get_finetune_encoder.py
+index ab1fc6b..c95857e 100644
+--- a/ml/get_finetune_encoder.py
++++ b/ml/get_finetune_encoder.py
+@@ -127,7 +127,7 @@ def get_finetune_encoder_from_modelID(model_id, path_to_proccessed_data, output_
+ 
+ 
+ 
+-def get_input_data(data_location):
++def get_finetune_input_data(data_location):
+ 
+     #defining the input datasets
+     
+diff --git a/ml/get_pretrain_encoder.py b/ml/get_pretrain_encoder.py
+index fe7d036..41b5e40 100644
+--- a/ml/get_pretrain_encoder.py
++++ b/ml/get_pretrain_encoder.py
+@@ -151,18 +151,17 @@ def get_pretrain_encoder_from_modelID(model_id, path_to_proccessed_data, output_
+ 
+     os.makedirs(f'{pretrain_save_dir}/{model_id}',  exist_ok=True)
+     
+-
+     #download the encoder state dict
+-    #if not os.path.exists(local_path):
+-    #    run['pretrain/models/encoder_state_dict'].download(local_path)
++    if not os.path.exists(model_local_path):
++       # Download the encoder state dict
++        run['pretrain/models/encoder_state_dict'].download(model_encoder_file)
++    
+ 
+-    # Check if the file exists and remove it if necessary
+-    if os.path.exists(model_encoder_file):
+-        os.remove(model_encoder_file)
+-        print(f"Deleted existing file at {model_encoder_file}")
++    # # Check if the file exists and remove it if necessary
++    # if os.path.exists(model_encoder_file):
++    #     os.remove(model_encoder_file)
++    #     print(f"Deleted existing file at {model_encoder_file}")
+ 
+-    # Download the encoder state dict
+-    run['pretrain/models/encoder_state_dict'].download(model_encoder_file)
+     # stop the run
+     run.stop()
+     
+diff --git a/ml/run_pretraining_LP.py b/ml/run_pretraining_LP.py
+index 2b05083..5951c60 100644
+--- a/ml/run_pretraining_LP.py
++++ b/ml/run_pretraining_LP.py
+@@ -126,7 +126,7 @@ def main(STUDY_INFO_DICT, num_trials=5,
+     os.makedirs(output_dir, exist_ok=True)
+     subdir_col = 'Study ID'
+ 
+-    fit_subset_col = 'Pretrain Discovery Train'
++    fit_subset_col = 'Pretrain Discovery Train' #Finetune_Discovery_Train
+     eval_subset_col = 'Pretrain Discovery Val'
+     test_subset_col = 'Pretrain Test'
+     setup_id = 'pretrain'

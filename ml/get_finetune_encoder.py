@@ -127,7 +127,7 @@ def get_finetune_encoder_from_modelID(model_id, path_to_proccessed_data, output_
 
 
 
-def get_input_data(data_location):
+def get_finetune_input_data(data_location):
 
     #defining the input datasets
     

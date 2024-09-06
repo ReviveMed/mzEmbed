@@ -126,7 +126,7 @@ def main(STUDY_INFO_DICT, num_trials=5,
     os.makedirs(output_dir, exist_ok=True)
     subdir_col = 'Study ID'
 
-    fit_subset_col = 'Pretrain Discovery Train'
+    fit_subset_col = 'Pretrain Discovery Train' #Finetune_Discovery_Train
     eval_subset_col = 'Pretrain Discovery Val'
     test_subset_col = 'Pretrain Test'
     setup_id = 'pretrain'
