@@ -25,7 +25,7 @@ ADD_EXISTING_RUNS_TO_STUDY = False
 limit_add = -1  # limit the number of runs added to the study
 
 encoder_kind = 'VAE'
-tag_study='pretrain latent penalty w=1, corrected, not norm, KL-annealing'
+tag_study='ppretrain-hidden-layer_2-4-latent-size_test'
 
 STUDY_DICT = {
     # oputuna study parameters
@@ -97,7 +97,7 @@ def get_study_kwargs(head_kwargs_dict, adv_kwargs_dict,
 
                              batch_size=96, batch_size_min=32, batch_size_max=128, batch_size_step=32,
                              noise_factor=None, noise_factor_min=0, noise_factor_max=0.25, noise_factor_step=0.05,
-                             num_epochs=20, num_epochs_min=50, num_epochs_max=400, num_epochs_step=25,
+                             num_epochs=10, num_epochs_min=50, num_epochs_max=400, num_epochs_step=25,
                              num_epochs_log=False,
                              learning_rate=None, learning_rate_min=0.00001, learning_rate_max=0.005,
                              learning_rate_step=None, learning_rate_log=True,

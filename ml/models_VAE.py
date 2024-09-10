@@ -22,6 +22,21 @@ from lifelines.utils import concordance_index
 # Helper functions
 
 
+def grad_reverse(x: torch.Tensor, lambd: float = 1.0) -> torch.Tensor:
+    return GradReverse.apply(x, lambd)
+
+
+
+def get_reg_penalty(model,l1_lambda,l2_lambda):
+    if (l1_lambda == 0) and (l2_lambda == 0):
+        return torch.tensor(0, dtype=torch.float32)
+    all_params = torch.cat([x.view(-1) for x in model.parameters()])
+    if l1_lambda == 0:
+        return l2_lambda * torch.sum(all_params.pow(2))
+    elif l2_lambda == 0:
+        return l1_lambda * torch.sum(all_params.abs())
+    return l1_lambda * torch.sum(all_params.abs()) + l2_lambda * torch.sum(all_params.pow(2))
+
 
 
 def _reset_params(layer):
@@ -75,28 +90,12 @@ def _nan_cleaner(y_output, y_true, ignore_nan=True, label_type='class'):
 
 
 #########################################################
-### Basic Multi-layer Perceptron
 class Dense_Layers(nn.Module):
-    def __init__(self,**kwargs):
-    # def __init__(self, input_size, hidden_size, output_size, 
-    #     num_hidden_layers=1, dropout_rate=0.2, activation='leakyrelu',
-    #     use_batch_norm=False, act_on_output_layer=False):
+    def __init__(self, input_size, output_size, num_hidden_layers=1, dropout_rate=0.2, activation='leakyrelu', use_batch_norm=False, act_on_output_layer=False):
         super(Dense_Layers, self).__init__()
 
-        input_size = kwargs.get('input_size', 1)
-        hidden_size = kwargs.get('hidden_size', 1)
-        output_size = kwargs.get('output_size', 1)
-        num_hidden_layers = kwargs.get('num_hidden_layers', 1)
-        dropout_rate = kwargs.get('dropout_rate', 0.2)
-        activation = kwargs.get('activation', 'leakyrelu')
-        use_batch_norm = kwargs.get('use_batch_norm', False)
-        act_on_output_layer = kwargs.get('act_on_output_layer', False)
-        verbose = kwargs.get('verbose', False)
-        
-        # print the unusued kwargs
-        for key, value in kwargs.items():
-            if key not in ['input_size', 'hidden_size', 'output_size', 'num_hidden_layers', 'dropout_rate', 'activation', 'use_batch_norm', 'act_on_output_layer','verbose']:
-                if verbose: print(f'Warning: {key} is not a valid argument for Dense_Layers')
+        # Create a list to store the size of each layer
+        hidden_sizes = self._compute_hidden_sizes(input_size, output_size, num_hidden_layers)
 
         if activation == 'leakyrelu' or activation == 'leaky_relu':
             activation_func = nn.LeakyReLU()
@@ -109,56 +108,39 @@ class Dense_Layers(nn.Module):
         elif activation == 'elu':
             activation_func = nn.ELU()
         else:
-            raise ValueError('activation must be one of "leakyrelu", "relu", "tanh", or "sigmoid", user gave: {}'.format(activation))
+            raise ValueError(f'Invalid activation: {activation}')
 
-        if num_hidden_layers < 1:
-            # raise ValueError('num_hidden_layers must be at least 1')
-            self.network = nn.Sequential(
-                nn.Linear(input_size, output_size))
-        else:
-            # this if else statement is a little hacky, but its needed for backwards compatibility
+        layers = []
+        prev_size = input_size
+
+        # Build layers based on the computed sizes
+        for hidden_size in hidden_sizes:
+            layers.append(nn.Linear(prev_size, hidden_size))
             if use_batch_norm:
-                self.network = nn.Sequential(
-                    nn.Linear(input_size, hidden_size),
-                    nn.BatchNorm1d(hidden_size),
-                    activation_func,
-                    nn.Dropout(dropout_rate)
-                )
-                for _ in range(num_hidden_layers-1):
-                    self.network.add_module('hidden_layer', nn.Sequential(
-                        nn.Linear(hidden_size, hidden_size),
-                        nn.BatchNorm1d(hidden_size),
-                        activation_func,
-                        nn.Dropout(dropout_rate)
-                    ))
-                self.network.add_module('output_layer', nn.Sequential(
-                    nn.Linear(hidden_size, output_size),
-                ))
+                layers.append(nn.BatchNorm1d(hidden_size))
+            layers.append(activation_func)
+            layers.append(nn.Dropout(dropout_rate))
+            prev_size = hidden_size
 
+        # Output layer
+        layers.append(nn.Linear(prev_size, output_size))
 
-            else:
-                self.network = nn.Sequential(
-                    nn.Linear(input_size, hidden_size),
-                    activation_func,
-                    nn.Dropout(dropout_rate)
-                )
-                for _ in range(num_hidden_layers-1):
-                    self.network.add_module('hidden_layer', nn.Sequential(
-                        nn.Linear(hidden_size, hidden_size),
-                        activation_func,
-                        nn.Dropout(dropout_rate)
-                    ))
-                self.network.add_module('output_layer', nn.Sequential(
-                    nn.Linear(hidden_size, output_size),
-                ))
-            
         if act_on_output_layer:
-            self.network.add_module('output_activation', activation_func)
-            self.network.add_module('output_dropout', nn.Dropout(dropout_rate))
+            layers.append(activation_func)
+            layers.append(nn.Dropout(dropout_rate))
 
+        self.network = nn.Sequential(*layers)
 
     def forward(self, x):
         return self.network(x)
+
+    def _compute_hidden_sizes(self, input_size, latent_size, num_hidden_layers):
+        # Calculate the ratio for geometric progression
+        r = (latent_size / input_size) ** (1 / num_hidden_layers)
+
+        # Create the hidden sizes list using geometric progression
+        hidden_sizes = [int(input_size * (r ** (i + 1))) for i in range(num_hidden_layers)]
+        return hidden_sizes
 
 
 
@@ -209,7 +191,6 @@ class VAE(nn.Module):
         self.latent_weight = 0.5
 
         self.encoder = Dense_Layers(input_size=input_size, 
-                                    hidden_size=hidden_size, 
                                     output_size=2*latent_size, 
                                     num_hidden_layers=num_hidden_layers,
                                     dropout_rate = dropout_rate,
@@ -218,12 +199,12 @@ class VAE(nn.Module):
                                     act_on_output_layer=act_on_latent_layer)
         
         self.decoder = Dense_Layers(input_size=latent_size, 
-                                    hidden_size = hidden_size, 
                                     output_size = input_size,
                                     num_hidden_layers = num_hidden_layers, 
                                     dropout_rate = dropout_rate,
                                     activation = activation,
-                                    use_batch_norm = use_batch_norm)
+                                    use_batch_norm = use_batch_norm,
+                                    act_on_output_layer=act_on_latent_layer)
 
 
         # self.encoder = Dense_Layers(input_size, hidden_size, 2*latent_size, 
@@ -264,10 +245,10 @@ class VAE(nn.Module):
 
         # Reconstruction loss    
         recon_loss = F.mse_loss(x_recon, x, reduction='mean')
-        print('recon_loss', recon_loss) 
+        #print('recon_loss', recon_loss) 
         
         kl_loss = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
-        print('kl_loss', kl_loss)
+        #print('kl_loss', kl_loss)
         
         # Latent size penalty
         latent_size_penalty = (self.latent_size * self.latent_weight)

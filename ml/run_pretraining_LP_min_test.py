@@ -15,6 +15,7 @@ from prep_run import get_selection_df, convert_model_kwargs_list_to_dict, conver
 # %% Load the latest data
 
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIwZDlmZGM4ZC05OGM2LTQ2YzctYmRhNi0zMjIwODMzMWM1ODYifQ=='
+
 WEBAPP_DB_LOC = 'mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB'
 
 project_id = 'revivemed/RCC'
@@ -25,7 +26,7 @@ ADD_EXISTING_RUNS_TO_STUDY = False
 limit_add = -1  # limit the number of runs added to the study
 
 encoder_kind = 'VAE'
-tag_study='pretrain latent weight w=0.5 Sep4'
+tag_study='pretrain-hidden-layer_2-4-latent-size_test'
 
 STUDY_DICT = {
     # oputuna study parameters
@@ -107,6 +108,7 @@ def get_study_kwargs(head_kwargs_dict, adv_kwargs_dict,
                              adversarial_start_epoch_step=2,
                              )
     return kwargs
+
 
 
 def main(STUDY_INFO_DICT, num_trials=5,

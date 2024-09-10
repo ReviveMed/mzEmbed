@@ -4,7 +4,7 @@ import torch
 import json
 import os
 import torch.nn.functional as F
-from models import get_reg_penalty, grad_reverse
+from models_VAE import get_reg_penalty, grad_reverse
 from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler, WeightedRandomSampler
 from sklearn.model_selection import train_test_split
 import time

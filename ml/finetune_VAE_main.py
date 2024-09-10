@@ -17,10 +17,6 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 
-from get_finetune_encoder import get_finetune_encoder_from_modelID, get_finetune_input_data
-from get_pretrain_encoder import get_pretrain_encoder_from_modelID
-
-from models_VAE import VAE
 import optuna
 import pickle
 
@@ -28,11 +24,16 @@ import optuna.visualization as vis
 import plotly.io as pio
 
 
+#Import my fucntions
+from get_finetune_encoder import get_finetune_input_data
+from get_pretrain_encoder import get_pretrain_encoder_from_modelID
+
+from models_VAE import VAE
 from train_finetune_VAE import fine_tune_vae
 
 
 
-def objective(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, finetune_save_dir, pretrain_modelID):
+def objective(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name):
     """
     Objective function for Optuna optimization.
     
@@ -66,14 +67,14 @@ def objective(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transf
     # Save the model if it's the first trial or has the best performance so far
     if len(trial.study.trials) == 1 or val_loss < trial.study.best_value:
         # Save the best model to a file
-        torch.save(fine_tuned_model, f'{finetune_save_dir}/finetune_VAE_TL_{transfer_learning}_{pretrain_modelID}_pretrain.pth')
+        torch.save(fine_tuned_model, f'{result_name}_TL_{transfer_learning}_model.pth')
     
     # Return validation loss for Optuna to minimize
     return val_loss
 
 
 
-def optimize_finetune_vae(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, finetune_save_dir, pretrain_modelID, n_trials=50):
+def optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, n_trials=50):
     """
     Optimize the fine-tuning of a VAE using Optuna.
     
@@ -89,7 +90,7 @@ def optimize_finetune_vae(trial, pretrain_VAE, X_data_train, X_data_val, X_data_
     study = optuna.create_study(direction='minimize')
 
     # Define the objective function
-    study.optimize(lambda trial: objective(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, finetune_save_dir, pretrain_modelID), n_trials=n_trials)
+    study.optimize(lambda trial: objective(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name), n_trials=n_trials)
 
     # Print the best hyperparameters
     print("Best hyperparameters:", study.best_params)
@@ -230,45 +231,51 @@ def save_combined_optimization_history_html(study_TL, study_rand, filename):
 
 def main ():
 
-    #get the input data
-    print ('get the input data')
-
+    
     input_data_location='/home/leilapirhaji/PROCESSED_DATA_2'
     finetune_save_dir='/home/leilapirhaji/finetune_models' 
     finetune_save_dir='/home/leilapirhaji/finetune_VAE_models'
+    n_trail=50
+
+    #get the input data
+    print ('get the input data')
 
     (X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test)=get_finetune_input_data(input_data_location)
 
     #get pretrain encoder
     print ('get pretrain encoder')
 
-    pretrain_modelID='RCC-37133'
-    result_name=f'{finetune_save_dir}/Finetune_VAE_pretain_{pretrain_modelID}'
-    print ('pretrain_modelID:', pretrain_modelID)
+    pretrain_model_list=['RCC-37133', 'RCC-37005', 'RCC-36991', 'RCC-37216']
 
-    (pretrain_VAE, Z_pretrain_all, Z_pretrain_train, Z_pretrain_val, Z_pretrain_test, y_data_all, y_pretrain_data_train, y_pretain_data_val, y__pretrain_data_test)=get_pretrain_encoder_from_modelID(pretrain_modelID, input_data_location, finetune_save_dir, ml_code_path)
-
-
-    #fine tune the encoder with transfer learning
-    print ('fine tune the encoder with transfer learning')
-    transfer_learning=True
-    study_TL= optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, finetune_save_dir, pretrain_modelID, n_trials=50)
-
-    with open(f"{result_name}_Transfer_learning_{transfer_learning}_optune_results.pkl", "wb") as f:
-        pickle.dump(study_TL, f)
-
-    #fine tune the encoder without transfer learning
-    print ('fine tune the encoder without transfer learning')
-    transfer_learning=False
-    study_rand= optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, finetune_save_dir, pretrain_modelID, n_trials=50)
-
-    with open(f"{result_name}_Transfer_learning_{transfer_learning}_optune_results.pkl", "wb") as f:
-        pickle.dump(study_rand, f)
+    for pretrain_modelID in pretrain_model_list:
         
-    #save the results
-    print ('save the results')
+        print ('pretrain_modelID:', pretrain_modelID)
 
-    save_combined_optimization_history_html(study_TL, study_rand, f'{result_name}_combined_optimization_history_TL_rand')
+        (pretrain_VAE, Z_pretrain_all, Z_pretrain_train, Z_pretrain_val, Z_pretrain_test, y_data_all, y_pretrain_data_train, y_pretain_data_val, y__pretrain_data_test)=get_pretrain_encoder_from_modelID(pretrain_modelID, input_data_location, finetune_save_dir, ml_code_path)
+
+        result_name=f'{finetune_save_dir}/{pretrain_modelID}/Finetune_VAE_pretain_{pretrain_modelID}'
+        
+
+        #fine tune the encoder with transfer learning
+        print ('fine tune the encoder with transfer learning')
+        transfer_learning=True
+        study_TL= optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, n_trials=n_trail)
+
+        with open(f"{result_name}_TL_{transfer_learning}_optune_results.pkl", "wb") as f:
+            pickle.dump(study_TL, f)
+
+        #fine tune the encoder without transfer learning
+        print ('fine tune the encoder without transfer learning')
+        transfer_learning=False
+        study_rand= optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, n_trials=n_trail)
+
+        with open(f"{result_name}_TL_{transfer_learning}_optune_results.pkl", "wb") as f:
+            pickle.dump(study_rand, f)
+            
+        #save the results
+        print ('save the results')
+
+        save_combined_optimization_history_html(study_TL, study_rand, f'{result_name}_combined_optimization_history_TL_rand')
 
 
 
