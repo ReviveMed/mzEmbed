@@ -90,13 +90,37 @@ def _nan_cleaner(y_output, y_true, ignore_nan=True, label_type='class'):
 
 
 #########################################################
+
 class Dense_Layers(nn.Module):
-    def __init__(self, input_size, output_size, num_hidden_layers=1, dropout_rate=0.2, activation='leakyrelu', use_batch_norm=False, act_on_output_layer=False):
+    def __init__(self, input_size, output_size, num_hidden_layers=1, dropout_rate=0.2, 
+                 activation='leakyrelu', use_batch_norm=False, act_on_output_layer=False, 
+                 mode='encode', saved_hidden_sizes=None):
+        """
+        A generic fully connected layer class that can act as either encoder or decoder.
+        
+        Parameters:
+            input_size (int): Input size of the first layer.
+            output_size (int): Final output size (e.g., latent size for encoder, input size for decoder).
+            num_hidden_layers (int): Number of hidden layers to apply.
+            dropout_rate (float): Dropout rate applied between layers.
+            activation (str): Activation function to use.
+            use_batch_norm (bool): Whether to apply batch normalization.
+            act_on_output_layer (bool): Whether to apply activation on the final output layer.
+            mode (str): 'encode' for encoder (compression), 'decode' for decoder (expansion).
+            saved_hidden_sizes (list): A list of hidden sizes passed from encoder for decoding.
+        """
         super(Dense_Layers, self).__init__()
 
-        # Create a list to store the size of each layer
-        hidden_sizes = self._compute_hidden_sizes(input_size, output_size, num_hidden_layers)
+        if mode == 'encode':
+            # Compute hidden sizes for encoder
+            hidden_sizes = self._compute_hidden_sizes(input_size, output_size, num_hidden_layers)
+            self.hidden_sizes = hidden_sizes  # Save encoder hidden sizes for decoder
+        elif mode == 'decode':
+            # Use the saved hidden sizes in reverse for the decoder
+            assert saved_hidden_sizes is not None, "Decoder requires saved encoder hidden sizes"
+            hidden_sizes = saved_hidden_sizes
 
+        # Activation function
         if activation == 'leakyrelu' or activation == 'leaky_relu':
             activation_func = nn.LeakyReLU()
         elif activation == 'relu':
@@ -113,7 +137,7 @@ class Dense_Layers(nn.Module):
         layers = []
         prev_size = input_size
 
-        # Build layers based on the computed sizes
+        # Build layers based on the computed or passed hidden sizes
         for hidden_size in hidden_sizes:
             layers.append(nn.Linear(prev_size, hidden_size))
             if use_batch_norm:
@@ -134,15 +158,13 @@ class Dense_Layers(nn.Module):
     def forward(self, x):
         return self.network(x)
 
-    def _compute_hidden_sizes(self, input_size, latent_size, num_hidden_layers):
-        # Calculate the ratio for geometric progression
-        r = (latent_size / input_size) ** (1 / num_hidden_layers)
-
-        # Create the hidden sizes list using geometric progression
+    def _compute_hidden_sizes(self, input_size, output_size, num_hidden_layers):
+        """
+        Computes the hidden sizes for encoding (compression mode).
+        """
+        r = (output_size / input_size) ** (1 / num_hidden_layers)
         hidden_sizes = [int(input_size * (r ** (i + 1))) for i in range(num_hidden_layers)]
         return hidden_sizes
-
-
 
 
 
@@ -151,15 +173,12 @@ class Dense_Layers(nn.Module):
 
 
 ### Variational Autoencoder
+    
 class VAE(nn.Module):
-    # def __init__(self, input_size, hidden_size, latent_size,
-    #              num_hidden_layers=1, dropout_rate=0,
-    #              activation='leaky_relu', use_batch_norm=False, act_on_latent_layer=False):
     def __init__(self, **kwargs):
         super(VAE, self).__init__()
 
         input_size = kwargs.get('input_size', 1)
-        hidden_size = kwargs.get('hidden_size', 1)
         latent_size = kwargs.get('latent_size', 1)
         num_hidden_layers = kwargs.get('num_hidden_layers', 1)
         dropout_rate = kwargs.get('dropout_rate', 0.2)
@@ -167,17 +186,13 @@ class VAE(nn.Module):
         use_batch_norm = kwargs.get('use_batch_norm', False)
         act_on_latent_layer = kwargs.get('act_on_latent_layer', False)
         verbose = kwargs.get('verbose', False)
-        # print the unusued kwargs
-        for key, value in kwargs.items():
-            if key not in ['input_size', 'hidden_size', 'latent_size', 'num_hidden_layers', 'dropout_rate', 'activation', 'use_batch_norm', 'act_on_latent_layer']:
-                if verbose: print(f'Warning: {key} is not a valid argument for VAE')
+        
 
         self.goal = 'encode'
         self.kind = 'VAE'
         self.file_id = 'VAE'
         self.latent_size = latent_size
         self.input_size = input_size
-        self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
         self.dropout_rate = dropout_rate
         if activation == 'leakyrelu':
@@ -190,30 +205,32 @@ class VAE(nn.Module):
         self.kl_weight = 1.0
         self.latent_weight = 0.5
 
+
+        # Encoder: compress input_size -> 2*latent_size (mu + log_var)
         self.encoder = Dense_Layers(input_size=input_size, 
-                                    output_size=2*latent_size, 
+                                    output_size=2 * latent_size,  # 2 * latent size for mu and log_var
                                     num_hidden_layers=num_hidden_layers,
-                                    dropout_rate = dropout_rate,
-                                    activation = activation,
+                                    dropout_rate=dropout_rate,
+                                    activation=activation,
                                     use_batch_norm=use_batch_norm, 
-                                    act_on_output_layer=act_on_latent_layer)
-        
+                                    act_on_output_layer=act_on_latent_layer,
+                                    mode='encode')  # Use mode='encode' for compression
+
+        # Get the hidden sizes from the encoder and reverse them for the decoder
+        encoder_hidden_sizes = self.encoder.hidden_sizes[::-1]  # Reverse encoder sizes for decoder
+
+        # Decoder: expand latent_size -> input_size using reversed encoder hidden sizes
         self.decoder = Dense_Layers(input_size=latent_size, 
-                                    output_size = input_size,
-                                    num_hidden_layers = num_hidden_layers, 
-                                    dropout_rate = dropout_rate,
-                                    activation = activation,
-                                    use_batch_norm = use_batch_norm,
-                                    act_on_output_layer=act_on_latent_layer)
+                                    output_size=input_size,  # Back to original input size
+                                    num_hidden_layers=num_hidden_layers,
+                                    dropout_rate=dropout_rate,
+                                    activation=activation,
+                                    use_batch_norm=use_batch_norm,
+                                    act_on_output_layer=act_on_latent_layer,
+                                    mode='decode',
+                                    saved_hidden_sizes=encoder_hidden_sizes)  # Pass reversed encoder sizes
 
-
-        # self.encoder = Dense_Layers(input_size, hidden_size, 2*latent_size, 
-        #                             num_hidden_layers, dropout_rate, activation,
-        #                             use_batch_norm,act_on_output_layer=act_on_latent_layer)
-        
-        # self.decoder = Dense_Layers(latent_size, hidden_size, input_size,
-        #                             num_hidden_layers, dropout_rate, activation,
-        #                             use_batch_norm)
+    
 
     def init_layers(self):
         # Weight Initialization: Proper weight initialization can help mitigate 
@@ -221,6 +238,17 @@ class VAE(nn.Module):
         # Techniques like Xavier/Glorot or He initialization can be used
         _init_weights_xavier(self.encoder,gain=nn.init.calculate_gain(self.activation))
         _init_weights_xavier(self.decoder,gain=nn.init.calculate_gain(self.activation))  
+
+
+    def reparameterize(self, mu, log_var):
+        std = torch.exp(0.5 * log_var)
+        eps = torch.randn_like(std)
+        return mu + eps * std
+    
+    def forward(self, x):
+        mu, log_var = self.encoder(x).chunk(2, dim=1)
+        z = self.reparameterize(mu, log_var)
+        return self.decoder(z), mu, log_var
 
     def reparameterize(self, mu, log_var):
         std = torch.exp(0.5*log_var)
