@@ -6,7 +6,9 @@ import pandas as pd
 import numpy as np
 import os
 import json
-from models import get_model, Binary_Head, Dummy_Head, MultiClass_Head, MultiHead, Regression_Head, Cox_Head, get_encoder
+from models import Binary_Head, Dummy_Head, MultiClass_Head, MultiHead, Regression_Head, Cox_Head, get_encoder
+
+from models_VAE import VAE
 
 from train4 import CompoundDataset, train_compound_model, get_end_state_eval_funcs, evaluate_compound_model, create_dataloaders, create_dataloaders_old
 
@@ -568,7 +570,7 @@ def setup_neptune_run(PROCESSED_DATA_dir, data_dir,setup_id,with_run_id=None,run
             if run_training or run_evaluation or save_latent_space or plot_latent_space:
                 print('creating models')
                 
-                encoder = get_model(encoder_kind, input_size, **encoder_kwargs)
+                encoder = VAE (input_size=input_size, **encoder_kwargs)
 
 
                 if (load_encoder_loc) and (load_model_weights):
@@ -936,7 +938,7 @@ def setup_neptune_run(PROCESSED_DATA_dir, data_dir,setup_id,with_run_id=None,run
     try:
         if encoder is None:
             print('No encoder created, attempt to load from save location')
-            encoder = get_model(encoder_kind, input_size, **encoder_kwargs)
+            encoder = VAE (input_size=input_size, **encoder_kwargs)
             encoder_save_loc = f'{save_dir}/{setup_id}_encoder_state_dict.pth'
             if (load_encoder_loc) and (load_model_weights):
                 print(f'loading encoder from {load_encoder_loc}')
