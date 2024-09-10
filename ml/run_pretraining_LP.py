@@ -25,7 +25,7 @@ ADD_EXISTING_RUNS_TO_STUDY = False
 limit_add = -1  # limit the number of runs added to the study
 
 encoder_kind = 'VAE'
-tag_study='ppretrain-hidden-layer_2-4-latent-size_test'
+tag_study='pretrain-hidden-layer_2-4-latent-size_test'
 
 STUDY_DICT = {
     # oputuna study parameters
@@ -44,7 +44,7 @@ STUDY_DICT = {
 
 
 def get_study_kwargs(head_kwargs_dict, adv_kwargs_dict,
-                     latent_size_min=100, latent_size_max=254,
+                     latent_size_min=128, latent_size_max=512,
                      num_hidden_layers_min=2, num_hidden_layers_max=4):
     kwargs = make_kwargs_set(encoder_kind=encoder_kind,
                              head_kwargs_dict=head_kwargs_dict,
@@ -55,7 +55,7 @@ def get_study_kwargs(head_kwargs_dict, adv_kwargs_dict,
                              # -1 means the parameter was not used
                              # fixed value is fixed to the value
                              latent_size=None, latent_size_min=latent_size_min, latent_size_max=latent_size_max,
-                             latent_size_step=50,
+                             latent_size_step=16,
                              hidden_size=-1, hidden_size_min=16, hidden_size_max=64, hidden_size_step=16,
                              hidden_size_mult=1.5, hidden_size_mult_min=1.25, hidden_size_mult_max=2,
                              hidden_size_mult_step=0.25,
@@ -97,7 +97,7 @@ def get_study_kwargs(head_kwargs_dict, adv_kwargs_dict,
 
                              batch_size=96, batch_size_min=32, batch_size_max=128, batch_size_step=32,
                              noise_factor=None, noise_factor_min=0, noise_factor_max=0.25, noise_factor_step=0.05,
-                             num_epochs=10, num_epochs_min=50, num_epochs_max=400, num_epochs_step=25,
+                             num_epochs=100, num_epochs_min=50, num_epochs_max=400, num_epochs_step=25,
                              num_epochs_log=False,
                              learning_rate=None, learning_rate_min=0.00001, learning_rate_max=0.005,
                              learning_rate_step=None, learning_rate_log=True,
@@ -110,7 +110,7 @@ def get_study_kwargs(head_kwargs_dict, adv_kwargs_dict,
 
 
 def main(STUDY_INFO_DICT, num_trials=5,
-         latent_size_min=100, latent_size_max=254,
+         latent_size_min=128, latent_size_max=512,
          num_hidden_layers_min=2, num_hidden_layers_max=4,
          tag='tag'):
     neptune_api_token = NEPTUNE_API_TOKEN
@@ -263,8 +263,8 @@ def main(STUDY_INFO_DICT, num_trials=5,
 
 if __name__ == '__main__':
     # 250-350
-    main(STUDY_DICT, num_trials=50,
-         latent_size_min=100, latent_size_max=300,
+    main(STUDY_DICT, num_trials=200,
+         latent_size_min=128, latent_size_max=512,
          num_hidden_layers_min=2, num_hidden_layers_max=4,
          # change neptune run tag to keep track of the runs
          tag=tag_study

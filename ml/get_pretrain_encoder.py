@@ -27,8 +27,6 @@ import neptune.new as neptune
 import torch
 
 
-#importing Jonha's funtions 
-from models import get_model, Binary_Head, Dummy_Head, MultiClass_Head, MultiHead, Regression_Head, Cox_Head, get_encoder
 
 from models_VAE import VAE
 

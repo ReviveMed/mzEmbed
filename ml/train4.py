@@ -752,7 +752,7 @@ def evaluate_compound_model(dataloaders, encoder, head, adversary, run, **kwargs
     prefix = kwargs.get('prefix', 'eval')
     sklearn_models = kwargs.get('sklearn_models', None)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print('using device: ', device)
+    #print('using device: ', device)
     
     encoder.eval()
     head.eval()
