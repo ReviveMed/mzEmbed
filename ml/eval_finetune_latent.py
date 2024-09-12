@@ -23,7 +23,7 @@ label_encoder = LabelEncoder()
 
 
 #importing fundtion to get encoder info and perfrom tasks 
-from latent_task_predict_finetune import log_reg_multi_class, cox_proportional_hazards
+from mz_embed_engine.ml.LP_archived_code.latent_task_predict_finetune import log_reg_multi_class, cox_proportional_hazards
 
 from get_finetune_encoder import get_finetune_encoder_from_modelID, get_finetune_input_data
 

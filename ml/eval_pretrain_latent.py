@@ -21,7 +21,7 @@ label_encoder = LabelEncoder()
 
 
 from get_pretrain_encoder import get_pretrain_encoder_from_modelID
-from latent_task_predict_pretrain import log_reg_multi_class, ridge_regression_predict
+from mz_embed_engine.ml.LP_archived_code.latent_task_predict_pretrain import log_reg_multi_class, ridge_regression_predict
 
 
 

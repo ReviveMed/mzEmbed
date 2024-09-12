@@ -61,44 +61,77 @@ class CoxPHLoss(nn.Module):
 
 # Define the fine-tuning model with a CoxPH head
 class FineTuneCoxModel(nn.Module):
-    def __init__(self, encoder, dropout=0.2, task_layer_size=128):
+    def __init__(self, VAE_model, num_layers_to_retrain=1, add_post_latent_layers=False, num_post_latent_layers=1, post_latent_layer_size=128, dropout=0.2):
         super(FineTuneCoxModel, self).__init__()
-        latent_size = self.get_last_linear_out_features(encoder)
-        self.encoder = encoder
-        self.freeze_encoder_except_last()
+        self.latent_size=VAE_model.latent_size
+        #latent_size = self.get_last_linear_out_features(encoder)
+        self.encoder = VAE_model.encoder
+        self.freeze_encoder_except_last(num_layers_to_retrain)
         self.latent_mode = False  # Add a flag to toggle between raw input and latent mode
         
+
+        # If additional layers are needed after latent space
+        if add_post_latent_layers:
+            layers = []
+            input_size = self.latent_size  # Start with the original latent size
+            for _ in range(num_post_latent_layers):
+                layers.append(nn.Linear(input_size, post_latent_layer_size))
+                layers.append(nn.ReLU())
+                layers.append(nn.Dropout(dropout))
+                input_size = post_latent_layer_size  # Update for next layer input size
+
+            self.post_latent_layers = nn.Sequential(*layers)
+            self.post_latent_layer_size = post_latent_layer_size  # Keep track of post-latent size
+        else:
+            self.post_latent_layers = None
+            self.post_latent_layer_size = self.latent_size  # Use latent size if no post-latent layers
+
+        # CoxPH head
         self.cox_head = nn.Sequential(
-            nn.Linear(latent_size, task_layer_size),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(task_layer_size, 1)  # Output layer with 1 unit for CoxPH model (log hazard ratio)
+            nn.Linear(self.post_latent_layer_size, 1)  # Output layer with 1 unit for CoxPH model (log hazard ratio)
         )
 
-    def get_last_linear_out_features(self, module):
-        for m in reversed(list(module.modules())):
-            if isinstance(m, nn.Linear):
-                return m.out_features
-        raise ValueError("No nn.Linear layer found in the encoder")
-    
-    def freeze_encoder_except_last(self):
-        for name, param in self.encoder.named_parameters():
-            param.requires_grad = False
-        latent_size = self.get_last_linear_out_features(self.encoder)
-        for m in reversed(list(self.encoder.modules())):
-            if isinstance(m, nn.Linear) and m.out_features == latent_size:
-                for param in m.parameters():
-                    param.requires_grad = True
-                break
 
+    def freeze_encoder_except_last(self, num_layers_to_retrain):
+        """Freeze all trainable (Linear) layers in the encoder except the specified number of layers."""
+        
+        # Get only the Linear layers from the encoder's Sequential block
+        encoder_layers = [layer for layer in self.encoder.network.children() if isinstance(layer, nn.Linear)]
+        # Exclude the last Linear layer (latent space)
+        hidden_layers = encoder_layers[:-1]
+
+        # Get the total number of hidden layers (excluding latent)
+        total_layers = len(hidden_layers)
+                
+        # If num_layers_to_retrain exceeds total layers, set it to total layers
+        if num_layers_to_retrain > total_layers:
+            print(f"num_layers_to_retrain exceeds total layers ({total_layers}). Setting num_layers_to_retrain to {total_layers}.")
+            num_layers_to_retrain = total_layers
+
+        # Freeze all parameters in the encoder
+        for param in self.encoder.parameters():
+            param.requires_grad = False
+
+        # Unfreeze the specified number of layers from the end of the hidden layers
+        if num_layers_to_retrain > 0:
+            for layer in hidden_layers[-num_layers_to_retrain:]:
+                for param in layer.parameters():
+                        param.requires_grad = True
+
+    
     def forward(self, x):
         if not self.latent_mode:  # If in raw input mode
-            x = self.encoder(x)
-            if isinstance(x, tuple):
-                x = x[0]
-        # If in latent mode, assume x is already a latent representation
+            encoder_output = self.encoder(x)  # Get latent representation from encoder
+            # Slice the first half of the encoder output to get `mu`
+            # Assuming the encoder output shape is [batch_size, 2 * latent_size]
+            mu = encoder_output[:, :self.latent_size]  # Get the first half for `mu`
+            x = mu  # Use `mu` as the input to the classifier
+        
+        if self.post_latent_layers:
+            x = self.post_latent_layers(x)
+        
+        # Pass the latent representation (`mu`) to the classifier
         return self.cox_head(x)
-
 
 
 
@@ -139,23 +172,28 @@ def l1_regularization(model, l1_reg_weight):
 
 
 # Define the fine-tuning model function with L1 and L2 regularization for survival analysis
-def fine_tune_cox_model(encoder, X_train, y_duration_train, y_event_train, X_val, y_duration_val, y_event_val, num_epochs=20, batch_size=32, learning_rate=1e-4, dropout=0.2, task_layer_size=128, l1_reg_weight=0.0, l2_reg_weight=0.0, latent_passes=10, seed=None):
+def fine_tune_cox_model(VAE_model, X_train, y_data_train, y_event_train, X_val, y_data_val, y_event_val, num_layers_to_retrain=1, add_post_latent_layers=False, num_post_latent_layers=1, post_latent_layer_size=128, num_epochs=20, batch_size=32, learning_rate=1e-4, dropout=0.2, l1_reg_weight=0.0, l2_reg_weight=0.0, latent_passes=10, seed=None):
     
     # Set seed for reproducibility
     seed = set_seed(seed)
 
-    model = FineTuneCoxModel(encoder, dropout, task_layer_size)
+    # Check if CUDA is available and set the device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    #initialize the model
+    model = FineTuneCoxModel(VAE_model, num_layers_to_retrain=num_layers_to_retrain, add_post_latent_layers=add_post_latent_layers, num_post_latent_layers=num_post_latent_layers, post_latent_layer_size=post_latent_layer_size, dropout=dropout)
+    model=model.to(device)
     
     criterion = CoxPHLoss()  # Use CoxPH loss function for survival analysis
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=l2_reg_weight)
 
     # Convert pandas DataFrames to PyTorch tensors
-    X_train_tensor = torch.tensor(X_train.values, dtype=torch.float32)
-    y_duration_train_tensor = torch.tensor(y_duration_train.fillna(-1).values, dtype=torch.float32)
-    y_event_train_tensor = torch.tensor(y_event_train.fillna(-1).values, dtype=torch.float32)
-    X_val_tensor = torch.tensor(X_val.values, dtype=torch.float32)
-    y_duration_val_tensor = torch.tensor(y_duration_val.fillna(-1).values, dtype=torch.float32)
-    y_event_val_tensor = torch.tensor(y_event_val.fillna(-1).values, dtype=torch.float32)
+    X_train_tensor = torch.tensor(X_train.values, dtype=torch.float32).to(device)
+    y_duration_train_tensor = torch.tensor(y_data_train.fillna(-1).values, dtype=torch.float32).to(device)
+    y_event_train_tensor = torch.tensor(y_event_train.fillna(-1).values, dtype=torch.float32).to(device)
+    X_val_tensor = torch.tensor(X_val.values, dtype=torch.float32).to(device)
+    y_duration_val_tensor = torch.tensor(y_data_val.fillna(-1).values, dtype=torch.float32).to(device)
+    y_event_val_tensor = torch.tensor(y_event_val.fillna(-1).values, dtype=torch.float32).to(device)
 
     # Create TensorDataset
     train_dataset = TensorDataset(X_train_tensor, y_duration_train_tensor, y_event_train_tensor)
@@ -175,27 +213,46 @@ def fine_tune_cox_model(encoder, X_train, y_duration_train, y_event_train, X_val
     # Training loop
     for epoch in range(num_epochs):
         model.train()
+        model.latent_mode = False  # Train using raw input data
+
         running_loss = 0.0
         for inputs, durations, events in train_loader:
-            optimizer.zero_grad()
+            # Check for NaNs in inputs
+            if torch.isnan(inputs).any():
+                print("NaN found in inputs")
+            if torch.isnan(durations).any():
+                print("NaN found in durations")
+            if torch.isnan(events).any():
+                print("NaN found in events")
+
+            optimizer.zero_grad() # Reset gradients before backpropagation
 
             # Latent averaging with fine-tuning of the last encoder layer
             latent_reps_train = []
             for _ in range(latent_passes):  # Generate multiple latent representations
-                latent_rep = model.encoder(inputs)[0]  # Assuming the first output is mu
-                latent_reps_train.append(latent_rep)
+                latent_rep = model.encoder(inputs) 
+                mu=latent_rep[:, :model.latent_size]
+                latent_reps_train.append(mu)
             latent_rep_train = torch.mean(torch.stack(latent_reps_train), dim=0)
 
+            # Set the model to latent mode to ensure it processes latent representations correctly
+            model.latent_mode = True
             # Forward pass using averaged latent representations
-            outputs = model.cox_head(latent_rep_train)
+            outputs = model(latent_rep_train)
+
             loss = criterion(outputs, durations, events)
+            #print(f"Outputs: {outputs}")
 
             # Add L1 regularization
             l1_norm = l1_regularization(model, l1_reg_weight)
             loss += l1_norm
 
-            loss.backward()
-            optimizer.step()
+            loss.backward() # Backward pass (compute gradients)
+
+            # Gradient clipping (optional but recommended)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        
+            optimizer.step()  # Update weights based on gradients
             running_loss += loss.item()
         
         print(f'Epoch {epoch+1}/{num_epochs}, Loss: {running_loss/len(train_loader)}')
@@ -213,8 +270,9 @@ def fine_tune_cox_model(encoder, X_train, y_duration_train, y_event_train, X_val
                 # Latent averaging for validation
                 latent_reps_val = []
                 for _ in range(latent_passes):  # Multiple passes through the encoder
-                    latent_rep = model.encoder(inputs)[0]
-                    latent_reps_val.append(latent_rep)
+                    latent_rep = model.encoder(inputs)
+                    mu=latent_rep[:, :model.latent_size]
+                    latent_reps_val.append(mu)
                 latent_rep_val = torch.mean(torch.stack(latent_reps_val), dim=0)
 
                 # Forward pass using averaged latent representations

@@ -245,7 +245,7 @@ def main ():
     #get pretrain encoder
     print ('get pretrain encoder')
 
-    pretrain_model_list=['RCC-37133', 'RCC-37005', 'RCC-36991', 'RCC-37216']
+    pretrain_model_list=['RCC-37542', 'RCC-37522', 'RCC-37520', 'RCC-37544']
 
     for pretrain_modelID in pretrain_model_list:
         

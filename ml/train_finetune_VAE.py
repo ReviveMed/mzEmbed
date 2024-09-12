@@ -43,7 +43,6 @@ def fine_tune_vae(pretrain_VAE, X_data_train,
 
     # Step 2: Initialize the fine-tuning model with the same architecture as the pre-trained VAE
     fine_tune_VAE = VAE(input_size=pretrain_VAE.input_size, 
-                        hidden_size=pretrain_VAE.hidden_size, 
                         latent_size=pretrain_VAE.latent_size, 
                         num_hidden_layers=pretrain_VAE.num_hidden_layers, 
                         dropout_rate=dropout_rate,  # Pass dropout_rate here
