@@ -49,7 +49,7 @@ def get_finetune_encoder_from_modelID(model_id, path_to_proccessed_data, output_
     
     
     # Step 0: get the input data
-    (X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test) = get_input_data(path_to_proccessed_data)
+    (X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test) = get_finetune_input_data(path_to_proccessed_data)
 
     # Step 1: Connect to Neptune
 
@@ -127,7 +127,7 @@ def get_finetune_encoder_from_modelID(model_id, path_to_proccessed_data, output_
 
 
 
-def get_input_data(data_location):
+def get_finetune_input_data(data_location):
 
     #defining the input datasets
     

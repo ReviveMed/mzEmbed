@@ -27,8 +27,8 @@ import neptune.new as neptune
 import torch
 
 
-#importing Jonha's funtions 
-from models import get_model, Binary_Head, Dummy_Head, MultiClass_Head, MultiHead, Regression_Head, Cox_Head, get_encoder
+
+from models_VAE import VAE
 
 
 from utils_neptune import check_neptune_existance, start_neptune_run, convert_neptune_kwargs, neptunize_dict_keys, get_latest_dataset
@@ -40,7 +40,7 @@ NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGl
 
 
 
-def get_input_data(data_location):
+def get_pretrain_input_data(data_location):
 
     #defining the input datasets
     pretrain_X_all=f'{data_location}/X_Pretrain_All.csv'
@@ -104,7 +104,7 @@ def get_pretrain_encoder_from_modelID(model_id, path_to_proccessed_data, output_
     
     
     # Step 0: get the input data
-    (X_data_all, y_data_all, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test) = get_input_data(path_to_proccessed_data)
+    (X_data_all, y_data_all, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test) = get_pretrain_input_data(path_to_proccessed_data)
 
     # Step 1: Connect to Neptune
     run = neptune.init_run(project='revivemed/RCC', api_token= NEPTUNE_API_TOKEN, with_id=model_id)
@@ -145,30 +145,26 @@ def get_pretrain_encoder_from_modelID(model_id, path_to_proccessed_data, output_
 
 
     # Load the encoder state dict
-    pretrain_save_dir=f'{output_path}/pretrained_models'
-    model_local_path = f'{pretrain_save_dir}/{model_id}'
-    model_encoder_file = f'{pretrain_save_dir}/{model_id}/encoder_state_dict.pth'
+    
+    model_local_path = f'{output_path}/{model_id}'
+    model_encoder_file = f'{model_local_path}/{model_id}_encoder_state_dict.pth'
 
-    os.makedirs(f'{pretrain_save_dir}/{model_id}',  exist_ok=True)
+    os.makedirs(f'{model_local_path}',  exist_ok=True)
+    
+    #download the encoder state dict
+    if not os.path.exists(model_encoder_file):
+       # Download the encoder state dict
+        run['pretrain/models/encoder_state_dict'].download(model_encoder_file)
+    else: 
+        print(f"Encoder state dict already exists at {model_encoder_file}")
     
 
-    #download the encoder state dict
-    #if not os.path.exists(local_path):
-    #    run['pretrain/models/encoder_state_dict'].download(local_path)
-
-    # Check if the file exists and remove it if necessary
-    if os.path.exists(model_encoder_file):
-        os.remove(model_encoder_file)
-        print(f"Deleted existing file at {model_encoder_file}")
-
-    # Download the encoder state dict
-    run['pretrain/models/encoder_state_dict'].download(model_encoder_file)
     # stop the run
     run.stop()
     
     #Create the Encoder Models
     # Load the encoder
-    encoder = get_model(encoder_kind, input_size, **encoder_kwargs)
+    encoder = VAE(input_size=input_size, **encoder_kwargs)
 
     encoder_state_dict = torch.load(model_encoder_file)
     encoder.load_state_dict(encoder_state_dict)
