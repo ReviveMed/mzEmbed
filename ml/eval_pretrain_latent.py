@@ -21,7 +21,7 @@ label_encoder = LabelEncoder()
 
 
 from get_pretrain_encoder import get_pretrain_encoder_from_modelID
-from mz_embed_engine.ml.LP_archived_code.latent_task_predict_pretrain import log_reg_multi_class, ridge_regression_predict
+from latent_task_predict import log_reg_multi_class, ridge_regression_predict
 
 
 
@@ -46,7 +46,7 @@ def evalute_pretrain_latent_extra_task(model_id, input_data_location, pretrain_s
 
     for task in task_list_cat:
 
-        (val_accuracy, test_accuracy) = log_reg_multi_class(task, Z_train, y_data_train, Z_val, y_data_val, Z_test, y_data_test)
+        (val_accuracy, val_auc, test_accuracy, test_auc) = log_reg_multi_class(task, Z_train, y_data_train, Z_val, y_data_val, Z_test, y_data_test)
 
         # Store the results in the dictionary
         model_results[f'{task} Val Accuracy'] = val_accuracy

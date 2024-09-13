@@ -26,7 +26,7 @@ ADD_EXISTING_RUNS_TO_STUDY = False
 limit_add = -1  # limit the number of runs added to the study
 
 encoder_kind = 'VAE'
-tag_study='pretrain, different size hidden-layers, latent_weight =0.5'
+tag_study='pretrain, different size hidden-layers, latent_weight =0.25'
 
 STUDY_DICT = {
     # oputuna study parameters
