@@ -1,9 +1,13 @@
 '''
+
 fine tune  VAE model with and without transfer learning
 
 
 '''
 
+import argparse
+import pandas as pd
+import os
 
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
@@ -228,11 +232,41 @@ def save_combined_optimization_history_html(study_TL, study_rand, filename):
 def main ():
 
     
-    input_data_location='/home/leilapirhaji/PROCESSED_DATA_2'
-    finetune_save_dir='/home/leilapirhaji/finetune_models' 
-    finetune_save_dir='/home/leilapirhaji/finetune_VAE_models'
-    n_trail=50
+    #Set up the argument parser
+    parser = argparse.ArgumentParser(description='Finetune VAE models with optional transfer learning.')
 
+    # Define the arguments with defaults and help messages
+    parser.add_argument('--input_data_location', type=str,
+                        default='/home/leilapirhaji/PROCESSED_DATA_2',
+                        help='Path to the input data location.')
+
+    parser.add_argument('--finetune_save_dir', type=str,
+                        default='/home/leilapirhaji/finetune_VAE_models',
+                        help='Directory to save finetuned models.')
+
+    parser.add_argument('--pretrain_model_list_file', type=str,
+                        default='/home/leilapirhaji/pretrained_models_to_finetune.txt',
+                        help='File containing list of pre-trained model IDs to finetune.')
+
+    parser.add_argument('--n_trial', type=int, default=50,
+                        help='Number of trials for optimization.')
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    # Access the arguments
+    input_data_location = args.input_data_location
+    finetune_save_dir = args.finetune_save_dir
+    pretrain_model_list_file = args.pretrain_model_list_file
+    n_trial = args.n_trial
+
+
+    # Read the text file into a DataFrame
+    pretrain_model_list = pd.read_csv(pretrain_model_list_file, header=None)[0]
+    pretrain_model_list = pretrain_model_list.dropna().tolist()
+
+
+    
     #get the input data
     print ('get the input data')
 
@@ -240,14 +274,21 @@ def main ():
 
     #get pretrain encoder
     print ('get pretrain encoder')
-
-    pretrain_model_list=['RCC-37542', 'RCC-37522', 'RCC-37520', 'RCC-37544']
+ 
 
     for pretrain_modelID in pretrain_model_list:
         
         print ('pretrain_modelID:', pretrain_modelID)
 
-        (pretrain_VAE, Z_pretrain_all, Z_pretrain_train, Z_pretrain_val, Z_pretrain_test, y_data_all, y_pretrain_data_train, y_pretain_data_val, y__pretrain_data_test)=get_pretrain_encoder_from_modelID(pretrain_modelID, input_data_location, finetune_save_dir, ml_code_path)
+        result_file_name = f'{finetune_save_dir}/{pretrain_modelID}/Finetune_VAE_pretain_{pretrain_modelID}_combined_optimization_history_TL_rand.html'
+
+        # Check if the output file already exists
+        if os.path.exists(result_file_name):
+            print(f'Output file {result_file_name} already exists. Skipping this model.')
+            continue  # Skip to the next pretrain_modelID
+
+
+        (pretrain_VAE, Z_pretrain_all, Z_pretrain_train, Z_pretrain_val, Z_pretrain_test, y_data_all, y_pretrain_data_train, y_pretain_data_val, y__pretrain_data_test)=get_pretrain_encoder_from_modelID(pretrain_modelID, input_data_location, finetune_save_dir)
 
         result_name=f'{finetune_save_dir}/{pretrain_modelID}/Finetune_VAE_pretain_{pretrain_modelID}'
         
@@ -255,7 +296,7 @@ def main ():
         #fine tune the encoder with transfer learning
         print ('fine tune the encoder with transfer learning')
         transfer_learning=True
-        study_TL= optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, n_trials=n_trail)
+        study_TL= optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, n_trials=n_trial)
 
         with open(f"{result_name}_TL_{transfer_learning}_optune_results.pkl", "wb") as f:
             pickle.dump(study_TL, f)
@@ -263,7 +304,7 @@ def main ():
         #fine tune the encoder without transfer learning
         print ('fine tune the encoder without transfer learning')
         transfer_learning=False
-        study_rand= optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, n_trials=n_trail)
+        study_rand= optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, n_trials=n_trial)
 
         with open(f"{result_name}_TL_{transfer_learning}_optune_results.pkl", "wb") as f:
             pickle.dump(study_rand, f)

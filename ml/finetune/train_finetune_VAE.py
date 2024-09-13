@@ -87,7 +87,12 @@ def fine_tune_vae(pretrain_VAE, X_data_train,
             x_recon, mu, log_var = model(x_batch)
             loss = model.loss(x_batch, x_recon, mu, log_var)
             loss += l1_penalty(model)  # Add L1 regularization
-            loss.backward()
+
+            loss.backward()  # Backward pass (compute gradients)
+
+            # Gradient clipping (optional but recommended)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        
             optimizer.step()
             total_loss += loss.item()
         return total_loss / len(data_loader)

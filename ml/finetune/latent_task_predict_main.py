@@ -28,7 +28,7 @@ from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_sco
 
 from finetune.get_finetune_encoder import  get_finetune_input_data
 from models.models_VAE import VAE
-from finetune.latent_task_predict import log_reg_multi_class, cox_proportional_hazards
+from finetune.latent_task_predict import log_reg_multi_class, cox_proportional_hazards, cox_proportional_hazards_l1_sksurv
 
 
 
@@ -104,8 +104,11 @@ def predict_survival_from_latent_avg(vae_model, task, task_event, X_data_train, 
     Y_test_OS = y_data_test[task]
     Y_test_event = y_data_test[task_event]
 
+    #l2 cox
+    #best_val_c_index, best_test_c_index, best_params= cox_proportional_hazards(Z_train, Y_train_OS, Y_train_event, Z_val, Y_val_OS, Y_val_event, Z_test, Y_test_OS, Y_test_event)
 
-    best_val_c_index, best_test_c_index, best_params= cox_proportional_hazards(Z_train, Y_train_OS, Y_train_event, Z_val, Y_val_OS, Y_val_event, Z_test, Y_test_OS, Y_test_event)
+    #l1 cox
+    best_val_c_index, best_test_c_index, best_params= cox_proportional_hazards_l1_sksurv(Z_train, Y_train_OS, Y_train_event, Z_val, Y_val_OS, Y_val_event, Z_test, Y_test_OS, Y_test_event)
 
     return best_val_c_index, best_test_c_index, best_params
 
