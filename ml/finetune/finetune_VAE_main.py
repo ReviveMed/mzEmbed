@@ -26,7 +26,9 @@ import plotly.io as pio
 
 #Import my fucntions
 from finetune.get_finetune_encoder import get_finetune_input_data
-from pretrain.get_pretrain_encoder import get_pretrain_encoder_from_modelID
+
+from pretrain.get_pretrain_encoder import get_pretrain_encoder_from_modelID, visualize_latent_space_multiple_tasks
+
 
 from models.models_VAE import VAE
 from finetune.train_finetune_VAE import fine_tune_vae
@@ -233,7 +235,7 @@ def main ():
 
     
     #Set up the argument parser
-    parser = argparse.ArgumentParser(description='Finetune VAE models with optional transfer learning.')
+    parser = argparse.ArgumentParser(description='It get a list of pre-trained models, and use them to develop finetune VAE models with trasnfer learning of the pretrained model. It also develop a fine-tune model with NO tansfer learning (i,e, random init.). It uses optuna to find the best hyper-paramteres to minize the Recon loss of finetune models. it also visulaize the latent space of the pretrained model used for transfer learning and save all the results.')
 
     # Define the arguments with defaults and help messages
     parser.add_argument('--input_data_location', type=str,
@@ -289,6 +291,13 @@ def main ():
 
 
         (pretrain_VAE, Z_pretrain_all, Z_pretrain_train, Z_pretrain_val, Z_pretrain_test, y_data_all, y_pretrain_data_train, y_pretain_data_val, y__pretrain_data_test)=get_pretrain_encoder_from_modelID(pretrain_modelID, input_data_location, finetune_save_dir)
+
+        #UMAP visualization of the latent space of pretrain model
+        print ('UMAP visualization of the latent space of pretrain model')
+        output_path=f'{finetune_save_dir}/{pretrain_modelID}'
+        visualize_latent_space_multiple_tasks( pretrain_modelID, output_path, Z_pretrain_all, Z_pretrain_train, Z_pretrain_val, Z_pretrain_test, y_data_all, y_data_train, y_data_val, y_data_test)
+
+        print ('the UMUP visualization of the latent space of pretrain model is saved in:', output_path)
 
         result_name=f'{finetune_save_dir}/{pretrain_modelID}/Finetune_VAE_pretain_{pretrain_modelID}'
         

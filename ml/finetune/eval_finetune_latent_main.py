@@ -27,6 +27,12 @@ import torch
 import torch.nn.functional as F
 
 
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+import umap
+import seaborn as sns
+
+
 #importing fundtion to get encoder info and perfrom tasks 
 
 from finetune.get_finetune_encoder import  get_finetune_input_data
@@ -170,6 +176,139 @@ def compute_losses(model, X_data_train, X_data_val, X_data_test, device):
 
 
 
+def visualize_latent_space_multiple_tasks( vae_model, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, result_png_file, batch_size=64, num_times=10, method='UMAP', n_components=2, dpi=300, palette='tab10', **kwargs):
+    """
+    Visualize the latent space for multiple tasks (categorical and numerical) using PCA or UMAP, and plot subplots for train, val, test, and all combined for each task.
+
+    Parameters:
+    - pretrain_encoder: Pre-trained encoder for getting latent space
+    - Z_all, Z_train, Z_val, Z_test: Latent space data for all, train, val, and test.
+    - y_data_all, y_data_train, y_data_val, y_data_test: Metadata for all, train, val, and test.
+    - method: 'PCA' or 'UMAP' for dimensionality reduction.
+    - n_components: Number of dimensions to reduce to (default is 2).
+    - dpi: Resolution of the figure (default is 300 for high-quality images).
+    - palette: Color palette to use for distinct colors (default is 'Set1').
+    - kwargs: Additional parameters to pass to UMAP or PCA.
+    """
+    
+    #Availbe taks for pre-trained meta-data
+    #tasks to predict using encoder
+    task_list_cat=['Treatment', 'IMDC BINARY', 'IMDC ORDINAL', 'MSKCC BINARY', 'MSKCC ORDINAL', 'ORR', 'Benefit', 'Prior_2' ]
+
+    #survival tasks
+    task_list_num=[ 'OS', 'NIVO OS', 'EVER OS', 'PFS']  # List of numerical tasks
+
+    # Generate latent spaces 10 times for each dataset
+    # Generate averaged latent spaces
+    # making the emebedding for all the data
+    X_data_all = pd.concat([X_data_train, X_data_val, X_data_test])
+    y_data_all = pd.concat([y_data_train, y_data_val, y_data_test])
+
+    Z_all = generate_average_latent_space(X_data_all, vae_model, batch_size, num_times)
+    Z_train = generate_average_latent_space(X_data_train, vae_model, batch_size, num_times)
+    Z_val = generate_average_latent_space(X_data_val, vae_model, batch_size, num_times)
+    Z_test = generate_average_latent_space(X_data_test, vae_model, batch_size, num_times)
+
+
+    # Perform dimensionality reduction (UMAP or PCA) once using all samples
+    if method == 'PCA':
+        reducer = PCA(n_components=n_components)
+    elif method == 'UMAP':
+        reducer = umap.UMAP(n_components=n_components, **kwargs)
+    else:
+        raise ValueError("Method must be either 'PCA' or 'UMAP'")
+
+
+    # Apply dimensionality reduction to all the samples
+    Z_reduced_all = reducer.fit_transform(Z_all)
+    Z_reduced_train = reducer.fit_transform(Z_train)
+    Z_reduced_val = reducer.fit_transform(Z_val)
+    Z_reduced_test = reducer.fit_transform(Z_test)
+
+
+    # Function to filter and plot categorical data
+    def filter_and_plot_cat(Z_reduced, y_data, data_label, task, ax):
+        valid_rows = y_data[[task]].dropna().index
+        # Convert valid_rows into integer indices that NumPy arrays understand
+        valid_indices = [y_data.index.get_loc(idx) for idx in valid_rows]
+        Z_filtered = Z_reduced[valid_indices]
+        y_filtered = y_data.loc[valid_rows, task]
+
+        # Count the number of samples for each category
+        category_counts = y_filtered.value_counts().to_dict()
+
+        # Create a custom legend label with sample counts
+        custom_legend_labels = [f'{cat}: {count} samples' for cat, count in category_counts.items()]
+
+        # Plot the reduced data with smaller dots and transparency for categorical data
+        sns.scatterplot(x=Z_filtered[:, 0], y=Z_filtered[:, 1], hue=y_filtered, palette=palette, s=50, alpha=0.5, ax=ax)
+
+        # Title with the total number of samples
+        ax.set_title(f"{data_label} colored by {task} (n={len(valid_rows)})", fontsize=20)
+        ax.set_xlabel(f'{method} Component 1', fontsize=18)
+        ax.set_ylabel(f'{method} Component 2', fontsize=18)
+
+        # Update the legend with sample counts
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles, custom_legend_labels, title=f"{task} (n={len(valid_rows)})", bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=12, title_fontsize=14)
+
+
+    # Function to filter and plot numerical data
+    def filter_and_plot_num(Z_reduced, y_data, data_label, task, ax):
+        valid_rows = y_data[[task]].dropna().index
+        # Convert valid_rows into integer indices that NumPy arrays understand
+        valid_indices = [y_data.index.get_loc(idx) for idx in valid_rows]
+        Z_filtered = Z_reduced[valid_indices]
+        y_filtered = y_data.loc[valid_rows, task]
+
+        # Special handling for BMI: cap the values at 40 for better visualization
+        if task == 'PFS':
+            y_filtered_capped = y_filtered.copy()
+            y_filtered_capped = np.where(y_filtered_capped > 20, 20, y_filtered_capped)  # Cap BMI values at 20
+            scatter = ax.scatter(Z_filtered[:, 0], Z_filtered[:, 1], c=y_filtered_capped, cmap='coolwarm', s=50, alpha=0.5)
+            plt.colorbar(scatter, ax=ax, label=f"{task} (capped at 20)")
+        else:
+            scatter = ax.scatter(Z_filtered[:, 0], Z_filtered[:, 1], c=y_filtered, cmap='coolwarm', s=50, alpha=0.5)
+            plt.colorbar(scatter, ax=ax, label=task)
+
+        # Title with the total number of samples
+        ax.set_title(f"{data_label} colored by {task} (n={len(valid_rows)})", fontsize=20)
+        ax.set_xlabel(f'{method} Component 1', fontsize=18)
+        ax.set_ylabel(f'{method} Component 2', fontsize=18)
+
+
+    # Adjust the figure to be square-shaped
+    num_tasks = len(task_list_cat) + len(task_list_num)
+    fig, axs = plt.subplots(num_tasks, 4, figsize=(42, 7 * num_tasks), dpi=dpi)  # Adjusted figsize for square subplots
+
+
+    # Plot for categorical tasks
+    for i, task in enumerate(task_list_cat):
+        filter_and_plot_cat(Z_reduced_all, y_data_all, 'All Combined', task, axs[i, 0])
+        filter_and_plot_cat(Z_reduced_train, y_data_train, 'Train', task, axs[i, 1])
+        filter_and_plot_cat(Z_reduced_val, y_data_val, 'Validation', task, axs[i, 2])
+        filter_and_plot_cat(Z_reduced_test, y_data_test, 'Test', task, axs[i, 3])
+
+    # Plot for numerical tasks
+    for i, task in enumerate(task_list_num, start=len(task_list_cat)):
+        filter_and_plot_num(Z_reduced_all, y_data_all, 'All Combined', task, axs[i, 0])
+        filter_and_plot_num(Z_reduced_train, y_data_train, 'Train', task, axs[i, 1])
+        filter_and_plot_num(Z_reduced_val, y_data_val, 'Validation', task, axs[i, 2])
+        filter_and_plot_num(Z_reduced_test, y_data_test, 'Test', task, axs[i, 3])
+
+    plt.tight_layout()
+
+    plt.savefig(result_png_file)
+    print (f'Latent space visualization saved at {result_png_file}')
+  
+
+
+
+
+
+
+
+
 def main():
     
      #Set up the argument parser
@@ -183,6 +322,13 @@ def main():
     parser.add_argument('--finetune_save_dir', type=str,
                         default='/home/leilapirhaji/finetune_VAE_models',
                         help='Directory to finetuned VAE models, the results will be saved there too.')
+    
+    parser.add_argument('--pretrain_model_list_file', type=str,
+                        default='/home/leilapirhaji/pretrained_models_to_finetune.txt',
+                        help='File containing list of pre-trained model IDs to finetune.')
+    
+    parser.add_argument('--result_name', type=str, default='top_finetune_latent_w=0.0',
+                        help='the name of the result file.')
 
     
     # Parse the arguments
@@ -191,6 +337,12 @@ def main():
     # Access the arguments
     input_data_location = args.input_data_location
     finetune_save_dir = args.finetune_save_dir
+    pretrain_model_list_file = args.pretrain_model_list_file
+    result_name = args.result_name
+
+    # Read the text file into a DataFrame
+    pretrain_model_list = pd.read_csv(pretrain_model_list_file, header=None)[0]
+    pretrain_model_list = pretrain_model_list.dropna().tolist()
     
 
     #tasks to predict using encoder
@@ -206,9 +358,7 @@ def main():
     print ('Getting fine-tuning input data')
     (X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test)=get_finetune_input_data(input_data_location)
 
-    #first getting A list of pretrained models and their associated fine-tune 
-    pretrain_model_list=os.listdir(finetune_save_dir)
-    
+
 
     # Initialize a list to collect all results
     all_results = []
@@ -231,6 +381,19 @@ def main():
 
         latent_size= finetune_VAE_TL.latent_size
         num_hidden_layers= finetune_VAE_TL.num_hidden_layers
+
+        ## visulizing the latnet space of the VAE models
+
+        # with transfer learning
+        result_png_file_TL= f'{models_path}/finetune_VAE_{pretrain_model_ID}_TL_latent_space.png'
+        visualize_latent_space_multiple_tasks(finetune_VAE_TL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, result_png_file_TL)
+
+        # without transfer learning
+        result_png_file_TL= f'{models_path}/finetune_VAE_{pretrain_model_ID}_TL_latent_space.png'
+        visualize_latent_space_multiple_tasks(finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, result_png_file_TL)
+
+
+
 
         #getting the recon loss of the models
         # Example usage
@@ -321,9 +484,9 @@ def main():
     results_df = pd.DataFrame(all_results)
 
     # Save the results to a CSV file
-    results_df.to_csv(f'{models_path}/pre-train_latnet_avg_predictions.csv', index=False)
+    results_df.to_csv(f'{finetune_save_dir}/{result_name}.csv', index=False)
 
-    print (f'Predictions are saved in: {models_path}/pre-train_latnet_avg_predictions.csv')
+    print (f'Predictions are saved in: {finetune_save_dir}/{result_name}.csv')
 
 
 
