@@ -292,18 +292,20 @@ def main ():
 
         (pretrain_VAE, Z_pretrain_all, Z_pretrain_train, Z_pretrain_val, Z_pretrain_test, y_data_all, y_pretrain_data_train, y_pretain_data_val, y__pretrain_data_test)=get_pretrain_encoder_from_modelID(pretrain_modelID, input_data_location, finetune_save_dir)
 
-        #UMAP visualization of the latent space of pretrain model
-        print ('UMAP visualization of the latent space of pretrain model')
-        output_path=f'{finetune_save_dir}/{pretrain_modelID}'
-        visualize_latent_space_multiple_tasks( pretrain_modelID, output_path, Z_pretrain_all, Z_pretrain_train, Z_pretrain_val, Z_pretrain_test, y_data_all, y_data_train, y_data_val, y_data_test)
 
-        print ('the UMUP visualization of the latent space of pretrain model is saved in:', output_path)
+        # #UMAP visualization of the latent space of pretrain model
+        # print ('UMAP visualization of the latent space of pretrain model')
+        # output_path=f'{finetune_save_dir}/{pretrain_modelID}'
+        # visualize_latent_space_multiple_tasks( pretrain_modelID, output_path, Z_pretrain_all, Z_pretrain_train, Z_pretrain_val, Z_pretrain_test, y_data_all, y_data_train, y_data_val, y_data_test)
 
-        result_name=f'{finetune_save_dir}/{pretrain_modelID}/Finetune_VAE_pretain_{pretrain_modelID}'
-        
+        # print ('the UMUP visualization of the latent space of pretrain model is saved in:', output_path)
+
 
         #fine tune the encoder with transfer learning
         print ('fine tune the encoder with transfer learning')
+
+        result_name=f'{finetune_save_dir}/{pretrain_modelID}/Finetune_VAE_pretain_{pretrain_modelID}'
+        
         transfer_learning=True
         study_TL= optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, n_trials=n_trial)
 
@@ -323,6 +325,7 @@ def main ():
 
         save_combined_optimization_history_html(study_TL, study_rand, f'{result_name}_combined_optimization_history_TL_rand')
 
+print ('All DONE!')
 
 
 

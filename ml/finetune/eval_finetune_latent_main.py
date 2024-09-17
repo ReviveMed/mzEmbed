@@ -384,14 +384,13 @@ def main():
 
         ## visulizing the latnet space of the VAE models
 
-        # with transfer learning
-        result_png_file_TL= f'{models_path}/finetune_VAE_{pretrain_model_ID}_TL_latent_space.png'
-        visualize_latent_space_multiple_tasks(finetune_VAE_TL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, result_png_file_TL)
+        # # with transfer learning
+        # result_png_file_TL= f'{models_path}/finetune_VAE_{pretrain_model_ID}_TL_latent_space.png'
+        # visualize_latent_space_multiple_tasks(finetune_VAE_TL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, result_png_file_TL)
 
-        # without transfer learning
-        result_png_file_TL= f'{models_path}/finetune_VAE_{pretrain_model_ID}_TL_latent_space.png'
-        visualize_latent_space_multiple_tasks(finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, result_png_file_TL)
-
+        # # without transfer learning
+        # result_png_file_TL= f'{models_path}/finetune_VAE_{pretrain_model_ID}_TL_latent_space.png'
+        # visualize_latent_space_multiple_tasks(finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, result_png_file_TL)
 
 
 

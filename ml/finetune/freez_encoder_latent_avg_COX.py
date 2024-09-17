@@ -172,7 +172,7 @@ def l1_regularization(model, l1_reg_weight):
 
 
 # Define the fine-tuning model function with L1 and L2 regularization for survival analysis
-def fine_tune_cox_model(VAE_model, X_train, y_data_train, y_event_train, X_val, y_data_val, y_event_val, num_layers_to_retrain=1, add_post_latent_layers=False, num_post_latent_layers=1, post_latent_layer_size=128, num_epochs=20, batch_size=32, learning_rate=1e-4, dropout=0.2, l1_reg_weight=0.0, l2_reg_weight=0.0, latent_passes=10, seed=None):
+def fine_tune_cox_model(VAE_model, X_train, y_data_train, y_event_train, X_val, y_data_val, y_event_val, num_layers_to_retrain=1, add_post_latent_layers=False, num_post_latent_layers=1, post_latent_layer_size=128, num_epochs=20, batch_size=32, learning_rate=1e-4, dropout=0.2, l1_reg_weight=0.0, l2_reg_weight=0.0, latent_passes=10, seed=None, patience=5):
     
     # Set seed for reproducibility
     seed = set_seed(seed)
@@ -205,6 +205,12 @@ def fine_tune_cox_model(VAE_model, X_train, y_data_train, y_event_train, X_val, 
                               shuffle=True, 
                               worker_init_fn=lambda worker_id: set_seed(seed))
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+
+    # Early Stopping Setup
+    best_c_index = -float('inf')  # Best validation AUC
+    best_model = None  # Store the state of the best model
+    patience_counter = 0  # Counter to track patience
 
     # DataFrame to store metrics per epoch
     metrics_per_epoch = pd.DataFrame(columns=['Epoch', 'C-index', 'Validation Loss'])
@@ -290,6 +296,21 @@ def fine_tune_cox_model(VAE_model, X_train, y_data_train, y_event_train, X_val, 
         # Calculate C-index
         c_index = concordance_index(all_durations, -np.array(all_risks), all_events)
 
+        # Check early stopping condition
+        # Early stopping logic (if patience > 0)
+        if patience > 0:
+            if c_index > best_c_index:
+                best_c_index = c_index
+                best_model = model # Save the best model state
+                patience_counter = 0  # Reset patience counter
+            else:
+                patience_counter += 1
+
+            # If no improvement for `patience` epochs, stop training
+            if patience_counter >= patience:
+                print(f'Early stopping triggered at epoch {epoch+1}')
+                break
+
         # Create a DataFrame with the metrics for the current epoch
         metrics_df = pd.DataFrame({
             'Epoch': [epoch + 1],
@@ -303,4 +324,4 @@ def fine_tune_cox_model(VAE_model, X_train, y_data_train, y_event_train, X_val, 
         print(f'Validation Loss: {val_loss/len(val_loader)}, C-index: {c_index}')
 
     print('Fine-tuning completed.')
-    return model, metrics_per_epoch
+    return best_model, metrics_per_epoch

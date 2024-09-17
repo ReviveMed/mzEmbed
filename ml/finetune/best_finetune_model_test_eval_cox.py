@@ -159,7 +159,6 @@ def evaluate_model(model, latent_rep, y_duration_test, y_event_test, seed, batch
             'C-index': [c_index]
         })
 
-        
 
         print(f'Test C-index: {c_index}')
 
@@ -169,7 +168,6 @@ def evaluate_model(model, latent_rep, y_duration_test, y_event_test, seed, batch
 
 
 def best_finetune_model_test_eval_cox(best_model, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed):
-
 
     ### Training data
     # Convert pandas DataFrames to PyTorch tensors
@@ -219,11 +217,19 @@ def best_finetune_model_test_eval_cox(best_model, X_data_train, y_data_train, X_
 
     metrics_test=evaluate_model(best_model, latent_rep_test, y_data_test[task], y_data_test[task_event], seed, batch_size=32)
 
+    # Add an identifier column to each dataframe
+    metrics_train['Dataset'] = 'Train'
+    metrics_val['Dataset'] = 'Validation'
+    metrics_test['Dataset'] = 'Test'
+
+    # Concatenate the dataframes into a single dataframe
+    combined_result_metrics = pd.concat([metrics_train, metrics_val, metrics_test], ignore_index=True)
+
+    # Reorder the columns to make 'Dataset' the first column
+    combined_result_metrics = combined_result_metrics[['Dataset'] + [col for col in combined_result_metrics.columns if col != 'Dataset']]
+
     
-    
-    
-    
-    return metrics_train, metrics_val, metrics_test, latent_rep_train, latent_rep_val, latent_rep_test 
+    return combined_result_metrics, latent_rep_train, latent_rep_val, latent_rep_test 
 
 
 
