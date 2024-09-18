@@ -27,7 +27,7 @@ import plotly.io as pio
 #Import my fucntions
 from finetune.get_finetune_encoder import get_finetune_input_data
 
-from pretrain.get_pretrain_encoder import get_pretrain_encoder_from_modelID, visualize_latent_space_multiple_tasks
+from pretrain_neptune.get_pretrain_encoder import get_pretrain_encoder_from_modelID, visualize_latent_space_multiple_tasks
 
 
 from models.models_VAE import VAE

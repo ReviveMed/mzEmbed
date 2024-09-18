@@ -29,7 +29,7 @@ When using an Intel CPU without any gpu, use the GCP's deep learning VM image
     - `git checkout <branch_name>`
 - Install the requirements
     - `pip install -r requirements.txt` or `pip install -r requirements_4.txt`
-- move to ml folder and run to make a package
+- move to ml folder and run to make a package, if build not available: pip install build
     - 'cd ml'
-    - 'pip install -e .'
+    - 'python -m build'
 

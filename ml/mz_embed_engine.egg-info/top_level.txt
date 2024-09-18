@@ -2,4 +2,6 @@ config
 finetune
 models
 pretrain
+pretrain_neptune
+scripts
 utils
