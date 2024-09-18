@@ -315,21 +315,10 @@ def main():
     print (f'Validation data shape: {X_data_val.shape}')
     print (f'Test data shape: {X_data_test.shape}')
 
-    # Combined parameter ranges and default values (with flexibility to tune)
-    combined_params = {
-        'latent_size': args.latent_size,            # Either fixed or range
-        'num_hidden_layers': args.num_hidden_layers,  # Either fixed or range
-        'dropout_rate': args.dropout_rate,          # Either fixed or range
-        'learning_rate': args.learning_rate,        # Either fixed or range
-        'weight_decay': args.weight_decay,          # Either fixed or range
-        'batch_size': args.batch_size,              # Either fixed or range
-        'patience': args.patience,                  # Either fixed or range
-        'num_epochs': args.num_epochs               # Fixed value
-    }
-
+    
     # Run the hyperparameter optimization
     print ('Optimizing the hyperparameters')
-    best_trial, study = optimize_hyperparameters(X_data_train, X_data_val, combined_params, trial_name, pretrain_save_dir, n_trials=n_trials)
+    best_trial, study = optimize_hyperparameters(X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, combined_params, trial_name, pretrain_save_dir, n_trials=n_trials)
 
     print(f"Best hyperparameters: {best_trial.params}")
 

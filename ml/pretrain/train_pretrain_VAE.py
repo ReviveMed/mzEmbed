@@ -21,8 +21,7 @@ import optuna
 
 #importing my own functions and classes
 from models.models_VAE import VAE  # Assuming the VAE class is in vae_model.py
-from pretrain.latent_task_predict import log_reg_multi_class, ridge_regression_predict
-
+from pretrain.eval_pretrained_VAE import evalute_pretrain_latent_extra_task
 
 
 #### setting the same seed for everything
@@ -78,7 +77,7 @@ class PretrainVAE(VAE):
 
 
 
-def pretrain_vae(X_data_train, X_data_val, trial_name, trial_id, save_path, **kwargs):
+def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_val, y_data_test, trial_name, trial_id, save_path, **kwargs):
     """
     Pretrains a Variational Autoencoder (VAE) on the provided data.
     Recon loss only
@@ -203,10 +202,10 @@ def pretrain_vae(X_data_train, X_data_val, trial_name, trial_id, save_path, **kw
         json.dump(serializable_hyperparameters, f, indent=4)
 
     ### evaluating pre-trained model on the latent task prediction and loss calculation
-    
+    #evlaute the model on the latent task
+    evalute_pretrain_latent_extra_task(vae, X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, model_folder)
     
         
-
     print(f"Encoder saved to {encoder_path}")
     print(f"Hyperparameters saved to {hyperparams_save_path}")
 
@@ -214,7 +213,9 @@ def pretrain_vae(X_data_train, X_data_val, trial_name, trial_id, save_path, **kw
 
 
 
-def objective(trial, X_data_train, X_data_val, combined_params, trial_name, save_path, **kwargs):
+   
+
+def objective(trial, X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, combined_params, trial_name, save_path, **kwargs):
     """
     Objective function for Optuna to minimize the loss using different hyperparameters.
     
@@ -231,45 +232,62 @@ def objective(trial, X_data_train, X_data_val, combined_params, trial_name, save
         Validation loss for the current trial.
     """
 
-    # Helper function to determine whether the parameter should be tuned or kept fixed
-    def suggest_param(param_name, param_value):
-        if isinstance(param_value, tuple):
-            # Integer parameter with step size
-            if len(param_value) == 3:
-                min_val, max_val, step = param_value
-                if isinstance(min_val, int) and isinstance(max_val, int):  # Ensure it's an integer range
-                    return trial.suggest_int(param_name, min_val, max_val, step=step)
-                else:
-                    # If it's not an integer range, treat it as a float range
-                    return trial.suggest_float(param_name, min_val, max_val)
-                # Float parameter without step size
-            elif len(param_value) == 2:
-                if param_name in ['learning_rate', 'weight_decay']:
-                    return trial.suggest_loguniform(param_name, param_value[0], param_value[1])
-                else:
-                    return trial.suggest_float(param_name, param_value[0], param_value[1])
-        elif isinstance(param_value, list):
-            # Categorical parameter (e.g., activation functions, optimizer)
-            return trial.suggest_categorical(param_name, param_value)
-        else:
-            # Fixed value (not tuned)
-            return param_value
+    # Case-by-case parsing based on parameter type (range, fixed, or categorical)
+    
 
-    # Model hyperparameters
-    latent_size = suggest_param('latent_size', combined_params.get('latent_size'))
-    num_hidden_layers = suggest_param('num_hidden_layers', combined_params.get('num_hidden_layers'))
-    dropout_rate = suggest_param('dropout_rate', combined_params.get('dropout_rate'))  # Only one dropout rate is needed here
-    learning_rate = suggest_param('learning_rate', combined_params.get('learning_rate'))
-    weight_decay = suggest_param('weight_decay', combined_params.get('weight_decay'))
-    activation = suggest_param('activation', combined_params.get('activation', 'leakyrelu'))
+    # Latent size: integer range or fixed
+    if isinstance(combined_params['latent_size'], tuple):
+        min_val, max_val, step = combined_params['latent_size']
+        latent_size = trial.suggest_int('latent_size', min_val, max_val, step=step)
+    else:
+        latent_size = combined_params['latent_size']
 
-    # Batch normalization (True or False)
-    batch_norm = suggest_param('use_batch_norm', combined_params.get('use_batch_norm', False))
+    # Number of hidden layers: integer range or fixed
+    if isinstance(combined_params['num_hidden_layers'], tuple):
+        min_val, max_val, step = combined_params['num_hidden_layers']
+        num_hidden_layers = trial.suggest_int('num_hidden_layers', min_val, max_val, step=step)
+    else:
+        num_hidden_layers = combined_params['num_hidden_layers']
 
-    # Training hyperparameters
-    batch_size = suggest_param('batch_size', combined_params.get('batch_size', 64))  # Tune batch size
-    patience = suggest_param('patience', combined_params.get('patience', 5))  # Tune patience
-    num_epochs = suggest_param('num_epochs', combined_params.get('num_epochs', 20))  # Tune num_epochs
+    # Dropout rate: float range or fixed
+    if isinstance(combined_params['dropout_rate'], tuple):
+        min_val, max_val, step = combined_params['dropout_rate']
+        dropout_rate = trial.suggest_float('dropout_rate', min_val, max_val, step=step)
+    else:
+        dropout_rate = combined_params['dropout_rate']
+
+    # Learning rate: loguniform or fixed
+    if isinstance(combined_params['learning_rate'], tuple):
+        learning_rate = trial.suggest_loguniform('learning_rate', combined_params['learning_rate'][0], combined_params['learning_rate'][1])
+    else:
+        learning_rate = combined_params['learning_rate']
+
+    # Weight decay: loguniform or fixed
+    if isinstance(combined_params['weight_decay'], tuple):
+        weight_decay = trial.suggest_loguniform('weight_decay', combined_params['weight_decay'][0],combined_params['weight_decay'][1] )
+    else:
+        weight_decay = combined_params['weight_decay']
+
+    # Batch size: categorical (fixed list of values) or fixed
+    if isinstance(combined_params['batch_size'], tuple):
+        min_val, max_val, step = combined_params['batch_size']
+        batch_size = trial.suggest_categorical('batch_size', min_val, max_val, step=step)
+    else:
+        batch_size = combined_params['batch_size']
+
+    # Patience: integer range or fixed
+    if isinstance(combined_params['patience'], tuple):
+        min_val, max_val, step = combined_params['patience']
+        patience = trial.suggest_int('patience', min_val, max_val, step=step)
+    else:
+        patience = combined_params['patience']
+
+    # Number of epochs: integer range or fixed
+    if isinstance(combined_params['num_epochs'], tuple):
+        min_val, max_val, step = combined_params['num_epochs']
+        num_epochs = trial.suggest_int('num_epochs', min_val, max_val, step=step)
+    else:
+        num_epochs = combined_params['num_epochs']
 
     # Update kwargs with all the hyperparameters
     kwargs.update({
@@ -278,23 +296,22 @@ def objective(trial, X_data_train, X_data_val, combined_params, trial_name, save
         'dropout_rate': dropout_rate,
         'learning_rate': learning_rate,
         'weight_decay': weight_decay,
-        'activation': activation,
-        'use_batch_norm': batch_norm,
-        'input_size': X_data_train.shape[1],  # Automatically determine input size
         'batch_size': batch_size,
         'patience': patience,
-        'num_epochs': num_epochs
+        'num_epochs': num_epochs,
+        'input_size': X_data_train.shape[1],  # Automatically determine input size
     })
 
+
     # Call the pretrain_vae function to train the model and return the validation loss
-    avg_val_loss = pretrain_vae(X_data_train, X_data_val, trial_name, trial.number, save_path, **kwargs)
+    avg_val_loss = pretrain_vae(X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, trial_name, trial.number, save_path, **kwargs)
 
     return avg_val_loss
 
 
 
 
-def optimize_hyperparameters(X_data_train, X_data_val, param_ranges, trial_name, save_path,  n_trials=50, **kwargs):
+def optimize_hyperparameters(X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test,  param_ranges, trial_name, save_path,  n_trials=50, **kwargs):
     """
     Function to run hyperparameter optimization using Optuna.
     
@@ -311,7 +328,7 @@ def optimize_hyperparameters(X_data_train, X_data_val, param_ranges, trial_name,
 
     
     study = optuna.create_study(direction='minimize')
-    study.optimize(lambda trial: objective(trial, X_data_train, X_data_val, param_ranges, trial_name, save_path, **kwargs), n_trials=n_trials)
+    study.optimize(lambda trial: objective(trial, X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, param_ranges, trial_name, save_path, **kwargs), n_trials=n_trials)
 
     print(f"Best trial: {study.best_trial}")
     print(f"Best hyperparameters: {study.best_trial.params}")
