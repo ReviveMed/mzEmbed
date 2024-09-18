@@ -54,7 +54,7 @@ def get_finetune_VAE_TL_noTL(pretrain_model_ID, finetune_save_dir ):
 
 
 
-def retrain_finetune_VAE_TL_noTL_fixed_hyper_par(finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed, **kwargs):
+def retrain_finetune_VAE_TL_noTL_fixed_hyper_par(finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed, patience=5, **kwargs):
 
     # Default configuration for fine-tuning, which can be overridden by kwargs
     config = {
@@ -85,12 +85,14 @@ def retrain_finetune_VAE_TL_noTL_fixed_hyper_par(finetune_VAE_TL, finetune_VAE_n
     # Fine-tune TL model
     model_TL, val_metrics_TL = fine_tune_cox_model(
         VAE_model=finetune_VAE_TL,  # Pass the model separately
+        patience=patience,  # Early stopping patience
         **config  # Unpack the rest of the arguments from the config
     )
 
     # Fine-tune no TL model
     model_noTL, val_metrics_noTL = fine_tune_cox_model(
         VAE_model=finetune_VAE_noTL,  # Pass the model separately
+        patience=patience,  # Early stopping patience
         **config  # Unpack the rest of the arguments from the config
     )
 
@@ -99,7 +101,7 @@ def retrain_finetune_VAE_TL_noTL_fixed_hyper_par(finetune_VAE_TL, finetune_VAE_n
         model_TL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed)
 
     result_metrics_noTL, latent_rep_train, latent_rep_val, latent_rep_test = best_finetune_model_test_eval_cox(
-        model_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed
+        model_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed, 
     )
 
     # Add model labels to differentiate between Transfer Learning and No Transfer Learning results
@@ -118,7 +120,7 @@ def retrain_finetune_VAE_TL_noTL_fixed_hyper_par(finetune_VAE_TL, finetune_VAE_n
 
 
 
-def retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed, finetune_save_dir, pretrain_model_ID, n_trials=50, **kwargs):
+def retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed, finetune_save_dir, pretrain_model_ID, n_trials=50, patience=5, **kwargs):
 
     #path to pre-train and fine-tune models
     models_path=f'{finetune_save_dir}/{pretrain_model_ID}'
@@ -138,13 +140,13 @@ def retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_V
         else:
             post_latent_layer_size = 1  # Default value when add_post_latent_layers is False
     
-        num_layers_to_retrain = trial.suggest_categorical('num_layers_to_retrain', [0, 1, 2, 3])
-        num_epochs = trial.suggest_int('num_epochs', 10, 50)
+        num_layers_to_retrain = trial.suggest_categorical('num_layers_to_retrain', [1, 2])
+        #num_epochs = trial.suggest_int('num_epochs', 10, 50)
         batch_size = trial.suggest_categorical('batch_size', [32])
-        learning_rate = trial.suggest_loguniform('learning_rate', 1e-6, 1e-5)
+        learning_rate = trial.suggest_loguniform('learning_rate', 1e-6, 1e-4)
         dropout = trial.suggest_uniform('dropout', 0.1, 0.4)
-        l1_reg_weight = trial.suggest_loguniform('l1_reg_weight', 1e-8, 1e-3)
-        l2_reg_weight = trial.suggest_loguniform('l2_reg_weight', 1e-8, 1e-3)
+        l1_reg_weight = trial.suggest_loguniform('l1_reg_weight', 1e-7, 1e-3)
+        l2_reg_weight = trial.suggest_loguniform('l2_reg_weight', 1e-7, 1e-3)
 
         # Default configuration for fine-tuning, which can be overridden by kwargs
         config = {
@@ -158,7 +160,7 @@ def retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_V
             'add_post_latent_layers': add_post_latent_layers,
             'num_post_latent_layers': 1,
             'post_latent_layer_size': post_latent_layer_size,
-            'num_epochs': num_epochs,
+            'num_epochs': 50,
             'batch_size': batch_size,
             'learning_rate': learning_rate,
             'dropout': dropout,
@@ -171,12 +173,14 @@ def retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_V
         # Fine-tune TL model
         model_TL, val_metrics_TL = fine_tune_cox_model(
             VAE_model=finetune_VAE_TL, 
+            patience=patience,  # Early stopping patience
             **config  # Unpack the rest of the arguments from the config
         )
 
         # Fine-tune no TL model
         model_noTL, val_metrics_noTL = fine_tune_cox_model(
             VAE_model=finetune_VAE_noTL, 
+            patience=patience,  # Early stopping patience
             **config  # Unpack the rest of the arguments from the config
         )
 

@@ -36,6 +36,22 @@ import seaborn as sns
 from models.models_VAE import VAE
 
 
+#setting the neptune api token
+NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
+
+
+def convert_neptune_kwargs(kwargs):
+    if isinstance(kwargs, dict):
+        return {k: convert_neptune_kwargs(v) for k, v in kwargs.items()}
+    elif isinstance(kwargs, str):
+        try:
+            return eval(kwargs)
+        except:
+            return kwargs
+    else:
+        return kwargs    
+
+
 def get_pretrain_input_data(data_location):
 
     #defining the input datasets

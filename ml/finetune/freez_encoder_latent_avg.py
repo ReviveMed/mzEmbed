@@ -354,6 +354,8 @@ def fine_tune_model(VAE_model, X_train, y_data_train, X_val, y_data_val, num_cla
                 if patience_counter >= patience:
                     print(f'Early stopping triggered at epoch {epoch+1}')
                     break
+            else:
+                best_model = model
             
         # Create a DataFrame with the metrics for the current epoch
         metrics_df = pd.DataFrame({

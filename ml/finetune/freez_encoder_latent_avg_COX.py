@@ -310,6 +310,8 @@ def fine_tune_cox_model(VAE_model, X_train, y_data_train, y_event_train, X_val, 
             if patience_counter >= patience:
                 print(f'Early stopping triggered at epoch {epoch+1}')
                 break
+        else:
+            best_model = model
 
         # Create a DataFrame with the metrics for the current epoch
         metrics_df = pd.DataFrame({

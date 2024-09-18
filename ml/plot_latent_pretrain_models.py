@@ -38,7 +38,7 @@ print ('X_data_all.shape:', X_data_all.shape)
 
 finetune_save_dir='/home/leilapirhaji/finetune_VAE_models'
 #get only the directories in the finetune_save_dir
-pretrain_model_list_file='/home/leilapirhaji/pretrained_models_to_finetune_v2.txt'
+pretrain_model_list_file='/home/leilapirhaji/pretrained_models_to_finetune_v3.txt'
 
 print ('gettng pretrain_model_list_file')
 # Read the text file into a DataFrame

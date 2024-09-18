@@ -137,8 +137,8 @@ def retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_V
         else:
             post_latent_layer_size = 1  # Default value when add_post_latent_layers is False
     
-        num_layers_to_retrain = trial.suggest_categorical('num_layers_to_retrain', [1, 2])
-        num_epochs = trial.suggest_int('num_epochs', 20, 80)
+        num_layers_to_retrain = trial.suggest_categorical('num_layers_to_retrain', [1])
+        #num_epochs = trial.suggest_int('num_epochs', 20, 80)
         batch_size = trial.suggest_categorical('batch_size', [32])
         learning_rate = trial.suggest_loguniform('learning_rate', 1e-6, 1e-4)
         dropout = trial.suggest_uniform('dropout', 0.1, 0.4)
@@ -156,13 +156,13 @@ def retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_V
             'add_post_latent_layers': add_post_latent_layers,
             'num_post_latent_layers': 1,
             'post_latent_layer_size': post_latent_layer_size,
-            'num_epochs': num_epochs,
+            'num_epochs': 50,
             'batch_size': batch_size,
             'learning_rate': learning_rate,
             'dropout': dropout,
             'l1_reg_weight': l1_reg_weight,
             'l2_reg_weight': l2_reg_weight,
-            'latent_passes': 10,
+            'latent_passes': 20,
             'seed': seed
         }
 
