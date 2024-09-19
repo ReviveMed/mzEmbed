@@ -10,7 +10,7 @@ from models.models import Binary_Head, Dummy_Head, MultiClass_Head, MultiHead, R
 
 from models.models_VAE import VAE
 
-from pretrain.train4 import CompoundDataset, train_compound_model, get_end_state_eval_funcs, evaluate_compound_model, create_dataloaders, create_dataloaders_old
+from pretrain_neptune.train4 import CompoundDataset, train_compound_model, get_end_state_eval_funcs, evaluate_compound_model, create_dataloaders, create_dataloaders_old
 
 
 import neptune
@@ -37,9 +37,9 @@ from sklearn.preprocessing import LabelEncoder
 label_encoder = LabelEncoder()
 
 
-from get_pretrain_encoder import get_pretrain_encoder_from_modelID
-from latent_task_predict import log_reg_multi_class, ridge_regression_predict
-from eval_pretrain_latent import evalute_pretrain_latent_extra_task
+from pretrain_neptune.get_pretrain_encoder import get_pretrain_encoder_from_modelID
+from pretrain_neptune.latent_task_predict import log_reg_multi_class, ridge_regression_predict
+from pretrain_neptune.eval_pretrain_latent import evalute_pretrain_latent_extra_task
 
 
 

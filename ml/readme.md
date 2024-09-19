@@ -32,4 +32,5 @@ When using an Intel CPU without any gpu, use the GCP's deep learning VM image
 - move to ml folder and run to make a package, if build not available: pip install build
     - 'cd ml'
     - 'python -m build'
+    - 'pip install -e .'
 

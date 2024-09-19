@@ -3,13 +3,13 @@ import numpy as np
 import optuna
 import json
 from utils.utils_neptune import get_run_id_list, check_neptune_existance
-from pretrain.setup3 import setup_neptune_run
+from pretrain_neptune.setup3 import setup_neptune_run
 from utils.misc import round_to_sig
-from pretrain.prep_run import convert_neptune_kwargs, dict_diff, dict_diff_cleanup, flatten_dict, convert_model_kwargs_list_to_dict
+from pretrain_neptune.prep_run import convert_neptune_kwargs, dict_diff, dict_diff_cleanup, flatten_dict, convert_model_kwargs_list_to_dict
 # from optuna.distributions import json_to_distribution, check_distribution_compatibility, distribution_to_json
 NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxMGM5ZDhiMy1kOTlhLTRlMTAtOGFlYy1hOTQzMDE1YjZlNjcifQ=='
 from neptune.utils import stringify_unsupported
-from prep_run import make_kwargs_set
+from pretrain_neptune.prep_run import make_kwargs_set
 import os
 import pandas as pd
 import anndata as ad

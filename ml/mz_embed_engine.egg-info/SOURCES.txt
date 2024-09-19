@@ -6,7 +6,8 @@ finetune/__init__.py
 finetune/best_finetune_model_test_eval.py
 finetune/best_finetune_model_test_eval_cox.py
 finetune/eval_finetune_latent_main.py
-finetune/finetune_VAE_main.py
+finetune/finetune_VAE_local_main.py
+finetune/finetune_VAE_neptune_main.py
 finetune/freez_encoder_latent_avg.py
 finetune/freez_encoder_latent_avg_COX.py
 finetune/get_finetune_encoder.py
