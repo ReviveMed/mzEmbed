@@ -203,7 +203,7 @@ class VAE(nn.Module):
         self.act_on_latent_layer = act_on_latent_layer
         # self.kl_weight = 1.0/np.sqrt(num_hidden_layers)
         self.kl_weight = 1.0
-        self.latent_weight = 0.25
+        self.latent_weight = 0.0
 
 
         # Encoder: compress input_size -> 2*latent_size (mu + log_var)

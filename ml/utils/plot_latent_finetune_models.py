@@ -31,7 +31,7 @@ from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_sco
 from finetune.get_finetune_encoder import  get_finetune_input_data
 
 from models.models_VAE import VAE
-from finetune.eval_finetune_latent_main import visualize_latent_space_multiple_tasks
+from mz_embed_engine.ml.finetune.eval_finetune_latent_neptune_main import visualize_latent_space_multiple_tasks
 
 
 
