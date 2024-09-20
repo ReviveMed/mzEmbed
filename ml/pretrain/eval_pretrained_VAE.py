@@ -126,16 +126,18 @@ def calculating_recon_loss(vae_model, X_data_train, X_data_val, X_data_test):
             
             # # Take the mean over the batch and normalize by the latent dimensions
             kl_loss = kl_loss.mean() / vae_model.latent_size
+            
+            total_loss = recon_loss.item() + kl_loss.item()
 
-            return recon_loss.item(), kl_loss.item()
+            return recon_loss.item(), total_loss
 
 
     # Calculate reconstruction losses
-    recon_loss_train, kl_loss_train = compute_recon_loss(X_train_tensor, vae_model)
-    recon_loss_val, kl_loss_val = compute_recon_loss(X_val_tensor, vae_model)
-    recon_loss_test, kl_loss_test = compute_recon_loss(X_test_tensor, vae_model)
+    recon_loss_train, total_loss_train = compute_recon_loss(X_train_tensor, vae_model)
+    recon_loss_val, total_loss_val = compute_recon_loss(X_val_tensor, vae_model)
+    recon_loss_test, total_loss_test = compute_recon_loss(X_test_tensor, vae_model)
     
-    return recon_loss_train, kl_loss_train, recon_loss_val, kl_loss_val, recon_loss_test, kl_loss_test
+    return recon_loss_train, total_loss_train, recon_loss_val, total_loss_val, recon_loss_test, total_loss_test
 
 
 
@@ -160,14 +162,14 @@ def evalute_pretrain_latent_extra_task(vae_model, X_data_train, X_data_val, X_da
     model_results = {}
 
     ## first, calcualting the Recon loss for train, val and test sets
-    (recon_loss_train, kl_loss_train, recon_loss_val, kl_loss_val, recon_loss_test, kl_loss_test)= calculating_recon_loss(vae_model, X_data_train, X_data_val, X_data_test)
+    (recon_loss_train, total_loss_train, recon_loss_val, total_loss_val, recon_loss_test, total_loss_test)= calculating_recon_loss(vae_model, X_data_train, X_data_val, X_data_test)
 
+    model_results['Total Loss Train'] = total_loss_train
     model_results['Recon Loss Train'] = recon_loss_train
-    model_results['KL Loss Train'] = kl_loss_train
+    model_results['Total Loss Val'] = total_loss_val
     model_results['Recon Loss Val'] = recon_loss_val
-    model_results['KL Loss Val'] = kl_loss_val
+    model_results['Total Loss Test'] = total_loss_test
     model_results['Recon Loss Test'] = recon_loss_test
-    model_results['KL Loss Test'] = kl_loss_test
 
     print ('Recon Loss Train:', recon_loss_train)
     print ('Recon Loss Val:', recon_loss_val)

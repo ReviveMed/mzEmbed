@@ -14,8 +14,10 @@ from torch.utils.data import DataLoader, TensorDataset
 from torch import nn
 import torch.optim as optim
 import torch.nn.functional as F
-import optuna
 
+import optuna
+import subprocess
+import threading
 
 
 
@@ -35,6 +37,28 @@ random.seed(random_seed)
 
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
+
+import subprocess
+import threading
+
+
+def launch_dashboard(trial_name, storage):
+    """
+    Launches the Optuna dashboard in a separate thread.
+    
+    Parameters:
+        trial_name: Name of the Optuna trial.
+        storage: Path to the persistent storage (e.g., sqlite:///<path_to_db>.db).
+    """
+    cmd = f"optuna-dashboard --host 0.0.0.0 --port 8081 {storage}"
+    
+    def run_dashboard():
+        subprocess.run(cmd, shell=True)
+    
+    # Launch the dashboard in a new thread to run in the background
+    dashboard_thread = threading.Thread(target=run_dashboard)
+    dashboard_thread.start()
+    print(f"Optuna dashboard launched at http://localhost:8081 for trial '{trial_name}'.")
 
 
 
@@ -220,7 +244,8 @@ def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_va
 
     ### evaluating pre-trained model on the latent task prediction and loss calculation
     #evlaute the model on the latent task
-    evalute_pretrain_latent_extra_task(vae, X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, model_folder)
+    if avg_val_loss is not None:
+        evalute_pretrain_latent_extra_task(vae, X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, model_folder)
     
         
     print(f"Encoder saved to {encoder_path}")
@@ -343,25 +368,70 @@ def objective(trial, X_data_train, X_data_val, X_data_test, y_data_train, y_data
 
 
 
-def optimize_hyperparameters(X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test,  param_ranges, trial_name, save_path,  n_trials=50, **kwargs):
+# def optimize_hyperparameters(X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test,  param_ranges, trial_name, save_path,  n_trials=50, **kwargs):
+#     """
+#     Function to run hyperparameter optimization using Optuna.
+    
+#     Parameters:
+#         X_data_train: Pandas DataFrame, training input data.
+#         X_data_val: Pandas DataFrame, validation input data.
+#         param_ranges: Dictionary containing the parameter ranges for optimization.
+#         n_trials: Number of trials to run for Optuna optimization.
+#         **kwargs: Additional keyword arguments for the VAE model configuration.
+        
+#     Returns:
+#         Best trial object containing optimal hyperparameters.
+#     """
+
+    
+#     study = optuna.create_study(direction='minimize')
+#     study.optimize(lambda trial: objective(trial, X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, param_ranges, trial_name, save_path, **kwargs), n_trials=n_trials)
+
+#     print(f"Best trial: {study.best_trial}")
+#     print(f"Best hyperparameters: {study.best_trial.params}")
+    
+#     return study.best_trial, study
+
+
+
+
+def optimize_hyperparameters(X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test,  param_ranges, trial_name, save_path, n_trials=50, storage='mysql://root:zm6148mz@34.134.200.45/mzlearn_webapp_DB', **kwargs):
     """
-    Function to run hyperparameter optimization using Optuna.
+    Function to run hyperparameter optimization using Optuna with dashboard support.
     
     Parameters:
         X_data_train: Pandas DataFrame, training input data.
         X_data_val: Pandas DataFrame, validation input data.
+        X_data_test: Pandas DataFrame, test input data.
+        y_data_train: Pandas DataFrame, training target data.
+        y_data_val: Pandas DataFrame, validation target data.
+        y_data_test: Pandas DataFrame, test target data.
         param_ranges: Dictionary containing the parameter ranges for optimization.
+        trial_name: Name for the trial.
+        save_path: Path to save the models and trial results.
         n_trials: Number of trials to run for Optuna optimization.
+        storage: Path to the persistent storage for Optuna (e.g., sqlite:///<path_to_db>.db).
         **kwargs: Additional keyword arguments for the VAE model configuration.
         
     Returns:
         Best trial object containing optimal hyperparameters.
     """
-
     
-    study = optuna.create_study(direction='minimize')
+    # Launch the Optuna dashboard in the background
+    #launch_dashboard(trial_name, storage)
+    
+    # Create or load the existing Optuna study
+    study = optuna.create_study(
+        direction='minimize',
+        study_name=trial_name,
+        storage=storage,
+        load_if_exists=True
+    )
+
+    # Optimize the hyperparameters using the objective function
     study.optimize(lambda trial: objective(trial, X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, param_ranges, trial_name, save_path, **kwargs), n_trials=n_trials)
 
+    # Output the best trial and hyperparameters
     print(f"Best trial: {study.best_trial}")
     print(f"Best hyperparameters: {study.best_trial.params}")
     

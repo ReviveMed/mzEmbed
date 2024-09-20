@@ -330,6 +330,7 @@ def main():
 
     # Assuming 'study' is the Optuna study object and 'combined_params' contains the parameter ranges
     save_optuna_study_results_as_html(study, combined_params, save_dir=f'{pretrain_save_dir}/{trial_name}', file_name=f'{trial_name}_optuna_report.html')
+    
 
     with open(f"{pretrain_save_dir}/{trial_name}/{trial_name}_optuna_report.pkl", "wb") as f:
             pickle.dump(study, f)
