@@ -251,7 +251,7 @@ def main ():
 
     parser.add_argument('--pretrain_model_list_file', type=str,
                         default='/home/leilapirhaji/top_pretrained_models_local.txt',
-                        help='This is a tsv file, that for each top pre-trained model it includes a colum of trial number and a column of trail name.')
+                        help='This is a tsv file, that for each top pre-trained model it includes a colum of trial number and a column of trial name.')
 
     parser.add_argument('--n_trial', type=int, default=50,
                         help='Number of trials for optimization.')
@@ -286,12 +286,12 @@ def main ():
         
         print(pretrain_name, pretrain_id)
         
-        VAE_results_dir = f'{finetune_save_dir}/{pretrain_name}/trail_{pretrain_id}'
+        VAE_results_dir = f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_id}'
         
         os.makedirs(VAE_results_dir, exist_ok=True)
 
 
-        result_file_name = f'{finetune_save_dir}/{pretrain_name}/trail_{pretrain_id}/Finetune_VAE_combined_optimization_history_TL_rand.html'
+        result_file_name = f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_id}/Finetune_VAE_combined_optimization_history_TL_rand.html'
 
         # Check if the output file already exists
         if os.path.exists(result_file_name):
@@ -313,7 +313,7 @@ def main ():
         #fine tune the encoder with transfer learning
         print ('fine tune the encoder with transfer learning')
 
-        result_name=f'{finetune_save_dir}/{pretrain_name}/trail_{pretrain_id}/finetune_VAE'
+        result_name=f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_id}/finetune_VAE'
         
         transfer_learning=True
         study_TL= optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, n_trials=n_trial)

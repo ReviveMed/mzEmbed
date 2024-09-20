@@ -56,9 +56,11 @@ class PretrainVAE(VAE):
 
         # Training parameters
         self.learning_rate = float(kwargs.get('learning_rate', 0.001))
+        self.l1_reg = float(kwargs.get('1_reg', 0))
         self.weight_decay = float(kwargs.get('weight_decay', 1e-5))
-        self.num_epochs = int(kwargs.get('num_epochs', 10))
-        self.batch_size = int(kwargs.get('batch_size', 64))
+        self.noise_factor = float(kwargs.get('noise_factor', 0))
+        self.num_epochs = int(kwargs.get('num_epochs', 50))
+        self.batch_size = int(kwargs.get('batch_size', 94))
         self.patience = int(kwargs.get('patience', 5))  # Early stopping patience
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)  # Move model to device
@@ -125,17 +127,32 @@ def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_va
 
         # KL-annealing schedule: linearly increase KL weight over the annealing period
         kl_weight = kl_start_weight + (kl_max_weight - kl_start_weight) * min(1, epoch / kl_annealing_epochs)
+        vae.kl_weight = kl_weight
 
         for batch in train_loader:
             batch = batch[0].to(device)  # Move batch to device
 
+            if vae.noise_factor > 0:
+                # Inject noise into the batch
+                noisy_batch = batch + vae.noise_factor * torch.randn_like(batch)
+                # Optionally, clamp the values to be between 0 and 1 if your data is normalized
+                #noisy_batch = torch.clamp(noisy_batch, 0., 1.)
+            else:
+                noisy_batch = batch
+
+    
             # Forward pass
             vae.optimizer.zero_grad()
-            recon, mu, log_var = vae(batch)
+            recon, mu, log_var = vae(noisy_batch)
 
             # Compute the loss
-            vae.kl_weight = kl_weight
-            loss = vae.loss(batch, recon, mu, log_var)
+            loss = vae.loss(noisy_batch, recon, mu, log_var)
+            
+            # Compute L1 regularization term in the training loop
+            l1_norm = sum(p.abs().sum() for p in vae.parameters())
+            
+            # Add the L1 regularization to the loss
+            loss = loss + vae.l1_reg * l1_norm
 
             # Backpropagation and optimization
             loss.backward()
@@ -255,12 +272,25 @@ def objective(trial, X_data_train, X_data_val, X_data_test, y_data_train, y_data
         dropout_rate = trial.suggest_float('dropout_rate', min_val, max_val, step=step)
     else:
         dropout_rate = combined_params['dropout_rate']
+        
+    # Noise factor: float range or fixed
+    if isinstance(combined_params['noise_factor'], tuple):
+        min_val, max_val, step = combined_params['noise_factor']
+        noise_factor = trial.suggest_float('noise_factor', min_val, max_val, step=step)
+    else:
+        noise_factor = combined_params['noise_factor']
 
     # Learning rate: loguniform or fixed
     if isinstance(combined_params['learning_rate'], tuple):
         learning_rate = trial.suggest_loguniform('learning_rate', combined_params['learning_rate'][0], combined_params['learning_rate'][1])
     else:
         learning_rate = combined_params['learning_rate']
+        
+    # Learning rate: loguniform or fixed
+    if isinstance(combined_params['l1_reg'], tuple):
+        l1_reg = trial.suggest_loguniform('l1_reg', combined_params['l1_reg'][0], combined_params['l1_reg'][1])
+    else:
+        l1_reg = combined_params['l1_reg']
 
     # Weight decay: loguniform or fixed
     if isinstance(combined_params['weight_decay'], tuple):
@@ -294,7 +324,9 @@ def objective(trial, X_data_train, X_data_val, X_data_test, y_data_train, y_data
         'latent_size': latent_size,
         'num_hidden_layers': num_hidden_layers,
         'dropout_rate': dropout_rate,
+        'noise_factor': noise_factor,
         'learning_rate': learning_rate,
+        'l1_reg': l1_reg,
         'weight_decay': weight_decay,
         'batch_size': batch_size,
         'patience': patience,

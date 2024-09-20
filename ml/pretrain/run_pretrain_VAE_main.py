@@ -262,9 +262,13 @@ def main():
                         help='Number of hidden layers (either fixed or a range, integer)')
     parser.add_argument('--dropout_rate', nargs='*', default=[0.1], 
                         help='Dropout rate: Either a single value or "min max step" for range (float)')
+    parser.add_argument('--noise_factor', nargs='*', default=[0.15], 
+                        help='Dropout rate: Either a single value or "min max step" for range (float)')
     parser.add_argument('--learning_rate', nargs='*', default=["1e-5", "1e-2"], 
                         help='Learning rate range: Either a single value or "min max" for range (float)')
-    parser.add_argument('--weight_decay', nargs='*', default=["1e-6", "1e-4"],
+    parser.add_argument('--l1_reg', nargs='*', default=["1e-6", "1e-2"],
+                        help='Weight decay range: Either a single value or "min max" for range (float)')
+    parser.add_argument('--weight_decay', nargs='*', default=["1e-6", "1e-2"],
                         help='Weight decay range: Either a single value or "min max" for range (float)')
     parser.add_argument('--batch_size', nargs='*', default=[64],
                         help='Batch size (either fixed or a range, integer)')
@@ -287,7 +291,9 @@ def main():
         'latent_size': parse_range_or_single(args.latent_size, is_int=True),
         'num_hidden_layers': parse_range_or_single(args.num_hidden_layers, is_int=True),
         'dropout_rate': parse_range_or_single(args.dropout_rate, is_int=False),
+        'noise_factor': parse_range_or_single(args.noise_factor, is_int=False),
         'learning_rate': parse_range_or_single(args.learning_rate, is_int=False),
+        'l1_reg': parse_range_or_single(args.l1_reg, is_int=False),
         'weight_decay': parse_range_or_single(args.weight_decay, is_int=False),
         'batch_size': parse_range_or_single(args.batch_size, is_int=True),
         'patience': parse_range_or_single(args.patience, is_int=True),

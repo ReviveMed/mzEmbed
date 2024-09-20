@@ -149,10 +149,13 @@ def compute_losses(model, X_data_train, X_data_val, X_data_test, device):
             num_samples = x.size(0)  # Get the number of samples
 
             # Compute reconstruction loss (MSE here, you can change to BCE if needed)
-            recon_loss = F.mse_loss(recon_x, x, reduction='sum') / num_samples  # Normalize by number of samples
+            recon_loss = F.mse_loss(recon_x, x, reduction='mean') #/ num_samples  # Normalize by number of samples
 
             # Compute KL divergence loss and normalize by the number of samples
-            kl_loss = (-0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())) / num_samples
+            kl_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp(), dim=1) # / num_samples
+            
+            # # Take the mean over the batch and normalize by the latent dimensions
+            kl_loss = kl_loss.mean() / model.latent_size
 
             return recon_loss, kl_loss
 
@@ -325,7 +328,7 @@ def main():
     
     parser.add_argument('--pretrain_model_list_file', type=str,
                         default='/home/leilapirhaji/top_pretrained_models_local.txt',
-                        help='This is a tsv file, that for each top pre-trained model it includes a colum of trial number and a column of trail name.')
+                        help='This is a tsv file, that for each top pre-trained model it includes a colum of trial number and a column of trial name.')
     
     parser.add_argument('--result_name', type=str, default='',
                         help='the name of the result file.')
@@ -373,7 +376,7 @@ def main():
         print (f'Predicting tasks using the latnet space of the VAE models with pre-train model name {pretrain_name} and trial ID: {pretrain_id}') 
 
         #path to pre-train and fine-tune models
-        models_path=f'{finetune_save_dir}/{pretrain_name}/trail_{pretrain_id}'
+        models_path=f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_id}'
 
         #finetune models files
         finetune_VAE_TL_file= f'{models_path}/finetune_VAE_TL_True_model.pth'
@@ -489,9 +492,9 @@ def main():
     results_df = pd.DataFrame(all_results)
 
     # Save the results to a CSV file
-    results_df.to_csv(f'{finetune_save_dir}/{pretrain_name}/{pretrain_name}_latent_eval_results.csv', index=False)
+    results_df.to_csv(f'{finetune_save_dir}/{pretrain_name}/fine_tune_TL_noTL_{pretrain_name}_latent_eval_results.csv', index=False)
 
-    print (f'Predictions are saved in: {finetune_save_dir}/{pretrain_name}/{pretrain_name}_latent_eval_results.csv')
+    print (f'Predictions are saved in: {finetune_save_dir}/{pretrain_name}/fine_tune_TL_noTL_{pretrain_name}_latent_eval_results.csv')
 
 
 

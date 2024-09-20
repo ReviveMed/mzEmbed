@@ -119,17 +119,23 @@ def calculating_recon_loss(vae_model, X_data_train, X_data_val, X_data_test):
             recon, mu, log_var = vae_model(data_tensor)
             
             # Compute reconstruction loss (assuming MSE loss for continuous data)
-            recon_loss = F.mse_loss(recon, data_tensor, reduction='sum')
-        
-        # Return the average reconstruction loss per data point
-        return recon_loss.item() / len(data_tensor)
+            recon_loss = F.mse_loss(recon, data_tensor, reduction='mean')
+            
+            # Compute KL divergence loss and normalize by the number of samples
+            kl_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp(), dim=1) # / num_samples
+            
+            # # Take the mean over the batch and normalize by the latent dimensions
+            kl_loss = kl_loss.mean() / vae_model.latent_size
+
+            return recon_loss.item(), kl_loss.item()
+
 
     # Calculate reconstruction losses
-    recon_loss_train = compute_recon_loss(X_train_tensor, vae_model)
-    recon_loss_val = compute_recon_loss(X_val_tensor, vae_model)
-    recon_loss_test = compute_recon_loss(X_test_tensor, vae_model)
+    recon_loss_train, kl_loss_train = compute_recon_loss(X_train_tensor, vae_model)
+    recon_loss_val, kl_loss_val = compute_recon_loss(X_val_tensor, vae_model)
+    recon_loss_test, kl_loss_test = compute_recon_loss(X_test_tensor, vae_model)
     
-    return recon_loss_train, recon_loss_val, recon_loss_test
+    return recon_loss_train, kl_loss_train, recon_loss_val, kl_loss_val, recon_loss_test, kl_loss_test
 
 
 
@@ -154,11 +160,14 @@ def evalute_pretrain_latent_extra_task(vae_model, X_data_train, X_data_val, X_da
     model_results = {}
 
     ## first, calcualting the Recon loss for train, val and test sets
-    (recon_loss_train, recon_loss_val, recon_loss_test)= calculating_recon_loss(vae_model, X_data_train, X_data_val, X_data_test)
+    (recon_loss_train, kl_loss_train, recon_loss_val, kl_loss_val, recon_loss_test, kl_loss_test)= calculating_recon_loss(vae_model, X_data_train, X_data_val, X_data_test)
 
     model_results['Recon Loss Train'] = recon_loss_train
+    model_results['KL Loss Train'] = kl_loss_train
     model_results['Recon Loss Val'] = recon_loss_val
+    model_results['KL Loss Val'] = kl_loss_val
     model_results['Recon Loss Test'] = recon_loss_test
+    model_results['KL Loss Test'] = kl_loss_test
 
     print ('Recon Loss Train:', recon_loss_train)
     print ('Recon Loss Val:', recon_loss_val)
