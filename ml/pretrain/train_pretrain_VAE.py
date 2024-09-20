@@ -42,6 +42,7 @@ import subprocess
 import threading
 
 
+#this is only needed for locally launching the dashboard
 def launch_dashboard(trial_name, storage):
     """
     Launches the Optuna dashboard in a separate thread.
@@ -60,6 +61,17 @@ def launch_dashboard(trial_name, storage):
     dashboard_thread.start()
     print(f"Optuna dashboard launched at http://localhost:8081 for trial '{trial_name}'.")
 
+
+
+
+def _init_weights_xavier(layer,gain=1.0):
+        if hasattr(layer, '.weight'):
+            # nn.init.xavier_normal_(layer.weight.data,gain=gain)
+            nn.init.xavier_uniform_(layer.weight.data,gain=gain)
+        else:
+            if hasattr(layer, 'children'):
+                for child in layer.children():
+                    _init_weights_xavier(child,gain=gain)
 
 
 
@@ -91,16 +103,18 @@ class PretrainVAE(VAE):
 
         # Optimizer
         self.optimizer = optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
-        
+            
     def init_layers(self):
-        self.apply(self._init_weights)  # Initialize weights using a helper function
-
-    def _init_weights(self, layer):
-        if isinstance(layer, nn.Linear):
-            nn.init.xavier_normal_(layer.weight)
-            if layer.bias is not None:
-                nn.init.zeros_(layer.bias)
-
+        #self.apply(self._init_weights)  # Initialize weights using a helper function
+        _init_weights_xavier(self.encoder,gain=nn.init.calculate_gain(self.activation))
+        _init_weights_xavier(self.decoder,gain=nn.init.calculate_gain(self.activation))  
+                
+    # def _init_weights(self, layer):
+    #     # if isinstance(layer, nn.Linear):
+    #     #     nn.init.xavier_normal_(layer.weight)
+    #     #     if layer.bias is not None:
+    #     #         nn.init.zeros_(layer.bias)
+        
 
 
 def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_val, y_data_test, trial_name, trial_id, save_path, **kwargs):
