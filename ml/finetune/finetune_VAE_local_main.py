@@ -291,7 +291,7 @@ def main ():
         os.makedirs(VAE_results_dir, exist_ok=True)
 
 
-        result_file_name = f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_id}/Finetune_VAE_combined_optimization_history_TL_rand.html'
+        result_file_name = f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_id}/finetune_VAE_combined_optimization_history_TL_rand.html'
 
         # Check if the output file already exists
         if os.path.exists(result_file_name):
