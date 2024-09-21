@@ -1,2 +1,2 @@
 #!/bin/bash
-python ../finetune/finetune_VAE_neptune_main.py --input_data_location /home/leilapirhaji/PROCESSED_DATA_2 --finetune_save_dir /home/leilapirhaji/finetune_VAE_NO_RCC --pretrain_model_list_file /home/leilapirhaji/pretrained_models_to_finetune_NO_RCC.txt --n_trial 50
+python ../finetune/finetune_VAE_neptune_main.py --input_data_location /home/leilapirhaji/PROCESSED_DATA --finetune_save_dir /home/leilapirhaji/finetune_VAE_Neptune --pretrain_model_list_file /home/leilapirhaji/pretrained_models_to_finetune.txt --n_trial 50

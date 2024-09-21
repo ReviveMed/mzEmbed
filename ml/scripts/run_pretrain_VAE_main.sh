@@ -33,5 +33,5 @@ python ../pretrain/run_pretrain_VAE_main.py \
   --batch_size 32 126 32 \
   --patience 0 \
   --num_epochs 80 200 20 \
-  --trial_name pretrain_VAE_L_380_480_e_80_200 \
+  --trial_name pretrain_VAE_L_380_480_e_80_200_KL_ann_.75 \
   --n_trials 200

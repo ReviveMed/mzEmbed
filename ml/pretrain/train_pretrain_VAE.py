@@ -151,14 +151,16 @@ def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_va
     best_val_loss = np.inf
     epochs_no_improve = 0
 
-    # KL-Annealing parameters
-    kl_annealing_epochs = kwargs.get('kl_annealing_epochs', 10)  # Number of epochs for KL annealing
+    # KL-Annealing parameters & epochs
+    num_epochs = int(kwargs.get('num_epochs', 50))
+    
+    kl_annealing_epochs_default = 0.75 * num_epochs
+    kl_annealing_epochs = kwargs.get('kl_annealing_epochs', kl_annealing_epochs_default)  # Number of epochs for KL annealing
     kl_start_weight = kwargs.get('kl_start_weight', 0.0)  # Initial weight for KL divergence
     kl_max_weight = kwargs.get('kl_max_weight', 1.0)  # Maximum weight for KL divergence
 
     
     # Training loop
-    num_epochs = int(kwargs.get('num_epochs', 10))
     for epoch in range(num_epochs):
         vae.train()  # Set model to training mode
         train_loss = 0
@@ -340,7 +342,7 @@ def objective(trial, X_data_train, X_data_val, X_data_test, y_data_train, y_data
     # Batch size: categorical (fixed list of values) or fixed
     if isinstance(combined_params['batch_size'], tuple):
         min_val, max_val, step = combined_params['batch_size']
-        batch_size = trial.suggest_categorical('batch_size', min_val, max_val, step=step)
+        batch_size = trial.suggest_int('batch_size', min_val, max_val, step=step)
     else:
         batch_size = combined_params['batch_size']
 

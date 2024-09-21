@@ -254,7 +254,7 @@ def cox_proportional_hazards_l1_sksurv(X_train, Y_train_OS, Y_train_event,
 
     # Define a grid of alpha (L1 regularization strength) to search over
     param_grid = {
-        'alphas': [[0.001], [0.01], [0.1], [1], [10]]  # L1 regularization strength
+        'alphas': [[0.001], [0.01], [0.1], [1], [10]]  # L1 regularization strength [[0.001], [0.01], [0.1], [1], [10]]  
     }
 
     # Perform grid search to find the best regularization strength

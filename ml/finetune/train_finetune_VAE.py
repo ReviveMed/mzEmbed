@@ -113,9 +113,23 @@ def fine_tune_vae(pretrain_VAE, X_data_train,
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     fine_tune_VAE.to(device)
 
+
+    # KL-Annealing parameters
+    
+    kl_annealing_epochs = 0.5 *num_epochs # Number of epochs for KL annealing
+    kl_start_weight =  0.0  # Initial weight for KL divergence
+    kl_max_weight = 1 # Maximum weight for KL divergence
+
+
     for epoch in range(num_epochs):
+        
+        # KL-annealing schedule: linearly increase KL weight over the annealing period
+        kl_weight = kl_start_weight + (kl_max_weight - kl_start_weight) * min(1, epoch / kl_annealing_epochs)
+        fine_tune_VAE.kl_weight = kl_weight
+        
         train_loss = train_epoch(fine_tune_VAE, train_loader)
         val_loss = validate(fine_tune_VAE, val_loader)
+        
         print(f'Epoch [{epoch+1}/{num_epochs}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}')
     
     # Step 6: Evaluate on the validation set during fine-tuning

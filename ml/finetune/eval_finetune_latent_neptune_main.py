@@ -149,25 +149,31 @@ def compute_losses(model, X_data_train, X_data_val, X_data_test, device):
             num_samples = x.size(0)  # Get the number of samples
 
             # Compute reconstruction loss (MSE here, you can change to BCE if needed)
-            recon_loss = F.mse_loss(recon_x, x, reduction='sum') / num_samples  # Normalize by number of samples
+            recon_loss = F.mse_loss(recon_x, x, reduction='mean') #/ num_samples  # Normalize by number of samples
 
             # Compute KL divergence loss and normalize by the number of samples
-            kl_loss = (-0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())) / num_samples
+            kl_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp(), dim=1) # / num_samples
+            
+            # # Take the mean over the batch and normalize by the latent dimensions
+            kl_loss = kl_loss.mean() / model.latent_size
 
             return recon_loss, kl_loss
 
     # Train dataset
     train_recon_loss, train_kl_loss = compute_recon_kl_loss(X_data_train, model)
+    losses['train_total_loss'] = train_recon_loss.item() + train_kl_loss.item()
     losses['train_recon_loss'] = train_recon_loss.item()
     losses['train_kl_loss'] = train_kl_loss.item()
 
     # Validation dataset
     val_recon_loss, val_kl_loss = compute_recon_kl_loss(X_data_val, model)
+    losses['val_total_loss'] = val_recon_loss.item() + val_kl_loss.item()
     losses['val_recon_loss'] = val_recon_loss.item()
     losses['val_kl_loss'] = val_kl_loss.item()
 
     # Test dataset
     test_recon_loss, test_kl_loss = compute_recon_kl_loss(X_data_test, model)
+    losses['test_total_loss'] = test_recon_loss.item() + test_kl_loss.item()
     losses['test_recon_loss'] = test_recon_loss.item()
     losses['test_kl_loss'] = test_kl_loss.item()
 
@@ -415,14 +421,18 @@ def main():
                 'Pretrain Model ID': pretrain_model_ID,
                 'Latent Size': latent_size,
                 'Num Hidden Layers': num_hidden_layers,
-                'Validation Recon Loss TL': np.log(losses_TL['val_recon_loss']),
-                'Validation KL Loss TL': np.log(losses_TL['val_kl_loss']),
-                'Test Recon Loss TL':np.log(losses_TL['test_recon_loss']),
-                'Test KL Loss TL': np.log(losses_TL['test_kl_loss']),
-                'Validation Recon Loss NO TL': np.log(losses_noTL['val_recon_loss']),
-                'Validation KL Loss NO TL': np.log(losses_noTL['val_kl_loss']),
-                'Test Recon Loss NO TL':np.log(losses_noTL['test_recon_loss']),
-                'Test KL Loss NO TL':np.log(losses_noTL['test_kl_loss']),
+                'Validation Total Loss TL': losses_TL['val_total_loss'],
+                'Validation Recon Loss TL': losses_TL['val_recon_loss'],
+                'Validation KL Loss TL': losses_TL['val_kl_loss'],
+                'Test total Loss TL':losses_TL['test_total_loss'],
+                'Test Recon Loss TL':losses_TL['test_recon_loss'],
+                'Test KL Loss TL': losses_TL['test_kl_loss'],
+                'Validation Total Loss NO TL': losses_noTL['val_total_loss'],
+                'Validation Recon Loss NO TL': losses_noTL['val_recon_loss'],
+                'Validation KL Loss NO TL': losses_noTL['val_kl_loss'],
+                'Test total Loss NO TL':losses_noTL['test_total_loss'],
+                'Test Recon Loss NO TL':losses_noTL['test_recon_loss'],
+                'Test KL Loss NO TL':losses_noTL['test_kl_loss'],
                 'Task': task,
                 'Type': 'Classification',
                 'Best Val Accuracy TL': best_val_accuracy_TL,
@@ -460,14 +470,18 @@ def main():
                 'Pretrain Model ID': pretrain_model_ID,
                 'Latent Size': latent_size,
                 'Num Hidden Layers': num_hidden_layers,
-                'Validation Recon Loss TL': np.log(losses_TL['val_recon_loss']),
-                'Validation KL Loss TL': np.log(losses_TL['val_kl_loss']),
-                'Test Recon Loss TL':np.log(losses_TL['test_recon_loss']),
-                'Test KL Loss TL': np.log(losses_TL['test_kl_loss']),
-                'Validation Recon Loss NO TL': np.log(losses_noTL['val_recon_loss']),
-                'Validation KL Loss NO TL': np.log(losses_noTL['val_kl_loss']),
-                'Test Recon Loss NO TL':np.log(losses_noTL['test_recon_loss']),
-                'Test KL Loss NO TL':np.log(losses_noTL['test_kl_loss']),
+                'Validation Total Loss TL': losses_TL['val_total_loss'],
+                'Validation Recon Loss TL': losses_TL['val_recon_loss'],
+                'Validation KL Loss TL': losses_TL['val_kl_loss'],
+                'Test total Loss TL':losses_TL['test_total_loss'],
+                'Test Recon Loss TL':losses_TL['test_recon_loss'],
+                'Test KL Loss TL': losses_TL['test_kl_loss'],
+                'Validation Total Loss NO TL': losses_noTL['val_total_loss'],
+                'Validation Recon Loss NO TL': losses_noTL['val_recon_loss'],
+                'Validation KL Loss NO TL': losses_noTL['val_kl_loss'],
+                'Test total Loss NO TL':losses_noTL['test_total_loss'],
+                'Test Recon Loss NO TL':losses_noTL['test_recon_loss'],
+                'Test KL Loss NO TL':losses_noTL['test_kl_loss'],
                 'Task': task,
                 'Type': 'Survival',
                 'Best Val C-Index TL': best_val_c_index_TL,

@@ -161,15 +161,18 @@ def compute_losses(model, X_data_train, X_data_val, X_data_test, device):
 
     # Train dataset
     train_recon_loss, train_kl_loss = compute_recon_kl_loss(X_data_train, model)
+    losses['train_total_loss'] = train_recon_loss.item() + train_kl_loss.item()
     losses['train_recon_loss'] = train_recon_loss.item()
     losses['train_kl_loss'] = train_kl_loss.item()
 
     # Validation dataset
     val_recon_loss, val_kl_loss = compute_recon_kl_loss(X_data_val, model)
+    losses['val_total_loss'] = val_recon_loss.item() + val_kl_loss.item()
     losses['val_recon_loss'] = val_recon_loss.item()
     losses['val_kl_loss'] = val_kl_loss.item()
 
     # Test dataset
+    test_recon_loss, test_kl_loss = compute_recon_kl_loss(X_data_test, model)
     test_recon_loss, test_kl_loss = compute_recon_kl_loss(X_data_test, model)
     losses['test_recon_loss'] = test_recon_loss.item()
     losses['test_kl_loss'] = test_kl_loss.item()
@@ -423,12 +426,16 @@ def main():
                 'Pretrain Model name': pretrain_name,
                 'Latent Size': latent_size,
                 'Num Hidden Layers': num_hidden_layers,
+                'Validation Total Loss TL': losses_TL['val_total_loss'],
                 'Validation Recon Loss TL': losses_TL['val_recon_loss'],
                 'Validation KL Loss TL': losses_TL['val_kl_loss'],
+                'Test total Loss TL':losses_TL['test_total_loss'],
                 'Test Recon Loss TL':losses_TL['test_recon_loss'],
                 'Test KL Loss TL': losses_TL['test_kl_loss'],
+                'Validation Total Loss NO TL': losses_noTL['val_total_loss'],
                 'Validation Recon Loss NO TL': losses_noTL['val_recon_loss'],
                 'Validation KL Loss NO TL': losses_noTL['val_kl_loss'],
+                'Test total Loss NO TL':losses_noTL['test_total_loss'],
                 'Test Recon Loss NO TL':losses_noTL['test_recon_loss'],
                 'Test KL Loss NO TL':losses_noTL['test_kl_loss'],
                 'Task': task,
@@ -469,12 +476,16 @@ def main():
                 'Pretrain Model name': pretrain_name,
                 'Latent Size': latent_size,
                 'Num Hidden Layers': num_hidden_layers,
+                'Validation Total Loss TL': losses_TL['val_total_loss'],
                 'Validation Recon Loss TL': losses_TL['val_recon_loss'],
                 'Validation KL Loss TL': losses_TL['val_kl_loss'],
+                'Test total Loss TL':losses_TL['test_total_loss'],
                 'Test Recon Loss TL':losses_TL['test_recon_loss'],
                 'Test KL Loss TL': losses_TL['test_kl_loss'],
+                'Validation Total Loss NO TL': losses_noTL['val_total_loss'],
                 'Validation Recon Loss NO TL': losses_noTL['val_recon_loss'],
                 'Validation KL Loss NO TL': losses_noTL['val_kl_loss'],
+                'Test total Loss NO TL':losses_noTL['test_total_loss'],
                 'Test Recon Loss NO TL':losses_noTL['test_recon_loss'],
                 'Test KL Loss NO TL':losses_noTL['test_kl_loss'],
                 'Task': task,

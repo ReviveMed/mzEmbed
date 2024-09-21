@@ -48,7 +48,7 @@ def objective(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transf
     """
     # Suggest hyperparameters using Optuna
     learning_rate = trial.suggest_loguniform('learning_rate', 1e-5, 1e-2)
-    dropout_rate = trial.suggest_uniform('dropout_rate', 0.1, 0.5)
+    dropout_rate = trial.suggest_uniform('dropout_rate', 0.0, 0.5)
     l1_reg_weight = trial.suggest_loguniform('l1_reg_weight', 1e-6, 1e-2)
     l2_reg_weight = trial.suggest_loguniform('l2_reg_weight', 1e-6, 1e-2)
 
@@ -66,10 +66,14 @@ def objective(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transf
                                                transfer_learning=transfer_learning)
     
     # Save the model if it's the first trial or has the best performance so far
-    if len(trial.study.trials) == 1 or val_loss < trial.study.best_value:
-        # Save the best model to a file
-        torch.save(fine_tuned_model, f'{result_name}_TL_{transfer_learning}_model.pth')
-    
+    try:
+        if len(trial.study.trials) == 1 or val_loss < trial.study.best_value:
+            # Save the best model to a file
+            torch.save(fine_tuned_model, f'{result_name}_TL_{transfer_learning}_model.pth')
+    except ValueError:
+        # Handle the case where no trials are completed yet
+        print("No trials are completed yet. Proceeding with current trial.")
+                
     # Return validation loss for Optuna to minimize
     return val_loss
 
