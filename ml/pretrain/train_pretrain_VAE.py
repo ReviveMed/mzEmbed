@@ -103,7 +103,7 @@ class PretrainVAE(VAE):
         self.noise_factor = float(kwargs.get('noise_factor', 0))
         self.num_epochs = int(kwargs.get('num_epochs', 50))
         self.batch_size = int(kwargs.get('batch_size', 94))
-        self.patience = int(kwargs.get('patience', 5))  # Early stopping patience
+        self.patience = int(kwargs.get('patience', 0))  # Early stopping patience
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)  # Move model to device
     
@@ -176,6 +176,7 @@ def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_va
     # Set early stopping parameters
     patience = int(kwargs.get('patience', 0))  # 0 means no early stopping
     best_val_loss = np.inf
+    best_model=None
     epochs_no_improve = 0
     
     # Optimizer and scheduler
@@ -287,6 +288,7 @@ def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_va
         if patience > 0 and epoch > kl_annealing_epochs:
             if avg_val_loss < best_val_loss:
                 best_val_loss = avg_val_loss
+                best_model = vae
                 epochs_no_improve = 0
                 print (f'best val loss so far: {best_val_loss}')
             else:
@@ -299,10 +301,10 @@ def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_va
     
     # Save the encoder state
     encoder_path = os.path.join(model_folder, f"encoder_state.pt")
-    torch.save(vae.encoder.state_dict(), encoder_path)
+    torch.save(best_model.encoder.state_dict(), encoder_path)
 
     # Save the model hyperparameters
-    hyperparameters = vae.get_hyperparameters()
+    hyperparameters = best_model.get_hyperparameters()
 
     # Filter out non-serializable values
     serializable_hyperparameters = {k: v for k, v in hyperparameters.items() if isinstance(v, (int, float, str, bool, list, dict))}
@@ -314,7 +316,7 @@ def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_va
     ### evaluating pre-trained model on the latent task prediction and loss calculation
     #evlaute the model on the latent task
     if avg_val_loss is not None:
-        evalute_pretrain_latent_extra_task(vae, X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, model_folder)
+        evalute_pretrain_latent_extra_task(best_model, X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, model_folder)
     
         
     print(f"Encoder saved to {encoder_path}")

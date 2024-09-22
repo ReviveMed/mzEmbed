@@ -13,6 +13,7 @@ label_encoder = LabelEncoder()
 import optuna
 import imaplib
 import os
+import json
 
 import torch
 import torch.nn as nn
@@ -37,6 +38,7 @@ import seaborn as sns
 
 from finetune.get_finetune_encoder import  get_finetune_input_data
 from models.models_VAE import VAE
+from pretrain.train_pretrain_VAE import PretrainVAE
 from finetune.latent_task_predict import log_reg_multi_class, cox_proportional_hazards, cox_proportional_hazards_l1_sksurv
 
 
@@ -382,13 +384,30 @@ def main():
         models_path=f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_id}'
 
         #finetune models files
-        finetune_VAE_TL_file= f'{models_path}/finetune_VAE_TL_True_model.pth'
-        finetune_VAE_TL=torch.load(finetune_VAE_TL_file)
+        
+        ## TL True 
+        finetune_VAE_TL_encoder_file= f'{models_path}/finetune_VAE_TL_True_best_model_encoder_state.pt'
+        finetune_VAE_TL_encoder_stat_dict= torch.load(finetune_VAE_TL_encoder_file)
+        
+        finetune_VAE_TL_kwarg_file=f'{models_path}/finetune_VAE_TL_True_best_model_model_hyperparameters.json'
+        finetune_VAE_TL_encoder_kwargs = json.load(open(finetune_VAE_TL_kwarg_file, 'r'))
+        
+        finetune_VAE_TL= PretrainVAE(**finetune_VAE_TL_encoder_kwargs)
+        finetune_VAE_TL.encoder.load_state_dict(finetune_VAE_TL_encoder_stat_dict)
 
-        finetune_VAE_noTL_file= f'{models_path}/finetune_VAE_TL_False_model.pth'
-        finetune_VAE_noTL=torch.load(finetune_VAE_noTL_file)
+         ## TL False 
+        finetune_VAE_noTL_encoder_file= f'{models_path}/finetune_VAE_TL_False_best_model_encoder_state.pt'
+        finetune_VAE_noTL_encoder_stat_dict= torch.load(finetune_VAE_noTL_encoder_file)
+        
+        finetune_VAE_noTL_kwarg_file=f'{models_path}/finetune_VAE_TL_False_best_model_model_hyperparameters.json'
+        finetune_VAE_noTL_encoder_kwargs = json.load(open(finetune_VAE_noTL_kwarg_file, 'r'))
+        
+        finetune_VAE_noTL= PretrainVAE(**finetune_VAE_noTL_encoder_kwargs)
+        finetune_VAE_noTL.encoder.load_state_dict(finetune_VAE_noTL_encoder_stat_dict)
 
 
+
+        # getting the hyperparameters of the models
         latent_size= finetune_VAE_TL.latent_size
         num_hidden_layers= finetune_VAE_TL.num_hidden_layers
 
@@ -408,7 +427,7 @@ def main():
         # Example usage
         # Assuming model is your trained VAE model
         losses_TL = compute_losses(finetune_VAE_TL, X_data_train, X_data_val, X_data_test, device)
-        losses_noTL = compute_losses(finetune_VAE_TL, X_data_train, X_data_val, X_data_test, device)
+        losses_noTL = compute_losses(finetune_VAE_noTL, X_data_train, X_data_val, X_data_test, device)
 
 
         for task in task_list_cat:

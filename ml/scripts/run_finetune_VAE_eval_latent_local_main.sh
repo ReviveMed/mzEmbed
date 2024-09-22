@@ -7,7 +7,7 @@
 INPUT_DATA_LOCATION="/home/leilapirhaji/PROCESSED_DATA"
 FINETUNE_SAVE_DIR="/home/leilapirhaji/finetune_VAE_models"
 PRETRAIN_SAVE_DIR="/home/leilapirhaji/pretrained_models"
-PRETRAIN_MODEL_DF_FILE="/home/leilapirhaji/top_pretrain_VAE_tensor_board.txt"
+PRETRAIN_MODEL_DF_FILE="/home/leilapirhaji/top_pretrain_VAE_L_425_485_e_400_p_25.txt"
 N_TRIALS=50
 
 

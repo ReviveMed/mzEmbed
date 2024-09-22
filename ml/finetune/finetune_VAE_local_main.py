@@ -8,6 +8,7 @@ fine tune  VAE model with and without transfer learning
 import argparse
 import pandas as pd
 import os
+import shutil
 
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
@@ -19,6 +20,7 @@ from torch.utils.data import DataLoader, TensorDataset
 
 import optuna
 import pickle
+import json
 
 import optuna.visualization as vis
 import plotly.io as pio
@@ -47,13 +49,13 @@ def objective(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transf
         float: Validation loss after fine-tuning the VAE model.
     """
     # Suggest hyperparameters using Optuna
-    learning_rate = trial.suggest_loguniform('learning_rate', 1e-5, 1e-2)
+    learning_rate = trial.suggest_loguniform('learning_rate', 1e-6, 1e-3)
     dropout_rate = trial.suggest_uniform('dropout_rate', 0.0, 0.5)
     l1_reg_weight = trial.suggest_loguniform('l1_reg_weight', 1e-6, 1e-2)
-    l2_reg_weight = trial.suggest_loguniform('l2_reg_weight', 1e-6, 1e-2)
+    weight_decay = trial.suggest_loguniform('weight_decay', 1e-6, 1e-2)
 
     # Call fine_tune_vae with the suggested hyperparameters
-    fine_tuned_model, val_loss = fine_tune_vae(pretrain_VAE, 
+    fine_tuned_model, val_loss, log_dir = fine_tune_vae(pretrain_VAE, result_name,
                                                X_data_train, 
                                                X_data_val, 
                                                X_data_test, 
@@ -62,14 +64,35 @@ def objective(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transf
                                                learning_rate=learning_rate, 
                                                dropout_rate=dropout_rate, 
                                                l1_reg_weight=l1_reg_weight, 
-                                               l2_reg_weight=l2_reg_weight, 
+                                               weight_decay=weight_decay, 
                                                transfer_learning=transfer_learning)
     
     # Save the model if it's the first trial or has the best performance so far
+    # Track the best model and logs
+    best_model_path = f'{result_name}_TL_{transfer_learning}_best_model_'
+    best_log_dir = f'{result_name}_TL_{transfer_learning}_best_logs'
+    
     try:
         if len(trial.study.trials) == 1 or val_loss < trial.study.best_value:
+            
             # Save the best model to a file
-            torch.save(fine_tuned_model, f'{result_name}_TL_{transfer_learning}_model.pth')
+            torch.save(fine_tuned_model.encoder.state_dict(), f'{best_model_path}encoder_state.pt')
+            
+            # Save the model hyperparameters
+            hyperparameters = fine_tuned_model.get_hyperparameters()
+
+            # Filter out non-serializable values
+            serializable_hyperparameters = {k: v for k, v in hyperparameters.items() if isinstance(v, (int, float, str, bool, list, dict))}
+            
+            with open(f'{best_model_path}model_hyperparameters.json', 'w') as f:
+                json.dump(serializable_hyperparameters, f, indent=4)
+
+            
+            # Copy logs to a "best logs" directory
+            if os.path.exists(best_log_dir):
+                shutil.rmtree(best_log_dir)  # Remove previous best logs
+            shutil.copytree(log_dir, best_log_dir)  # Copy current trial's logs as the best logs
+
     except ValueError:
         # Handle the case where no trials are completed yet
         print("No trials are completed yet. Proceeding with current trial.")
