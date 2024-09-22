@@ -173,7 +173,7 @@ def compute_losses(model, X_data_train, X_data_val, X_data_test, device):
 
     # Test dataset
     test_recon_loss, test_kl_loss = compute_recon_kl_loss(X_data_test, model)
-    test_recon_loss, test_kl_loss = compute_recon_kl_loss(X_data_test, model)
+    losses['test_total_loss'] = test_recon_loss.item() + test_kl_loss.item()
     losses['test_recon_loss'] = test_recon_loss.item()
     losses['test_kl_loss'] = test_kl_loss.item()
 

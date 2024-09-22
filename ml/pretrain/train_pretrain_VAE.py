@@ -9,6 +9,7 @@ import json
 import numpy as np
 import random
 
+
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 from torch import nn
@@ -19,7 +20,10 @@ import optuna
 import subprocess
 import threading
 
+import tensorflow as tf
+from torch.utils.tensorboard import SummaryWriter
 
+import torch.optim.lr_scheduler as lr_scheduler
 
 #importing my own functions and classes
 from models.models_VAE import VAE  # Assuming the VAE class is in vae_model.py
@@ -27,19 +31,21 @@ from pretrain.eval_pretrained_VAE import evalute_pretrain_latent_extra_task
 
 
 #### setting the same seed for everything
-random_seed = 42
+# random_seed = 42
 
-np.random.seed(random_seed)
-torch.manual_seed(random_seed)
-torch.cuda.manual_seed_all(random_seed)
-np.random.seed(random_seed)
-random.seed(random_seed)
+# np.random.seed(random_seed)
+# torch.manual_seed(random_seed)
+# torch.cuda.manual_seed_all(random_seed)
+# np.random.seed(random_seed)
+# random.seed(random_seed)
 
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
+# torch.backends.cudnn.deterministic = True
+# torch.backends.cudnn.benchmark = False
 
 import subprocess
 import threading
+
+import math
 
 
 #this is only needed for locally launching the dashboard
@@ -100,6 +106,7 @@ class PretrainVAE(VAE):
         self.patience = int(kwargs.get('patience', 5))  # Early stopping patience
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)  # Move model to device
+    
 
         # Optimizer
         self.optimizer = optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
@@ -109,12 +116,23 @@ class PretrainVAE(VAE):
         _init_weights_xavier(self.encoder,gain=nn.init.calculate_gain(self.activation))
         _init_weights_xavier(self.decoder,gain=nn.init.calculate_gain(self.activation))  
                 
-    # def _init_weights(self, layer):
-    #     # if isinstance(layer, nn.Linear):
-    #     #     nn.init.xavier_normal_(layer.weight)
-    #     #     if layer.bias is not None:
-    #     #         nn.init.zeros_(layer.bias)
+    def loss(self, x, x_recon, mu, log_var):
+
+        # Reconstruction loss    
+        recon_loss = F.mse_loss(x_recon, x, reduction='mean')
+        #print('recon_loss', recon_loss) 
         
+        kl_loss = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
+        #print('kl_loss', kl_loss)
+        
+        # Total loss
+        total_loss = recon_loss + self.kl_weight * kl_loss 
+
+        # print('kl_loss', kl_loss)
+        return recon_loss, kl_loss, total_loss
+        
+
+
 
 
 def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_val, y_data_test, trial_name, trial_id, save_path, **kwargs):
@@ -129,6 +147,15 @@ def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_va
     """
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    # Create a directory for this trial
+    model_folder = os.path.join(save_path, trial_name, f"trial_{trial_id}")
+    os.makedirs(model_folder, exist_ok=True)
+
+    # Initialize TensorBoard logging directory for each trial
+    log_dir = model_folder
+    writer = SummaryWriter(log_dir=log_dir)  # Initialize SummaryWriter for TensorBoard
+
 
     # Automatically infer the input size from X_data_train
     input_size = X_data_train.shape[1]
@@ -150,23 +177,32 @@ def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_va
     patience = int(kwargs.get('patience', 0))  # 0 means no early stopping
     best_val_loss = np.inf
     epochs_no_improve = 0
+    
+    # Optimizer and scheduler
+    # scheduler = lr_scheduler.StepLR(vae.optimizer, step_size=10, gamma=0.5)
+
 
     # KL-Annealing parameters & epochs
     num_epochs = int(kwargs.get('num_epochs', 50))
     
-    kl_annealing_epochs_default = 0.75 * num_epochs
-    kl_annealing_epochs = kwargs.get('kl_annealing_epochs', kl_annealing_epochs_default)  # Number of epochs for KL annealing
+    kl_annealing_epochs = kwargs.get('kl_annealing_epochs', 50)  # Number of epochs for KL annealing
     kl_start_weight = kwargs.get('kl_start_weight', 0.0)  # Initial weight for KL divergence
-    kl_max_weight = kwargs.get('kl_max_weight', 1.0)  # Maximum weight for KL divergence
+    kl_max_weight = kwargs.get('kl_max_weight', 0.5)  # Maximum weight for KL divergence
+    beta = kwargs.get('beta', 5.0)  # Growth rate for the exponential annealing
 
     
     # Training loop
     for epoch in range(num_epochs):
         vae.train()  # Set model to training mode
         train_loss = 0
+        train_recon_loss = 0
+        train_kl_loss = 0
 
         # KL-annealing schedule: linearly increase KL weight over the annealing period
         kl_weight = kl_start_weight + (kl_max_weight - kl_start_weight) * min(1, epoch / kl_annealing_epochs)
+        # Exponential KL-annealing schedule: exponentially increase KL weight over the annealing period
+        #kl_weight = kl_start_weight + (kl_max_weight - kl_start_weight) * (1 - math.exp(-beta * epoch / kl_annealing_epochs))
+        
         vae.kl_weight = kl_weight
 
         for batch in train_loader:
@@ -186,7 +222,7 @@ def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_va
             recon, mu, log_var = vae(noisy_batch)
 
             # Compute the loss
-            loss = vae.loss(noisy_batch, recon, mu, log_var)
+            recon_loss, kl_loss, loss = vae.loss(noisy_batch, recon, mu, log_var)
             
             # Compute L1 regularization term in the training loop
             l1_norm = sum(p.abs().sum() for p in vae.parameters())
@@ -197,14 +233,6 @@ def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_va
             # Backpropagation and optimization
             loss.backward()
 
-            # Log gradient norms
-            # total_norm = 0
-            # for p in vae.parameters():
-            #     param_norm = p.grad.data.norm(2)
-            #     total_norm += param_norm.item() ** 2
-            # total_norm = total_norm ** 0.5
-            # print(f"Gradient norm: {total_norm}")
-
             # Clip gradients to prevent explosion
             torch.nn.utils.clip_grad_norm_(vae.parameters(), max_norm=1.0)
 
@@ -212,38 +240,63 @@ def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_va
             vae.optimizer.step()
 
             train_loss += loss.item()
+            train_recon_loss += recon_loss.item()
+            train_kl_loss += kl_loss.item()
 
+        # # Update the learning rate
+        # scheduler.step()        
+        
         avg_train_loss = train_loss / len(train_loader)
+        avg_train_recon_loss = train_recon_loss / len(train_loader)
+        avg_train_kl_loss = train_kl_loss / len(train_loader)
+        
         print(f'Epoch {epoch + 1}/{num_epochs}, Train Loss: {avg_train_loss:.4f}')
+        
+        # Log training loss to TensorBoard
+        writer.add_scalar('Loss/train', avg_train_loss, epoch)
+        writer.add_scalar('Loss/train_recon', avg_train_recon_loss, epoch)
+        writer.add_scalar('Loss/train_kl', avg_train_kl_loss, epoch)
 
         # Validation loop
         vae.eval()  # Set model to evaluation mode
         val_loss = 0
+        val_recon_loss = 0
+        val_kl_loss = 0
         with torch.no_grad():
             for batch in val_loader:
                 batch = batch[0].to(vae.device)
                 recon, mu, log_var = vae(batch)
-                loss = vae.loss(batch, recon, mu, log_var)
+                recon_loss, kl_loss, loss = vae.loss(batch, recon, mu, log_var)
                 val_loss += loss.item()
+                val_recon_loss += recon_loss.item()
+                val_kl_loss += kl_loss.item()
 
         avg_val_loss = val_loss / len(val_loader)
+        avg_val_recon_loss = val_recon_loss / len(val_loader)
+        avg_val_kl_loss = val_kl_loss / len(val_loader)
+        
+        # scheduler.step(avg_val_loss)
         print(f'Validation Loss: {avg_val_loss:.4f}')
+        
+        # Log validation loss to TensorBoard
+        writer.add_scalar('Loss/val', avg_val_loss, epoch)
+        writer.add_scalar('Loss/val_recon', avg_val_recon_loss, epoch)
+        writer.add_scalar('Loss/val_kl', avg_val_kl_loss, epoch)
 
         # Early stopping logic
-        if patience > 0:
+        if patience > 0 and epoch > kl_annealing_epochs:
             if avg_val_loss < best_val_loss:
                 best_val_loss = avg_val_loss
                 epochs_no_improve = 0
+                print (f'best val loss so far: {best_val_loss}')
             else:
                 epochs_no_improve += 1
+                print (f'epchs with no imporvemnt: {epochs_no_improve}')
                 if epochs_no_improve >= patience:
                     print(f"Early stopping triggered at epoch {epoch + 1}")
                     break
 
-    # Create a directory for this trial
-    model_folder = os.path.join(save_path, trial_name, f"trial_{trial_id}")
-    os.makedirs(model_folder, exist_ok=True)
-
+    
     # Save the encoder state
     encoder_path = os.path.join(model_folder, f"encoder_state.pt")
     torch.save(vae.encoder.state_dict(), encoder_path)
@@ -267,7 +320,10 @@ def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_va
     print(f"Encoder saved to {encoder_path}")
     print(f"Hyperparameters saved to {hyperparams_save_path}")
 
-    return avg_val_loss
+    # Close TensorBoard writer
+    writer.close()
+    
+    return best_val_loss
 
 
 
@@ -383,30 +439,6 @@ def objective(trial, X_data_train, X_data_val, X_data_test, y_data_train, y_data
 
 
 
-
-# def optimize_hyperparameters(X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test,  param_ranges, trial_name, save_path,  n_trials=50, **kwargs):
-#     """
-#     Function to run hyperparameter optimization using Optuna.
-    
-#     Parameters:
-#         X_data_train: Pandas DataFrame, training input data.
-#         X_data_val: Pandas DataFrame, validation input data.
-#         param_ranges: Dictionary containing the parameter ranges for optimization.
-#         n_trials: Number of trials to run for Optuna optimization.
-#         **kwargs: Additional keyword arguments for the VAE model configuration.
-        
-#     Returns:
-#         Best trial object containing optimal hyperparameters.
-#     """
-
-    
-#     study = optuna.create_study(direction='minimize')
-#     study.optimize(lambda trial: objective(trial, X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, param_ranges, trial_name, save_path, **kwargs), n_trials=n_trials)
-
-#     print(f"Best trial: {study.best_trial}")
-#     print(f"Best hyperparameters: {study.best_trial.params}")
-    
-#     return study.best_trial, study
 
 
 
