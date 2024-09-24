@@ -135,6 +135,7 @@ def dataframe_to_tensor(df, device):
 
 # Custom function to compute reconstruction and KL loss, normalized by the number of samples
 def compute_losses(model, X_data_train, X_data_val, X_data_test, device):
+    
     model = model.to(device)  # Move the model to the appropriate device (GPU or CPU)
     model.eval()  # Set the model to evaluation mode
     losses = {}
@@ -147,35 +148,37 @@ def compute_losses(model, X_data_train, X_data_val, X_data_test, device):
     # Function to compute reconstruction and KL divergence loss, normalized by the number of samples
     def compute_recon_kl_loss(x, model):
         with torch.no_grad():  # Disable gradient computation
-            recon_x, mu, log_var = model(x)  # Forward pass
-            num_samples = x.size(0)  # Get the number of samples
-
-            # Compute reconstruction loss (MSE here, you can change to BCE if needed)
-            recon_loss = F.mse_loss(recon_x, x, reduction='mean') #/ num_samples  # Normalize by number of samples
-
-            # Compute KL divergence loss and normalize by the number of samples
-            kl_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp(), dim=1) # / num_samples
             
-            # # Take the mean over the batch and normalize by the latent dimensions
-            kl_loss = kl_loss.mean() / model.latent_size
+            recon_x, mu, log_var = model(x)  # Forward pass
+            
+            recon_loss, kl_loss, total_loss = model.loss(x, recon_x, mu, log_var)
 
-            return recon_loss, kl_loss
+            # # Compute reconstruction loss (MSE here, you can change to BCE if needed)
+            # recon_loss = F.mse_loss(recon_x, x, reduction='mean') #/ num_samples  # Normalize by number of samples
+
+            # # Compute KL divergence loss and normalize by the number of samples
+            # kl_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp(), dim=1) # / num_samples
+            
+            # # # Take the mean over the batch and normalize by the latent dimensions
+            # kl_loss = kl_loss.mean() / model.latent_size
+
+            return recon_loss, kl_loss, total_loss
 
     # Train dataset
-    train_recon_loss, train_kl_loss = compute_recon_kl_loss(X_data_train, model)
-    losses['train_total_loss'] = train_recon_loss.item() + train_kl_loss.item()
+    train_recon_loss, train_kl_loss, train_total_loss = compute_recon_kl_loss(X_data_train, model)
+    losses['train_total_loss'] = train_total_loss.item()
     losses['train_recon_loss'] = train_recon_loss.item()
     losses['train_kl_loss'] = train_kl_loss.item()
 
     # Validation dataset
-    val_recon_loss, val_kl_loss = compute_recon_kl_loss(X_data_val, model)
-    losses['val_total_loss'] = val_recon_loss.item() + val_kl_loss.item()
+    val_recon_loss, val_kl_loss, val_total_loss = compute_recon_kl_loss(X_data_val, model)
+    losses['val_total_loss'] = val_total_loss.item() 
     losses['val_recon_loss'] = val_recon_loss.item()
     losses['val_kl_loss'] = val_kl_loss.item()
 
     # Test dataset
-    test_recon_loss, test_kl_loss = compute_recon_kl_loss(X_data_test, model)
-    losses['test_total_loss'] = test_recon_loss.item() + test_kl_loss.item()
+    test_recon_loss, test_kl_loss, test_total_loss = compute_recon_kl_loss(X_data_test, model)
+    losses['test_total_loss'] = test_total_loss.item() 
     losses['test_recon_loss'] = test_recon_loss.item()
     losses['test_kl_loss'] = test_kl_loss.item()
 
@@ -386,26 +389,13 @@ def main():
         #finetune models files
         
         ## TL True 
-        finetune_VAE_TL_encoder_file= f'{models_path}/finetune_VAE_TL_True_best_model_encoder_state.pt'
-        finetune_VAE_TL_encoder_stat_dict= torch.load(finetune_VAE_TL_encoder_file)
-        
-        finetune_VAE_TL_kwarg_file=f'{models_path}/finetune_VAE_TL_True_best_model_model_hyperparameters.json'
-        finetune_VAE_TL_encoder_kwargs = json.load(open(finetune_VAE_TL_kwarg_file, 'r'))
-        
-        finetune_VAE_TL= PretrainVAE(**finetune_VAE_TL_encoder_kwargs)
-        finetune_VAE_TL.encoder.load_state_dict(finetune_VAE_TL_encoder_stat_dict)
+        finetune_VAE_TL_file= f'{models_path}/finetune_VAE_TL_True_best_model_state.pt'
+        finetune_VAE_TL=torch.load(finetune_VAE_TL_file)
 
          ## TL False 
-        finetune_VAE_noTL_encoder_file= f'{models_path}/finetune_VAE_TL_False_best_model_encoder_state.pt'
-        finetune_VAE_noTL_encoder_stat_dict= torch.load(finetune_VAE_noTL_encoder_file)
+        finetune_VAE_noTL_file= f'{models_path}/finetune_VAE_TL_False_best_model_state.pt'
+        finetune_VAE_noTL= torch.load(finetune_VAE_noTL_file)
         
-        finetune_VAE_noTL_kwarg_file=f'{models_path}/finetune_VAE_TL_False_best_model_model_hyperparameters.json'
-        finetune_VAE_noTL_encoder_kwargs = json.load(open(finetune_VAE_noTL_kwarg_file, 'r'))
-        
-        finetune_VAE_noTL= PretrainVAE(**finetune_VAE_noTL_encoder_kwargs)
-        finetune_VAE_noTL.encoder.load_state_dict(finetune_VAE_noTL_encoder_stat_dict)
-
-
 
         # getting the hyperparameters of the models
         latent_size= finetune_VAE_TL.latent_size

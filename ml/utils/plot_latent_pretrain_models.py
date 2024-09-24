@@ -48,8 +48,8 @@ pretrain_save_dir='/home/leilapirhaji/pretrained_models'
 # pretrain_model_list = pd.read_csv(pretrain_model_list_file, header=None)[0]
 # pretrain_model_list = pretrain_model_list.dropna().tolist()
 
-pretrain_id_list=[81, 51]
-pretrain_name= 'pretrain_VAE_Latent_464'
+pretrain_id_list=[34]
+pretrain_name= 'pretrain_VAE_L_425_485_e_400_p_25'
 
 
 for pretrain_id in pretrain_id_list:

@@ -55,8 +55,8 @@ print ('X_data_train:', X_data_train.shape)
 
 # pretrain_model_list=['RCC-37832', 'RCC-37783', 'RCC-38043', 'RCC-37867', 'RCC-37915', 'RCC-37922', 'RCC-37800', 'RCC-37600']
 
-pretrain_id_list=[81, 51]
-pretrain_name= 'pretrain_VAE_Latent_464'
+pretrain_id_list=[34]
+pretrain_name= 'pretrain_VAE_L_425_485_e_400_p_25'
 
 
 for pretrain_id in pretrain_id_list:
@@ -70,10 +70,10 @@ for pretrain_id in pretrain_id_list:
     models_path=f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_id}'
 
     #finetune models files
-    finetune_VAE_TL_file= f'{models_path}/finetune_VAE_TL_True_model.pth'
+    finetune_VAE_TL_file= f'{models_path}/finetune_VAE_TL_True_best_model_state.pt'
     finetune_VAE_TL=torch.load(finetune_VAE_TL_file)
 
-    finetune_VAE_noTL_file= f'{models_path}/finetune_VAE_TL_False_model.pth'
+    finetune_VAE_noTL_file= f'{models_path}/finetune_VAE_TL_False_best_model_state.pt'
     finetune_VAE_noTL=torch.load(finetune_VAE_noTL_file)
 
 
@@ -94,7 +94,7 @@ for pretrain_id in pretrain_id_list:
     elif os.path.exists(result_png_file_TL):
         # # without transfer learning
         print ('UMAP visualization of the latent space of finetune model with NO TL')
-        visualize_latent_space_multiple_tasks(finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, result_png_file_TL)
+        visualize_latent_space_multiple_tasks(finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, result_png_file_noTL)
         continue
     else:
         #UMAP visualization of the latent space of pretrain model
@@ -103,7 +103,7 @@ for pretrain_id in pretrain_id_list:
 
         # without transfer learning
         print ('UMAP visualization of the latent space of finetune model with NO TL')
-        visualize_latent_space_multiple_tasks(finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, result_png_file_TL)
+        visualize_latent_space_multiple_tasks(finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, result_png_file_noTL)
 
         # Free up memory after processing each model
         del finetune_VAE_TL, finetune_VAE_noTL  # Delete model objects

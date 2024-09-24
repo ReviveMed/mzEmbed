@@ -38,7 +38,7 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train,
                   X_data_val,  
                   X_data_test, 
                   batch_size=64, num_epochs=10, learning_rate=1e-4, 
-                  dropout_rate=0.2, l1_reg_weight=0.0, weight_decay=0.0, 
+                  dropout_rate=0.2, l1_reg=0.0, weight_decay=0.0, patience=0,
                   transfer_learning=True, **kwargs):
     
     
@@ -65,7 +65,13 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train,
     fine_tune_VAE = PretrainVAE (input_size=pretrain_VAE.input_size, 
                         latent_size=pretrain_VAE.latent_size, 
                         num_hidden_layers=pretrain_VAE.num_hidden_layers, 
+                        learning_rate=learning_rate,
+                        batch_size=batch_size,
+                        num_epochs=num_epochs,
                         dropout_rate=dropout_rate,  # Pass dropout_rate here
+                        l1_reg=l1_reg,  # Pass l1_reg_weight here
+                        weight_decay=weight_decay,  # Pass weight_decay here
+                        patience=patience,
                         activation=pretrain_VAE.activation, 
                         use_batch_norm=pretrain_VAE.use_batch_norm)
     
@@ -90,19 +96,19 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train,
 
 
     # Step 4: Set up optimizer with weight decay for L2 regularization
-    optimizer = optim.Adam(fine_tune_VAE.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    optimizer = optim.Adam(fine_tune_VAE.parameters(), lr=fine_tune_VAE.learning_rate, weight_decay=fine_tune_VAE.weight_decay)
 
     # L1 regularization function
     def l1_penalty(model):
         l1_loss = 0
         for param in model.parameters():
             l1_loss += torch.sum(torch.abs(param))
-        return l1_reg_weight * l1_loss
+        return model.l1_reg * l1_loss
     
     
-    kl_annealing_epochs = kwargs.get('kl_annealing_epochs', 50)  # Number of epochs for KL annealing
+    kl_annealing_epochs = kwargs.get('kl_annealing_epochs', 0.5*num_epochs)  # Number of epochs for KL annealing
     kl_start_weight = kwargs.get('kl_start_weight', 0.0)  # Initial weight for KL divergence
-    kl_max_weight = kwargs.get('kl_max_weight', 0.5)  # Maximum weight for KL divergence
+    kl_max_weight = kwargs.get('kl_max_weight', 1)  # Maximum weight for KL divergence
 
 
     best_val_loss = np.inf

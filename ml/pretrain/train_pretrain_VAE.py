@@ -97,8 +97,8 @@ class PretrainVAE(VAE):
         super().__init__(**vae_kwargs)
 
         # Training parameters
-        self.learning_rate = float(kwargs.get('learning_rate', 0.001))
-        self.l1_reg = float(kwargs.get('1_reg', 0))
+        self.learning_rate = float(kwargs.get('learning_rate', 1e-5))
+        self.l1_reg = float(kwargs.get('l1_reg', 0))
         self.weight_decay = float(kwargs.get('weight_decay', 1e-5))
         self.noise_factor = float(kwargs.get('noise_factor', 0))
         self.num_epochs = int(kwargs.get('num_epochs', 50))

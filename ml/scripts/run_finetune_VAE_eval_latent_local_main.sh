@@ -8,7 +8,6 @@ INPUT_DATA_LOCATION="/home/leilapirhaji/PROCESSED_DATA"
 FINETUNE_SAVE_DIR="/home/leilapirhaji/finetune_VAE_models"
 PRETRAIN_SAVE_DIR="/home/leilapirhaji/pretrained_models"
 PRETRAIN_MODEL_DF_FILE="/home/leilapirhaji/top_pretrain_VAE_L_425_485_e_400_p_25.txt"
-N_TRIALS=50
 
 
 
@@ -18,7 +17,14 @@ python ../finetune/finetune_VAE_local_main.py \
     --finetune_save_dir $FINETUNE_SAVE_DIR \
     --pretrain_save_dir $PRETRAIN_SAVE_DIR \
     --pretrain_model_list_file $PRETRAIN_MODEL_DF_FILE \
-    --n_trial $N_TRIALS
+    --dropout_rate 0.1 0.4 0.05 \
+    --learning_rate 1e-5 1e-3 \
+    --l1_reg 1e-5 1e-3 \
+    --weight_decay 1e-5 1e-3 \
+    --batch_size 32 \
+    --patience 0 \
+    --num_epochs 30 \
+    --n_trials 30
 
 
 # Evaluate the latent space

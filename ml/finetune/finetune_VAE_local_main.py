@@ -36,7 +36,7 @@ from pretrain.get_pretrain_encoder import get_pretrain_encoder_from_local
 
 
 
-def objective(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name):
+def objective(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, combined_params):
     """
     Objective function for Optuna optimization.
     
@@ -49,34 +49,84 @@ def objective(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transf
         float: Validation loss after fine-tuning the VAE model.
     """
     # Suggest hyperparameters using Optuna
-    learning_rate = trial.suggest_loguniform('learning_rate', 1e-6, 1e-3)
-    dropout_rate = trial.suggest_uniform('dropout_rate', 0.0, 0.5)
-    l1_reg_weight = trial.suggest_loguniform('l1_reg_weight', 1e-6, 1e-2)
-    weight_decay = trial.suggest_loguniform('weight_decay', 1e-6, 1e-2)
+    # Dropout rate: float range or fixed
+    if isinstance(combined_params['dropout_rate'], tuple):
+        min_val, max_val, step = combined_params['dropout_rate']
+        dropout_rate = trial.suggest_float('dropout_rate', min_val, max_val, step=step)
+    else:
+        dropout_rate = combined_params['dropout_rate']
+        
+    # Learning rate: loguniform or fixed
+    if isinstance(combined_params['learning_rate'], tuple):
+        learning_rate = trial.suggest_loguniform('learning_rate', combined_params['learning_rate'][0], combined_params['learning_rate'][1])
+    else:
+        learning_rate = combined_params['learning_rate']
+        
+    # L2 regularization: loguniform or fixed
+    if isinstance(combined_params['l1_reg'], tuple):
+        l1_reg = trial.suggest_loguniform('l1_reg', combined_params['l1_reg'][0], combined_params['l1_reg'][1])
+    else:
+        l1_reg = combined_params['l1_reg']
+
+    # Weight decay: loguniform or fixed
+    if isinstance(combined_params['weight_decay'], tuple):
+        weight_decay = trial.suggest_loguniform('weight_decay', combined_params['weight_decay'][0],combined_params['weight_decay'][1] )
+    else:
+        weight_decay = combined_params['weight_decay']
+
+    # Batch size: categorical (fixed list of values) or fixed
+    if isinstance(combined_params['batch_size'], tuple):
+        min_val, max_val, step = combined_params['batch_size']
+        batch_size = trial.suggest_int('batch_size', min_val, max_val, step=step)
+    else:
+        batch_size = combined_params['batch_size']
+
+    # Patience: integer range or fixed
+    if isinstance(combined_params['patience'], tuple):
+        min_val, max_val, step = combined_params['patience']
+        patience = trial.suggest_int('patience', min_val, max_val, step=step)
+    else:
+        patience = combined_params['patience']
+
+    # Number of epochs: integer range or fixed
+    if isinstance(combined_params['num_epochs'], tuple):
+        min_val, max_val, step = combined_params['num_epochs']
+        num_epochs = trial.suggest_int('num_epochs', min_val, max_val, step=step)
+    else:
+        num_epochs = combined_params['num_epochs']
+
+    
+    
+    if len(trial.study.trials) == 1:
+        best_val_loss = float('inf')
+    else:
+        best_val_loss = trial.study.best_value
 
     # Call fine_tune_vae with the suggested hyperparameters
     fine_tuned_model, val_loss, log_dir = fine_tune_vae(pretrain_VAE, result_name,
                                                X_data_train, 
                                                X_data_val, 
                                                X_data_test, 
-                                               batch_size=32, 
-                                               num_epochs=20, 
+                                               batch_size=batch_size, 
+                                               num_epochs=num_epochs, 
                                                learning_rate=learning_rate, 
                                                dropout_rate=dropout_rate, 
-                                               l1_reg_weight=l1_reg_weight, 
+                                               l1_reg=l1_reg, 
                                                weight_decay=weight_decay, 
+                                               patience=patience,
                                                transfer_learning=transfer_learning)
     
     # Save the model if it's the first trial or has the best performance so far
     # Track the best model and logs
-    best_model_path = f'{result_name}_TL_{transfer_learning}_best_model_'
+    best_model_path = f'{result_name}_TL_{transfer_learning}_best_model'
     best_log_dir = f'{result_name}_TL_{transfer_learning}_best_logs'
     
+    
     try:
-        if len(trial.study.trials) == 1 or val_loss < trial.study.best_value:
+        if len(trial.study.trials) == 1 or val_loss  < best_val_loss:
             
             # Save the best model to a file
-            torch.save(fine_tuned_model.encoder.state_dict(), f'{best_model_path}encoder_state.pt')
+            torch.save(fine_tuned_model, f'{best_model_path}_state.pt')
             
             # Save the model hyperparameters
             hyperparameters = fine_tuned_model.get_hyperparameters()
@@ -84,7 +134,7 @@ def objective(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transf
             # Filter out non-serializable values
             serializable_hyperparameters = {k: v for k, v in hyperparameters.items() if isinstance(v, (int, float, str, bool, list, dict))}
             
-            with open(f'{best_model_path}model_hyperparameters.json', 'w') as f:
+            with open(f'{best_model_path}_model_hyperparameters.json', 'w') as f:
                 json.dump(serializable_hyperparameters, f, indent=4)
 
             
@@ -102,7 +152,7 @@ def objective(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transf
 
 
 
-def optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, n_trials=50):
+def optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, combined_params, n_trials=50):
     """
     Optimize the fine-tuning of a VAE using Optuna.
     
@@ -118,7 +168,7 @@ def optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, t
     study = optuna.create_study(direction='minimize')
 
     # Define the objective function
-    study.optimize(lambda trial: objective(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name), n_trials=n_trials)
+    study.optimize(lambda trial: objective(trial, pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, combined_params), n_trials=n_trials )
 
     # Print the best hyperparameters
     print("Best hyperparameters:", study.best_params)
@@ -257,6 +307,31 @@ def save_combined_optimization_history_html(study_TL, study_rand, filename):
 
 
 
+def parse_range_or_single(values, is_int=False):
+    """
+    Custom argparse type to parse either a single value or a range from a list.
+    If `is_int` is True, parses integers; otherwise, parses floats.
+    
+    Example inputs: 
+        ["256"] -> Outputs: 256 (int)
+        ["256", "512", "32"] -> Outputs: (256, 512, 32) (int)
+    """
+    # If it's a list but contains only one element, treat it as a single value
+    if len(values) == 1:
+        if is_int:
+            return int(values[0])  # Single integer value
+        else:
+            return float(values[0])  # Single float value
+    
+    # Otherwise, treat it as a range
+    if is_int:
+        return tuple(map(int, values))  # Convert to tuple of integers
+    else:
+        return tuple(map(float, values))  # Convert to tuple of floats
+
+
+
+
 def main ():
 
     
@@ -279,19 +354,45 @@ def main ():
     parser.add_argument('--pretrain_model_list_file', type=str,
                         default='/home/leilapirhaji/top_pretrained_models_local.txt',
                         help='This is a tsv file, that for each top pre-trained model it includes a colum of trial number and a column of trial name.')
-
-    parser.add_argument('--n_trial', type=int, default=50,
-                        help='Number of trials for optimization.')
-
+    
+    # Add arguments for the hyperparameters
+    parser.add_argument('--dropout_rate', nargs='*', default=[0.1], 
+                        help='Dropout rate: Either a single value or "min max step" for range (float)')
+    parser.add_argument('--learning_rate', nargs='*', default=["1e-5", "1e-2"], 
+                        help='Learning rate range: Either a single value or "min max" for range (float)')
+    parser.add_argument('--l1_reg', nargs='*', default=["1e-6", "1e-2"],
+                        help='Weight decay range: Either a single value or "min max" for range (float)')
+    parser.add_argument('--weight_decay', nargs='*', default=["1e-6", "1e-2"],
+                        help='Weight decay range: Either a single value or "min max" for range (float)')
+    parser.add_argument('--batch_size', nargs='*', default=[32],
+                        help='Batch size (either fixed or a range, integer)')
+    parser.add_argument('--patience', nargs='*', default=[0], 
+                        help='Patience: Either a single value or "min max step" for range (integer), 0 means no early stopping')
+    parser.add_argument('--num_epochs', nargs='*', default=[30], 
+                        help='Number of epochs (either fixed or a range, integer)')
+    parser.add_argument('--n_trials', type=int, default=50, 
+                        help='Number of trials for hyperparameter optimization')
+    
     # Parse the arguments
     args = parser.parse_args()
+    
+    # Use parsed arguments and convert them using parse_range_or_single
+    combined_params = {
+        'dropout_rate': parse_range_or_single(args.dropout_rate, is_int=False),
+        'learning_rate': parse_range_or_single(args.learning_rate, is_int=False),
+        'l1_reg': parse_range_or_single(args.l1_reg, is_int=False),
+        'weight_decay': parse_range_or_single(args.weight_decay, is_int=False),
+        'batch_size': parse_range_or_single(args.batch_size, is_int=True),
+        'patience': parse_range_or_single(args.patience, is_int=True),
+        'num_epochs': parse_range_or_single(args.num_epochs, is_int=True)
+    }
 
     # Access the arguments
     input_data_location = args.input_data_location
     finetune_save_dir = args.finetune_save_dir
     pretrain_save_dir = args.pretrain_save_dir
     pretrain_model_df_file = args.pretrain_model_list_file
-    n_trial = args.n_trial
+    n_trials = args.n_trials
 
     
     #get the input data
@@ -343,7 +444,7 @@ def main ():
         result_name=f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_id}/finetune_VAE'
         
         transfer_learning=True
-        study_TL= optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, n_trials=n_trial)
+        study_TL= optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, combined_params, n_trials=n_trials)
 
         with open(f"{result_name}_TL_{transfer_learning}_optune_results.pkl", "wb") as f:
             pickle.dump(study_TL, f)
@@ -351,7 +452,7 @@ def main ():
         #fine tune the encoder without transfer learning
         print ('fine tune the encoder without transfer learning')
         transfer_learning=False
-        study_rand= optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, n_trials=n_trial)
+        study_rand= optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, X_data_test, transfer_learning, result_name, combined_params, n_trials=n_trials)
 
         with open(f"{result_name}_TL_{transfer_learning}_optune_results.pkl", "wb") as f:
             pickle.dump(study_rand, f)
