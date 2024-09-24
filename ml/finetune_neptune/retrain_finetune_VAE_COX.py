@@ -33,17 +33,17 @@ from finetune.best_finetune_model_test_eval_cox import best_finetune_model_test_
 
 
 
-def get_finetune_VAE_TL_noTL(finetune_save_dir, pretrain_name, pretrain_trial_id):
+def get_finetune_VAE_TL_noTL(pretrain_model_ID, finetune_save_dir ):
 
 
     #path to pre-train and fine-tune models
-    models_path=f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_trial_id}'
+    models_path=f'{finetune_save_dir}/{pretrain_model_ID}'
 
     #finetune models files
-    finetune_VAE_TL_file= f'{models_path}/finetune_VAE_TL_True_best_model_state.pt'
+    finetune_VAE_TL_file= f'{models_path}/Finetune_VAE_pretain_{pretrain_model_ID}_TL_True_model.pth'
     finetune_VAE_TL=torch.load(finetune_VAE_TL_file)
 
-    finetune_VAE_noTL_file= f'{models_path}/finetune_VAE_TL_False_best_model_state.pt'
+    finetune_VAE_noTL_file= f'{models_path}/Finetune_VAE_pretain_{pretrain_model_ID}_TL_False_model.pth'
     finetune_VAE_noTL=torch.load(finetune_VAE_noTL_file)
 
 
@@ -54,7 +54,7 @@ def get_finetune_VAE_TL_noTL(finetune_save_dir, pretrain_name, pretrain_trial_id
 
 
 
-def retrain_finetune_VAE_TL_noTL_fixed_hyper_par(finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed, patience=0, **kwargs):
+def retrain_finetune_VAE_TL_noTL_fixed_hyper_par(finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed, patience=5, **kwargs):
 
     # Default configuration for fine-tuning, which can be overridden by kwargs
     config = {
@@ -120,10 +120,10 @@ def retrain_finetune_VAE_TL_noTL_fixed_hyper_par(finetune_VAE_TL, finetune_VAE_n
 
 
 
-def retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed, finetune_save_dir, pretrain_name, pretrain_trial_id, param_ranges, n_trials=50, patience=0, latent_passes= 20, **kwargs):
+def retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed, finetune_save_dir, pretrain_model_ID, n_trials=50, patience=5, **kwargs):
 
     #path to pre-train and fine-tune models
-    models_path=f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_trial_id}'
+    models_path=f'{finetune_save_dir}/{pretrain_model_ID}'
 
     def objective(trial):
 
@@ -134,20 +134,19 @@ def retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_V
         best_c_index = -float('inf')  # Initialize to a very low value to keep track of the best AUC
         
         # Hyperparameters to optimize
-        add_post_latent_layers = trial.suggest_categorical('add_post_latent_layers', param_ranges['add_post_latent_layers'])
+        add_post_latent_layers = trial.suggest_categorical('add_post_latent_layers', [True, False])
         if add_post_latent_layers:
-            post_latent_layer_size = trial.suggest_categorical('post_latent_layer_size', param_ranges['post_latent_layer_size'])
+            post_latent_layer_size = trial.suggest_categorical('post_latent_layer_size', [8, 32, 64, 128])
         else:
             post_latent_layer_size = 1  # Default value when add_post_latent_layers is False
     
-        num_layers_to_retrain = trial.suggest_categorical('num_layers_to_retrain', param_ranges['num_layers_to_retrain'])
-        num_epochs = trial.suggest_int('num_epochs',  param_ranges['num_epochs'][0], param_ranges['num_epochs'][1], step=param_ranges['num_epochs'][2])
+        num_layers_to_retrain = trial.suggest_categorical('num_layers_to_retrain', [1, 2])
+        #num_epochs = trial.suggest_int('num_epochs', 10, 50)
         batch_size = trial.suggest_categorical('batch_size', [32])
-        learning_rate = trial.suggest_loguniform('learning_rate', param_ranges['learning_rate'][0], param_ranges['learning_rate'][1])
-        dropout = trial.suggest_float('dropout', param_ranges['dropout'][0], param_ranges['dropout'][1], step = param_ranges['dropout'][2])
-        l1_reg_weight = trial.suggest_loguniform('l1_reg_weight', param_ranges['l1_reg_weight'][0], param_ranges['l1_reg_weight'][1])
-        l2_reg_weight = trial.suggest_loguniform('l2_reg_weight', param_ranges['l2_reg_weight'][0], param_ranges['l2_reg_weight'][1])
-           
+        learning_rate = trial.suggest_loguniform('learning_rate', 1e-6, 1e-4)
+        dropout = trial.suggest_uniform('dropout', 0.1, 0.4)
+        l1_reg_weight = trial.suggest_loguniform('l1_reg_weight', 1e-7, 1e-3)
+        l2_reg_weight = trial.suggest_loguniform('l2_reg_weight', 1e-7, 1e-3)
 
         # Default configuration for fine-tuning, which can be overridden by kwargs
         config = {
@@ -161,13 +160,13 @@ def retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_V
             'add_post_latent_layers': add_post_latent_layers,
             'num_post_latent_layers': 1,
             'post_latent_layer_size': post_latent_layer_size,
-            'num_epochs': num_epochs,
+            'num_epochs': 50,
             'batch_size': batch_size,
             'learning_rate': learning_rate,
             'dropout': dropout,
             'l1_reg_weight': l1_reg_weight,
             'l2_reg_weight': l2_reg_weight,
-            'latent_passes': latent_passes,
+            'latent_passes': 20,
             'seed': seed
         }
 
@@ -198,10 +197,19 @@ def retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_V
             best_model_noTL = model_noTL
 
             # Save the best models
-            torch.save(best_model_TL, f'{models_path}/finetune_TL_{task}_best_COX_model.pth')
-            torch.save(best_model_noTL, f'{models_path}/finetune_noTL_{task}_best_COX_model.pth')
+            torch.save(best_model_TL, f'{models_path}/pre-train_{pretrain_model_ID}_finetune_TL_{task}_best_COX_model.pth')
+            torch.save(best_model_noTL, f'{models_path}/pre-train_{pretrain_model_ID}_finetune_noTL_{task}_best_COX_model.pth')
 
-        
+        # auc_avg = (val_metrics_TL['AUC'].iloc[-1] + val_metrics_noTL['AUC'].iloc[-1]) / 2
+        # if auc_avg > best_auc:
+        #     best_auc = auc_avg
+        #     best_model_TL = model_TL
+        #     best_model_noTL = model_noTL
+
+        #     # Save the best models
+        #     torch.save(best_model_TL, f'{models_path}/pre-train_{pretrain_model_ID}_finetune_TL_{task}_best_model.pth')
+        #     torch.save(best_model_noTL, f'{models_path}/pre-train_{pretrain_model_ID}_finetune_noTL_{task}_best_model.pth')
+
         # return auc_avg
         return val_c_index_TL
 
@@ -211,13 +219,13 @@ def retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_V
 
 
     # Evaluate both models on the test set
-    best_model_TL=torch.load(f'{models_path}/finetune_TL_{task}_best_COX_model.pth')
+    best_model_TL=torch.load(f'{models_path}/pre-train_{pretrain_model_ID}_finetune_TL_{task}_best_COX_model.pth')
 
     result_metrics_TL,latent_rep_train, latent_rep_val, latent_rep_test = best_finetune_model_test_eval_cox(
         best_model_TL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed
     )
 
-    best_model_noTL=torch.load(f'{models_path}/finetune_noTL_{task}_best_COX_model.pth')
+    best_model_noTL=torch.load(f'{models_path}/pre-train_{pretrain_model_ID}_finetune_noTL_{task}_best_COX_model.pth')
     result_metrics_noTL, latent_rep_train, latent_rep_val, latent_rep_test = best_finetune_model_test_eval_cox(
         best_model_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed
     )

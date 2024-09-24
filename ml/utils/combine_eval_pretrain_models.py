@@ -15,7 +15,7 @@ import json
 
 
 pretrain_save_dir='/home/leilapirhaji/pretrained_models'
-trial_name= 'pretrain_VAE_L_425_485_e_400_p_25'
+trial_name= 'pretrain_VAE_L_410_490_e_400_p_25_S_8.1.1'
 
 
 trail_list=os.listdir(f'{pretrain_save_dir}/{trial_name}')

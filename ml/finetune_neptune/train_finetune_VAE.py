@@ -184,7 +184,7 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train,
         writer.add_scalar('Loss/val_recon', avg_val_recon_loss, epoch)
         writer.add_scalar('Loss/val_kl', avg_val_kl_loss, epoch)
 
-        if avg_val_loss < best_val_loss and epoch > kl_annealing_epochs:
+        if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             best_model = fine_tune_VAE
 

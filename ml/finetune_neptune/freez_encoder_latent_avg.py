@@ -179,7 +179,7 @@ class FineTuneModel(nn.Module):
 
 
 
-def fine_tune_model(VAE_model, X_train, y_data_train, X_val, y_data_val, num_classes, num_layers_to_retrain=1, add_post_latent_layers=False, num_post_latent_layers=1, post_latent_layer_size=128, num_epochs=20, batch_size=32, learning_rate=1e-4, dropout=0.2, l1_reg_weight=0.0, l2_reg_weight=0.0, latent_passes=10, seed=None, patience=0):
+def fine_tune_model(VAE_model, X_train, y_data_train, X_val, y_data_val, num_classes, num_layers_to_retrain=1, add_post_latent_layers=False, num_post_latent_layers=1, post_latent_layer_size=128, num_epochs=20, batch_size=32, learning_rate=1e-4, dropout=0.2, l1_reg_weight=0.0, l2_reg_weight=0.0, latent_passes=10, seed=None, patience=5):
     
     # Set seed for reproducibility
     if seed is not None:
