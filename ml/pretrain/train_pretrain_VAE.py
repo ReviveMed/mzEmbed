@@ -301,7 +301,7 @@ def pretrain_vae(X_data_train, X_data_val,  X_data_test, y_data_train, y_data_va
     
     # Save the encoder state
     encoder_path = os.path.join(model_folder, f"encoder_state.pt")
-    torch.save(best_model.encoder.state_dict(), encoder_path)
+    torch.save(best_model.state_dict(), encoder_path)
 
     # Save the model hyperparameters
     hyperparameters = best_model.get_hyperparameters()
