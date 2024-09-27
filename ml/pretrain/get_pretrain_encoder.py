@@ -110,8 +110,10 @@ def get_pretrain_encoder_from_local(pretrain_name, pretrain_id, pretrain_save_di
     vae_model = VAE( **encoder_kwargs)
     #encoder=vae_model.encoder
 
-    encoder_state_dict = torch.load(model_encoder_file)
-    vae_model.encoder.load_state_dict(encoder_state_dict)
+    model_state_dict = torch.load(model_encoder_file)
+    # vae_model.encoder.load_state_dict(encoder_state_dict)
+    #pre-trained models are saved as the whole model not just the encoder
+    vae_model.load_state_dict(model_state_dict)
     
     # Getting the latent space that is saved in the model directory
     Z_train = pd.read_csv(f'{model_local_path}/Z_train_avg_20.csv', index_col=0)

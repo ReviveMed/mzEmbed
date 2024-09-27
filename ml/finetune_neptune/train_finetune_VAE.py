@@ -38,7 +38,7 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train,
                   X_data_val,  
                   X_data_test, 
                   batch_size=64, num_epochs=10, learning_rate=1e-4, 
-                  dropout_rate=0.2, l1_reg=0.0, weight_decay=0.0, patience=0,
+                  dropout_rate=0.2, l1_reg=0.0, weight_decay=0.0, patience=0, kl_weight=5,
                   transfer_learning=True, **kwargs):
     
     
@@ -72,6 +72,7 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train,
                         l1_reg=l1_reg,  # Pass l1_reg_weight here
                         weight_decay=weight_decay,  # Pass weight_decay here
                         patience=patience,
+                        kl_weight=kl_weight,  
                         activation=pretrain_VAE.activation, 
                         use_batch_norm=pretrain_VAE.use_batch_norm)
     
@@ -106,9 +107,9 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train,
         return model.l1_reg * l1_loss
     
     
-    kl_annealing_epochs = kwargs.get('kl_annealing_epochs', 0.5*num_epochs)  # Number of epochs for KL annealing
-    kl_start_weight = kwargs.get('kl_start_weight', 0.0)  # Initial weight for KL divergence
-    kl_max_weight = kwargs.get('kl_max_weight', 1)  # Maximum weight for KL divergence
+    # kl_annealing_epochs = kwargs.get('kl_annealing_epochs', 0.5*num_epochs)  # Number of epochs for KL annealing
+    # kl_start_weight = kwargs.get('kl_start_weight', 0.0)  # Initial weight for KL divergence
+    # kl_max_weight = kwargs.get('kl_max_weight', 1)  # Maximum weight for KL divergence
 
 
     best_val_loss = np.inf
@@ -123,9 +124,9 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train,
         train_kl_loss = 0
         
         # KL-annealing schedule: linearly increase KL weight over the annealing period
-        kl_weight = kl_start_weight + (kl_max_weight - kl_start_weight) * min(1, epoch / kl_annealing_epochs)
+        # kl_weight = kl_start_weight + (kl_max_weight - kl_start_weight) * min(1, epoch / kl_annealing_epochs)
         
-        fine_tune_VAE.kl_weight = kl_weight
+        # fine_tune_VAE.kl_weight = kl_weight    
         
         for x_batch in train_loader:
             x_batch = x_batch[0].to(device)  # Extract the actual data from the tuple

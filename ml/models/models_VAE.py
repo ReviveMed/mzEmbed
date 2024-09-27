@@ -182,6 +182,7 @@ class VAE(nn.Module):
         latent_size = kwargs.get('latent_size', 1)
         num_hidden_layers = kwargs.get('num_hidden_layers', 1)
         dropout_rate = kwargs.get('dropout_rate', 0.2)
+        kl_weight = kwargs.get('kl_weight', 1.0)
         activation = kwargs.get('activation', 'leakyrelu')
         use_batch_norm = kwargs.get('use_batch_norm', False)
         act_on_latent_layer = kwargs.get('act_on_latent_layer', False)
@@ -202,7 +203,7 @@ class VAE(nn.Module):
         self.use_batch_norm = use_batch_norm
         self.act_on_latent_layer = act_on_latent_layer
         # self.kl_weight = 1.0/np.sqrt(num_hidden_layers)
-        self.kl_weight = 1.0
+        self.kl_weight = kl_weight
         self.latent_weight = 0.0
 
 

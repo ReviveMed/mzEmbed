@@ -104,6 +104,7 @@ class PretrainVAE(VAE):
         self.num_epochs = int(kwargs.get('num_epochs', 50))
         self.batch_size = int(kwargs.get('batch_size', 94))
         self.patience = int(kwargs.get('patience', 0))  # Early stopping patience
+        self.kl_weight = int(kwargs.get('kl_weight', 1))  # KL weight for the loss function
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)  # Move model to device
     
