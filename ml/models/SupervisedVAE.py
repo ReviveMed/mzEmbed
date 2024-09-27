@@ -106,8 +106,14 @@ class SupervisedVAE(PretrainVAE):
         self.task_type = task_type
         self.num_classes = num_classes
         
-        # Classification head for binary or multi-class classification
-        self.classification_head = nn.Linear(self.latent_size, num_classes)
+        # Adjust the classification head based on the task
+        if task_type == 'classification':
+            if num_classes == 2:
+                # For binary classification, we output 1 value (logit)
+                self.classification_head = nn.Linear(self.latent_size, 1)
+            else:
+                # For multi-class classification, output `num_classes` values (logits)
+                self.classification_head = nn.Linear(self.latent_size, num_classes)
         
         # Cox regression head (for survival analysis)
         self.cox_head = nn.Linear(self.latent_size, 1)  # Single output for Cox
@@ -119,7 +125,7 @@ class SupervisedVAE(PretrainVAE):
         encoded = self.encoder(x)  # Single output from encoder
         
         # Debugging: Print the shape of the encoder output
-        print(f"Encoded shape: {encoded.shape}")
+        #print(f"Encoded shape: {encoded.shape}")
 
         # Reshape the encoded vector to be [batch_size, latent_dim]
         if len(encoded.shape) == 1:  # If it's a 1D tensor
@@ -135,19 +141,18 @@ class SupervisedVAE(PretrainVAE):
         # Supervised output
         if self.task_type == 'classification':
             if self.classification_head.out_features == 1:
-                # Binary classification
-                supervised_out = torch.sigmoid(self.classification_head(z))  # Sigmoid for binary
+                # Binary classification: apply sigmoid to get probabilities
+                supervised_out = torch.sigmoid(self.classification_head(z))  # Shape [batch_size, 1]
             else:
-                # Multi-class classification
-                supervised_out = self.classification_head(z)  # Raw logits for CrossEntropyLoss
-      
+                # Multi-class classification: output raw logits
+                supervised_out = self.classification_head(z)  # Shape [batch_size, num_classes]
         elif self.task_type == 'cox':
             supervised_out = self.cox_head(z)
 
         return recon_x, mu, logvar, supervised_out
 
 
-    def loss_function(self, x, recon_x, mu, logvar, supervised_out, y, duration=None,event=None, lambda_sup=1.0):
+    def loss_function(self, x, recon_x, mu, logvar, supervised_out, y=None, duration=None,event=None, lambda_sup=1.0):
         """
         Compute the total loss including:
         - VAE reconstruction loss

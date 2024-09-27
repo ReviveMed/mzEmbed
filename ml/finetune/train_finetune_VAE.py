@@ -131,6 +131,7 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train,
         
         for x_batch in train_loader:
             x_batch = x_batch[0].to(device)  # Extract the actual data from the tuple
+            print (f' x_batch.shape {x_batch.shape}')
             
             optimizer.zero_grad()
             x_recon, mu, log_var = fine_tune_VAE(x_batch)

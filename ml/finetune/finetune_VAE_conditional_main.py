@@ -31,12 +31,12 @@ from finetune.get_finetune_encoder import get_finetune_input_data
 
 
 from models.models_VAE import VAE
-from finetune.train_finetune_VAE_supervised import fine_tune_vae
+from finetune.train_finetune_VAE_conditional import fine_tune_vae
 from pretrain.get_pretrain_encoder import get_pretrain_encoder_from_local
 
 
 
-def objective(trial, pretrain_VAE, X_data_train, X_data_val, y_data_train, y_data_val, task, task_type, num_classes, task_event, transfer_learning, result_name, combined_params):
+def objective(trial, pretrain_VAE, X_data_train, X_data_val, y_data_train_cond, y_data_val_cond, transfer_learning, result_name, combined_params):
     """
     Objective function for Optuna optimization.
     
@@ -104,7 +104,7 @@ def objective(trial, pretrain_VAE, X_data_train, X_data_val, y_data_train, y_dat
 
     
     # Call fine_tune_vae with the suggested hyperparameters
-    fine_tuned_model, val_loss, log_dir = fine_tune_vae(pretrain_VAE, result_name, X_data_train, X_data_val, y_data_train, y_data_val, task, task_type, num_classes, task_event, batch_size, num_epochs, learning_rate, dropout_rate, l1_reg, weight_decay, patience, transfer_learning)
+    fine_tuned_model, val_loss, log_dir = fine_tune_vae(pretrain_VAE, result_name, X_data_train, X_data_val, y_data_train_cond, y_data_val_cond, batch_size, num_epochs, learning_rate, dropout_rate, l1_reg, weight_decay, patience, transfer_learning)
     
     # Save the model if it's the first trial or has the best performance so far
     # Track the best model and logs
@@ -143,7 +143,7 @@ def objective(trial, pretrain_VAE, X_data_train, X_data_val, y_data_train, y_dat
 
 
 
-def optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, y_data_train, y_data_val, task, task_type, num_classes, task_event, transfer_learning, result_name, combined_params, n_trials=50):
+def optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, y_data_train_cond, y_data_val_cond, transfer_learning, result_name, combined_params, n_trials=50):
     """
     Optimize the fine-tuning of a VAE using Optuna.
     
@@ -159,7 +159,7 @@ def optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, y_data_train, 
     study = optuna.create_study(direction='minimize')
 
     # Define the objective function
-    study.optimize(lambda trial: objective(trial, pretrain_VAE, X_data_train, X_data_val, y_data_train, y_data_val, task, task_type, num_classes, task_event, transfer_learning, result_name, combined_params), n_trials=n_trials )
+    study.optimize(lambda trial: objective(trial, pretrain_VAE, X_data_train, X_data_val, y_data_train_cond, y_data_val_cond, transfer_learning, result_name, combined_params), n_trials=n_trials )
 
     # Print the best hyperparameters
     print("Best hyperparameters:", study.best_params)
@@ -346,22 +346,10 @@ def main ():
                         default='/home/leilapirhaji/top_pretrained_models_local.txt',
                         help='This is a tsv file, that for each top pre-trained model it includes a colum of trial number and a column of trial name.')
     
-    parser.add_argument('--task', type=str,
-                        default='IMDC BINARY',
-                        help='The task to tune the VAE model for')
-    
-    parser.add_argument('--task_type', type=str,
-                        default='classification',
-                        help='either classification or cox')
-    
-    parser.add_argument('--num_classes', type=str,
-                        default='2',
-                        help='The number of classes for the classification task')
-    
-    parser.add_argument('--task_event', type=str,
-                        default='OS_event', 
-                        help='The censoring event for the cox analysis task')
-    
+    parser.add_argument('--condition_list', type=str,
+                        default='OS, OS_event',
+                        help='A list of conditions to be used for the conditional VAE model. It should be a string of condition names separated by commas. Example: "OS,MSI,MSS"')
+        
     # Add arguments for the hyperparameters
     parser.add_argument('--dropout_rate', nargs='*', default=[0.1], 
                         help='Dropout rate: Either a single value or "min max step" for range (float)')
@@ -401,11 +389,10 @@ def main ():
     finetune_save_dir = args.finetune_save_dir
     pretrain_save_dir = args.pretrain_save_dir
     pretrain_model_df_file = args.pretrain_model_list_file
-    task=args.task
-    task_type=args.task_type
-    num_classes=int(args.num_classes)
-    task_event=args.task_event
     n_trials = args.n_trials
+    
+    condition_list_str=args.condition_list
+    condition_list=condition_list_str.split(',')
 
     print ('task is : {task}')
     
@@ -413,6 +400,10 @@ def main ():
     print ('get the input data')
 
     (X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test)=get_finetune_input_data(input_data_location)
+    
+    #creating conditional data from y_data
+    y_data_train_cond = y_data_train[condition_list].fillna(-1)
+    y_data_val_cond = y_data_val[condition_list].fillna(-1)
 
     #get pretrain encoder
     print ('get pretrain encoder')
@@ -433,9 +424,9 @@ def main ():
         os.makedirs(VAE_results_dir, exist_ok=True)
 
         # Use a modified version of task only for file naming (spaces replaced with underscores)
-        task_for_filename = task.replace(' ', '_')
+        condition_for_filename = condition_list_str.replace(' ', '_')
 
-        result_file_name = f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_id}/{task_for_filename}_finetune_VAE_combined_optimization_history_TL_rand.html'
+        result_file_name = f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_id}/{condition_for_filename}_finetune_VAE_combined_optimization_history_TL_rand.html'
 
         # Check if the output file already exists
         if os.path.exists(result_file_name):
@@ -457,18 +448,14 @@ def main ():
         #fine tune the encoder with transfer learning
         print ('fine tune the encoder with transfer learning')
 
-        result_name=f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_id}/{task_for_filename}_finetune_VAE'
+        result_name=f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_id}/{condition_for_filename}_finetune_VAE'
         
         transfer_learning=True
         study_TL= optimize_finetune_vae(pretrain_VAE, 
                                         X_data_train, 
                                         X_data_val, 
-                                        y_data_train,
-                                        y_data_val,
-                                        task,
-                                        task_type,
-                                        num_classes,
-                                        task_event,
+                                        y_data_train_cond,
+                                        y_data_val_cond,
                                         transfer_learning, result_name, combined_params, n_trials=n_trials)
 
         with open(f"{result_name}_TL_{transfer_learning}_optune_results.pkl", "wb") as f:
@@ -480,12 +467,8 @@ def main ():
         study_rand= optimize_finetune_vae(pretrain_VAE, 
                                             X_data_train, 
                                             X_data_val, 
-                                            y_data_train,
-                                            y_data_val,
-                                            task,
-                                            task_type,
-                                            num_classes,
-                                            task_event,
+                                            y_data_train_cond,
+                                            y_data_val_cond,
                                             transfer_learning, result_name, combined_params, n_trials=n_trials)
 
         with open(f"{result_name}_TL_{transfer_learning}_optune_results.pkl", "wb") as f:

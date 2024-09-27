@@ -25,8 +25,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 #importing the VAE model and the pretrain VAE model
 from models.models_VAE import VAE
-from models.SupervisedVAE import SupervisedVAE
-from pretrain.train_pretrain_VAE import PretrainVAE
+from models.ConditionalVAE import ConditionalVAE
 
 
 def _reset_params(layer):
@@ -35,9 +34,9 @@ def _reset_params(layer):
 
 
 
-def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_train, y_data_val, task, task_type, num_classes, task_event, batch_size, num_epochs, learning_rate, dropout_rate, l1_reg, weight_decay, patience, transfer_learning):
+
+def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_train_cond, y_data_val_cond, batch_size, num_epochs, learning_rate, dropout_rate, l1_reg, weight_decay, patience, transfer_learning):
     
-    batch_size=X_data_train.shape[0]  # Set batch size to the entire dataset
     
     # Initialize TensorBoard logging directory for each trial
     log_dir = f'{model_path}_TL_{transfer_learning}'
@@ -54,27 +53,14 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
     X_val_tensor = torch.tensor(X_data_val.values, dtype=torch.float32).to(device)
  
     
-    if task_type == 'classification':
-        
-        #getting the y data and filling missing values with -1
-        y_data_train_tensor = torch.tensor(y_data_train[task].fillna(-1).values, dtype=torch.long if num_classes > 2 else torch.float32).to(device)
-        y_data_val_tensor = torch.tensor(y_data_val[task].fillna(-1).values, dtype=torch.long if num_classes > 2 else torch.float32).to(device)
-        
-        # Create TensorDataset
-        train_dataset = TensorDataset(X_train_tensor, y_data_train_tensor)
-        val_dataset = TensorDataset(X_val_tensor, y_data_val_tensor)
-            
-    elif task_type == 'cox':
-        # Convert pandas DataFrames to PyTorch tensors
-        y_duration_train_tensor = torch.tensor(y_data_train[task].fillna(-1).values, dtype=torch.float32).to(device)
-        y_event_train_tensor = torch.tensor(y_data_train[task_event].fillna(-1).values, dtype=torch.float32).to(device)
-        y_duration_val_tensor = torch.tensor(y_data_val[task].fillna(-1).values, dtype=torch.float32).to(device)
-        y_event_val_tensor = torch.tensor(y_data_val[task_event].fillna(-1).values, dtype=torch.float32).to(device)
+    # Convert the condition data to PyTorch tensors and move to device
+    y_data_train_tensor = torch.tensor(y_data_train_cond.values, dtype=torch.float32).to(device)
+    y_data_val_tensor = torch.tensor(y_data_val_cond.values, dtype=torch.float32).to(device)
 
-        # Create TensorDataset
-        train_dataset = TensorDataset(X_train_tensor, y_duration_train_tensor, y_event_train_tensor)
-        val_dataset = TensorDataset(X_val_tensor, y_duration_val_tensor, y_event_val_tensor)
-
+    # Create TensorDataset
+    train_dataset = TensorDataset(X_train_tensor, y_data_train_tensor)
+    val_dataset = TensorDataset(X_val_tensor, y_data_val_tensor)
+    
 
     # Create DataLoader for training and validation
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -85,11 +71,12 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
     # print(f"X_val_tensor shape: {X_val_tensor.shape}")
     # print(f"y_data_val_tensor shape: {y_data_val_tensor.shape}")
 
+    condition_size = y_data_train_cond.shape[1]  # Number of condition features
+    print (f"condition_size: {condition_size}")
 
-
-    # Step 2: Initialize the fine-tuning model with the same architecture as the pre-trained VAE
-    fine_tune_VAE = SupervisedVAE (task_type=task_type, 
-                        num_classes=num_classes,
+    fine_tune_VAE = ConditionalVAE (
+                        pretrained_vae= pretrain_VAE,
+                        condition_size=condition_size,  # Pass condition_size here
                         input_size=pretrain_VAE.input_size, 
                         latent_size=pretrain_VAE.latent_size, 
                         num_hidden_layers=pretrain_VAE.num_hidden_layers, 
@@ -103,20 +90,16 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
                         activation=pretrain_VAE.activation, 
                         use_batch_norm=pretrain_VAE.use_batch_norm)
     
+
     # setting the device right
     fine_tune_VAE.to(device)
     
-    # Step 3: Transfer learning logic
-    if transfer_learning:
-        # Load pre-trained encoder weights
-        fine_tune_VAE.encoder.load_state_dict(pretrain_VAE.encoder.state_dict())
-        # Load pre-trained decoder weights
-        fine_tune_VAE.decoder.load_state_dict(pretrain_VAE.decoder.state_dict())
-        print("Transfer learning: Initialized weights from the pre-trained VAE.")
-    else:
+    # If Random initialization, reset all parameters
+    if transfer_learning==False:
         # Random initialization (no need to load pre-trained weights)
         fine_tune_VAE.apply(_reset_params)
         print("Random initialization: Initialized weights randomly.")
+
 
 
     # Optional: If you want to freeze the encoder during fine-tuning, uncomment below:
@@ -153,7 +136,7 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
         train_loss = 0
         train_recon_loss = 0
         train_kl_loss = 0
-        train_sup_loss = 0
+        train_c_loss= 0
         
         # # KL-annealing schedule: linearly increase KL weight over the annealing period
         # kl_weight = kl_start_weight + (kl_max_weight - kl_start_weight) * min(1, epoch / kl_annealing_epochs)
@@ -162,27 +145,33 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
 
         
         for batch in train_loader:
-            if task_type == 'classification':
-                x_batch, y_batch = batch
-                y_batch = y_batch.to(device)
-            elif task_type == 'cox':
-                x_batch, duration_batch, event_batch = batch
-                duration_batch = duration_batch.to(device)
-                event_batch = event_batch.to(device)
+    
+            # Extract the actual data from the tuple        
+            x_batch, c_batch = batch
             
             x_batch = x_batch.to(device)  # Move the entire batch to the device
-            
+            c_batch = c_batch.to(device)  # Move the entire batch to the device
+            # Assuming c_tensor contains condition data with missing values marked as -1
+            c_mask = (c_batch != -1).float()  # 1 where observed, 0 where missing
+
+            # Replace missing values with zeros (or another placeholder)
+            c_batch = c_batch.clone()
+            c_batch[c_batch == -1] = 0.0
+
             optimizer.zero_grad()
             
-            x_recon, mu, log_var, supervised_out = fine_tune_VAE(x_batch)
             
-            #print(f"supervised_out shape: {supervised_out.shape}")
+            # Forward pass for decoding C with input
+            # x_recon, mu, log_var, c_decoded = fine_tune_VAE.forward_c(x_batch, c_batch, c_mask)
             
-            # Compute loss
-            if task_type == 'classification':
-                recon_loss, kl_loss, sup_loss, loss = fine_tune_VAE.loss_function(x_batch, x_recon, mu, log_var, supervised_out, y_batch, lambda_sup=lambda_sup)
-            elif task_type == 'cox':
-                recon_loss, kl_loss, sup_loss, loss = fine_tune_VAE.loss_function(x_batch, x_recon, mu, log_var, supervised_out, duration=duration_batch, event=event_batch, lambda_sup=lambda_sup)
+            # #compute loss for input X and vector C
+            # loss, recon_loss, kl_loss, c_loss = fine_tune_VAE.loss_c(x_batch, x_recon, mu, log_var, c_batch, c_decoded, c_mask)
+            
+            
+            # Forward pass for Feature-wise Linear Modulation (FiLM) of the Latent Space
+            x_recon, mu, log_var = fine_tune_VAE(x_batch, c_batch, c_mask)
+            
+            loss, recon_loss, kl_loss, c_loss = fine_tune_VAE.loss_c(x_batch, x_recon, mu, log_var)
             
             
             loss += l1_penalty(fine_tune_VAE)  # Add L1 regularization
@@ -196,12 +185,13 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
             train_loss += loss.item()
             train_recon_loss += recon_loss.item()
             train_kl_loss += kl_loss.item()
-            train_sup_loss += sup_loss.item()
+            train_c_loss += c_loss.item()
+          
             
         avg_train_loss = train_loss / len(train_loader)
         avg_train_recon_loss = train_recon_loss / len(train_loader)
         avg_train_kl_loss = train_kl_loss / len(train_loader)
-        avg_train_sup_loss = train_sup_loss / len(train_loader)
+        avg_train_c_loss = train_c_loss / len(train_loader)
 
         print(f'Epoch {epoch + 1}/{num_epochs}, Train Loss: {avg_train_loss:.4f}')
         
@@ -209,42 +199,54 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
         writer.add_scalar('Loss/train', avg_train_loss, epoch)
         writer.add_scalar('Loss/train_recon', avg_train_recon_loss, epoch)
         writer.add_scalar('Loss/train_kl', avg_train_kl_loss, epoch)
-        writer.add_scalar('Loss/train_sup', avg_train_sup_loss, epoch)
+        writer.add_scalar('Loss/train_c', avg_train_c_loss, epoch)
+
         
         # Validation loop
         fine_tune_VAE.eval()
         val_loss = 0
         val_recon_loss = 0
         val_kl_loss = 0
-        val_sup_loss = 0
+        val_c_loss= 0
+        
         with torch.no_grad():
             for batch in val_loader:
-                if task_type == 'classification':
-                    x_batch, y_batch = batch
-                    y_batch = y_batch.to(device)
-                elif task_type == 'cox':
-                    x_batch, duration_batch, event_batch = batch
-                    duration_batch = duration_batch.to(device)
-                    event_batch = event_batch.to(device)
-                    
-                x_batch = x_batch.to(device)  # Extract the actual data from the tuple
-                x_recon, mu, log_var, supervised_out = fine_tune_VAE(x_batch)
                 
-                # Compute validation loss
-                if task_type == 'classification':
-                    recon_loss, kl_loss, sup_loss, loss = fine_tune_VAE.loss_function(x_batch, x_recon, mu, log_var, supervised_out, y_batch, lambda_sup=lambda_sup)
-                elif task_type == 'cox':
-                    recon_loss, kl_loss, sup_loss, loss = fine_tune_VAE.loss_function(x_batch, x_recon, mu, log_var, supervised_out, duration=duration_batch, event=event_batch, lambda_sup=lambda_sup)
-               
+                x_batch, c_batch = batch    
+                x_batch = x_batch.to(device)  # Extract the actual data from the tuple
+                c_batch = c_batch.to(device)  # Extract the actual data from the tuple
+                
+                # Assuming c_tensor contains condition data with missing values marked as -1
+                c_mask = (c_batch != -1).float()  # 1 where observed, 0 where missing
+
+                # Replace missing values with zeros (or another placeholder)
+                c_batch = c_batch.clone()
+                c_batch[c_batch == -1] = 0.0
+
+                
+                # Forward pass for decoding C with input
+                # x_recon, mu, log_var, c_decoded = fine_tune_VAE.forward_c(x_batch, c_batch, c_mask)
+                
+                # #compute loss for input X and vector C
+                # loss, recon_loss, kl_loss, c_loss = fine_tune_VAE.loss_c(x_batch, x_recon, mu, log_var, c_batch, c_decoded, c_mask)
+                
+                
+                # Forward pass for Feature-wise Linear Modulation (FiLM) of the Latent Space
+                x_recon, mu, log_var = fine_tune_VAE(x_batch, c_batch, c_mask)
+                
+                loss, recon_loss, kl_loss, c_loss = fine_tune_VAE.loss_c(x_batch, x_recon, mu, log_var)
+                
+                
                 val_loss += loss.item()
                 val_recon_loss += recon_loss.item()
                 val_kl_loss += kl_loss.item()
-                val_sup_loss += sup_loss.item()
+                val_c_loss += c_loss.item()
+
                 
         avg_val_loss = val_loss / len(val_loader)
         avg_val_recon_loss = val_recon_loss / len(val_loader)
         avg_val_kl_loss = val_kl_loss / len(val_loader)
-        avg_val_sup_loss = val_sup_loss / len(val_loader)
+        avg_val_c_loss= val_c_loss / len(val_loader)
         
 
         # scheduler.step(avg_val_loss)
@@ -254,7 +256,7 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
         writer.add_scalar('Loss/val', avg_val_loss, epoch)
         writer.add_scalar('Loss/val_recon', avg_val_recon_loss, epoch)
         writer.add_scalar('Loss/val_kl', avg_val_kl_loss, epoch)
-        writer.add_scalar('Loss/val_sup', avg_val_sup_loss, epoch)
+        writer.add_scalar('Loss/val_c', avg_val_c_loss, epoch)
         
 
         if avg_val_loss < best_val_loss and epoch > kl_annealing_epochs:
