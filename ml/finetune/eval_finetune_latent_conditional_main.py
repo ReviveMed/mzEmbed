@@ -39,56 +39,70 @@ import seaborn as sns
 from finetune.get_finetune_encoder import  get_finetune_input_data
 from models.models_VAE import VAE
 from pretrain.train_pretrain_VAE import PretrainVAE
+from models.ConditionalVAE import ConditionalVAE
 from finetune.latent_task_predict import log_reg_multi_class, cox_proportional_hazards, cox_proportional_hazards_l1_sksurv
 
 
 
 
-def generate_latent_space(X_data, model, batch_size=128):
-    if isinstance(X_data, pd.DataFrame):
-        x_index = X_data.index
-        X_data = torch.tensor(X_data.to_numpy(), dtype=torch.float32)
-    Z = torch.tensor([])
-    model.eval()
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model.to(device)
-    with torch.inference_mode():
-        for i in range(0, len(X_data), batch_size):
-            # print(i, len(X_data))
-            X_batch = X_data[i:i+batch_size].to(device)
-            Z_batch = model.transform(X_batch)
-            Z_batch = Z_batch.cpu()
-            Z = torch.cat((Z, Z_batch), dim=0)
-        Z = Z.detach().numpy()
-        Z = pd.DataFrame(Z, index=x_index)
-    model.to('cpu')
+def generate_latent_space(X_data, y_cond, model, device,):
+    
+    model.eval()  # Set the model to evaluation mode
+    
+    # Get the index of the input data
+    x_index = X_data.index
+    
+    # Convert the input data to tensors
+    x_tensor = torch.tensor(X_data.values, dtype=torch.float32).to(device)
+    y_cond_tensor = torch.tensor(y_cond.values, dtype=torch.float32).to(device)
+    
+    # Create a mask for the conditional data
+    c_mask = (y_cond_tensor != -1).float()  # 1 where observed, 0 where missing
+
+    # Replace missing values with zeros (or another placeholder)
+    y_cond_tensor = y_cond_tensor.clone()
+    y_cond_tensor[y_cond_tensor == -1] = 0.0
+    
+    # Forward pass
+    x_recon, mu, log_var= model.forward(x_tensor, y_cond_tensor, c_mask)
+    
+    # Reparameterization trick
+    Z = model.reparameterize(mu, log_var)
+    
+    # Detach the latent space and move it to the CPU
+    Z=Z.detach().cpu().numpy()
+    Z = pd.DataFrame(Z, index=x_index)
+    
     return Z
 
 
 
 
-def generate_average_latent_space(X_data, model, batch_size, num_times=10):
+def generate_average_latent_space(X_data, y_cond, model, device, num_times=10):
+    
     latent_space_sum = None
+    
     for i in range(num_times):
-        latent_space = generate_latent_space(X_data, model, batch_size)
+        latent_space = generate_latent_space(X_data, y_cond, model, device)
         if latent_space_sum is None:
             latent_space_sum = latent_space
         else:
             latent_space_sum += latent_space  # Sum the latent spaces
     latent_space_avg = latent_space_sum / num_times  # Compute the average
+    
     return latent_space_avg
 
 
 
 
 
-def predict_task_from_latent_avg(vae_model, task, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, batch_size=64, num_times=10):
+def predict_task_from_latent_avg(vae_model, task, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, y_data_train_cond, y_data_val_cond, y_data_test_cond, device, num_times=10):
     
     # Generate latent spaces 10 times for each dataset
     # Generate averaged latent spaces
-    Z_train = generate_average_latent_space(X_data_train, vae_model, batch_size, num_times)
-    Z_val = generate_average_latent_space(X_data_val, vae_model, batch_size, num_times)
-    Z_test = generate_average_latent_space(X_data_test, vae_model, batch_size, num_times)
+    Z_train = generate_average_latent_space(X_data_train, y_data_train_cond, vae_model, device, num_times)
+    Z_val = generate_average_latent_space(X_data_val, y_data_val_cond, vae_model, device, num_times)
+    Z_test = generate_average_latent_space(X_data_test, y_data_test_cond, vae_model, device, num_times)
 
 
     (best_val_accuracy, best_val_auc, test_accuracy, test_auc)= log_reg_multi_class(task, Z_train, y_data_train, Z_val, y_data_val, Z_test, y_data_test)
@@ -99,13 +113,13 @@ def predict_task_from_latent_avg(vae_model, task, X_data_train, y_data_train, X_
 
 
 
-def predict_survival_from_latent_avg(vae_model, task, task_event, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, batch_size=64, num_times=10):
+def predict_survival_from_latent_avg(vae_model, task, task_event, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test,  y_data_train_cond, y_data_val_cond, y_data_test_cond, device, num_times=10):
     
     # Generate latent spaces 10 times for each dataset
     # Generate averaged latent spaces
-    Z_train = generate_average_latent_space(X_data_train, vae_model, batch_size, num_times)
-    Z_val = generate_average_latent_space(X_data_val, vae_model, batch_size, num_times)
-    Z_test = generate_average_latent_space(X_data_test, vae_model, batch_size, num_times)
+    Z_train = generate_average_latent_space(X_data_train, y_data_train_cond, vae_model, device, num_times)
+    Z_val = generate_average_latent_space(X_data_val, y_data_val_cond, vae_model, device, num_times)
+    Z_test = generate_average_latent_space(X_data_test, y_data_test_cond, vae_model, device, num_times)
 
 
     Y_train_OS = y_data_train[task]
@@ -133,8 +147,9 @@ def predict_survival_from_latent_avg(vae_model, task, task_event, X_data_train, 
 def dataframe_to_tensor(df, device):
     return torch.tensor(df.values, dtype=torch.float32).to(device)
 
+
 # Custom function to compute reconstruction and KL loss, normalized by the number of samples
-def compute_losses(model, X_data_train, X_data_val, X_data_test, device):
+def compute_losses(model, X_data_train, X_data_val, X_data_test, y_data_train_cond, y_data_val_cond, y_data_test_cond, device):
     
     model = model.to(device)  # Move the model to the appropriate device (GPU or CPU)
     model.eval()  # Set the model to evaluation mode
@@ -146,10 +161,20 @@ def compute_losses(model, X_data_train, X_data_val, X_data_test, device):
     X_data_test = dataframe_to_tensor(X_data_test, device)
 
     # Function to compute reconstruction and KL divergence loss, normalized by the number of samples
-    def compute_recon_kl_loss(x, model):
+    def compute_recon_kl_loss(x, y_cond, model, device):
+        
+        y_cond_tensor = torch.tensor(y_cond.values, dtype=torch.float32).to(device)
+        
+        c_mask = (y_cond_tensor != -1).float()  # 1 where observed, 0 where missing
+
+        # Replace missing values with zeros (or another placeholder)
+        y_cond_tensor = y_cond_tensor.clone()
+        y_cond_tensor[y_cond_tensor == -1] = 0.0
+        
+        
         with torch.no_grad():  # Disable gradient computation
             
-            recon_x, mu, log_var = model.forward_x(x)  # Forward pass
+            recon_x, mu, log_var = model.forward(x, y_cond_tensor, c_mask)  # Forward pass
             
             #recon_loss, kl_loss, total_loss = model.loss(x, recon_x, mu, log_var)
 
@@ -165,19 +190,19 @@ def compute_losses(model, X_data_train, X_data_val, X_data_test, device):
             return recon_loss, kl_loss, total_loss
 
     # Train dataset
-    train_recon_loss, train_kl_loss, train_total_loss = compute_recon_kl_loss(X_data_train, model)
+    train_recon_loss, train_kl_loss, train_total_loss = compute_recon_kl_loss(X_data_train, y_data_train_cond, model, device)
     losses['train_total_loss'] = train_total_loss.item()
     losses['train_recon_loss'] = train_recon_loss.item()
     losses['train_kl_loss'] = train_kl_loss.item()
 
     # Validation dataset
-    val_recon_loss, val_kl_loss, val_total_loss = compute_recon_kl_loss(X_data_val, model)
+    val_recon_loss, val_kl_loss, val_total_loss = compute_recon_kl_loss(X_data_val, y_data_val_cond, model, device)
     losses['val_total_loss'] = val_total_loss.item() 
     losses['val_recon_loss'] = val_recon_loss.item()
     losses['val_kl_loss'] = val_kl_loss.item()
 
     # Test dataset
-    test_recon_loss, test_kl_loss, test_total_loss = compute_recon_kl_loss(X_data_test, model)
+    test_recon_loss, test_kl_loss, test_total_loss = compute_recon_kl_loss(X_data_test, y_data_test_cond, model, device)
     losses['test_total_loss'] = test_total_loss.item() 
     losses['test_recon_loss'] = test_recon_loss.item()
     losses['test_kl_loss'] = test_kl_loss.item()
@@ -353,7 +378,9 @@ def main():
     finetune_save_dir = args.finetune_save_dir
     pretrain_model_df_file = args.pretrain_model_list_file
     result_name = args.result_name
-    condition_list = args.condition_list
+    condition_list_str=args.condition_list
+    condition_list=condition_list_str.split(',')
+
 
     # Read the text file into a DataFrame
     # Read the text file into a DataFrame
@@ -375,6 +402,11 @@ def main():
     (X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test)=get_finetune_input_data(input_data_location)
 
 
+    # getting the condition data
+    y_data_train_cond = y_data_train[condition_list].fillna(-1)
+    y_data_val_cond = y_data_val[condition_list].fillna(-1)
+    y_data_test_cond = y_data_val[condition_list].fillna(-1)
+    
 
     # Initialize a list to collect all results
     all_results = []
@@ -393,7 +425,7 @@ def main():
         #finetune models files
         
         # Use a modified version of task only for file naming (spaces replaced with underscores)
-        condition_list_for_filename = condition_list.replace(' ', '_')
+        condition_list_for_filename = condition_list_str.replace(' ', '_')
         
         ## TL True 
         finetune_VAE_TL_file= f'{models_path}/{condition_list_for_filename}_finetune_VAE_TL_True_best_model_state.pt'
@@ -423,17 +455,17 @@ def main():
         #getting the recon loss of the models
         # Example usage
         # Assuming model is your trained VAE model
-        losses_TL = compute_losses(finetune_VAE_TL, X_data_train, X_data_val, X_data_test, device)
-        losses_noTL = compute_losses(finetune_VAE_noTL, X_data_train, X_data_val, X_data_test, device)
+        losses_TL = compute_losses(finetune_VAE_TL, X_data_train, X_data_val, X_data_test, y_data_train_cond, y_data_val_cond, y_data_test_cond, device)
+        losses_noTL = compute_losses(finetune_VAE_noTL, X_data_train, X_data_val, X_data_test, y_data_train_cond, y_data_val_cond, y_data_test_cond, device)
 
 
         for task in task_list_cat:
             print (f'Predicting task: {task}')
             # predicting tasks using the latnet space of the VAE models with transfer learning 
-            best_val_accuracy_TL, best_val_auc_TL, test_accuracy_TL, test_auc_TL= predict_task_from_latent_avg (finetune_VAE_TL, task, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, batch_size=64, num_times=10)
+            best_val_accuracy_TL, best_val_auc_TL, test_accuracy_TL, test_auc_TL= predict_task_from_latent_avg (finetune_VAE_TL, task, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, y_data_train_cond, y_data_val_cond, y_data_test_cond, device, num_times=10)
 
             # predicting tasks using the latnet space of the VAE models without transfer learning
-            best_val_accuracy_noTL, best_val_auc_noTL, test_accuracy_noTL, test_auc_noTL= predict_task_from_latent_avg (finetune_VAE_noTL, task, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, batch_size=64, num_times=10)
+            best_val_accuracy_noTL, best_val_auc_noTL, test_accuracy_noTL, test_auc_noTL= predict_task_from_latent_avg (finetune_VAE_noTL, task, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, y_data_train_cond, y_data_val_cond, y_data_test_cond, device, num_times=10)
 
 
             # Append the results to the list
@@ -480,10 +512,10 @@ def main():
                 task_event= None
 
             # predicting survival tasks using the latnet space of the VAE models with transfer learning 
-            best_val_c_index_TL, best_test_c_index_TL, best_params_TL= predict_survival_from_latent_avg (finetune_VAE_TL, task, task_event, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, batch_size=64, num_times=10)
+            best_val_c_index_TL, best_test_c_index_TL, best_params_TL= predict_survival_from_latent_avg (finetune_VAE_TL, task, task_event, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, y_data_train_cond, y_data_val_cond, y_data_test_cond, device, num_times=10)
 
             # predicting survival tasks using the latnet space of the VAE models without transfer learning
-            best_val_c_index_noTL, best_test_c_index_noTL, best_params_noTL= predict_survival_from_latent_avg (finetune_VAE_noTL, task, task_event, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, batch_size=64, num_times=10)
+            best_val_c_index_noTL, best_test_c_index_noTL, best_params_noTL= predict_survival_from_latent_avg (finetune_VAE_noTL, task, task_event, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, y_data_train_cond, y_data_val_cond, y_data_test_cond, device, num_times=10)
 
 
             # Append the results to the list

@@ -5,11 +5,11 @@
 
 # Define common variables
 INPUT_DATA_LOCATION="/home/leilapirhaji/PROCESSED_DATA_S_8.1.1"
-FINETUNE_SAVE_DIR="/home/leilapirhaji/finetune_conditional_VAE"
+FINETUNE_SAVE_DIR="/home/leilapirhaji/finetune_conditional_VAE_FiLM"
 PRETRAIN_SAVE_DIR="/home/leilapirhaji/pretrained_models"
 PRETRAIN_MODEL_DF_FILE="/home/leilapirhaji/top_pretrain_VAE_L_410_490_e_400_p_25_S_8.1.1.txt"
 
-CONDITION_LIST='OS,NIVO OS,EVER OS,OS_Event'
+CONDITION_LIST='OS,OS_Event'
 
 
 
@@ -26,11 +26,11 @@ python ../finetune/finetune_VAE_conditional_main.py \
     --weight_decay 1e-6 1e-3 \
     --batch_size 32 \
     --patience 0 \
-    --num_epochs 30 100 20 \
-    --n_trials 30
+    --num_epochs 50 100 20 \
+    --n_trials 50
 
 
-# # # Evaluate the latent space
+# # # # Evaluate the latent space
 python ../finetune/eval_finetune_latent_conditional_main.py \
     --input_data_location $INPUT_DATA_LOCATION \
     --finetune_save_dir $FINETUNE_SAVE_DIR \

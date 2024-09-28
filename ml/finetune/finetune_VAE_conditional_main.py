@@ -114,25 +114,27 @@ def objective(trial, pretrain_VAE, X_data_train, X_data_val, y_data_train_cond, 
     
     
     try:
-        if len(trial.study.trials) == 1 or val_loss  < best_val_loss:
+        if fine_tuned_model is not None:
             
-            # Save the best model to a file
-            torch.save(fine_tuned_model, f'{best_model_path}_state.pt')
-            
-            # Save the model hyperparameters
-            hyperparameters = fine_tuned_model.get_hyperparameters()
+            if len(trial.study.trials) == 1 or val_loss  < best_val_loss:
+                
+                # Save the best model to a file
+                torch.save(fine_tuned_model, f'{best_model_path}_state.pt')
+                
+                # Save the model hyperparameters
+                hyperparameters = fine_tuned_model.get_hyperparameters()
 
-            # Filter out non-serializable values
-            serializable_hyperparameters = {k: v for k, v in hyperparameters.items() if isinstance(v, (int, float, str, bool, list, dict))}
-            
-            with open(f'{best_model_path}_model_hyperparameters.json', 'w') as f:
-                json.dump(serializable_hyperparameters, f, indent=4)
+                # Filter out non-serializable values
+                serializable_hyperparameters = {k: v for k, v in hyperparameters.items() if isinstance(v, (int, float, str, bool, list, dict))}
+                
+                with open(f'{best_model_path}_model_hyperparameters.json', 'w') as f:
+                    json.dump(serializable_hyperparameters, f, indent=4)
 
-            
-            # Copy logs to a "best logs" directory
-            if os.path.exists(best_log_dir):
-                shutil.rmtree(best_log_dir)  # Remove previous best logs
-            shutil.copytree(log_dir, best_log_dir)  # Copy current trial's logs as the best logs
+                
+                # Copy logs to a "best logs" directory
+                if os.path.exists(best_log_dir):
+                    shutil.rmtree(best_log_dir)  # Remove previous best logs
+                shutil.copytree(log_dir, best_log_dir)  # Copy current trial's logs as the best logs
 
     except ValueError:
         # Handle the case where no trials are completed yet

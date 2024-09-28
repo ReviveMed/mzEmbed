@@ -171,7 +171,7 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
             # Forward pass for Feature-wise Linear Modulation (FiLM) of the Latent Space
             x_recon, mu, log_var = fine_tune_VAE(x_batch, c_batch, c_mask)
             
-            loss, recon_loss, kl_loss, c_loss = fine_tune_VAE.loss_c(x_batch, x_recon, mu, log_var)
+            loss, recon_loss, kl_loss = fine_tune_VAE.loss(x_batch, x_recon, mu, log_var)
             
             
             loss += l1_penalty(fine_tune_VAE)  # Add L1 regularization
@@ -185,13 +185,13 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
             train_loss += loss.item()
             train_recon_loss += recon_loss.item()
             train_kl_loss += kl_loss.item()
-            train_c_loss += c_loss.item()
+            #train_c_loss += c_loss.item()
           
             
         avg_train_loss = train_loss / len(train_loader)
         avg_train_recon_loss = train_recon_loss / len(train_loader)
         avg_train_kl_loss = train_kl_loss / len(train_loader)
-        avg_train_c_loss = train_c_loss / len(train_loader)
+        #avg_train_c_loss = train_c_loss / len(train_loader)
 
         print(f'Epoch {epoch + 1}/{num_epochs}, Train Loss: {avg_train_loss:.4f}')
         
@@ -199,7 +199,7 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
         writer.add_scalar('Loss/train', avg_train_loss, epoch)
         writer.add_scalar('Loss/train_recon', avg_train_recon_loss, epoch)
         writer.add_scalar('Loss/train_kl', avg_train_kl_loss, epoch)
-        writer.add_scalar('Loss/train_c', avg_train_c_loss, epoch)
+        #writer.add_scalar('Loss/train_c', avg_train_c_loss, epoch)
 
         
         # Validation loop
@@ -234,19 +234,19 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
                 # Forward pass for Feature-wise Linear Modulation (FiLM) of the Latent Space
                 x_recon, mu, log_var = fine_tune_VAE(x_batch, c_batch, c_mask)
                 
-                loss, recon_loss, kl_loss, c_loss = fine_tune_VAE.loss_c(x_batch, x_recon, mu, log_var)
+                loss, recon_loss, kl_loss = fine_tune_VAE.loss(x_batch, x_recon, mu, log_var)
                 
                 
                 val_loss += loss.item()
                 val_recon_loss += recon_loss.item()
                 val_kl_loss += kl_loss.item()
-                val_c_loss += c_loss.item()
+                #val_c_loss += c_loss.item()
 
                 
         avg_val_loss = val_loss / len(val_loader)
         avg_val_recon_loss = val_recon_loss / len(val_loader)
         avg_val_kl_loss = val_kl_loss / len(val_loader)
-        avg_val_c_loss= val_c_loss / len(val_loader)
+        #avg_val_c_loss= val_c_loss / len(val_loader)
         
 
         # scheduler.step(avg_val_loss)
@@ -256,7 +256,7 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
         writer.add_scalar('Loss/val', avg_val_loss, epoch)
         writer.add_scalar('Loss/val_recon', avg_val_recon_loss, epoch)
         writer.add_scalar('Loss/val_kl', avg_val_kl_loss, epoch)
-        writer.add_scalar('Loss/val_c', avg_val_c_loss, epoch)
+        #writer.add_scalar('Loss/val_c', avg_val_c_loss, epoch)
         
 
         if avg_val_loss < best_val_loss and epoch > kl_annealing_epochs:
