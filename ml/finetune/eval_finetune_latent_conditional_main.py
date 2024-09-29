@@ -42,6 +42,9 @@ from pretrain.train_pretrain_VAE import PretrainVAE
 from models.ConditionalVAE import ConditionalVAE
 from finetune.latent_task_predict import log_reg_multi_class, cox_proportional_hazards, cox_proportional_hazards_l1_sksurv
 
+from finetune.eval_finetune_latent_local_main import predict_survival_from_latent_avg as predict_survival_from_latent_avg_x
+
+from finetune.eval_finetune_latent_local_main import predict_task_from_latent_avg as predict_task_from_latent_avg_x
 
 
 
@@ -51,6 +54,7 @@ def generate_latent_space(X_data, y_cond, model, device,):
     
     # Get the index of the input data
     x_index = X_data.index
+    model.to(device)  # Move the model to the appropriate device (GPU or CPU)
     
     # Convert the input data to tensors
     x_tensor = torch.tensor(X_data.values, dtype=torch.float32).to(device)
@@ -58,6 +62,7 @@ def generate_latent_space(X_data, y_cond, model, device,):
     
     # Create a mask for the conditional data
     c_mask = (y_cond_tensor != -1).float()  # 1 where observed, 0 where missing
+    c_mask = c_mask.to(device)
 
     # Replace missing values with zeros (or another placeholder)
     y_cond_tensor = y_cond_tensor.clone()
@@ -389,10 +394,12 @@ def main():
  
 
     #tasks to predict using encoder
-    task_list_cat=['Benefit BINARY', 'Nivo Benefit BINARY', 'MSKCC BINARY', 'IMDC BINARY', 'Benefit ORDINAL', 'MSKCC ORDINAL', 'IMDC ORDINAL', 'ORR', 'Benefit', 'IMDC', 'MSKCC', 'Prior_2' ]
+    # task_list_cat=['Benefit BINARY', 'Nivo Benefit BINARY', 'MSKCC BINARY', 'IMDC BINARY', 'Benefit ORDINAL', 'MSKCC ORDINAL', 'IMDC ORDINAL', 'ORR', 'Benefit', 'IMDC', 'MSKCC', 'Prior_2' ]
+
+    task_list_cat=['MSKCC BINARY', 'IMDC BINARY', 'MSKCC ORDINAL', 'IMDC ORDINAL' ]
 
     #survival tasks
-    task_list_survival=[ 'OS', 'NIVO OS', 'EVER OS', 'PFS']
+    task_list_survival=[ 'OS', 'NIVO OS', 'EVER OS']
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print (f'Device: {device}')
@@ -428,15 +435,30 @@ def main():
         condition_list_for_filename = condition_list_str.replace(' ', '_')
         
         ## TL True 
-        finetune_VAE_TL_file= f'{models_path}/{condition_list_for_filename}_finetune_VAE_TL_True_best_model_state.pt'
-        finetune_VAE_TL=torch.load(finetune_VAE_TL_file)
-
-         ## TL False 
-        finetune_VAE_noTL_file= f'{models_path}/{condition_list_for_filename}_finetune_VAE_TL_False_best_model_state.pt'
-        finetune_VAE_noTL= torch.load(finetune_VAE_noTL_file)
+        finetune_VAE_TL_file = f'{models_path}/{condition_list_for_filename}_finetune_VAE_TL_True_best_model_state.pt'
         
-
-        # getting the hyperparameters of the models
+        ## TL False 
+        finetune_VAE_noTL_file = f'{models_path}/{condition_list_for_filename}_finetune_VAE_TL_False_best_model_state.pt'
+        
+        print (f'Loading models from: {finetune_VAE_TL_file} and {finetune_VAE_noTL_file}')
+        
+        try:
+            # Load the model with transfer learning
+            finetune_VAE_TL = torch.load(finetune_VAE_TL_file)
+            # Load the model without transfer learning
+            finetune_VAE_noTL = torch.load(finetune_VAE_noTL_file)
+        except FileNotFoundError as e:
+            print(f'Error loading model: {e}')
+            print(f'Skipping trial {pretrain_id} for {pretrain_name} as one or both files do not exist.')
+            continue
+        
+        # Skip if either model is None
+        if finetune_VAE_TL is None or finetune_VAE_noTL is None:
+            print(f'Skipping trial {pretrain_id} for {pretrain_name} as one or both models are None.')
+            continue
+        
+        
+        # # getting the hyperparameters of the models
         latent_size= finetune_VAE_TL.latent_size
         num_hidden_layers= finetune_VAE_TL.num_hidden_layers
 
@@ -461,11 +483,21 @@ def main():
 
         for task in task_list_cat:
             print (f'Predicting task: {task}')
+            
             # predicting tasks using the latnet space of the VAE models with transfer learning 
+            #here the latent space is also conditioned on the condition data
             best_val_accuracy_TL, best_val_auc_TL, test_accuracy_TL, test_auc_TL= predict_task_from_latent_avg (finetune_VAE_TL, task, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, y_data_train_cond, y_data_val_cond, y_data_test_cond, device, num_times=10)
-
-            # predicting tasks using the latnet space of the VAE models without transfer learning
+            
+            # here the latent space does NOT consider the condition data
+            best_val_accuracy_TL_x, best_val_auc_TL_x, test_accuracy_TL_x, test_auc_TL_x= predict_task_from_latent_avg_x (finetune_VAE_TL, task, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, batch_size=64, num_times=10)
+            
+            ## NO transfer learning
+            #here the latent space is also conditioned on the condition data
             best_val_accuracy_noTL, best_val_auc_noTL, test_accuracy_noTL, test_auc_noTL= predict_task_from_latent_avg (finetune_VAE_noTL, task, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, y_data_train_cond, y_data_val_cond, y_data_test_cond, device, num_times=10)
+            
+            # here the latent space does NOT consider the condition data
+            best_val_accuracy_noTL_x, best_val_auc_noTL_x, test_accuracy_noTL_x, test_auc_noTL_x= predict_task_from_latent_avg_x (finetune_VAE_noTL, task, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, batch_size=64, num_times=10)
+        
 
 
             # Append the results to the list
@@ -495,7 +527,16 @@ def main():
                 'Best Val Accuracy NO TL': best_val_accuracy_noTL,
                 'Best Val AUC NO TL': best_val_auc_noTL,
                 'Test Accuracy NO TL': test_accuracy_noTL,
-                'Test AUC NO TL': test_auc_noTL
+                'Test AUC NO TL': test_auc_noTL,
+                'Best Val Accuracy TL X': best_val_accuracy_TL,
+                'Best Val AUC TL X': best_val_auc_TL_x,
+                'Test Accuracy TL X': test_accuracy_TL_x,
+                'Test AUC TL X': test_auc_TL_x,
+                'Best Val Accuracy NO TL X': best_val_accuracy_noTL_x,
+                'Best Val AUC NO TL X': best_val_auc_noTL_x,
+                'Test Accuracy NO TL X': test_accuracy_noTL_x,
+                'Test AUC NO TL X': test_auc_noTL_x
+
             }
             all_results.append(result_dict)
 
@@ -513,9 +554,18 @@ def main():
 
             # predicting survival tasks using the latnet space of the VAE models with transfer learning 
             best_val_c_index_TL, best_test_c_index_TL, best_params_TL= predict_survival_from_latent_avg (finetune_VAE_TL, task, task_event, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, y_data_train_cond, y_data_val_cond, y_data_test_cond, device, num_times=10)
+            
+            # predicting survival tasks using the latnet space of the VAE models with transfer learning 
+            best_val_c_index_TL_x, best_test_c_index_TL_x, best_params_TL_x= predict_survival_from_latent_avg_x (finetune_VAE_TL, task, task_event, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, batch_size=64, num_times=10)
+
 
             # predicting survival tasks using the latnet space of the VAE models without transfer learning
             best_val_c_index_noTL, best_test_c_index_noTL, best_params_noTL= predict_survival_from_latent_avg (finetune_VAE_noTL, task, task_event, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, y_data_train_cond, y_data_val_cond, y_data_test_cond, device, num_times=10)
+            
+            # predicting survival tasks using the latnet space of the VAE models without transfer learning
+            best_val_c_index_noTL_x, best_test_c_index_noTL_x, best_params_noT_xL= predict_survival_from_latent_avg_x (finetune_VAE_noTL, task, task_event, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test,y_data_test, batch_size=64, num_times=10)
+
+
 
 
             # Append the results to the list
@@ -542,6 +592,10 @@ def main():
                 'Best Test C-Index TL': best_test_c_index_TL,
                 'Best Val C-Index NO TL': best_val_c_index_noTL,
                 'Best Test C-Index NO TL': best_test_c_index_noTL,
+                'Best Val C-Index TL X': best_val_c_index_TL_x,
+                'Best Test C-Index TL X': best_test_c_index_TL_x,
+                'Best Val C-Index NO TL X': best_val_c_index_noTL_x,
+                'Best Test C-Index NO TL X': best_test_c_index_noTL_x,
             }
             all_results.append(result_dict)
         

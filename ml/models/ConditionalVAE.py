@@ -8,7 +8,7 @@ class ConditionalVAE(VAE):
     def __init__(self, pretrained_vae, condition_size, **kwargs):
         
         # Extract VAE-specific arguments and initialize the parent VAE class
-        kwargs = {
+        vae_kwargs = {
             'input_size': int(kwargs.get('input_size', 1)),
             'dropout_rate': float(kwargs.get('dropout_rate', 0.2)),
             'activation': kwargs.get('activation', 'leakyrelu'),
@@ -17,7 +17,7 @@ class ConditionalVAE(VAE):
             'verbose': kwargs.get('verbose', False)
         }
         
-        super(ConditionalVAE, self).__init__()
+        super(ConditionalVAE, self).__init__(**vae_kwargs)
         
         # Training parameters
         self.learning_rate = float(kwargs.get('learning_rate', 1e-5))
@@ -77,6 +77,11 @@ class ConditionalVAE(VAE):
         """
         Forward pass for Conditional VAE with FiLM conditioning.
         """
+        # Make sure input tensors are moved to the same device as the model
+        x = x.to(self.device)
+        c = c.to(self.device)
+        c_mask = c_mask.to(self.device)
+        
         # Encode x with pre-trained encoder
         h_x = self.encoder(x)
         mu_x, log_var_x = h_x.chunk(2, dim=1)
