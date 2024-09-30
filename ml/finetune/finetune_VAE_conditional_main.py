@@ -25,6 +25,10 @@ import json
 import optuna.visualization as vis
 import plotly.io as pio
 
+# One-hot encode clustering columns
+from sklearn.preprocessing import OneHotEncoder
+
+
 
 #Import my fucntions
 from finetune.get_finetune_encoder import get_finetune_input_data
@@ -325,6 +329,71 @@ def parse_range_or_single(values, is_int=False):
 
 
 
+
+# Define a function to process condition data and return the condition vector and mask
+def process_condition_data(y_data, condition_list, ohe=None):
+    
+    # Define the survival and clustering tasks
+    categorical_var = ['IMDC ORDINAL', 'MASKCC ORDINAL', 'Benefit', 'ORR', 'Treatment', 'Prior_2', 'Region', 'Sex']
+    continious_var = ['OS', 'PFS', 'NIVO OS', 'EVER OS', 'Age']
+    
+    # Identify survival and clustering columns in the condition list
+    survival_columns = [col for col in condition_list if col in continious_var]
+    clustering_columns = [col for col in condition_list if col in categorical_var]
+
+    # Extract condition data without filling missing values
+    y_data_cond = y_data[condition_list].copy()
+
+    # Create masks indicating where data is present (1) or missing (0) for the entire dataset
+    condition_mask = y_data_cond.notnull().astype(float)
+
+    # Standardize survival columns using z-score normalization
+    mean_values = {}
+    std_values = {}
+    for col in survival_columns:
+        mean_values[col] = y_data_cond[col].mean()
+        std_values[col] = y_data_cond[col].std()
+        y_data_cond[col] = (y_data_cond[col] - mean_values[col]) / std_values[col]
+
+    # Create a mask for the clustering columns
+    clustering_mask = condition_mask[clustering_columns]
+
+    # One-hot encode clustering columns without filling NaNs
+    if ohe is None:
+        ohe = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+        # Fit the encoder on the data without NaNs
+        ohe.fit(y_data_cond[clustering_columns].dropna())
+
+    # Transform the data for clustering columns
+    clustering_encoded = ohe.transform(y_data_cond[clustering_columns])
+    clustering_feature_names = ohe.get_feature_names_out(clustering_columns)
+    clustering_encoded_df = pd.DataFrame(clustering_encoded, columns=clustering_feature_names, index=y_data_cond.index)
+
+    # Create mask for the one-hot encoded columns based on the original clustering mask
+    # For each original clustering column, copy the mask to the new one-hot encoded columns
+    clustering_encoded_mask = pd.DataFrame(0, index=y_data_cond.index, columns=clustering_feature_names)
+    for original_col in clustering_columns:
+        mask = clustering_mask[original_col]
+        matching_columns = [col for col in clustering_feature_names if col.startswith(original_col + '_')]
+        clustering_encoded_mask.loc[:, matching_columns] = mask.values.reshape(-1,1)
+
+    # Drop the original clustering columns from condition_mask
+    condition_mask = condition_mask.drop(columns=clustering_columns)
+    # Add the clustering_encoded_mask to condition_mask
+    condition_mask = pd.concat([condition_mask, clustering_encoded_mask], axis=1)
+
+    # Drop the original clustering columns from y_data_cond and add the encoded columns
+    y_data_cond = y_data_cond.drop(columns=clustering_columns)
+    y_data_cond = pd.concat([y_data_cond, clustering_encoded_df], axis=1)
+
+    # Now, fill remaining missing values in y_data_cond with -1, if any remain
+    y_data_cond = y_data_cond.fillna(-1)
+
+    return y_data_cond, condition_mask, ohe
+
+
+
+
 def main ():
 
     
@@ -396,16 +465,22 @@ def main ():
     condition_list_str=args.condition_list
     condition_list=condition_list_str.split(',')
 
-    print ('task is : {task}')
     
     #get the input data
     print ('get the input data')
 
     (X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test)=get_finetune_input_data(input_data_location)
     
-    #creating conditional data from y_data
-    y_data_train_cond = y_data_train[condition_list].fillna(-1)
-    y_data_val_cond = y_data_val[condition_list].fillna(-1)
+    
+    # #creating conditional data from y_data & normalizing them
+    # Process train and validation condition data
+    y_data_train_cond, train_condition_mask, ohe = process_condition_data(
+        y_data_train, condition_list)
+    
+    y_data_val_cond, val_condition_mask, _ = process_condition_data(
+        y_data_val, condition_list, ohe)
+
+
 
     #get pretrain encoder
     print ('get pretrain encoder')

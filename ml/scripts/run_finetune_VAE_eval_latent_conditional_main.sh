@@ -1,15 +1,15 @@
 #!/bin/bash
 #running code in the backgrouhn
-#nohup ./run_finetune_VAE_eval_latent_conditional_main.sh > output_finetune.log 2>&1 &
-#tail -f output_finetune.log
+#nohup ./run_finetune_VAE_eval_latent_conditional_main.sh > output_finetune_IMDC_ordinal.log 2>&1 &
+#tail -f output_finetune_IMDC_ordinal.log
 
 # Define common variables
 INPUT_DATA_LOCATION="/home/leilapirhaji/PROCESSED_DATA_S_8.1.1"
-FINETUNE_SAVE_DIR="/home/leilapirhaji/finetune_conditional_VAE_FiLM"
+FINETUNE_SAVE_DIR="/home/leilapirhaji/finetune_conditional_VAE_FiLM/top_pretrain_optuna"
 PRETRAIN_SAVE_DIR="/home/leilapirhaji/pretrained_models"
-PRETRAIN_MODEL_DF_FILE="/home/leilapirhaji/top_pretrain_VAE_L_410_490_e_400_p_25_S_8.1.1.txt"
+PRETRAIN_MODEL_DF_FILE="/home/leilapirhaji/top_pretrain_VAE_S_8.1.1.txt"
 
-CONDITION_LIST='OS,OS_Event'
+CONDITION_LIST='IMDC ORDINAL'
 
 
 
@@ -20,10 +20,10 @@ python ../finetune/finetune_VAE_conditional_main.py \
     --pretrain_save_dir $PRETRAIN_SAVE_DIR \
     --pretrain_model_list_file $PRETRAIN_MODEL_DF_FILE \
     --condition_list "$CONDITION_LIST" \
-    --dropout_rate 0.1 0.4 0.05 \
+    --dropout_rate 0.5 0.6 0.05 \
     --learning_rate 1e-5 1e-3 \
-    --l1_reg 1e-6 1e-3 \
-    --weight_decay 1e-6 1e-3 \
+    --l1_reg 1e-6 1e-2 \
+    --weight_decay 1e-3 1e-2 \
     --batch_size 32 \
     --patience 0 \
     --num_epochs 50 100 20 \

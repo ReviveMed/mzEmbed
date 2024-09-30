@@ -42,10 +42,14 @@ class ConditionalVAE(VAE):
 
         # Condition network to produce gamma and beta for FiLM modulation
         self.condition_network = nn.Sequential(
-            nn.Linear(self.condition_size, 128),
+            nn.Linear(self.condition_size, 64),
             nn.ReLU(),
-            nn.Linear(128, 4 * self.latent_size)  # # Output gamma_mu, beta_mu, gamma_log_var, beta_log_var
+            nn.Linear(64, 2* self.latent_size)  # Output gamma, beta
         )
+        
+        # # Condition network with a single layer that directly outputs gamma and beta
+        #self.condition_network = nn.Linear(self.condition_size, 2 * self.latent_size) # Output gamma, beta
+
 
         # Condition encoder to process condition vector c
         self.condition_encoder = nn.Sequential(
@@ -92,11 +96,18 @@ class ConditionalVAE(VAE):
 
         # Pass c through the condition network to get gamma and beta
         gamma_beta = self.condition_network(c_masked)
-        gamma_mu, beta_mu, gamma_log_var, beta_log_var = gamma_beta.chunk(4, dim=1)
+        # print ('printing gamma_beta')
+        # print(gamma_beta.size())
+        # print (mu_x.size())
+        # print (log_var_x.size())
+        
+        gamma, beta = gamma_beta.chunk(2, dim=1)
+        #gamma_mu, beta_mu, gamma_log_var, beta_log_var = gamma_beta.chunk(4, dim=1)
 
         # Apply FiLM modulation to mu_x and log_var_x
-        mu = gamma_mu * mu_x + beta_mu
-        log_var = gamma_log_var * log_var_x + beta_log_var
+        mu = gamma * mu_x + beta
+        #log_var = log_var_x  # Assume log_var is the same as log_var_x
+        log_var = gamma * log_var_x + beta
 
         
         # Reparameterization trick
@@ -189,23 +200,4 @@ class ConditionalVAE(VAE):
         return total_loss, recon_loss, kl_loss, c_loss
     
     
-    def forward_x(self, x):
-        """
-        Forward pass for Conditional VAE with missing value handling.
-
-        Parameters:
-        - x: Input data tensor.
-        """
-        
-        # Encode x with pre-trained encoder
-        h_x = self.encoder(x)
-        mu_x, log_var_x = h_x.chunk(2, dim=1)
-
-        # Reparameterization trick
-        z_x = self.reparameterize(mu_x, log_var_x)
-
-        # Decode z_combined with pre-trained decoder
-        x_recon = self.decoder(z_x)
-
-        return x_recon, mu_x, log_var_x
-
+   

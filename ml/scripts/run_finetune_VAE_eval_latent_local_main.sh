@@ -7,7 +7,7 @@
 INPUT_DATA_LOCATION="/home/leilapirhaji/PROCESSED_DATA_S_8.1.1"
 FINETUNE_SAVE_DIR="/home/leilapirhaji/finetune_VAE_models"
 PRETRAIN_SAVE_DIR="/home/leilapirhaji/pretrained_models"
-PRETRAIN_MODEL_DF_FILE="/home/leilapirhaji/top_pretrain_VAE_L_410_490_e_400_p_25_S_8.1.1.txt"
+PRETRAIN_MODEL_DF_FILE="/home/leilapirhaji/top_pretrain_VAE_L_400_425_e_400_p_25_S_8.1.1.txt"
 
 
 
@@ -24,7 +24,7 @@ python ../finetune/finetune_VAE_local_main.py \
     --batch_size 32 \
     --patience 0 \
     --num_epochs 30 50 10 \
-    --n_trials 30
+    --n_trials 50
 
 
 # Evaluate the latent space

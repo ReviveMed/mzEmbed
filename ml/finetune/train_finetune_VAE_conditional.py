@@ -22,10 +22,40 @@ from torch.utils.tensorboard import SummaryWriter
 
 
 
-
 #importing the VAE model and the pretrain VAE model
 from models.models_VAE import VAE
 from models.ConditionalVAE import ConditionalVAE
+import random
+
+
+
+# Make sure to disable non-deterministic operations if exact reproducibility is crucial
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+
+
+def set_seed(seed=None):
+    """
+    Sets the seed for generating random numbers and returns the seed used.
+    
+    Parameters:
+    - seed (int): The seed value to use. If None, a random seed will be generated.
+
+    Returns:
+    - seed (int): The seed value used.
+    """
+    if seed is None:
+        seed = random.randint(0, 2**32 - 1)  # Generate a random seed if none is provided
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    return seed
+
 
 
 def _reset_params(layer):
@@ -35,9 +65,11 @@ def _reset_params(layer):
 
 
 
-def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_train_cond, y_data_val_cond, batch_size, num_epochs, learning_rate, dropout_rate, l1_reg, weight_decay, patience, transfer_learning):
+def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_train_cond, y_data_val_cond, batch_size, num_epochs, learning_rate, dropout_rate, l1_reg, weight_decay, patience, transfer_learning, latent_passes=20):
     
-    
+    # Set random seed for reproducibility
+    seed=set_seed()
+        
     # Initialize TensorBoard logging directory for each trial
     log_dir = f'{model_path}_TL_{transfer_learning}'
     os.makedirs(log_dir, exist_ok=True)
@@ -63,7 +95,7 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
     
 
     # Create DataLoader for training and validation
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, worker_init_fn=lambda worker_id: set_seed(seed))
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     # print(f"X_train_tensor shape: {X_train_tensor.shape}")
