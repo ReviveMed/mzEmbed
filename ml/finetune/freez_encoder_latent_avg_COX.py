@@ -1,4 +1,5 @@
 
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -7,6 +8,9 @@ import pandas as pd
 import numpy as np
 import random
 from lifelines.utils import concordance_index
+
+import tensorflow as tf
+from torch.utils.tensorboard import SummaryWriter
 
 
 # Define the custom CoxPH loss function
@@ -172,7 +176,7 @@ def l1_regularization(model, l1_reg_weight):
 
 
 # Define the fine-tuning model function with L1 and L2 regularization for survival analysis
-def fine_tune_cox_model(VAE_model, X_train, y_data_train, y_event_train, X_val, y_data_val, y_event_val, num_layers_to_retrain=1, add_post_latent_layers=False, num_post_latent_layers=1, post_latent_layer_size=128, num_epochs=20, batch_size=32, learning_rate=1e-4, dropout=0.2, l1_reg_weight=0.0, l2_reg_weight=0.0, latent_passes=10, seed=None, patience=0):
+def fine_tune_cox_model(VAE_model, log_path, X_train, y_data_train, y_event_train, X_val, y_data_val, y_event_val, num_layers_to_retrain=1, add_post_latent_layers=False, num_post_latent_layers=1, post_latent_layer_size=128, num_epochs=20, batch_size=32, learning_rate=1e-4, dropout=0.2, l1_reg_weight=0.0, l2_reg_weight=0.0, latent_passes=10, seed=None, patience=0):
     
     # Set seed for reproducibility
     seed = set_seed(seed)
@@ -215,6 +219,11 @@ def fine_tune_cox_model(VAE_model, X_train, y_data_train, y_event_train, X_val, 
     # DataFrame to store metrics per epoch
     metrics_per_epoch = pd.DataFrame(columns=['Epoch', 'C-index', 'Validation Loss'])
 
+    # Initialize TensorBoard logging directory for each trial
+    log_dir = log_path
+    os.makedirs(log_dir, exist_ok=True)
+    writer = SummaryWriter(log_dir=log_dir)  # Initialize SummaryWriter for TensorBoard
+        
 
     # Training loop
     for epoch in range(num_epochs):
@@ -261,7 +270,10 @@ def fine_tune_cox_model(VAE_model, X_train, y_data_train, y_event_train, X_val, 
             optimizer.step()  # Update weights based on gradients
             running_loss += loss.item()
         
-        print(f'Epoch {epoch+1}/{num_epochs}, Loss: {running_loss/len(train_loader)}')
+        avg_train_loss=running_loss/len(train_loader)
+        print(f'Epoch {epoch+1}/{num_epochs}, Loss: {avg_train_loss}')
+        # Log training loss to TensorBoard
+        writer.add_scalar('Loss/train', avg_train_loss, epoch)
 
         # Validation
         model.eval()
@@ -323,7 +335,15 @@ def fine_tune_cox_model(VAE_model, X_train, y_data_train, y_event_train, X_val, 
         # Concatenate with the existing DataFrame
         metrics_per_epoch = pd.concat([metrics_per_epoch, metrics_df], ignore_index=True)
 
-        print(f'Validation Loss: {val_loss/len(val_loader)}, C-index: {c_index}')
-
+        avg_val_loss = val_loss / len(val_loader)
+        print(f'Validation Loss: {avg_val_loss}, C-index: {c_index}')
+        # Log validation loss to TensorBoard
+        writer.add_scalar('Loss/val', avg_val_loss, epoch)
+         # Log validation loss to TensorBoard
+        writer.add_scalar('C-index val', c_index, epoch)
+        
+        
+    writer.close()  # Close the TensorBoard writer
     print('Fine-tuning completed.')
+    
     return best_model, metrics_per_epoch

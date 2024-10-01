@@ -35,7 +35,7 @@ def _reset_params(layer):
 
 
 
-def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_train, y_data_val, task, task_type, num_classes, task_event, batch_size, num_epochs, learning_rate, dropout_rate, l1_reg, weight_decay, patience, transfer_learning):
+def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_train, y_data_val, task, task_type, num_classes, lambda_sup, task_event, batch_size, num_epochs, learning_rate, dropout_rate, l1_reg, weight_decay, patience, transfer_learning):
     
     batch_size=X_data_train.shape[0]  # Set batch size to the entire dataset
     
@@ -90,6 +90,7 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
     # Step 2: Initialize the fine-tuning model with the same architecture as the pre-trained VAE
     fine_tune_VAE = SupervisedVAE (task_type=task_type, 
                         num_classes=num_classes,
+                        lambda_sup=lambda_sup,
                         input_size=pretrain_VAE.input_size, 
                         latent_size=pretrain_VAE.latent_size, 
                         num_hidden_layers=pretrain_VAE.num_hidden_layers, 
@@ -140,7 +141,6 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
     # kl_max_weight = kwargs.get('kl_max_weight', 1)  # Maximum weight for KL divergence
     kl_annealing_epochs=0
     fine_tune_VAE.kl_weight = 2.0
-    lambda_sup=1.0
 
 
     best_val_loss = np.inf
@@ -180,9 +180,9 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
             
             # Compute loss
             if task_type == 'classification':
-                recon_loss, kl_loss, sup_loss, loss = fine_tune_VAE.loss_function(x_batch, x_recon, mu, log_var, supervised_out, y_batch, lambda_sup=lambda_sup)
+                recon_loss, kl_loss, sup_loss, loss = fine_tune_VAE.loss_function(x_batch, x_recon, mu, log_var, supervised_out, y_batch)
             elif task_type == 'cox':
-                recon_loss, kl_loss, sup_loss, loss = fine_tune_VAE.loss_function(x_batch, x_recon, mu, log_var, supervised_out, duration=duration_batch, event=event_batch, lambda_sup=lambda_sup)
+                recon_loss, kl_loss, sup_loss, loss = fine_tune_VAE.loss_function(x_batch, x_recon, mu, log_var, supervised_out, duration=duration_batch, event=event_batch)
             
             
             loss += l1_penalty(fine_tune_VAE)  # Add L1 regularization
@@ -232,9 +232,9 @@ def fine_tune_vae(pretrain_VAE, model_path, X_data_train, X_data_val, y_data_tra
                 
                 # Compute validation loss
                 if task_type == 'classification':
-                    recon_loss, kl_loss, sup_loss, loss = fine_tune_VAE.loss_function(x_batch, x_recon, mu, log_var, supervised_out, y_batch, lambda_sup=lambda_sup)
+                    recon_loss, kl_loss, sup_loss, loss = fine_tune_VAE.loss_function(x_batch, x_recon, mu, log_var, supervised_out, y_batch)
                 elif task_type == 'cox':
-                    recon_loss, kl_loss, sup_loss, loss = fine_tune_VAE.loss_function(x_batch, x_recon, mu, log_var, supervised_out, duration=duration_batch, event=event_batch, lambda_sup=lambda_sup)
+                    recon_loss, kl_loss, sup_loss, loss = fine_tune_VAE.loss_function(x_batch, x_recon, mu, log_var, supervised_out, duration=duration_batch, event=event_batch)
                
                 val_loss += loss.item()
                 val_recon_loss += recon_loss.item()

@@ -31,7 +31,7 @@ from pretrain_neptune.get_pretrain_encoder import get_pretrain_encoder_from_mode
 
 
 from models.models_VAE import VAE
-from finetune.train_finetune_VAE import fine_tune_vae
+from mz_embed_engine.ml.finetune.train_finetune_VAE_unsupervised import fine_tune_vae
 
 
 

@@ -31,7 +31,7 @@ from finetune.get_finetune_encoder import get_finetune_input_data
 
 
 from models.models_VAE import VAE
-from finetune.train_finetune_VAE import fine_tune_vae
+from finetune.train_finetune_VAE_unsupervised import fine_tune_vae
 from pretrain.get_pretrain_encoder import get_pretrain_encoder_from_local
 
 

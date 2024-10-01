@@ -8,6 +8,10 @@ import numpy as np
 import random
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score, accuracy_score
 
+import tensorflow as tf
+from torch.utils.tensorboard import SummaryWriter
+
+import os
 
 # Make sure to disable non-deterministic operations if exact reproducibility is crucial
 torch.backends.cudnn.deterministic = True
@@ -179,7 +183,7 @@ class FineTuneModel(nn.Module):
 
 
 
-def fine_tune_model(VAE_model, X_train, y_data_train, X_val, y_data_val, num_classes, num_layers_to_retrain=1, add_post_latent_layers=False, num_post_latent_layers=1, post_latent_layer_size=128, num_epochs=20, batch_size=32, learning_rate=1e-4, dropout=0.2, l1_reg_weight=0.0, l2_reg_weight=0.0, latent_passes=10, seed=None, patience=0):
+def fine_tune_model(VAE_model,log_path, X_train, y_data_train, X_val, y_data_val, num_classes, num_layers_to_retrain=1, add_post_latent_layers=False, num_post_latent_layers=1, post_latent_layer_size=128, num_epochs=20, batch_size=32, learning_rate=1e-4, dropout=0.2, l1_reg_weight=0.0, l2_reg_weight=0.0, latent_passes=10, seed=None, patience=0):
     
     # Set seed for reproducibility
     if seed is not None:
@@ -226,6 +230,12 @@ def fine_tune_model(VAE_model, X_train, y_data_train, X_val, y_data_val, num_cla
     # DataFrame to store metrics per epoch
     metrics_per_epoch = pd.DataFrame(columns=['Epoch', 'Accuracy', 'Precision', 'Recall', 'F1 Score', 'AUC', 'Validation Loss'])
 
+    # Initialize TensorBoard logging directory for each trial
+    log_dir = log_path
+    os.makedirs(log_dir, exist_ok=True)
+    writer = SummaryWriter(log_dir=log_dir)  # Initialize SummaryWriter for TensorBoard
+    
+    
     # Training loop
     for epoch in range(num_epochs):
         model.train()
@@ -262,8 +272,10 @@ def fine_tune_model(VAE_model, X_train, y_data_train, X_val, y_data_val, num_cla
             optimizer.step()
             running_loss += loss.item()
         
+        avg_train_loss=running_loss/len(train_loader)
         print(f'Epoch {epoch+1}/{num_epochs}, Loss: {running_loss/len(train_loader)}')
-
+        # Log training loss to TensorBoard
+        writer.add_scalar('Loss/train', avg_train_loss, epoch)
 
         # Validation
         print  ('Validation started')
@@ -372,7 +384,14 @@ def fine_tune_model(VAE_model, X_train, y_data_train, X_val, y_data_val, num_cla
         metrics_per_epoch = pd.concat([metrics_per_epoch, metrics_df], ignore_index=True)
 
         print(f'Validation Loss: {val_loss/len(val_loader)}, Accuracy: {accuracy}%, Precision: {precision}%, Recall: {recall}%, F1 Score: {f1}%, AUC: {auc}%')
-
+        
+        avg_val_loss = val_loss / len(val_loader)
+        # Log validation loss to TensorBoard
+        writer.add_scalar('Loss/val', avg_val_loss, epoch)
+         # Log validation loss to TensorBoard
+        writer.add_scalar('AUC val', auc, epoch)
+        
+    writer.close()  # Close the TensorBoard writer
     print('Fine-tuning completed.')
     return best_model, metrics_per_epoch
 

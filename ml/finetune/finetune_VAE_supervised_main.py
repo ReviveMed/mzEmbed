@@ -36,7 +36,7 @@ from pretrain.get_pretrain_encoder import get_pretrain_encoder_from_local
 
 
 
-def objective(trial, pretrain_VAE, X_data_train, X_data_val, y_data_train, y_data_val, task, task_type, num_classes, task_event, transfer_learning, result_name, combined_params):
+def objective(trial, pretrain_VAE, X_data_train, X_data_val, y_data_train, y_data_val, task, task_type, num_classes, lambda_sup, task_event, transfer_learning, result_name, combined_params):
     """
     Objective function for Optuna optimization.
     
@@ -104,7 +104,7 @@ def objective(trial, pretrain_VAE, X_data_train, X_data_val, y_data_train, y_dat
 
     
     # Call fine_tune_vae with the suggested hyperparameters
-    fine_tuned_model, val_loss, log_dir = fine_tune_vae(pretrain_VAE, result_name, X_data_train, X_data_val, y_data_train, y_data_val, task, task_type, num_classes, task_event, batch_size, num_epochs, learning_rate, dropout_rate, l1_reg, weight_decay, patience, transfer_learning)
+    fine_tuned_model, val_loss, log_dir = fine_tune_vae(pretrain_VAE, result_name, X_data_train, X_data_val, y_data_train, y_data_val, task, task_type, num_classes, lambda_sup, task_event, batch_size, num_epochs, learning_rate, dropout_rate, l1_reg, weight_decay, patience, transfer_learning)
     
     # Save the model if it's the first trial or has the best performance so far
     # Track the best model and logs
@@ -143,7 +143,7 @@ def objective(trial, pretrain_VAE, X_data_train, X_data_val, y_data_train, y_dat
 
 
 
-def optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, y_data_train, y_data_val, task, task_type, num_classes, task_event, transfer_learning, result_name, combined_params, n_trials=50):
+def optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, y_data_train, y_data_val, task, task_type, num_classes, lambda_sup, task_event, transfer_learning, result_name, combined_params, n_trials=50):
     """
     Optimize the fine-tuning of a VAE using Optuna.
     
@@ -159,7 +159,7 @@ def optimize_finetune_vae(pretrain_VAE, X_data_train, X_data_val, y_data_train, 
     study = optuna.create_study(direction='minimize')
 
     # Define the objective function
-    study.optimize(lambda trial: objective(trial, pretrain_VAE, X_data_train, X_data_val, y_data_train, y_data_val, task, task_type, num_classes, task_event, transfer_learning, result_name, combined_params), n_trials=n_trials )
+    study.optimize(lambda trial: objective(trial, pretrain_VAE, X_data_train, X_data_val, y_data_train, y_data_val, task, task_type, num_classes, lambda_sup, task_event, transfer_learning, result_name, combined_params), n_trials=n_trials )
 
     # Print the best hyperparameters
     print("Best hyperparameters:", study.best_params)
@@ -363,6 +363,10 @@ def main ():
                         help='The censoring event for the cox analysis task')
     
     # Add arguments for the hyperparameters
+    parser.add_argument('--lambda_sup', type=float,
+                        default=1,
+                        help='lambda_sup: is the weight of the supervised loss in the total loss function. It is a float number.')
+    
     parser.add_argument('--dropout_rate', nargs='*', default=[0.1], 
                         help='Dropout rate: Either a single value or "min max step" for range (float)')
     parser.add_argument('--learning_rate', nargs='*', default=["1e-5", "1e-2"], 
@@ -404,6 +408,7 @@ def main ():
     task=args.task
     task_type=args.task_type
     num_classes=int(args.num_classes)
+    lambda_sup=float(args.lambda_sup)
     task_event=args.task_event
     n_trials = args.n_trials
 
@@ -438,9 +443,9 @@ def main ():
         result_file_name = f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_id}/{task_for_filename}_finetune_VAE_combined_optimization_history_TL_rand.html'
 
         # Check if the output file already exists
-        if os.path.exists(result_file_name):
-            print(f'Output file {result_file_name} already exists. Skipping this model.')
-            continue  # Skip to the next pretrain_modelID
+        # if os.path.exists(result_file_name):
+        #     print(f'Output file {result_file_name} already exists. Skipping this model.')
+        #     continue  # Skip to the next pretrain_modelID
 
 
         (pretrain_VAE, Z_pretrain_train, Z_pretrain_val, Z_pretrain_test)=get_pretrain_encoder_from_local(pretrain_name, pretrain_id, pretrain_save_dir)
@@ -468,6 +473,7 @@ def main ():
                                         task,
                                         task_type,
                                         num_classes,
+                                        lambda_sup,
                                         task_event,
                                         transfer_learning, result_name, combined_params, n_trials=n_trials)
 
@@ -485,6 +491,7 @@ def main ():
                                             task,
                                             task_type,
                                             num_classes,
+                                            lambda_sup,
                                             task_event,
                                             transfer_learning, result_name, combined_params, n_trials=n_trials)
 

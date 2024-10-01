@@ -28,15 +28,15 @@ class CoxPHLoss(nn.Module):
         # Create a mask to exclude missing values
         valid_mask = (duration != -1) & (event != -1)
         if valid_mask.sum() == 0:
-            return torch.tensor(0.0, requires_grad=True)
+            return torch.tensor(0.0, requires_grad=False)
 
         # Apply the mask
         duration = duration[valid_mask]
         event = event[valid_mask]
         risk = risk[valid_mask]
 
-        # Sort by duration in descending order
-        idx = torch.argsort(duration, descending=True)
+        # Sort by duration 
+        idx = torch.argsort(duration, descending=False) # Ascending order for pair comparison
         duration = duration[idx]
         event = event[idx]
         risk = risk[idx]
@@ -53,7 +53,27 @@ class CoxPHLoss(nn.Module):
         # Return the negative log-likelihood as the loss
         return -torch.mean(log_likelihood)
 
+        # # Get the pairwise comparison matrix for durations
+        # duration_diff = duration.unsqueeze(0) - duration.unsqueeze(1)
+        # risk_diff = risk.unsqueeze(0) - risk.unsqueeze(1)
 
+        # # Mask for valid comparisons (duration[i] < duration[j] and event[j] == 1)
+        # valid_pairs = (duration_diff < 0).float() * event.unsqueeze(0)  # Only when j has an event
+
+        # # Count concordant, discordant, and tied pairs
+        # concordant = (valid_pairs * (risk_diff > 0).float()).sum().item()
+        # discordant = (valid_pairs * (risk_diff < 0).float()).sum().item()
+        # tied = (valid_pairs * (risk_diff == 0).float()).sum().item()
+
+        # # Total number of comparable pairs
+        # total_pairs = concordant + discordant + tied
+        # if total_pairs == 0:
+        #     return torch.tensor(0.0, requires_grad=False)
+
+        # # Calculate the C-index
+        # return 1 - torch.tensor((concordant + 0.5 * tied) / total_pairs, requires_grad=False)
+        
+        
 
 
 
@@ -100,11 +120,13 @@ class MaskedBCELoss(nn.Module):
 
 
 class SupervisedVAE(PretrainVAE):
-    def __init__(self, task_type='classification', num_classes=2, **kwargs):
+    def __init__(self, task_type='classification', num_classes=2, lambda_sup=1, **kwargs):
+    
         super().__init__(**kwargs)
         
         self.task_type = task_type
         self.num_classes = num_classes
+        self.lambda_sup = lambda_sup
         
         # Adjust the classification head based on the task
         if task_type == 'classification':
@@ -152,7 +174,7 @@ class SupervisedVAE(PretrainVAE):
         return recon_x, mu, logvar, supervised_out
 
 
-    def loss_function(self, x, recon_x, mu, logvar, supervised_out, y=None, duration=None,event=None, lambda_sup=1.0):
+    def loss_function(self, x, recon_x, mu, logvar, supervised_out, y=None, duration=None,event=None):
         """
         Compute the total loss including:
         - VAE reconstruction loss
@@ -181,6 +203,6 @@ class SupervisedVAE(PretrainVAE):
             supervised_loss = supervised_loss_fn(supervised_out, duration, event)
 
         # Total loss = reconstruction + KL + supervised loss
-        total_loss = recon_loss + self.kl_weight * kl_loss + lambda_sup * supervised_loss
+        total_loss = recon_loss + self.kl_weight * kl_loss + self.lambda_sup * supervised_loss
         
         return recon_loss, kl_loss, supervised_loss, total_loss
