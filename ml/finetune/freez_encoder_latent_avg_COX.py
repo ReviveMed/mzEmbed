@@ -11,7 +11,7 @@ from lifelines.utils import concordance_index
 
 import tensorflow as tf
 from torch.utils.tensorboard import SummaryWriter
-
+import copy
 
 # Define the custom CoxPH loss function
 class CoxPHLoss(nn.Module):
@@ -176,7 +176,7 @@ def l1_regularization(model, l1_reg_weight):
 
 
 # Define the fine-tuning model function with L1 and L2 regularization for survival analysis
-def fine_tune_cox_model(VAE_model, log_path, X_train, y_data_train, y_event_train, X_val, y_data_val, y_event_val, num_layers_to_retrain=1, add_post_latent_layers=False, num_post_latent_layers=1, post_latent_layer_size=128, num_epochs=20, batch_size=32, learning_rate=1e-4, dropout=0.2, l1_reg_weight=0.0, l2_reg_weight=0.0, latent_passes=10, seed=None, patience=0):
+def fine_tune_cox_model(VAE_model, model_path, X_train, y_data_train, y_event_train, X_val, y_data_val, y_event_val, num_layers_to_retrain=1, add_post_latent_layers=False, num_post_latent_layers=1, post_latent_layer_size=128, num_epochs=20, batch_size=32, learning_rate=1e-4, dropout=0.2, l1_reg_weight=0.0, l2_reg_weight=0.0, latent_passes=20, seed=None, patience=0):
     
     # Set seed for reproducibility
     seed = set_seed(seed)
@@ -218,9 +218,10 @@ def fine_tune_cox_model(VAE_model, log_path, X_train, y_data_train, y_event_trai
 
     # DataFrame to store metrics per epoch
     metrics_per_epoch = pd.DataFrame(columns=['Epoch', 'C-index', 'Validation Loss'])
+    best_val_metrics = pd.DataFrame(columns=['Epoch', 'C-index', 'Validation Loss'])
 
     # Initialize TensorBoard logging directory for each trial
-    log_dir = log_path
+    log_dir = model_path
     os.makedirs(log_dir, exist_ok=True)
     writer = SummaryWriter(log_dir=log_dir)  # Initialize SummaryWriter for TensorBoard
         
@@ -305,25 +306,16 @@ def fine_tune_cox_model(VAE_model, log_path, X_train, y_data_train, y_event_trai
                 all_events.extend(events[valid_mask].cpu().numpy())
                 all_risks.extend(outputs[valid_mask].squeeze().cpu().numpy())
 
+        avg_val_loss = val_loss / len(val_loader)
+        
         # Calculate C-index
         c_index = concordance_index(all_durations, -np.array(all_risks), all_events)
-
-        # Check early stopping condition
-        # Early stopping logic (if patience > 0)
-        if patience > 0:
-            if c_index > best_c_index:
-                best_c_index = c_index
-                best_model = model # Save the best model state
-                patience_counter = 0  # Reset patience counter
-            else:
-                patience_counter += 1
-
-            # If no improvement for `patience` epochs, stop training
-            if patience_counter >= patience:
-                print(f'Early stopping triggered at epoch {epoch+1}')
-                break
-        else:
-            best_model = model
+        print(f'Validation Loss: {avg_val_loss}, C-index: {c_index}')
+        
+        # Log validation loss to TensorBoard
+        writer.add_scalar('Loss/val', avg_val_loss, epoch)
+         # Log validation loss to TensorBoard
+        writer.add_scalar('C-index val', c_index, epoch)
 
         # Create a DataFrame with the metrics for the current epoch
         metrics_df = pd.DataFrame({
@@ -335,15 +327,25 @@ def fine_tune_cox_model(VAE_model, log_path, X_train, y_data_train, y_event_trai
         # Concatenate with the existing DataFrame
         metrics_per_epoch = pd.concat([metrics_per_epoch, metrics_df], ignore_index=True)
 
-        avg_val_loss = val_loss / len(val_loader)
-        print(f'Validation Loss: {avg_val_loss}, C-index: {c_index}')
-        # Log validation loss to TensorBoard
-        writer.add_scalar('Loss/val', avg_val_loss, epoch)
-         # Log validation loss to TensorBoard
-        writer.add_scalar('C-index val', c_index, epoch)
+        # Check early stopping condition
+        if c_index > best_c_index:
+            best_c_index = c_index
+            # Save the best
+            torch.save(model, f'{model_path}/best_model.pth')
+            patience_counter = 0  # Reset patience counter
+            best_val_metrics = metrics_per_epoch
+        else:
+            patience_counter += 1
+
+        # Early stopping logic (if patience > 0)
+        if patience > 0:
+            # If no improvement for `patience` epochs, stop training
+            if patience_counter >= patience:
+                print(f'Early stopping triggered at epoch {epoch+1}')
+                break
         
         
     writer.close()  # Close the TensorBoard writer
     print('Fine-tuning completed.')
     
-    return best_model, metrics_per_epoch
+    return best_val_metrics

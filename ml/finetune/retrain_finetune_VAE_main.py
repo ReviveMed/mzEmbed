@@ -12,7 +12,9 @@ from sklearn.preprocessing import LabelEncoder
 label_encoder = LabelEncoder()
 import optuna
 
-
+from collections.abc import Iterable
+from itertools import product
+    
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -196,79 +198,6 @@ def save_optuna_study_results_as_html(study, combined_params, save_dir, file_nam
 
 
 
-def retrain_finetune_VAE_TL_noTL_fixed_hyper_par(finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, finetune_save_dir, pretrain_name, pretrain_trial_id, seed, patience=0, **kwargs):
-
-    # Default configuration for fine-tuning, which can be overridden by kwargs
-    config = {
-        'X_train': X_data_train,
-        'y_data_train': y_data_train[task],
-        'y_event_train': y_data_train[task_event],
-        'X_val': X_data_val,
-        'y_data_val': y_data_val[task],
-        'y_event_val': y_data_val[task_event],
-        'num_layers_to_retrain': 1,
-        'add_post_latent_layers': False,
-        'num_post_latent_layers': 1,
-        'post_latent_layer_size': 32,
-        'num_epochs': 30,
-        'batch_size': 32,
-        'learning_rate': 1e-5,
-        'dropout': 0.25,
-        'l1_reg_weight': 1e-7,
-        'l2_reg_weight': 1e-7,
-        'latent_passes': 20,
-        'seed': seed  # Set seed for reproducibility
-    }
-
-    # Update config with additional kwargs if provided
-    config.update(kwargs)
-
-    #path to pre-train and fine-tune models
-    model_path=f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_trial_id}'
-    
-    # Fine-tune TL model
-    model_TL, val_metrics_TL = fine_tune_cox_model(
-        VAE_model=finetune_VAE_TL,  # Pass the model separately
-        model_path=f'{model_path}/TL_{task}',
-        patience=patience,  # Early stopping patience
-        **config  # Unpack the rest of the arguments from the config
-    )
-
-    # Fine-tune no TL model
-    model_noTL, val_metrics_noTL = fine_tune_cox_model(
-        VAE_model=finetune_VAE_noTL,  # Pass the model separately
-        model_path=f'{model_path}/TL_{task}',
-        patience=patience,  # Early stopping patience
-        **config  # Unpack the rest of the arguments from the config
-    )
-
-    # Evaluate both models on the test set
-    result_metrics_TL, latent_rep_train, latent_rep_val, latent_rep_test = best_finetune_model_test_eval_cox(
-        model_TL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed)
-
-    result_metrics_noTL, latent_rep_train, latent_rep_val, latent_rep_test = best_finetune_model_test_eval_cox(
-        model_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed, 
-    )
-
-    #saving the fine-tuned models
-
-    # Add model labels to differentiate between Transfer Learning and No Transfer Learning results
-    result_metrics_TL['Model'] = 'Transfer Learning'
-    result_metrics_noTL['Model'] = 'No Transfer Learning'
-
-    # Combine both results into a single DataFrame
-    results_combined_df = pd.concat([result_metrics_TL, result_metrics_noTL], ignore_index=True)
-
-    # Move the 'Model' column to the front for clarity
-    results_combined_df = results_combined_df[['Model', 'Dataset', 'C-index']]
-
-    return results_combined_df
-
-
-
-
-
-
 def objective(trial, finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, task, task_type, num_classes, task_event, seed, model_path, combined_params, patience=0, latent_passes= 20, **kwargs):
     
 
@@ -290,11 +219,11 @@ def objective(trial, finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_tr
     
     # Hyperparameters to optimize common to VAEs
     # Dropout rate: float range or fixed
-    if isinstance(combined_params['dropout_rate'], tuple):
-        min_val, max_val, step = combined_params['dropout_rate']
-        dropout_rate = trial.suggest_float('dropout_rate', min_val, max_val, step=step)
+    if isinstance(combined_params['dropout'], tuple):
+        min_val, max_val, step = combined_params['dropout']
+        dropout = trial.suggest_float('dropout', min_val, max_val, step=step)
     else:
-        dropout_rate = combined_params['dropout_rate']
+        dropout = combined_params['dropout']
         
     # Learning rate: loguniform or fixed
     if isinstance(combined_params['learning_rate'], tuple):
@@ -302,17 +231,17 @@ def objective(trial, finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_tr
     else:
         learning_rate = combined_params['learning_rate']
         
-    # L2 regularization: loguniform or fixed
-    if isinstance(combined_params['l1_reg'], tuple):
-        l1_reg = trial.suggest_loguniform('l1_reg', combined_params['l1_reg'][0], combined_params['l1_reg'][1])
+    # L1 regularization: loguniform or fixed
+    if isinstance(combined_params['l1_reg_weight'], tuple):
+        l1_reg_weight = trial.suggest_loguniform('l1_reg_weight', combined_params['l1_reg_weight'][0], combined_params['l1_reg_weight'][1])
     else:
-        l1_reg = combined_params['l1_reg']
+        l1_reg_weight = combined_params['l1_reg_weight']
 
     # Weight decay: loguniform or fixed
-    if isinstance(combined_params['weight_decay'], tuple):
-        weight_decay = trial.suggest_loguniform('weight_decay', combined_params['weight_decay'][0],combined_params['weight_decay'][1] )
+    if isinstance(combined_params['l2_reg_weight'], tuple):
+        l2_reg_weight = trial.suggest_loguniform('l2_reg_weight', combined_params['l2_reg_weight'][0],combined_params['l2_reg_weight'][1] )
     else:
-        weight_decay = combined_params['weight_decay']
+        l2_reg_weight = combined_params['l2_reg_weight']
 
     # Batch size: categorical (fixed list of values) or fixed
     if isinstance(combined_params['batch_size'], tuple):
@@ -349,9 +278,9 @@ def objective(trial, finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_tr
         'num_epochs': num_epochs,
         'batch_size': batch_size,
         'learning_rate': learning_rate,
-        'dropout': dropout_rate,
-        'l1_reg_weight': l1_reg,
-        'l2_reg_weight': weight_decay,
+        'dropout': dropout,
+        'l1_reg_weight': l1_reg_weight,
+        'l2_reg_weight': l2_reg_weight,
         'latent_passes': latent_passes,
         'seed': seed
     }
@@ -361,14 +290,14 @@ def objective(trial, finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_tr
         config['num_classes'] = num_classes
         model_TL, val_metrics_TL = fine_tune_model(
             VAE_model=finetune_VAE_TL, 
-            log_path=f"{model_path}/TL_{task.replace(' ','_')}_log",
+            log_path=f"{model_path}/temp_log",
             **config  # Unpack the rest of the arguments from the config
         )
 
         # Fine-tune no TL model
         model_noTL, val_metrics_noTL = fine_tune_model(
             VAE_model=finetune_VAE_noTL, 
-            log_path=f"{model_path}/noTL_{task.replace(' ','_')}_log",
+            log_path=f"{model_path}/temp_log",
             **config  # Unpack the rest of the arguments from the config
         )        
     
@@ -378,7 +307,7 @@ def objective(trial, finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_tr
         config['y_event_val']= y_data_val[task_event]
         model_TL, val_metrics_TL = fine_tune_cox_model(
             VAE_model=finetune_VAE_TL, 
-            log_path=f"{model_path}/TL_{task.replace(' ','_')}_log",
+            log_path=f"{model_path}/temp_log",
             patience=patience,  # Early stopping patience
             **config  # Unpack the rest of the arguments from the config
         )
@@ -386,7 +315,7 @@ def objective(trial, finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_tr
         # Fine-tune no TL model
         model_noTL, val_metrics_noTL = fine_tune_cox_model(
             VAE_model=finetune_VAE_noTL, 
-            log_path=f"{model_path}/noTL_{task.replace(' ','_')}_log",
+            log_path=f"{model_path}/temp_log",
             patience=patience,  # Early stopping patience
             **config  # Unpack the rest of the arguments from the config
         )
@@ -394,8 +323,8 @@ def objective(trial, finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_tr
     else: 
         raise ValueError('Task type must be either "classification" or "cox"')
 
-    best_log_dir = f"{model_path}/TL_{task.replace(' ','_')}_best_logs"
-    log_dir=f"{model_path}/TL_{task.replace(' ','_')}_log"
+    best_log_dir = f"{model_path}/TL_{task.replace(' ','_')}_best_logs_optuna"
+    log_dir=f"{model_path}/temp_log"
 
     if task_type=='classification':
         val_auc_TL = val_metrics_TL['AUC'].iloc[-1]
@@ -431,8 +360,8 @@ def objective(trial, finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_tr
         raise ValueError('Task type must be either "classification" or "cox"')
     
     # Save the best models
-    torch.save(best_model_TL, f"{model_path}/finetune_TL_{task.replace(' ','_')}_best_model.pth")
-    torch.save(best_model_noTL, f"{model_path}/finetune_noTL_{task.replace(' ','_')}_best_model.pth")
+    torch.save(best_model_TL, f"{model_path}/finetune_TL_{task.replace(' ','_')}_best_model_optuna.pth")
+    torch.save(best_model_noTL, f"{model_path}/finetune_noTL_{task.replace(' ','_')}_best_model_optuna.pth")
 
     
     # return auc_avg
@@ -451,8 +380,8 @@ def retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_V
 
 
     # Evaluate both models on the test set
-    best_model_TL=torch.load(f"{model_path}/finetune_TL_{task.replace(' ','_')}_best_model.pth")
-    best_model_noTL=torch.load(f"{model_path}/finetune_noTL_{task.replace(' ','_')}_best_model.pth")
+    best_model_TL=torch.load(f"{model_path}/finetune_TL_{task.replace(' ','_')}_best_model_optuna.pth")
+    best_model_noTL=torch.load(f"{model_path}/finetune_noTL_{task.replace(' ','_')}_best_model_optuna.pth")
 
     if task_type=='classification':
         #TL
@@ -487,6 +416,229 @@ def retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_V
 
     return study, results_combined_df
 
+
+
+import os
+import pandas as pd
+
+def save_grid_search_results(results_list, model_path, task):
+    
+    file_path = f"{model_path}/{task.replace(' ', '_')}_all_grid_search_results.csv"
+    
+    # Convert results_list to a DataFrame
+    new_results_df = pd.DataFrame(results_list)
+    
+    # Check if the CSV file exists
+    if os.path.exists(file_path):
+        try:
+            # If the file exists, read the existing results into a DataFrame
+            existing_df = pd.read_csv(file_path)
+        except pd.errors.EmptyDataError:
+            # If the file is empty, create an empty DataFrame
+            existing_df = pd.DataFrame()
+        
+        # Append the new results
+        combined_df = pd.concat([existing_df, new_results_df], ignore_index=True)
+        
+        # Remove duplicates based on all columns
+        combined_df = combined_df.drop_duplicates()
+    else:
+        # If the file doesn't exist, the new results are the only data
+        combined_df = new_results_df
+    
+    # Save the updated DataFrame back to the CSV file
+    combined_df.to_csv(file_path, index=False)
+
+
+
+def retrain_finetune_VAE_TL_noTL_grid_search_optimization(
+    finetune_VAE_TL_OG, finetune_VAE_noTL_OG,
+    X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test,
+    task, task_type, num_classes, task_event, seed, model_path, combined_params):
+    
+    # Default configuration for fine-tuning, which can be overridden by kwargs
+    config = {
+        'X_train': X_data_train,
+        'y_data_train': y_data_train[task],
+        'X_val': X_data_val,
+        'y_data_val': y_data_val[task],
+        'seed': seed
+    }
+
+    for key, value in combined_params.items():
+        # Check if the value is an iterable but not a string or bytes
+        if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
+            # Wrap the value in a list if it's not iterable
+            combined_params[key] = [value]
+    print ('combined_params:', combined_params)
+    
+    param_names = list(combined_params.keys())
+    param_values = list(combined_params.values())
+    all_param_combinations = list(product(*param_values))
+    
+    print ('Nummber of grid search paramteres:', len(all_param_combinations))
+
+    best_val_metric = -float('inf')  # Initialize to a very low value to keep track of the best metric
+    best_params = None  # Variable to store the best parameters
+    
+    results_list = []  # List to store results for summary table
+    # creating directory to save the results
+    temp_path_TL = f"{model_path}/temp_path_TL"
+    temp_path_noTL = f"{model_path}/temp_path_noTL"
+    best_model_dir_noTL = f"{model_path}/noTL_{task.replace(' ', '_')}_best_model_grid_search"
+    best_model_dir_TL = f"{model_path}/TL_{task.replace(' ', '_')}_best_model_grid_search"
+    
+
+    for idx, param_values in enumerate(all_param_combinations):
+        
+        param_combination = dict(zip(param_names, param_values))
+        # Create a config for this combination
+        config_combination = config.copy()
+        config_combination.update(param_combination)
+
+        finetune_VAE_TL=copy.deepcopy(finetune_VAE_TL_OG)
+        finetune_VAE_noTL=copy.deepcopy(finetune_VAE_noTL_OG)
+
+        if task_type == 'classification':
+            # Fine-tune TL model
+            config_combination['num_classes'] = num_classes
+
+            val_metrics_TL = fine_tune_model(
+                VAE_model=finetune_VAE_TL,
+                model_path=temp_path_TL,
+                **config_combination  # Unpack the rest of the arguments from the config
+            )
+
+            # Fine-tune no TL model
+            val_metrics_noTL = fine_tune_model(
+                VAE_model=finetune_VAE_noTL,
+                model_path=temp_path_noTL,
+                **config_combination  # Unpack the rest of the arguments from the config
+            )
+
+            # Evaluate models
+            if num_classes == 2:
+                val_metric_TL = val_metrics_TL['AUC'].iloc[-1]
+                val_metric_noTL = val_metrics_noTL['AUC'].iloc[-1]
+            else:
+                val_metric_TL = val_metrics_TL['F1 Score'].iloc[-1]
+                val_metric_noTL = val_metrics_noTL['F1 Score'].iloc[-1]
+            
+            # Collect results
+            result_entry = param_combination.copy()
+            result_entry['val_metric_TL'] = val_metric_TL
+            result_entry['val_metric_noTL'] = val_metric_noTL
+            results_list.append(result_entry)
+
+            if val_metric_TL > best_val_metric:
+                best_val_metric = val_metric_TL
+                best_params = param_combination.copy()
+
+                # Copy temp to a "best model" directory - TL
+                if os.path.exists(best_model_dir_TL):
+                    shutil.rmtree(best_model_dir_TL)  # Remove previous best logs
+                shutil.copytree(temp_path_TL, best_model_dir_TL)  # Copy current trial's logs
+                
+                # Copy logs to a "best logs" directory - noTL
+                if os.path.exists(best_model_dir_noTL):
+                    shutil.rmtree(best_model_dir_noTL)  # Remove previous best logs
+                shutil.copytree(temp_path_noTL, best_model_dir_noTL)  # Copy current trial's logs 
+
+        elif task_type == 'cox':
+            # Fine-tune TL model
+            config_combination['y_event_train'] = y_data_train[task_event]
+            config_combination['y_event_val'] = y_data_val[task_event]
+
+            val_metrics_TL = fine_tune_cox_model(
+                VAE_model=finetune_VAE_TL,
+                model_path=temp_path_TL,
+                **config_combination  # Unpack the rest of the arguments from the config
+            )
+
+            # Fine-tune no TL model
+            val_metrics_noTL = fine_tune_cox_model(
+                VAE_model=finetune_VAE_noTL,
+                model_path=temp_path_noTL,
+                **config_combination  # Unpack the rest of the arguments from the config
+            )
+
+            # Evaluate models
+            val_c_index_TL = val_metrics_TL['C-index'].iloc[-1]
+            val_c_index_noTL = val_metrics_noTL['C-index'].iloc[-1]
+
+            # Collect results
+            result_entry = param_combination.copy()
+            result_entry['val_c_index_TL'] = val_c_index_TL
+            result_entry['val_c_index_noTL'] = val_c_index_noTL
+            results_list.append(result_entry)
+
+            if val_c_index_TL > best_val_metric:
+                
+                best_val_metric = val_c_index_TL
+                best_params = param_combination.copy()
+
+                # Copy the model to a "best model" directory - TL
+                if os.path.exists(best_model_dir_TL):
+                    shutil.rmtree(best_model_dir_TL)  # Remove previous best logs
+                shutil.copytree(temp_path_TL, best_model_dir_TL)  # Copy current trial's logs
+                
+                # Copy the model to a "best model" directory - no TL
+                if os.path.exists(best_model_dir_noTL):
+                    shutil.rmtree(best_model_dir_noTL)  # Remove previous best logs
+                shutil.copytree(temp_path_noTL, best_model_dir_noTL)  # Copy current trial's logs 
+
+        else:
+            raise ValueError('Task type must be either "classification" or "cox"')
+
+
+    #remove temp_path
+    shutil.rmtree(temp_path_TL)  
+    shutil.rmtree(temp_path_noTL) 
+    
+    # Optionally, save the best parameters
+    with open(f"{model_path}/{task.replace(' ', '_')}_best_params_grid_search.txt", 'w') as f:
+        f.write(str(best_params))
+        
+
+    # Save the results to a CSV file
+    save_grid_search_results(results_list, model_path, task)
+
+    # load the best models
+    best_model_TL= torch.load(f"{best_model_dir_TL}/best_model.pth")
+    best_model_noTL= torch.load( f"{best_model_dir_noTL}/best_model.pth")
+
+    # Evaluate both models on the test set
+    if task_type=='classification':
+        #TL
+        # Evaluate both models on the test set
+        result_metrics_TL,latent_rep_train, latent_rep_val, latent_rep_test = evaluate_model_main(
+            best_model_TL, X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, task, num_classes, seed)
+        #NO TL
+        result_metrics_noTL, latent_rep_train, latent_rep_val, latent_rep_test = evaluate_model_main(
+            best_model_noTL, X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, task, num_classes, seed
+        )
+    
+    elif task_type=='cox':
+        #TL
+        result_metrics_TL,latent_rep_train, latent_rep_val, latent_rep_test = best_finetune_model_test_eval_cox(
+            best_model_TL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed)
+        #NO TL
+        result_metrics_noTL, latent_rep_train, latent_rep_val, latent_rep_test = best_finetune_model_test_eval_cox(
+            best_model_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed)
+    else:
+        raise ValueError('Task type must be either "classification" or "cox')
+
+    # Add model labels to differentiate between Transfer Learning and No Transfer Learning results
+    result_metrics_TL['Model'] = 'Transfer Learning'
+    result_metrics_noTL['Model'] = 'No Transfer Learning'
+
+    # Combine both results into a single DataFrame
+    results_combined_df = pd.concat([result_metrics_TL, result_metrics_noTL], ignore_index=True)
+
+    # Move the 'Model' column to the front for clarity
+    results_combined_df = results_combined_df[['Model']+ [col for col in results_combined_df.columns if col != 'Model']]
+
+    return results_combined_df
 
 
 
@@ -552,6 +704,10 @@ def main():
                         default='OS_event', 
                         help='The censoring event for the cox analysis task')
     
+    parser.add_argument('--optimization_type', type=str,
+                    default='grid_search', 
+                    help='The censoring event for the cox analysis task')
+    
     parser.add_argument('--add_post_latent_layers', type=str,
                         default='False,True', 
                         help='If addign a layer post latetn')
@@ -589,6 +745,7 @@ def main():
     finetune_save_dir = args.finetune_save_dir
     pretrain_model_name = args.pretrain_model_name
     pretrain_trial_ID = args.pretrain_trial_ID
+    optimization_type=args.optimization_type
     
     task=args.task
     task_type=args.task_type
@@ -607,10 +764,10 @@ def main():
         'add_post_latent_layers': [s == 'True' for s in add_post_latent_layers] , #boolean list: [False, True]
         'post_latent_layer_size': [int(x) for x in post_latent_layer_size if x.isdigit()],  # intiger list [16,32]
         'num_layers_to_retrain': [int(x) for x in num_layers_to_retrain if x.isdigit()],  # '1
-        'dropout_rate': parse_range_or_single(args.dropout_rate, is_int=False),
+        'dropout': parse_range_or_single(args.dropout_rate, is_int=False),
         'learning_rate': parse_range_or_single(args.learning_rate, is_int=False),
-        'l1_reg': parse_range_or_single(args.l1_reg, is_int=False),
-        'weight_decay': parse_range_or_single(args.weight_decay, is_int=False),
+        'l1_reg_weight': parse_range_or_single(args.l1_reg, is_int=False),
+        'l2_reg_weight': parse_range_or_single(args.weight_decay, is_int=False),
         'batch_size': parse_range_or_single(args.batch_size, is_int=True),
         'patience': parse_range_or_single(args.patience, is_int=True),
         'num_epochs': parse_range_or_single(args.num_epochs, is_int=True)
@@ -636,19 +793,28 @@ def main():
     finetune_VAE_noTL = copy.deepcopy(finetune_VAE_noTL_OG)
 
     #path to pre-train and fine-tune models
-    model_path=f'{finetune_save_dir}/{pretrain_model_name}/trial_{pretrain_trial_ID}'
+    model_path=f"{finetune_save_dir}/{pretrain_model_name}/trial_{pretrain_trial_ID}/{task.replace(' ','_')}"
+    os.makedirs(model_path, exist_ok=True)
     
     #Running optuna optimization
     print ('running optuna optimization')
     print ('task:', task)
-    study, results_combined_df= retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_type, num_classes, task_event, seed, model_path, combined_params, n_trials=n_trials)
+    
+    if optimization_type=='optuna':
+        study, results_combined_df= retrain_finetune_VAE_TL_noTL_Optuna_optimization(finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_type, num_classes, task_event, seed, model_path, combined_params, n_trials=n_trials)
+        
+    elif optimization_type=='grid_search':
+        results_combined_df= retrain_finetune_VAE_TL_noTL_grid_search_optimization(finetune_VAE_TL, finetune_VAE_noTL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_type, num_classes, task_event, seed, model_path, combined_params)
+    else:
+        raise ValueError('optimization_type must be either "optuna" or "grid_search"')
+        
     
     #saving the results
     print ('saving the results')
-    results_combined_df.to_csv(f"{model_path}/{task.replace(' ','_')}_results_combined_df.csv")
-    print (results_combined_df)
+    results_combined_df.to_csv(f"{model_path}/{task.replace(' ','_')}_best_model_results_{optimization_type}.csv")
+    #print (results_combined_df)
     
-    if n_trials>1:
+    if n_trials>1 and optimization_type=='optuna':
         #saving the optuna results
         save_optuna_study_results_as_html(study, combined_params, model_path, file_name=f"{task.replace(' ','_')}_optuna_report.html")
         

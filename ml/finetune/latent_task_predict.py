@@ -30,7 +30,7 @@ from sklearn.model_selection import train_test_split
 
 
 from sklearn.preprocessing import label_binarize
-from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.metrics import accuracy_score, roc_auc_score, f1_score
 
 
 def log_reg_multi_class(task, x_data_train, y_data_train, x_data_val, y_data_val, x_data_test, y_data_test):
@@ -64,6 +64,7 @@ def log_reg_multi_class(task, x_data_train, y_data_train, x_data_val, y_data_val
 
     best_val_accuracy = 0
     best_val_auc = 0
+    best_val_f1 = 0
     best_model = None
     test_auc=0
     val_auc=0
@@ -78,24 +79,27 @@ def log_reg_multi_class(task, x_data_train, y_data_train, x_data_val, y_data_val
                 # Evaluate on the validation set
                 y_val_pred = clf.predict(x_val)
                 val_accuracy = accuracy_score(y_val, y_val_pred)
+                val_f1 = f1_score(y_val, y_val_pred, average='weighted')
 
                 # Get probability predictions for AUC calculation
                 y_val_prob = clf.predict_proba(x_val)
                 if len(label_encoder.classes_) == 2:  # Binary classification
                     y_val_prob = y_val_prob[:, 1]  # Extract probability for the positive class
 
-                val_auc = roc_auc_score(y_val, y_val_prob, average='macro', multi_class='ovr')
+                val_auc = roc_auc_score(y_val, y_val_prob, average='weighted', multi_class='ovr')
 
                 # Check if this is the best model
                 if val_accuracy > best_val_accuracy:
                     best_val_accuracy = val_accuracy
                     best_val_auc = val_auc
+                    best_val_f1 = val_f1
                     best_model = clf
 
 
     # Final evaluation on the test set using the best model
     y_test_pred = best_model.predict(x_test)
     test_accuracy = accuracy_score(y_test, y_test_pred)
+    test_f1 = f1_score(y_test, y_test_pred, average='weighted')
 
     # Get probability predictions for AUC calculation on the test set
     y_test_prob = best_model.predict_proba(x_test)
@@ -105,12 +109,14 @@ def log_reg_multi_class(task, x_data_train, y_data_train, x_data_val, y_data_val
         y_test_prob = y_test_prob[:, 1]  # Extract probability for the positive class
 
     # Compute test AUC
-    test_auc = roc_auc_score(y_test, y_test_prob, average='macro', multi_class='ovr')
+    test_auc = roc_auc_score(y_test, y_test_prob, average='weighted', multi_class='ovr')
 
     print(f'Test Accuracy with best model: {test_accuracy:.4f}')
     print(f'Test AUC with best model: {test_auc:.4f}')
+    print(f'Test F1 Score with best model: {test_f1:.4f}')
 
-    return best_val_accuracy, best_val_auc, test_accuracy, test_auc
+    return best_val_f1, best_val_auc, test_f1, test_auc
+
 
 
 def cox_proportional_hazards(X_train, Y_train_OS, Y_train_event, X_val, Y_val_OS, Y_val_event, X_test, Y_test_OS, Y_test_event):

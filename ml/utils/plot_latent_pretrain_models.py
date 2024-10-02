@@ -39,7 +39,6 @@ print ('X_data_all.shape:', X_data_all.shape)
 
 pretrain_save_dir='/home/leilapirhaji/pretrained_models'
 
-
 # #get only the directories in the finetune_save_dir
 # pretrain_model_list_file='/home/leilapirhaji/pretrained_models_to_finetune_v3.txt'
 
@@ -48,8 +47,8 @@ pretrain_save_dir='/home/leilapirhaji/pretrained_models'
 # pretrain_model_list = pd.read_csv(pretrain_model_list_file, header=None)[0]
 # pretrain_model_list = pretrain_model_list.dropna().tolist()
 
-pretrain_id_list=[106]
-pretrain_name= 'pretrain_VAE_L_410_490_e_400_p_25_S_8.1.1'
+pretrain_id_list=[143]
+pretrain_name= 'pretrain_VAE_L_400_425_e_400_p_25_s_8.1.1'
 
 
 for pretrain_id in pretrain_id_list:

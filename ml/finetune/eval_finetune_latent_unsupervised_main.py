@@ -204,10 +204,10 @@ def visualize_latent_space_multiple_tasks( vae_model, X_data_train, y_data_train
     
     #Availbe taks for pre-trained meta-data
     #tasks to predict using encoder
-    task_list_cat=['Treatment', 'IMDC BINARY', 'IMDC ORDINAL', 'MSKCC BINARY', 'MSKCC ORDINAL', 'ORR', 'Benefit', 'Prior_2' ]
+    task_list_cat=['IMDC BINARY', 'IMDC ORDINAL', 'MSKCC BINARY', 'MSKCC ORDINAL' ]
 
     #survival tasks
-    task_list_num=[ 'OS', 'NIVO OS', 'EVER OS', 'PFS']  # List of numerical tasks
+    task_list_num=[ 'OS', 'NIVO OS', 'EVER OS']  # List of numerical tasks
 
     # Generate latent spaces 10 times for each dataset
     # Generate averaged latent spaces

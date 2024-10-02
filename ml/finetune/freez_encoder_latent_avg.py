@@ -11,6 +11,7 @@ from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_sco
 import tensorflow as tf
 from torch.utils.tensorboard import SummaryWriter
 
+import copy
 import os
 
 # Make sure to disable non-deterministic operations if exact reproducibility is crucial
@@ -183,7 +184,7 @@ class FineTuneModel(nn.Module):
 
 
 
-def fine_tune_model(VAE_model,log_path, X_train, y_data_train, X_val, y_data_val, num_classes, num_layers_to_retrain=1, add_post_latent_layers=False, num_post_latent_layers=1, post_latent_layer_size=128, num_epochs=20, batch_size=32, learning_rate=1e-4, dropout=0.2, l1_reg_weight=0.0, l2_reg_weight=0.0, latent_passes=10, seed=None, patience=0):
+def fine_tune_model(VAE_model,model_path, X_train, y_data_train, X_val, y_data_val, num_classes, num_layers_to_retrain=1, add_post_latent_layers=False, num_post_latent_layers=1, post_latent_layer_size=128, num_epochs=20, batch_size=32, learning_rate=1e-4, dropout=0.2, l1_reg_weight=0.0, l2_reg_weight=0.0, latent_passes=20, seed=None, patience=0):
     
     # Set seed for reproducibility
     if seed is not None:
@@ -223,15 +224,16 @@ def fine_tune_model(VAE_model,log_path, X_train, y_data_train, X_val, y_data_val
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     # Early Stopping Setup
-    best_val_auc = -float('inf')  # Best validation AUC
+    best_val_metric = -float('inf')  # Best validation metric, AUC for binary and F1-score for multi-class
     best_model = None  # Store the state of the best model
     patience_counter = 0  # Counter to track patience
 
     # DataFrame to store metrics per epoch
     metrics_per_epoch = pd.DataFrame(columns=['Epoch', 'Accuracy', 'Precision', 'Recall', 'F1 Score', 'AUC', 'Validation Loss'])
+    best_val_metrics_df = pd.DataFrame(columns=['Epoch', 'Accuracy', 'Precision', 'Recall', 'F1 Score', 'AUC', 'Validation Loss'])
 
     # Initialize TensorBoard logging directory for each trial
-    log_dir = log_path
+    log_dir = model_path
     os.makedirs(log_dir, exist_ok=True)
     writer = SummaryWriter(log_dir=log_dir)  # Initialize SummaryWriter for TensorBoard
     
@@ -339,6 +341,7 @@ def fine_tune_model(VAE_model,log_path, X_train, y_data_train, X_val, y_data_val
                 recall = recall_score(all_labels, (np.array(all_preds) >= 0.5).astype(int)) * 100
                 f1 = f1_score(all_labels, (np.array(all_preds) >= 0.5).astype(int)) * 100
                 auc = roc_auc_score(all_labels, all_preds) * 100
+                val_metric=auc
             else:
                 # Convert predicted probabilities to predicted class labels for multi-class classification
                 all_preds_np = np.vstack(all_preds)  # Stack the list of predictions
@@ -351,24 +354,16 @@ def fine_tune_model(VAE_model,log_path, X_train, y_data_train, X_val, y_data_val
             
                 # Calculate AUC for multi-class classification
                 auc = roc_auc_score(all_labels, all_preds_np, multi_class='ovr') * 100  # AUC for multi-class
+                val_metric=f1
 
-            # Check early stopping condition
-            # Early stopping logic (if patience > 0)
-            if patience > 0:
-                if auc > best_val_auc:
-                    best_val_auc = auc
-                    best_model = model # Save the best model state
-                    patience_counter = 0  # Reset patience counter
-                else:
-                    patience_counter += 1
-
-                # If no improvement for `patience` epochs, stop training
-                if patience_counter >= patience:
-                    print(f'Early stopping triggered at epoch {epoch+1}')
-                    break
-            else:
-                best_model = model
-            
+        avg_val_loss = val_loss / len(val_loader)
+        # Log validation loss to TensorBoard
+        writer.add_scalar('Loss/val', avg_val_loss, epoch)
+         # Log validation loss to TensorBoard
+        writer.add_scalar('AUC val', auc, epoch)
+        writer.add_scalar('F1 val', f1, epoch)
+        
+        
         # Create a DataFrame with the metrics for the current epoch
         metrics_df = pd.DataFrame({
             'Epoch': [epoch + 1],
@@ -385,15 +380,28 @@ def fine_tune_model(VAE_model,log_path, X_train, y_data_train, X_val, y_data_val
 
         print(f'Validation Loss: {val_loss/len(val_loader)}, Accuracy: {accuracy}%, Precision: {precision}%, Recall: {recall}%, F1 Score: {f1}%, AUC: {auc}%')
         
-        avg_val_loss = val_loss / len(val_loader)
-        # Log validation loss to TensorBoard
-        writer.add_scalar('Loss/val', avg_val_loss, epoch)
-         # Log validation loss to TensorBoard
-        writer.add_scalar('AUC val', auc, epoch)
+        
+        # saving the best model based on the validation metric
+        if val_metric > best_val_metric:
+            best_val_metric = val_metric
+            torch.save(model, f'{model_path}/best_model.pth')
+            best_val_metrics_df=metrics_df
+            patience_counter = 0  # Reset patience counter
+        else:
+            patience_counter += 1
+
+        # If no improvement for `patience` epochs, stop training
+        if patience > 0:
+            if patience_counter >= patience:
+                print(f'Early stopping triggered at epoch {epoch+1}')
+                break
+        
+        
+        
         
     writer.close()  # Close the TensorBoard writer
     print('Fine-tuning completed.')
-    return best_model, metrics_per_epoch
+    return best_val_metrics_df
 
 
 
