@@ -163,7 +163,7 @@ def evaluate_model(model, latent_rep, y_duration_test, y_event_test, seed, batch
         print(f'Test C-index: {c_index}')
 
     print('Fine-tuning completed.')
-    return metrics_test
+    return metrics_test, all_durations, all_risks, all_events
 
 
 
@@ -209,13 +209,13 @@ def best_finetune_model_test_eval_cox(best_model, X_data_train, y_data_train, X_
     latent_rep_test = torch.mean(torch.stack(latent_reps_test), dim=0)
 
 
-    metrics_train=evaluate_model(best_model, latent_rep_train, y_data_train[task], y_data_train[task_event], seed, batch_size=32)
+    metrics_train, all_durations, all_risks, all_events=evaluate_model(best_model, latent_rep_train, y_data_train[task], y_data_train[task_event], seed, batch_size=32)
   
 
-    metrics_val=evaluate_model(best_model, latent_rep_val, y_data_val[task], y_data_val[task_event], seed, batch_size=32)
+    metrics_val, all_durations, all_risks, all_events=evaluate_model(best_model, latent_rep_val, y_data_val[task], y_data_val[task_event], seed, batch_size=32)
 
 
-    metrics_test=evaluate_model(best_model, latent_rep_test, y_data_test[task], y_data_test[task_event], seed, batch_size=32)
+    metrics_test, all_durations, all_risks, all_events=evaluate_model(best_model, latent_rep_test, y_data_test[task], y_data_test[task_event], seed, batch_size=32)
 
     # Add an identifier column to each dataframe
     metrics_train['Dataset'] = 'Train'
