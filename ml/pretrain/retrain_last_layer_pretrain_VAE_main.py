@@ -37,7 +37,8 @@ from models.models_VAE import VAE
 from pretrain.get_pretrain_encoder import get_pretrain_encoder_from_local
 
 from pretrain.freez_pretrain_encoder_latent_avg_num import retrain_pretrain_num_task
-from pretrain.eval_pretrained_VAE import evalute_pretrain_latent_extra_task
+from pretrain.eval_pretrained_VAE import get_avg_latent_space
+from pretrain.latent_task_predict import ridge_regression_predict
 
 
 
@@ -71,6 +72,37 @@ def get_pretrain_input_data(data_location):
 
     #returning the data
     return(X_data_all, y_data_all, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test)
+
+
+
+
+def evalute_pretrain_latent_task( vae_model, X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, model_folder, task, latent_passes=20):
+    
+    # getting the avegrae latent space for the model
+    print ('Getting the avg latent space')
+    (Z_train, Z_val, Z_test)=get_avg_latent_space (vae_model, X_data_train, X_data_val, X_data_test, model_folder, latent_passes=latent_passes)
+    
+    print ('Latent space shape')
+    print (Z_train.shape, Z_val.shape, Z_test.shape)
+
+    #evaluating the model
+    (val_mse, val_mae, val_r2, test_mse, test_mae, test_r2)= ridge_regression_predict(task, Z_train, y_data_train, Z_val, y_data_val, Z_test, y_data_test)
+
+    
+    # Store the results in the dictionary
+    model_results = {}
+    
+    model_results[f'{task} Val MSE'] = val_mse
+    model_results[f'{task} Val MAE'] = val_mae
+    model_results[f'{task} Test MSE'] = test_mse
+    model_results[f'{task} Test MAE'] = test_mae
+
+    print(f'{task} Val MAE : {val_mae:.4f}')
+    print(f'{task} Test MAE : {test_mae:.4f}')
+    
+    model_results_df = pd.DataFrame(model_results, index=[0])
+    
+    return model_results_df
 
 
 
@@ -140,8 +172,8 @@ def retrain_pretrain_VAE_numerical_grid_search_optimization(
     
     results_list = []  # List to store results for summary table
     # creating directory to save the results
-    temp_path = f"{model_path}/temp_path_TL"
-    best_model_dir = f"{model_path}/TL_{task.replace(' ', '_')}_best_model_grid_search"
+    temp_path = f"{model_path}/temp_path"
+    best_model_dir = f"{model_path}/{task.replace(' ', '_')}_best_model_grid_search"
     
 
     for idx, param_values in enumerate(all_param_combinations):
@@ -201,16 +233,16 @@ def retrain_pretrain_VAE_numerical_grid_search_optimization(
     best_model= torch.load(f"{best_model_dir}/best_model.pth")
 
     # Evaluate both models on the test set 
-    result_metrics_TL,latent_rep_train, latent_rep_val, latent_rep_test = evalute_pretrain_latent_extra_task(
-        best_model, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, best_model_dir)
+    model_results_df = evalute_pretrain_latent_task(
+        best_model, X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, best_model_dir, task)
     
     
     # Add model labels to differentiate between Transfer Learning and No Transfer Learning results
-    result_metrics_TL['Model'] = 'Pretrain VAE'
+    model_results_df['Model'] = 'Pretrain VAE'
 
 
     # Combine both results into a single DataFrame
-    results_combined_df = result_metrics_TL
+    results_combined_df = model_results_df
 
     # Move the 'Model' column to the front for clarity
     results_combined_df = results_combined_df[['Model']+ [col for col in results_combined_df.columns if col != 'Model']]
@@ -363,7 +395,7 @@ def main():
     
     #saving the results
     print ('saving the results')
-    results_combined_df.to_csv(f"{model_path}/{task.replace(' ','_')}_best_model_results_adverserial.csv")
+    results_combined_df.to_csv(f"{model_path}/{task.replace(' ','_')}_best_model_results.csv")
     #print (results_combined_df)
     
         
