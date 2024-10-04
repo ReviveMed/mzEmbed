@@ -110,11 +110,20 @@ def get_pretrain_encoder_from_local(pretrain_name, pretrain_id, pretrain_save_di
     vae_model = VAE( **encoder_kwargs)
     #encoder=vae_model.encoder
 
-    model_state_dict = torch.load(model_encoder_file)
-    # vae_model.encoder.load_state_dict(encoder_state_dict)
-    #pre-trained models are saved as the whole model not just the encoder
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+        model_state_dict = torch.load(model_encoder_file)  # Load the model for GPU
+    else:
+        device = torch.device('cpu')
+        model_state_dict = torch.load(model_encoder_file, map_location=device)  # Load the model for CPU
+
+    # Load the pre-trained models (entire model, not just the encoder)
     vae_model.load_state_dict(model_state_dict)
-    
+
+    # Move the model to the correct device
+    vae_model.to(device)
+
+        
     # Getting the latent space that is saved in the model directory
     Z_train = pd.read_csv(f'{model_local_path}/Z_train_avg_20.csv', index_col=0)
     Z_val = pd.read_csv(f'{model_local_path}/Z_val_avg_20.csv', index_col=0)

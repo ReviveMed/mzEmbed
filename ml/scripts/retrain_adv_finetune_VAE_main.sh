@@ -23,12 +23,12 @@ python ../finetune/retrain_adverserial_cox_finetune_VAE_main.py \
     --task "$TASK" \
     --adv_task "$ADV_TASk" \
     --task_event "$TASK_EVENT" \
-    --lambda_adv 2.0 \
-    --add_post_latent_layers 'False' \
+    --lambda_adv 0.01 \
+    --add_post_latent_layers 'True' \
     --post_latent_layer_size "64" \
     --num_layers_to_retrain "1" \
     --dropout_rate 0.4 \
-    --learning_rate 5e-6 1e-5 1e-4 \
+    --learning_rate 4e-5 \
     --l1_reg 1e-6 \
     --weight_decay 1e-3 \
     --batch_size 32 \

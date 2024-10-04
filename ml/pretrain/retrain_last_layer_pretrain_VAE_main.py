@@ -34,29 +34,44 @@ from jinja2 import Template
 #importing fundtion to get encoder info and perfrom tasks 
 from models.models_VAE import VAE
 
-from finetune.get_finetune_encoder import  get_finetune_input_data
+from pretrain.get_pretrain_encoder import get_pretrain_encoder_from_local
 
-from finetune.freez_encoder_latent_avg_adv_COX import fine_tune_adv_cox_model, FineTuneCoxModel
-from finetune.best_finetune_model_test_eval_cox import best_finetune_model_test_eval_cox
-
-
+from pretrain.freez_pretrain_encoder_latent_avg_num import retrain_pretrain_num_task
+from pretrain.eval_pretrained_VAE import evalute_pretrain_latent_extra_task
 
 
-def get_finetune_VAE_TL_noTL(finetune_save_dir, pretrain_name, pretrain_trial_id):
 
+def get_pretrain_input_data(data_location):
 
-    #path to pre-train and fine-tune models
-    models_path=f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_trial_id}'
+    #defining the input datasets
+    pretrain_X_all=f'{data_location}/X_Pretrain_All.csv'
+    pretrain_y_all=f'{data_location}/y_Pretrain_All.csv'
 
-    #finetune models files
-    finetune_VAE_TL_file= f'{models_path}/finetune_VAE_TL_True_best_model_state.pt'
-    finetune_VAE_TL=torch.load(finetune_VAE_TL_file)
+    pretrain_X_train=f'{data_location}/X_Pretrain_Discovery_Train.csv'
+    pretrain_y_train=f'{data_location}/y_Pretrain_Discovery_Train.csv'
 
-    finetune_VAE_noTL_file= f'{models_path}/finetune_VAE_TL_False_best_model_state.pt'
-    finetune_VAE_noTL=torch.load(finetune_VAE_noTL_file)
+    pretrain_X_val=f'{data_location}/X_Pretrain_Discovery_Val.csv'
+    pretrain_y_val=f'{data_location}/y_Pretrain_Discovery_Val.csv'
 
+    pretrain_X_test=f'{data_location}/X_Pretrain_Test.csv'
+    pretrain_y_test=f'{data_location}/y_Pretrain_Test.csv'
 
-    return finetune_VAE_TL, finetune_VAE_noTL
+    #loading the data
+    X_data_all = pd.read_csv(pretrain_X_all, index_col=0)
+    y_data_all = pd.read_csv(pretrain_y_all, index_col=0)
+
+    X_data_train = pd.read_csv(pretrain_X_train, index_col=0)
+    y_data_train = pd.read_csv(pretrain_y_train, index_col=0)
+
+    X_data_val = pd.read_csv(pretrain_X_val, index_col=0)
+    y_data_val = pd.read_csv(pretrain_y_val, index_col=0)
+
+    X_data_test = pd.read_csv(pretrain_X_test, index_col=0)
+    y_data_test = pd.read_csv(pretrain_y_test, index_col=0)
+
+    #returning the data
+    return(X_data_all, y_data_all, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test)
+
 
 
 
@@ -90,22 +105,18 @@ def save_grid_search_results(results_list, model_path, task):
 
 
 
-def retrain_finetune_VAE_TL_adverserial_cox_grid_search_optimization(
-    finetune_VAE_TL_OG,
+
+def retrain_pretrain_VAE_numerical_grid_search_optimization(
+    pretrain_VAE_OG,
     X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test,
-    task, adv_task, task_event, lambda_adv, seed, model_path, combined_params):
+    task, seed, model_path, combined_params):
     
     # Default configuration for fine-tuning, which can be overridden by kwargs
     config = {
         'X_train': X_data_train,
         'y_data_train': y_data_train[task],
-        'y_data_train_adv': y_data_train[adv_task],
-        'y_event_train': y_data_train[task_event],
         'X_val': X_data_val,
         'y_data_val': y_data_val[task],
-        'y_data_val_adv': y_data_val[adv_task],
-        'y_event_val': y_data_val[task_event],
-        'lambda_adv': lambda_adv,
         'seed': seed
     }
         
@@ -124,13 +135,13 @@ def retrain_finetune_VAE_TL_adverserial_cox_grid_search_optimization(
     print ('Nummber of grid search paramteres:', len(all_param_combinations))
 
     best_val_metric = -float('inf')  # Initialize to a very low value to keep track of the best metric
-    best_val_loss= float('inf')
+    best_val_mae= float('inf')
     best_params = None  # Variable to store the best parameters
     
     results_list = []  # List to store results for summary table
     # creating directory to save the results
-    temp_path_TL = f"{model_path}/temp_path_TL"
-    best_model_dir_TL = f"{model_path}/TL_{task.replace(' ', '_')}_best_model_grid_search"
+    temp_path = f"{model_path}/temp_path_TL"
+    best_model_dir = f"{model_path}/TL_{task.replace(' ', '_')}_best_model_grid_search"
     
 
     for idx, param_values in enumerate(all_param_combinations):
@@ -141,53 +152,42 @@ def retrain_finetune_VAE_TL_adverserial_cox_grid_search_optimization(
         config_combination.update(param_combination)
 
 
-        finetune_VAE_TL=copy.deepcopy(finetune_VAE_TL_OG)
+        pretrain_VAE=copy.deepcopy(pretrain_VAE_OG)
 
-        val_metrics_TL = fine_tune_adv_cox_model(
-            VAE_model=finetune_VAE_TL,
-            model_path=temp_path_TL,
+        val_metrics = retrain_pretrain_num_task(
+            VAE_model=pretrain_VAE,
+            model_path=temp_path,
             **config_combination  # Unpack the rest of the arguments from the config
         )
 
         # Evaluate models
-        val_c_index_TL = val_metrics_TL['C-index'].iloc[-1]
-        val_loss_index_TL = val_metrics_TL['Validation Loss'].iloc[-1]
-        val_adv_c_index_TL = val_metrics_TL['Adv. C-index'].iloc[-1]
-        delta_c_index= val_c_index_TL - val_adv_c_index_TL
+        val_mae = val_metrics ['Mean avg. error'].iloc[-1]
+        val_mse = val_metrics ['Mean sq. error'].iloc[-1]
+        val_r2 = val_metrics ['R2'].iloc[-1]
+        val_loss = val_metrics ['Validation Loss'].iloc[-1]
+
 
         # Collect results
         result_entry = param_combination.copy()
-        result_entry['lambda_adv'] = lambda_adv
-        result_entry['val_c_index_TL'] = val_c_index_TL
-        result_entry['Adv. C-index'] = val_adv_c_index_TL
-        result_entry['val_loss'] = val_loss_index_TL
-        result_entry['delta_c_index'] = delta_c_index
+        result_entry['Mean avg. error'] = val_mae
+        result_entry['Mean sq. error'] = val_mse
+        result_entry['R2'] = val_r2
+        result_entry['val_loss'] = val_loss
         results_list.append(result_entry)
         
-        if lambda_adv<0 and val_loss_index_TL < best_val_loss:
+        if val_mae < best_val_mae:
             
-            best_val_metric = val_loss_index_TL
+            best_val_mae = val_mae
             best_params = param_combination.copy()
 
             # Copy the model to a "best model" directory - TL
-            if os.path.exists(best_model_dir_TL):
-                shutil.rmtree(best_model_dir_TL)  # Remove previous best logs
-            shutil.copytree(temp_path_TL, best_model_dir_TL)  # Copy current trial's logs
-            
-
-        if lambda_adv > 0 and val_c_index_TL > best_val_metric:
-            
-            best_val_metric = val_c_index_TL
-            best_params = param_combination.copy()
-
-            # Copy the model to a "best model" directory - TL
-            if os.path.exists(best_model_dir_TL):
-                shutil.rmtree(best_model_dir_TL)  # Remove previous best logs
-            shutil.copytree(temp_path_TL, best_model_dir_TL)  # Copy current trial's logs
+            if os.path.exists(best_model_dir):
+                shutil.rmtree(best_model_dir)  # Remove previous best logs
+            shutil.copytree(temp_path, best_model_dir)  # Copy current trial's logs
             
     
     #remove temp_path
-    shutil.rmtree(temp_path_TL)  
+    shutil.rmtree(temp_path)  
     
     # Optionally, save the best parameters
     with open(f"{model_path}/{task.replace(' ', '_')}_best_params_grid_search.txt", 'w') as f:
@@ -198,15 +198,15 @@ def retrain_finetune_VAE_TL_adverserial_cox_grid_search_optimization(
     save_grid_search_results(results_list, model_path, task)
 
     # load the best models
-    best_model_TL= torch.load(f"{best_model_dir_TL}/best_model.pth")
+    best_model= torch.load(f"{best_model_dir}/best_model.pth")
 
-    # Evaluate both models on the test set     #TL
-    result_metrics_TL,latent_rep_train, latent_rep_val, latent_rep_test = best_finetune_model_test_eval_cox(
-        best_model_TL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, task_event, seed)
+    # Evaluate both models on the test set 
+    result_metrics_TL,latent_rep_train, latent_rep_val, latent_rep_test = evalute_pretrain_latent_extra_task(
+        best_model, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, best_model_dir)
     
     
     # Add model labels to differentiate between Transfer Learning and No Transfer Learning results
-    result_metrics_TL['Model'] = 'Transfer Learning'
+    result_metrics_TL['Model'] = 'Pretrain VAE'
 
 
     # Combine both results into a single DataFrame
@@ -255,11 +255,11 @@ def main():
 
     # Define the arguments with defaults and help messages
     parser.add_argument('--input_data_location', type=str,
-                        default='/home/leilapirhaji/PROCESSED_DATA',
+                        default='/home/leilapirhaji/PROCESSED_DATA_S_8.1.1',
                         help='Path to the input data location.')
 
-    parser.add_argument('--finetune_save_dir', type=str,
-                        default='/home/leilapirhaji/finetune_VAE_models',
+    parser.add_argument('--pretrain_save_dir', type=str,
+                        default='/home/leilapirhaji/pretrained_models',
                         help='Directory to save finetuned models.')
     
     parser.add_argument('--pretrain_model_name', type=str,
@@ -271,21 +271,9 @@ def main():
                         help='The name of pretrained model trail was used for finetuning.')
     
     parser.add_argument('--task', type=str,
-                        default='NIVO OS',
+                        default='BMI',
                         help='The task to tune the VAE model for')
-    
-    parser.add_argument('--adv_task', type=str,
-                        default='EVER OS',
-                        help='The task for adverserial learning')
-    
-    parser.add_argument('--task_event', type=str,
-                        default='OS_event', 
-                        help='The censoring event for the cox analysis task')
-    
-    parser.add_argument('--lambda_adv', type=float,
-                        default='1.0', 
-                        help='the weight of adverserial loss')
-    
+        
     parser.add_argument('--add_post_latent_layers', type=str,
                         default='False,True', 
                         help='If addign a layer post latetn')
@@ -318,14 +306,11 @@ def main():
     
      # Access the arguments
     input_data_location = args.input_data_location
-    finetune_save_dir = args.finetune_save_dir
+    pretrain_save_dir = args.pretrain_save_dir
     pretrain_model_name = args.pretrain_model_name
     pretrain_trial_ID = args.pretrain_trial_ID
     
     task=args.task
-    adv_task=args.adv_task
-    task_event=args.task_event
-    lambda_adv=float(args.lambda_adv)
     
     add_post_latent_layers=args.add_post_latent_layers.split(',')
     post_latent_layer_size=args.post_latent_layer_size.split(',')
@@ -351,29 +336,29 @@ def main():
     
    
     #get fine-tuning input data 
-    print ('getting fine-tuning input data')
-    (X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test)=get_finetune_input_data(input_data_location)
+    print ('getting pretrain input data')
+    (X_data_all, y_data_all, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test)=  get_pretrain_input_data(input_data_location)
 
 
     #get the pre-trained models
-    print ('getting fine-tune models')
-    (finetune_VAE_TL_OG, finetune_VAE_noTL_OG)=get_finetune_VAE_TL_noTL(finetune_save_dir, pretrain_model_name, pretrain_trial_ID)
+    print ('getting pretrain VAE models')
+    (pretrain_vae_OG, Z_train, Z_val, Z_test)= get_pretrain_encoder_from_local(pretrain_model_name, pretrain_trial_ID, pretrain_save_dir)
 
     #loading the seed file
     seed=42
     
     # Create a deep copy of the model before retraining
-    finetune_VAE_TL = copy.deepcopy(finetune_VAE_TL_OG) 
+    pretrain_vae = copy.deepcopy(pretrain_vae_OG) 
 
     #path to pre-train and fine-tune models
-    model_path=f"{finetune_save_dir}/{pretrain_model_name}/trial_{pretrain_trial_ID}/{task.replace(' ','_')}_adverserial_{adv_task.replace(' ','_')}"
+    model_path=f"{pretrain_save_dir}/{pretrain_model_name}/trial_{pretrain_trial_ID}/{task.replace(' ','_')}"
     os.makedirs(model_path, exist_ok=True)
     
     #Running optuna optimization
-    print ('running optuna optimization')
+    print ('running grid search of hyper-par')
     print ('task:', task)
     
-    results_combined_df= retrain_finetune_VAE_TL_adverserial_cox_grid_search_optimization(finetune_VAE_TL, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, adv_task, task_event, lambda_adv, seed, model_path, combined_params)
+    results_combined_df= retrain_pretrain_VAE_numerical_grid_search_optimization(pretrain_vae, X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test, task, seed, model_path, combined_params)
     
     
     #saving the results

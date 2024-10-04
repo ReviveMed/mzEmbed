@@ -95,7 +95,7 @@ class CoxPHLoss(nn.Module):
             
         ######### total CoxPH loss #########
         # Combine the two losses with a weighting factor for the adversarial loss
-        total_loss = loss_main + self.lambda_adv * loss_adv
+        total_loss = loss_main - self.lambda_adv * loss_adv
         
         return total_loss, loss_main, loss_adv
 
@@ -407,29 +407,30 @@ def fine_tune_adv_cox_model(VAE_model, model_path, X_train, y_data_train, y_data
         metrics_per_epoch = pd.concat([metrics_per_epoch, metrics_df], ignore_index=True)
 
         #selecting a model based on the lowest validation loss
-        if epoch == 0:
-            min_val_loss = avg_val_loss
-            best_val_metrics = metrics_per_epoch
-            torch.save(model, f'{model_path}/best_model.pth')
-            patience_counter = 0
-        else:
-            if avg_val_loss < min_val_loss:
+        if lambda_adv < 0:
+            if epoch == 0:
                 min_val_loss = avg_val_loss
-                torch.save(model, f'{model_path}/best_model.pth')
                 best_val_metrics = metrics_per_epoch
+                torch.save(model, f'{model_path}/best_model.pth')
                 patience_counter = 0
             else:
+                if avg_val_loss < min_val_loss:
+                    min_val_loss = avg_val_loss
+                    torch.save(model, f'{model_path}/best_model.pth')
+                    best_val_metrics = metrics_per_epoch
+                    patience_counter = 0
+                else:
+                    patience_counter += 1
+        else:
+            if c_index > best_c_index:
+                best_c_index = c_index
+                # Save the best
+                torch.save(model, f'{model_path}/best_model.pth')
+                patience_counter = 0  # Reset patience counter
+                best_val_metrics = metrics_per_epoch
+            else:
                 patience_counter += 1
-        
-        # # Check early stopping condition
-        # if c_index > best_c_index:
-        #     best_c_index = c_index
-        #     # Save the best
-        #     #torch.save(model, f'{model_path}/best_model.pth')
-        #     #patience_counter = 0  # Reset patience counter
-        #     best_val_metrics = metrics_per_epoch
-        # else:
-        #     patience_counter += 1
+
 
         # Early stopping logic (if patience > 0)
         if patience > 0:
