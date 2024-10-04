@@ -35,7 +35,7 @@ def generate_latent_space(X_data, vae_model, batch_size=128):
         for i in range(0, len(X_data), batch_size):
             # print(i, len(X_data))
             X_batch = X_data[i:i+batch_size].to(device)
-            Z_batch = vae_model.transform(X_batch)
+            Z_batch, log_var = vae_model.encoder(X_batch).chunk(2, dim=1)
             Z_batch = Z_batch.cpu()
             Z = torch.cat((Z, Z_batch), dim=0)
         Z = Z.detach().numpy()
