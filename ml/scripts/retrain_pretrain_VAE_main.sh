@@ -9,7 +9,7 @@ PRETRAIN_SAVE_DIR="/home/leilapirhaji/pretrained_models"
 pretrain_model_name="pretrain_VAE_L_400_425_e_400_p_25_s_8.1.1"
 pretrain_trial_ID="143"
 
-TASK='BMI'
+TASK='Age'
 
 
 python ../pretrain/retrain_last_layer_pretrain_VAE_main.py \
