@@ -23,6 +23,7 @@ import pandas as pd
 import numpy as np
 import random
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score, accuracy_score
+from sklearn.metrics import accuracy_score, mean_squared_error, mean_absolute_error, r2_score
 
 import optuna.visualization as vis
 import plotly.io as pio
@@ -76,6 +77,7 @@ def get_pretrain_input_data(data_location):
 
 
 
+
 def evalute_pretrain_latent_task( vae_model, X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, model_folder, task, latent_passes=20):
     
     # getting the avegrae latent space for the model
@@ -87,7 +89,6 @@ def evalute_pretrain_latent_task( vae_model, X_data_train, X_data_val, X_data_te
 
     #evaluating the model
     (val_mse, val_mae, val_r2, test_mse, test_mae, test_r2)= ridge_regression_predict(task, Z_train, y_data_train, Z_val, y_data_val, Z_test, y_data_test)
-
     
     # Store the results in the dictionary
     model_results = {}
@@ -127,7 +128,7 @@ def save_grid_search_results(results_list, model_path, task):
         combined_df = pd.concat([existing_df, new_results_df], ignore_index=True)
         
         # Remove duplicates based on all columns
-        combined_df = combined_df.drop_duplicates()
+        combined_df = combined_df.drop_duplicates(subset=combined_df.columns[1:10], keep='first', ignore_index=True)
     else:
         # If the file doesn't exist, the new results are the only data
         combined_df = new_results_df
@@ -166,7 +167,7 @@ def retrain_pretrain_VAE_numerical_grid_search_optimization(
     
     print ('Nummber of grid search paramteres:', len(all_param_combinations))
 
-    best_val_metric = -float('inf')  # Initialize to a very low value to keep track of the best metric
+    best_val_loss = float('inf')  # Initialize to a very low value to keep track of the best metric
     best_val_mae= float('inf')
     best_params = None  # Variable to store the best parameters
     
@@ -207,15 +208,26 @@ def retrain_pretrain_VAE_numerical_grid_search_optimization(
         result_entry['val_loss'] = val_loss
         results_list.append(result_entry)
         
-        if val_mae < best_val_mae:
+        
+        if val_loss < best_val_loss:
             
-            best_val_mae = val_mae
+            best_val_loss = val_mae
             best_params = param_combination.copy()
 
             # Copy the model to a "best model" directory - TL
             if os.path.exists(best_model_dir):
                 shutil.rmtree(best_model_dir)  # Remove previous best logs
             shutil.copytree(temp_path, best_model_dir)  # Copy current trial's logs
+            
+        # if val_mae < best_val_mae:
+            
+        #     best_val_mae = val_mae
+        #     best_params = param_combination.copy()
+
+        #     # Copy the model to a "best model" directory - TL
+        #     if os.path.exists(best_model_dir):
+        #         shutil.rmtree(best_model_dir)  # Remove previous best logs
+        #     shutil.copytree(temp_path, best_model_dir)  # Copy current trial's logs
             
     
     #remove temp_path

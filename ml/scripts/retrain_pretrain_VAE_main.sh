@@ -20,11 +20,11 @@ python ../pretrain/retrain_last_layer_pretrain_VAE_main.py \
     --task "$TASK" \
     --add_post_latent_layers 'False' \
     --post_latent_layer_size "64" \
-    --num_layers_to_retrain "1" \
-    --dropout_rate 0.4 \
-    --learning_rate 1e-4 5e-4 \
-    --l1_reg 1e-6 \
-    --weight_decay 1e-3 \
+    --num_layers_to_retrain "2" \
+    --dropout_rate 0.2 \
+    --learning_rate 5e-5 1e-4 4e-5 9e-4 1e-3 \
+    --l1_reg 0 \
+    --weight_decay 1e-4 \
     --batch_size 32 \
     --patience 0 \
-    --num_epochs 50
+    --num_epochs 30

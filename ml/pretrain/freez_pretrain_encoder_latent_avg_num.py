@@ -201,8 +201,7 @@ def retrain_pretrain_num_task(VAE_model,model_path, X_train, y_data_train, X_val
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     # Early Stopping Setup
-    best_val_metric = -float('inf')  # Best validation metric, AUC for binary and F1-score for multi-class
-    best_model = None  # Store the state of the best model
+    best_val_metric = float('inf')  # Best validation metric
     patience_counter = 0  # Counter to track patience
 
     # DataFrame to store metrics per epoch
@@ -304,18 +303,15 @@ def retrain_pretrain_num_task(VAE_model,model_path, X_train, y_data_train, X_val
                 all_labels.extend(labels_np[valid_mask])  # Use only valid labels
             
                 
-            # Convert lists to NumPy arrays
-            all_preds_np = np.array(all_preds)  
-            all_labels_np = np.array(all_labels)
-            
-            # Calculate regression metrics
-            mse = mean_squared_error(all_labels_np, all_preds_np)
-            rmse = np.sqrt(mse)
-            mae = mean_absolute_error(all_labels_np, all_preds_np)
-            r2 = r2_score(all_labels_np, all_preds_np)  # R-squared metric
-
-            val_metric = mae  # Use MSE as the validation metric
-
+        # Convert lists to NumPy arrays
+        all_preds_np = np.array(all_preds)  
+        all_labels_np = np.array(all_labels)
+        
+        # Calculate regression metrics
+        mse = mean_squared_error(all_labels_np, all_preds_np)
+        rmse = np.sqrt(mse)
+        mae = mean_absolute_error(all_labels_np, all_preds_np)
+        r2 = r2_score(all_labels_np, all_preds_np)  # R-squared metric
 
         avg_val_loss = val_loss / len(val_loader)
         # Log validation loss to TensorBoard
@@ -323,6 +319,8 @@ def retrain_pretrain_num_task(VAE_model,model_path, X_train, y_data_train, X_val
          # Log validation loss to TensorBoard
         writer.add_scalar('MSE val', mse, epoch)
         writer.add_scalar('MAE val', mae, epoch)
+        
+        val_metric = avg_val_loss  # Use MSE as the validation metric
         
         
         # Create a DataFrame with the metrics for the current epoch
@@ -341,7 +339,7 @@ def retrain_pretrain_num_task(VAE_model,model_path, X_train, y_data_train, X_val
 
         
         # saving the best model based on the validation metric
-        if val_metric > best_val_metric:
+        if val_metric < best_val_metric:
             best_val_metric = val_metric
             torch.save(model, f'{model_path}/best_model.pth')
             best_val_metrics_df=metrics_df
