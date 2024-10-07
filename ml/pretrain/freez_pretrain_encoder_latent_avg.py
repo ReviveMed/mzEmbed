@@ -184,7 +184,7 @@ class FineTuneModel(nn.Module):
 
 
 
-def retrain_pretrain_num_task(VAE_model,model_path, X_train, y_data_train, X_val, y_data_val, num_classes, num_layers_to_retrain=1, add_post_latent_layers=False, num_post_latent_layers=1, post_latent_layer_size=128, num_epochs=20, batch_size=32, learning_rate=1e-4, dropout=0.2, l1_reg_weight=0.0, l2_reg_weight=0.0, latent_passes=20, seed=None, patience=0):
+def retrain_pretrain_classification_task(VAE_model,model_path, X_train, y_data_train, X_val, y_data_val, num_classes, num_layers_to_retrain=1, add_post_latent_layers=False, num_post_latent_layers=1, post_latent_layer_size=128, num_epochs=20, batch_size=32, learning_rate=1e-4, dropout=0.2, l1_reg_weight=0.0, l2_reg_weight=0.0, latent_passes=20, seed=None, patience=0):
     
     # Set seed for reproducibility
     if seed is not None:
@@ -275,12 +275,12 @@ def retrain_pretrain_num_task(VAE_model,model_path, X_train, y_data_train, X_val
             running_loss += loss.item()
         
         avg_train_loss=running_loss/len(train_loader)
-        print(f'Epoch {epoch+1}/{num_epochs}, Loss: {running_loss/len(train_loader)}')
+        print(f'Epoch {epoch+1}/{num_epochs}, Training Loss: {running_loss/len(train_loader)}')
         # Log training loss to TensorBoard
         writer.add_scalar('Loss/train', avg_train_loss, epoch)
 
         # Validation
-        print  ('Validation started')
+        #print  ('Validation started')
         model.eval()
         #model.latent_mode = True  # Use precomputed latent representations for validation
         
