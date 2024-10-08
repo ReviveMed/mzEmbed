@@ -44,16 +44,17 @@ from finetune.best_finetune_model_test_eval_cox import best_finetune_model_test_
 
 def get_finetune_VAE_TL_noTL(finetune_save_dir, pretrain_name, pretrain_trial_id):
 
+    device= torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     #path to pre-train and fine-tune models
     models_path=f'{finetune_save_dir}/{pretrain_name}/trial_{pretrain_trial_id}'
 
     #finetune models files
     finetune_VAE_TL_file= f'{models_path}/finetune_VAE_TL_True_best_model_state.pt'
-    finetune_VAE_TL=torch.load(finetune_VAE_TL_file)
+    finetune_VAE_TL=torch.load(finetune_VAE_TL_file, map_location=device)
 
     finetune_VAE_noTL_file= f'{models_path}/finetune_VAE_TL_False_best_model_state.pt'
-    finetune_VAE_noTL=torch.load(finetune_VAE_noTL_file)
+    finetune_VAE_noTL=torch.load(finetune_VAE_noTL_file, map_location=device)
 
 
     return finetune_VAE_TL, finetune_VAE_noTL
