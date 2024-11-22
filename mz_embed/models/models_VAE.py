@@ -6,7 +6,6 @@ from torch import Tensor
 import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint as cp
 import os
-from utils.misc import save_json, load_json
 import numpy as np
 
 # from torchmetrics import AUROC
@@ -367,15 +366,3 @@ class VAE(nn.Module):
 
     def get_info(self):
         return self.get_hyperparameters()
-
-    def save_info(self, save_path, save_name=None):
-        # save_json(self.get_hyperparameters(), save_path)
-        # pass
-        if save_name is None:
-            if os.path.isfile(save_path):
-                save_name = os.path.basename(save_path)
-                save_path = os.path.dirname(save_path)
-            else:
-                save_name = self.file_id + '_info.json'
-        save_json(self.get_info(), os.path.join(save_path, save_name))   
-

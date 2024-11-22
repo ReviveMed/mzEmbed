@@ -13,9 +13,7 @@ TASK_EVENT="OS_Event"
 # Define task lists with num_classes for classification
 classification_tasks=(
     "IMDC BINARY:2"
-    "MSKCC BINARY:2"
     "IMDC ORDINAL:3"
-    "MSKCC ORDINAL:3"
     # Add more classification tasks in the format 'TASK_NAME:num_classes'
 )
 

@@ -12,23 +12,17 @@ PRETRAIN_MODEL_DF_FILE="/home/leilapirhaji/top_pretrain_VAE_L_400_425_e_400_p_25
 
 
 # # Run the finetune_VAE_local_main.py script
-# python ../finetune/finetune_VAE_unsupervised_main.py \
-#     --input_data_location $INPUT_DATA_LOCATION \
-#     --finetune_save_dir $FINETUNE_SAVE_DIR \
-#     --pretrain_save_dir $PRETRAIN_SAVE_DIR \
-#     --pretrain_model_list_file $PRETRAIN_MODEL_DF_FILE \
-#     --dropout_rate 0.1 0.4 0.05 \
-#     --learning_rate 1e-5 1e-3 \
-#     --l1_reg 1e-6 1e-3 \
-#     --weight_decay 1e-6 1e-3 \
-#     --batch_size 32 \
-#     --patience 0 \
-#     --num_epochs 30 50 10 \
-#     --n_trials 50
-
-
-# Evaluate the latent space
-python ../finetune/eval_finetune_latent_unsupervised_main.py \
+python ../finetune/finetune_VAE_unsupervised_main.py \
     --input_data_location $INPUT_DATA_LOCATION \
     --finetune_save_dir $FINETUNE_SAVE_DIR \
-    --pretrain_model_list_file $PRETRAIN_MODEL_DF_FILE
+    --pretrain_save_dir $PRETRAIN_SAVE_DIR \
+    --pretrain_model_list_file $PRETRAIN_MODEL_DF_FILE \
+    --dropout_rate 0.1 0.4 0.05 \
+    --learning_rate 1e-5 1e-3 \
+    --l1_reg 1e-6 1e-3 \
+    --weight_decay 1e-6 1e-3 \
+    --batch_size 32 \
+    --patience 0 \
+    --num_epochs 30 50 10 \
+    --n_trials 50
+

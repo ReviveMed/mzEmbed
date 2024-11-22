@@ -9,9 +9,6 @@ PRETRAIN_SAVE_DIR="/home/leilapirhaji/pretrained_models"
 pretrain_model_name="pretrain_VAE_L_400_425_e_400_p_25_s_8.1.1"
 pretrain_trial_ID="143"
 
-# TASK='Age'
-# TAKS_TYPE='regression'
-
 
 TASK='is Female'
 TAKS_TYPE='classification'

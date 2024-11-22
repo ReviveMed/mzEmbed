@@ -34,10 +34,40 @@ from jinja2 import Template
 #importing fundtion to get encoder info and perfrom tasks 
 from models.models_VAE import VAE
 
-from finetune.get_finetune_encoder import  get_finetune_input_data
 
 from finetune.freez_encoder_latent_avg_adv_COX import fine_tune_adv_cox_model, FineTuneCoxModel
 from finetune.best_finetune_model_test_eval_cox import best_finetune_model_test_eval_cox
+
+
+
+
+def get_finetune_input_data(data_location):
+
+    #defining the input datasets
+    
+    finetune_X_train=f'{data_location}/X_Finetune_Discovery_Train.csv'
+    finetune_y_train=f'{data_location}/y_Finetune_Discovery_Train.csv'
+
+    finetune_X_val=f'{data_location}/X_Finetune_Discovery_Val.csv'
+    finetune_y_val=f'{data_location}/y_Finetune_Discovery_Val.csv'
+
+    finetune_X_test=f'{data_location}/X_Finetune_Test.csv'
+    finetune_y_test=f'{data_location}/y_Finetune_Test.csv'
+
+    
+    #loading the data
+    X_data_train = pd.read_csv(finetune_X_train, index_col=0)
+    y_data_train = pd.read_csv(finetune_y_train, index_col=0)
+
+    X_data_val = pd.read_csv(finetune_X_val, index_col=0)
+    y_data_val = pd.read_csv(finetune_y_val, index_col=0)
+
+    X_data_test = pd.read_csv(finetune_X_test, index_col=0)
+    y_data_test = pd.read_csv(finetune_y_test, index_col=0)
+
+
+    #returning the data
+    return(X_data_train, y_data_train, X_data_val, y_data_val, X_data_test, y_data_test)
 
 
 
