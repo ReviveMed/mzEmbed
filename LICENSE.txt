@@ -1,0 +1,24 @@
+Academic and Non-Profit Use License
+
+Copyright (c) 2024, ReviveMed Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to use, copy, modify, merge, publish, and distribute the Software, solely for academic research and non-profit purposes, subject to the following conditions:
+
+1. **Non-Commercial Use Only**: The Software shall not be used for commercial purposes, including, but not limited to:
+   - Incorporation into products or services for sale.
+   - Distribution as part of a commercial offering.
+   - Use in for-profit research and development activities.
+
+2. **Attribution**: Proper credit must be given to the original author(s) in any publications or presentations that result from the use of this Software. A citation to the repository or publication must be included where applicable.
+
+3. **Redistribution**:
+   - Redistributions in source or binary form must retain the above copyright notice, this list of conditions, and the following disclaimer.
+   - Any derivative works must also comply with these licensing terms.
+
+4. **No Warranty**: 
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+5. **Contact for Commercial Use**:
+   - For inquiries about commercial use, please contact lpirhaji@revivemed.io
+   
+By using this Software, you agree to abide by these terms and conditions.
