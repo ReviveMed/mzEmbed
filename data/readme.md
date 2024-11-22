@@ -45,7 +45,7 @@ input_data/
 
 ## Dataset Availability
 
-The dataset used in the paper, is available at [mzLearn.com/mzEmbed](http://mzLearn.com/mzEmbed).
+The dataset used in the paper are availbe from [Metabolomics Workbench](https://www.metabolomicsworkbench.org/) and [Metabolights](https://www.ebi.ac.uk/metabolights/) datasbased.
 
 ---
 
@@ -79,11 +79,11 @@ The dataset used in the paper, is available at [mzLearn.com/mzEmbed](http://mzLe
 
 #### Example: `y_Finetune_Discovery_Train.csv`
 
-| StudyID_SampleID  | Age  | Gender | BMI   | Treatment   |
-|-------------------|------|--------|-------|-------------|
-| ST001422_001      | 45   | Male   | 24.5  | Drug_A      |
-| ST001422_002      | 50   | Female | 27.1  | Placebo     |
-| ST001422_003      | 38   | Male   | 22.8  | Drug_B      |
+| StudyID_SampleID  | Age  | Gender | Overl Survival | Treatment   |
+|-------------------|------|--------|----------------|-------------|
+| ST001422_001      | 45   | Male   | 32.5           | Drug_A      |
+| ST001422_002      | 50   | Female | 27.1           | Placebo     |
+| ST001422_003      | 38   | Male   | 22.8           | Drug_B      |
 
 ---
 

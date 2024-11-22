@@ -78,7 +78,22 @@ The repository supports six main use cases, including pretraining, fine-tuning, 
 This command pretrains a Variational Autoencoder (VAE) using large-scale metabolomics data, with hyperparameter optimization using **Optuna**:
 
 ```bash
-python ../pretrain/run_pretrain_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_save_dir "$PRETRAIN_SAVE_DIR"   --latent_size 128 256 32   --num_hidden_layers 2 3 1   --dropout_rate 0.1 0.15 0.05   --noise_factor 0.2 0.25 0.05   --learning_rate 8e-5 2e-4   --l1_reg 0   --weight_decay 1e-6 1e-4   --batch_size 64   --patience 25   --num_epochs 400   --trial_name "$TRIAL_NAME"   --n_trials 50
+python ../pretrain/run_pretrain_VAE_main.py \
+  --input_data_location "$INPUT_DATA_LOCATION" \
+  --pretrain_save_dir "$PRETRAIN_SAVE_DIR" \
+  --latent_size 128 256 32 \
+  --num_hidden_layers 2 3 1 \
+  --dropout_rate 0.1 0.45 0.05 \
+  --noise_factor 0.2 0.25 0.05 \
+  --learning_rate 8e-5 2e-4 \
+  --l1_reg 0 \
+  --weight_decay 1e-6 1e-4 \
+  --batch_size 64 \
+  --patience 25 \
+  --num_epochs 400 \
+  --trial_name "$TRIAL_NAME" \
+  --n_trials 50
+
 ```
 
 Alternatively, you can run this process using the provided script:
@@ -93,7 +108,24 @@ cd mzEmbed/mz_embed/scripts
 Retrain the last layer of pretrained VAE models for specific tasks, such as learning demographic or clinical variables:
 
 ```bash
-python ../pretrain/retrain_pretrain_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_model_path "$PRETRAIN_MODEL_PATH"   --task_variable "age_group"   --learning_rate 5e-5   --batch_size 64   --num_epochs 200   --trial_name "$TRIAL_NAME"
+python ../pretrain/retrain_last_layer_pretrain_VAE_main.py \
+    --input_data_location "$INPUT_DATA_LOCATION" \
+    --pretrain_save_dir "$PRETRAIN_SAVE_DIR" \
+    --pretrain_model_name "$pretrain_model_name" \
+    --pretrain_trial_ID "$pretrain_trial_ID" \
+    --task "gender" \
+    --task_type "classification" \
+    --add_post_latent_layers 'False' \
+    --post_latent_layer_size "64" \
+    --num_layers_to_retrain "1" \
+    --dropout_rate 0.4 \
+    --learning_rate 1e-4 \
+    --l1_reg 1e-6 \
+    --weight_decay 1e-3 \
+    --batch_size 32 \
+    --patience 5 \
+    --num_epochs 30
+
 ```
 
 Alternatively, you can run this process using the provided script:
@@ -105,10 +137,22 @@ cd mzEmbed/mz_embed/scripts
 ---
 
 #### **3. Unsupervised Fine-Tuning**
-Fine-tune pretrained VAE models in an unsupervised manner on new datasets:
+Fine-tune pretrained VAE models in an unsupervised manner on new datasets with transfer learning from a list of pretrained models
 
 ```bash
-python ../finetune/finetune_unsupervised_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_model_path "$PRETRAIN_MODEL_PATH"   --fine_tune_save_dir "$FINE_TUNE_SAVE_DIR"   --dropout_rate 0.1   --learning_rate 1e-4   --batch_size 32   --num_epochs 300   --trial_name "$TRIAL_NAME"
+python ../finetune/finetune_VAE_unsupervised_main.py \
+    --input_data_location $INPUT_DATA_LOCATION \
+    --finetune_save_dir $FINETUNE_SAVE_DIR \
+    --pretrain_save_dir $PRETRAIN_SAVE_DIR \
+    --pretrain_model_list_file $PRETRAIN_MODEL_DF_FILE \
+    --dropout_rate 0.1 0.4 0.05 \
+    --learning_rate 1e-5 1e-3 \
+    --l1_reg 1e-6 1e-3 \
+    --weight_decay 1e-6 1e-3 \
+    --batch_size 32 \
+    --patience 0 \
+    --num_epochs 30 50 10 \
+    --n_trials 50
 ```
 
 Alternatively, you can run this process using the provided script:
@@ -120,10 +164,30 @@ cd mzEmbed/mz_embed/scripts
 ---
 
 #### **4. Task-Specific Fine-Tuning**
-Fine-tune pretrained VAE models for binary classification, multi-class classification, or survival analysis:
+Fine-tune pretrained VAE models for binary classification, multi-class classification, or survival analysis. 
 
 ```bash
-python ../finetune/finetune_retrain_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_model_path "$PRETRAIN_MODEL_PATH"   --task_variable "survival"   --learning_rate 5e-4   --batch_size 64   --num_epochs 200   --trial_name "$TRIAL_NAME"
+python ../finetune/retrain_finetune_VAE_main.py \
+    --input_data_location "$INPUT_DATA_LOCATION" \
+    --finetune_save_dir "$FINETUNE_SAVE_DIR" \
+    --pretrain_model_name "$pretrain_model_name" \
+    --pretrain_trial_ID "$pretrain_trial_ID" \
+    --task "OS" \
+    --task_type "cox" \
+    --num_classes "1" \
+    --task_event "OS_Event" \
+    --optimization_type 'grid_search' \
+    --add_post_latent_layers 'False' \
+    --post_latent_layer_size "64" \
+    --num_layers_to_retrain "1" \
+    --dropout_rate 0.4 \
+    --learning_rate 1e-5 3e-5 5e-5 7e-5 \
+    --l1_reg 1e-6 \
+    --weight_decay 1e-3 \
+    --batch_size 32 \
+    --patience 0 \
+    --num_epochs 20 \
+    --n_trials 1
 ```
 
 Alternatively, you can run this process using the provided script:
@@ -135,10 +199,28 @@ cd mzEmbed/mz_embed/scripts
 ---
 
 #### **5. Joint Learning for Prognostic Models**
-Jointly fine-tune two VAE models to identify treatment-independent prognostic features:
+Jointly fine-tune two VAE models to identify treatment-independent prognostic features. Grid search is used for hyper-parameter tuning.
 
 ```bash
-python ../finetune/finetune_retrain_syn_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_model_path_1 "$PRETRAIN_MODEL_PATH_1"   --pretrain_model_path_2 "$PRETRAIN_MODEL_PATH_2"   --task_variable "os"   --learning_rate 1e-4   --batch_size 32   --num_epochs 300   --trial_name "$TRIAL_NAME"
+python ../finetune/retrain_synergistic_cox_finetune_VAE_main.py \
+    --input_data_location "$INPUT_DATA_LOCATION" \
+    --finetune_save_dir "$FINETUNE_SAVE_DIR" \
+    --pretrain_model_name "$pretrain_model_name" \
+    --pretrain_trial_ID "$pretrain_trial_ID" \
+    --task 'NIVO OS' \
+    --syn_task 'EVER OS' \
+    --task_event "OS_Event" \
+    --lambda_syn 2.0 \
+    --add_post_latent_layers 'True' \
+    --post_latent_layer_size "64" \
+    --num_layers_to_retrain "1" \
+    --dropout_rate 0.4 \
+    --learning_rate 1e-5 3e-5 5e-5 7e-5 \
+    --l1_reg 1e-6 \
+    --weight_decay 1e-3 \
+    --batch_size 32 \
+    --patience 0 \
+    --num_epochs 20 \
 ```
 
 Alternatively, you can run this process using the provided script:
@@ -150,10 +232,28 @@ cd mzEmbed/mz_embed/scripts
 ---
 
 #### **6. Adversarial Learning for Predictive Models**
-Perform adversarial fine-tuning to isolate treatment-specific predictive features:
+Perform adversarial fine-tuning to isolate treatment-specific predictive features. Grid search is used for hyper-parameter tuning.
 
 ```bash
-python ../finetune/finetune_retrain_adv_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_model_path_1 "$PRETRAIN_MODEL_PATH_1"   --pretrain_model_path_2 "$PRETRAIN_MODEL_PATH_2"   --task_variable "treatment_response"   --learning_rate 5e-5   --batch_size 64   --num_epochs 200   --trial_name "$TRIAL_NAME"
+python ../finetune/retrain_adverserial_cox_finetune_VAE_main.py \
+    --input_data_location "$INPUT_DATA_LOCATION" \
+    --finetune_save_dir "$FINETUNE_SAVE_DIR" \
+    --pretrain_model_name "$pretrain_model_name" \
+    --pretrain_trial_ID "$pretrain_trial_ID" \
+    --task 'NIVO OS' \
+    --adv_task 'EVER OS' \
+    --task_event "OS_Event" \
+    --lambda_adv 0.1 \
+    --add_post_latent_layers 'True' \
+    --post_latent_layer_size "64" \
+    --num_layers_to_retrain "1" \
+    --dropout_rate 0.4 \
+    --learning_rate 1e-5 3e-5 5e-5 7e-5 \
+    --l1_reg 1e-6 \
+    --weight_decay 1e-3 \
+    --batch_size 32 \
+    --patience 0 \
+    --num_epochs 20 \
 ```
 
 Alternatively, you can run this process using the provided script:
@@ -167,7 +267,7 @@ cd mzEmbed/mz_embed/scripts
 ### Parameter Details
 - **Range Parameters:** Arguments with three values (`min max increment`) allow grid search. Example: `--latent_size 128 256 32` searches sizes between 128 and 256 in steps of 32.
 - **Single-Value Parameters:** Fixed values used directly in training (e.g., `--batch_size 64`).
-- **Optimization:** Optuna is used for hyperparameter tuning where specified (e.g., learning rate, dropout rate).
+- **Optimization:** Optuna is used for hyperparameter tuning where specified (e.g., learning rate, dropout rate) for training models. hyperparameter tuning for re-training models are done via grid search. 
 
 
 
