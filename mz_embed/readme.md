@@ -1,6 +1,3 @@
-
-
-
 ## Instructions for setting up the VM for pretraining with GPU
 
 When using an Nvidia T4 GPU, I used GCP's Deep Learning VM image:
@@ -19,18 +16,15 @@ When using an Intel CPU without any gpu, use the GCP's deep learning VM image
     - `sudo apt-get install -y git screen htop build-essential pkg-config libmariadb-dev-compat wget vim`
 - Update the settings for screen:
     - `echo "escape ^Jj" > .screenrc`
-- (Optional) set up an ssh connection to bitbucket:
-    - `ssh -T leilapirhaji@bitbucket.org`
-    - If you get an error, you may need to add the bitbucket ssh key to your ssh
-- Clone the repo and enter the directory:
-    - `git clone lpirhaji@bitbucket.org:revivemed/mz_embed_engine.git`
+
+- Clone or download the repo and enter the directory:
+    - `git clone git@bitbucket.org:revivemed/mz_embed_engine.git`
     - `cd mz_embed_engine`
-- (optional) Checkout the branch you want to work on
-    - `git checkout <branch_name>`
+    
 - Install the requirements
     - `pip install -r requirements.txt` or `pip install -r requirements_4.txt`
-- move to ml folder and run to make a package, if build not available: pip install build
-    - 'cd ml'
+- move to mz_embed folder and run to make a package, if build not available: pip install build
+    - 'cd mz_embed'
     - 'python -m build'
     - 'pip install -e .'
 
