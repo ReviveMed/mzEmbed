@@ -25,22 +25,22 @@ This repository contains the codebase for **mzEmbed**, a framework for developin
 
 ### Key Components of mzEmbed:
 1. **Pre-trained Model Development:**
-   - Combines metabolomics data from multiple studies, correcting for batch effects and drifts, to create robust pre-trained generative models.
+   - Combines metabolomics data from multiple studies to create robust pre-trained generative models.
    - Supports Variational Autoencoders (VAEs) for unsupervised learning of metabolite representations.
-   - Outputs embeddings that capture biological and demographic variability, such as age, disease state, and BMI.
+   - Enables parameter optimization using grid search and Optuna for hyperparameter tuning.
+   - Outputs embeddings that capture biological and demographic variability, such as age, disease state.
 
 2. **Fine-Tuning Pre-Trained Models:**
    - Allows fine-tuning of pre-trained models on independent datasets for improved task-specific performance.
    - Supports fine-tuning for binary classification, multi-class classification, and survival analysis.
-   - Enables parameter optimization using grid search and Optuna for hyperparameter tuning.
 
 3. **Task-Specific Model Refinement:**
    - Retrains the last layer of fine-tuned models for specific tasks, such as prognostic biomarker discovery or treatment response prediction.
    - Implements synergistic and adversarial learning frameworks to train joint and predictive models.
 
 4. **Advanced Architectures:**
-   - Supports the development of joint learning models for treatment-independent prognostic features.
-   - Implements adversarial learning to isolate treatment-specific predictive biomarkers.
+   - Supports the development of joint learning models for treatment-independent, prognostic stratification of patient.
+   - Implements adversarial learning to isolate treatment-specific predictive biomarkers, or predictive stratification of patient.
 
 ---
 
@@ -68,27 +68,108 @@ This repository contains the codebase for **mzEmbed**, a framework for developin
 
 ---
 
-## Usage
+
+## Usage: Running Python Commands Directly
+
+The repository supports six main use cases, including pretraining, fine-tuning, and advanced learning architectures. Below are examples of the Python commands for each use case. 
 
 
-### Developing Pre-Trained Models with mzEmbed
-To train a pre-trained VAE model:
+#### **1. Pretraining VAE Models**
+This command pretrains a Variational Autoencoder (VAE) using large-scale metabolomics data, with hyperparameter optimization using **Optuna**:
 
 ```bash
-python mzEmbed/pretrain_vae.py --data <input_data> --config <config_file>
+python ../pretrain/run_pretrain_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_save_dir "$PRETRAIN_SAVE_DIR"   --latent_size 128 256 32   --num_hidden_layers 2 3 1   --dropout_rate 0.1 0.15 0.05   --noise_factor 0.2 0.25 0.05   --learning_rate 8e-5 2e-4   --l1_reg 0   --weight_decay 1e-6 1e-4   --batch_size 64   --patience 25   --num_epochs 400   --trial_name "$TRIAL_NAME"   --n_trials 50
 ```
 
+Alternatively, you can run this process using the provided script:
+```
+cd mzEmbed/mz_embed/scripts
+./pretrain_run_VAE_main.sh
+```
 
-### Fine-Tuning and Task-Specific Models
+---
 
-To fine-tune a pre-trained model:
+#### **2. Retraining Pretrained VAE Models**
+Retrain the last layer of pretrained VAE models for specific tasks, such as learning demographic or clinical variables:
+
 ```bash
-python mzEmbed/fine_tune.py --pretrained_model <model_path> --data <fine_tune_data>
+python ../pretrain/retrain_pretrain_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_model_path "$PRETRAIN_MODEL_PATH"   --task_variable "age_group"   --learning_rate 5e-5   --batch_size 64   --num_epochs 200   --trial_name "$TRIAL_NAME"
 ```
-For binary classification, multi-class classification, or survival tasks:
+
+Alternatively, you can run this process using the provided script:
+```
+cd mzEmbed/mz_embed/scripts
+./pretrain_retrain_VAE_main.sh
+```
+
+---
+
+#### **3. Unsupervised Fine-Tuning**
+Fine-tune pretrained VAE models in an unsupervised manner on new datasets:
+
 ```bash
-python mzEmbed/task_specific_training/binary_classification.py --data <task_data>
+python ../finetune/finetune_unsupervised_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_model_path "$PRETRAIN_MODEL_PATH"   --fine_tune_save_dir "$FINE_TUNE_SAVE_DIR"   --dropout_rate 0.1   --learning_rate 1e-4   --batch_size 32   --num_epochs 300   --trial_name "$TRIAL_NAME"
 ```
+
+Alternatively, you can run this process using the provided script:
+```
+cd mzEmbed/mz_embed/scripts
+./finetune_unsupervised_VAE_main.sh
+```
+
+---
+
+#### **4. Task-Specific Fine-Tuning**
+Fine-tune pretrained VAE models for binary classification, multi-class classification, or survival analysis:
+
+```bash
+python ../finetune/finetune_retrain_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_model_path "$PRETRAIN_MODEL_PATH"   --task_variable "survival"   --learning_rate 5e-4   --batch_size 64   --num_epochs 200   --trial_name "$TRIAL_NAME"
+```
+
+Alternatively, you can run this process using the provided script:
+```
+cd mzEmbed/mz_embed/scripts
+./finetune_retrain_VAE_main.sh
+```
+
+---
+
+#### **5. Joint Learning for Prognostic Models**
+Jointly fine-tune two VAE models to identify treatment-independent prognostic features:
+
+```bash
+python ../finetune/finetune_retrain_syn_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_model_path_1 "$PRETRAIN_MODEL_PATH_1"   --pretrain_model_path_2 "$PRETRAIN_MODEL_PATH_2"   --task_variable "os"   --learning_rate 1e-4   --batch_size 32   --num_epochs 300   --trial_name "$TRIAL_NAME"
+```
+
+Alternatively, you can run this process using the provided script:
+```
+cd mzEmbed/mz_embed/scripts
+./finetune_retrain_syn_VAE_main.sh
+```
+
+---
+
+#### **6. Adversarial Learning for Predictive Models**
+Perform adversarial fine-tuning to isolate treatment-specific predictive features:
+
+```bash
+python ../finetune/finetune_retrain_adv_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_model_path_1 "$PRETRAIN_MODEL_PATH_1"   --pretrain_model_path_2 "$PRETRAIN_MODEL_PATH_2"   --task_variable "treatment_response"   --learning_rate 5e-5   --batch_size 64   --num_epochs 200   --trial_name "$TRIAL_NAME"
+```
+
+Alternatively, you can run this process using the provided script:
+```
+cd mzEmbed/mz_embed/scripts
+./finetune_retrain_adv_VAE_main.sh
+```
+
+---
+
+### Parameter Details
+- **Range Parameters:** Arguments with three values (`min max increment`) allow grid search. Example: `--latent_size 128 256 32` searches sizes between 128 and 256 in steps of 32.
+- **Single-Value Parameters:** Fixed values used directly in training (e.g., `--batch_size 64`).
+- **Optimization:** Optuna is used for hyperparameter tuning where specified (e.g., learning rate, dropout rate).
+
+
 
 ---
 
