@@ -37,7 +37,7 @@ neptune-pytorch
 plotly
 lifelines
 scikit-survival # scikit-learn for survival analysis, they suggest using conda to install
-# torchtext>=0.14.0 # needed for scGPT
+torchtext>=0.14.0 # needed for scGPT
 tqdm>=4.64.0
 anndata
 datasets>=2.3.2
@@ -45,14 +45,13 @@ leidenalg>=0.8.10
 llvmlite
 networkx>=2.6.3
 numba>=0.55.2
-fonttools==4.53.0
-# scanpy>=1.9.1
-# scvi-tools>=0.16.4
-# scikit-misc #used for loess regression, but I don't think it is used
-# scib>=1.0.3
+scanpy>=1.9.1
+scvi-tools>=0.16.4
+scikit-misc #used for loess regression, but I don't think it is used
+scib>=1.0.3
 typing-extensions>=4.2.0
 fast-transformer
-# wandb
+wandb
 louvain
 xgboost
 coral-pytorch
