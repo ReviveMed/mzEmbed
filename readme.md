@@ -1,114 +1,190 @@
+# mzLearn, a data-driven LC/MS signal detection algorithm, enables pre-trained generative models for untargeted metabolomics
 
-# Input Dataset for mzLearn and mzEmbed
+This repository contains the codebase for **mzEmbed**, a framework for developing pre-trained generative models and fine-tuning them for specific tasks for untargeted metabolomics datasets.
 
-This document describes the structure and requirements for the input datasets used in **mzEmbed** workflows.
+**Author**:
+- [Leila Pirhaji](https://www.linkedin.com/in/pirhaji/)
+
+
+## Overview of mzLearn
+
+**mzLearn** is a data-driven algorithm designed to autonomously detect metabolite signals from raw LC/MS data without requiring input parameters from the user. The algorithm processes raw LC/MS data files in the open-source `mzML` format, iteratively learning signal characteristics to ensure high-quality signal detection. 
+
+### Key Features of mzLearn:
+- **Zero-parameter design:** No prior knowledge or QC samples are required.
+- **Iterative learning:** mzLearn autonomously refines signal detection, correcting for retention time (rt) and intensity drifts caused by batch effects and run order.
+- **Output:** A two-dimensional table of detected features defined by median rt and m/z values, with normalized intensities across samples.
+- **Scalability:** Capable of handling large-scale datasets (e.g., 2,075 files in a single run).
+- **Accessibility:** mzLearn’s website for accessing the tool is available at [http://mzlearn.com/](http://mzlearn.com/).
 
 ---
 
-## Overview
+## Overview of mzEmbed Codebase
 
-The input data for **mzEmbed** workflows consists of processed LC/MS metabolomics data by **mzLearn**, saved in `.csv` format. These datasets are formatted into training, validation, and test sets for pretraining and fine-tuning applications. Proper organization of the input data folder is essential for running the provided scripts.
+**mzEmbed** extends mzLearn’s capabilities by combining outputs from multiple datasets to develop pre-trained generative models and applying them to a range of metabolomics applications.
+
+### Key Components of mzEmbed:
+1. **Pre-trained Model Development:**
+   - Combines metabolomics data from multiple studies to create robust pre-trained generative models.
+   - Supports Variational Autoencoders (VAEs) for unsupervised learning of metabolite representations.
+   - Enables parameter optimization using grid search and Optuna for hyperparameter tuning.
+   - Outputs embeddings that capture biological and demographic variability, such as age, disease state.
+
+2. **Fine-Tuning Pre-Trained Models:**
+   - Allows fine-tuning of pre-trained models on independent datasets for improved task-specific performance.
+   - Supports fine-tuning for binary classification, multi-class classification, and survival analysis.
+
+3. **Task-Specific Model Refinement:**
+   - Retrains the last layer of fine-tuned models for specific tasks, such as prognostic biomarker discovery or treatment response prediction.
+   - Implements synergistic and adversarial learning frameworks to train joint and predictive models.
+
+4. **Advanced Architectures:**
+   - Supports the development of joint learning models for treatment-independent, prognostic stratification of patient.
+   - Implements adversarial learning to isolate treatment-specific predictive biomarkers, or predictive stratification of patient.
 
 ---
 
-## Input Folder Format
+## Getting Started
 
-The input data folder must follow the structure below:
+### Requirements
+- Python 3.9 or higher
 
-### Folder Contents:
-- **Pretraining Data**:
-  - `X_Pretrain_Discovery_Train.csv`, `X_Pretrain_Discovery_Val.csv`, `X_Pretrain_Test.csv`: Split pretraining data into training, validation, and test sets.
-  - `y_Pretrain_Discovery_Train.csv`, `y_Pretrain_Discovery_Val.csv`, `y_Pretrain_Test.csv`: Labels for corresponding pretraining splits.
+### Installation
+1. Clone the repository:
+   ```bash
+   git clone git@github.com:ReviveMed/mzEmbed.git
+   cd mzEmbed
+   ```
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. building the package:
+    ```
+    cd mz_embed'
+    python -m build
+    pip install -e .
+    ```
 
-- **Fine-Tuning Data**:
-  - `X_Finetune_Discovery_Train.csv`, `X_Finetune_Discovery_Val.csv`, `X_Finetune_Test.csv`: Split fine-tuning data into training, validation, and test sets.
-  - `y_Finetune_Discovery_Train.csv`, `y_Finetune_Discovery_Val.csv`, `y_Finetune_Test.csv`: Labels for corresponding fine-tuning splits.
+---
 
-### Example Directory Structure:
+
+## Usage: Running Python Commands Directly
+
+The repository supports six main use cases, including pretraining, fine-tuning, and advanced learning architectures. Below are examples of the Python commands for each use case. 
+
+
+#### **1. Pretraining VAE Models**
+This command pretrains a Variational Autoencoder (VAE) using large-scale metabolomics data, with hyperparameter optimization using **Optuna**:
+
+```bash
+python ../pretrain/run_pretrain_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_save_dir "$PRETRAIN_SAVE_DIR"   --latent_size 128 256 32   --num_hidden_layers 2 3 1   --dropout_rate 0.1 0.15 0.05   --noise_factor 0.2 0.25 0.05   --learning_rate 8e-5 2e-4   --l1_reg 0   --weight_decay 1e-6 1e-4   --batch_size 64   --patience 25   --num_epochs 400   --trial_name "$TRIAL_NAME"   --n_trials 50
 ```
-input_data/
-├── X_Pretrain_Discovery_Train.csv
-├── X_Pretrain_Discovery_Val.csv
-├── X_Pretrain_Test.csv
-├── y_Pretrain_Discovery_Train.csv
-├── y_Pretrain_Discovery_Val.csv
-├── y_Pretrain_Test.csv
-├── X_Finetune_Discovery_Train.csv
-├── X_Finetune_Discovery_Val.csv
-├── X_Finetune_Test.csv
-├── y_Finetune_Discovery_Train.csv
-├── y_Finetune_Discovery_Val.csv
-├── y_Finetune_Test.csv
+
+Alternatively, you can run this process using the provided script:
+```
+cd mzEmbed/mz_embed/scripts
+./pretrain_run_VAE_main.sh
 ```
 
 ---
 
-## Dataset Availability
+#### **2. Retraining Pretrained VAE Models**
+Retrain the last layer of pretrained VAE models for specific tasks, such as learning demographic or clinical variables:
 
-The dataset used in the paper, is available at [mzLearn.com/mzEmbed](http://mzLearn.com/mzEmbed).
+```bash
+python ../pretrain/retrain_pretrain_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_model_path "$PRETRAIN_MODEL_PATH"   --task_variable "age_group"   --learning_rate 5e-5   --batch_size 64   --num_epochs 200   --trial_name "$TRIAL_NAME"
+```
 
----
-
-## Data File Format
-
-### **1. Feature Data (`X_*` Files)**
-
-- **Description**: Each `X_*` file contains the metabolite features for the samples in the corresponding dataset (e.g., pretraining or fine-tuning).
-- **Structure**:
-  - **Rows**: Each row corresponds to a sample.
-  - **Columns**: Each column corresponds to normalized intensity of a metabolite feature.
-  - **File Format**: `.csv` file where the first row contains feature names, and the first column contains sample IDs.
-
-#### Example: `X_Finetune_Discovery_Train.csv`
-
-| StudyID_SampleID  | Metabolite_1 | Metabolite_2 | Metabolite_3 | ... |
-|-------------------|--------------|--------------|--------------|-----|
-| ST001422_001      | 0.234        | 1.876        | 0.643        | ... |
-| ST001422_002      | 0.189        | 2.304        | 0.561        | ... |
-| ST001422_003      | 0.467        | 1.923        | 0.782        | ... |
+Alternatively, you can run this process using the provided script:
+```
+cd mzEmbed/mz_embed/scripts
+./pretrain_retrain_VAE_main.sh
+```
 
 ---
 
-### **2. Label/Metadata Data (`y_*` Files)**
+#### **3. Unsupervised Fine-Tuning**
+Fine-tune pretrained VAE models in an unsupervised manner on new datasets:
 
-- **Description**: Each `y_*` file contains the corresponding clinical or demographic metadata for the samples.
-- **Structure**:
-  - **Rows**: Each row corresponds to a sample.
-  - **Columns**: Each column corresponds to a specific clinical or demographic variable (e.g., age, gender, treatment group).
-  - **File Format**: `.csv` file where the first row contains variable names, and the first column contains sample IDs.
+```bash
+python ../finetune/finetune_unsupervised_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_model_path "$PRETRAIN_MODEL_PATH"   --fine_tune_save_dir "$FINE_TUNE_SAVE_DIR"   --dropout_rate 0.1   --learning_rate 1e-4   --batch_size 32   --num_epochs 300   --trial_name "$TRIAL_NAME"
+```
 
-#### Example: `y_Finetune_Discovery_Train.csv`
-
-| StudyID_SampleID  | Age  | Gender | BMI   | Treatment   |
-|-------------------|------|--------|-------|-------------|
-| ST001422_001      | 45   | Male   | 24.5  | Drug_A      |
-| ST001422_002      | 50   | Female | 27.1  | Placebo     |
-|ST001422_003       | 38   | Male   | 22.8  | Drug_B      |
+Alternatively, you can run this process using the provided script:
+```
+cd mzEmbed/mz_embed/scripts
+./finetune_unsupervised_VAE_main.sh
+```
 
 ---
 
-### Summary
+#### **4. Task-Specific Fine-Tuning**
+Fine-tune pretrained VAE models for binary classification, multi-class classification, or survival analysis:
 
-- **Feature Data (`X_*` Files)**: Samples as rows, metabolite features as columns.
-- **Metadata (`y_*` Files)**: Samples as rows, clinical/demographic variables as columns.
+```bash
+python ../finetune/finetune_retrain_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_model_path "$PRETRAIN_MODEL_PATH"   --task_variable "survival"   --learning_rate 5e-4   --batch_size 64   --num_epochs 200   --trial_name "$TRIAL_NAME"
+```
 
----
-
-## Dataset Requirements
-
-### **Pretraining Data**:
-- Should contain large-scale metabolomics data (e.g., >5,000 samples).
-- Can optionally include demographic or clinical metadata in for more targeted pretraining.
-
-### **Fine-Tuning Data**:
-- Designed for domain-specific tasks.
-- Requires training, validation, and test splits for supervised fine-tuning.
-- Labels (e.g., binary classification, multi-class labels, or survival times) should be included in the `y_Finetune_*` files.
+Alternatively, you can run this process using the provided script:
+```
+cd mzEmbed/mz_embed/scripts
+./finetune_retrain_VAE_main.sh
+```
 
 ---
 
-## Additional Notes
-- **Data Format**: Ensure all `.csv` files are formatted consistently, with feature values in columns and samples in rows.
-- **Compatibility**: The provided input structure is compatible with all mzEmbed scripts, ensuring seamless execution of pretraining, fine-tuning, and advanced architectures.
+#### **5. Joint Learning for Prognostic Models**
+Jointly fine-tune two VAE models to identify treatment-independent prognostic features:
+
+```bash
+python ../finetune/finetune_retrain_syn_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_model_path_1 "$PRETRAIN_MODEL_PATH_1"   --pretrain_model_path_2 "$PRETRAIN_MODEL_PATH_2"   --task_variable "os"   --learning_rate 1e-4   --batch_size 32   --num_epochs 300   --trial_name "$TRIAL_NAME"
+```
+
+Alternatively, you can run this process using the provided script:
+```
+cd mzEmbed/mz_embed/scripts
+./finetune_retrain_syn_VAE_main.sh
+```
+
+---
+
+#### **6. Adversarial Learning for Predictive Models**
+Perform adversarial fine-tuning to isolate treatment-specific predictive features:
+
+```bash
+python ../finetune/finetune_retrain_adv_VAE_main.py   --input_data_location "$INPUT_DATA_LOCATION"   --pretrain_model_path_1 "$PRETRAIN_MODEL_PATH_1"   --pretrain_model_path_2 "$PRETRAIN_MODEL_PATH_2"   --task_variable "treatment_response"   --learning_rate 5e-5   --batch_size 64   --num_epochs 200   --trial_name "$TRIAL_NAME"
+```
+
+Alternatively, you can run this process using the provided script:
+```
+cd mzEmbed/mz_embed/scripts
+./finetune_retrain_adv_VAE_main.sh
+```
+
+---
+
+### Parameter Details
+- **Range Parameters:** Arguments with three values (`min max increment`) allow grid search. Example: `--latent_size 128 256 32` searches sizes between 128 and 256 in steps of 32.
+- **Single-Value Parameters:** Fixed values used directly in training (e.g., `--batch_size 64`).
+- **Optimization:** Optuna is used for hyperparameter tuning where specified (e.g., learning rate, dropout rate).
+
+
+
+---
+
+## License
+This project is licensed under the Academic and Non-Profit Use License. See the LICENSE.txt file for details.
+
+
+---
+
+## Citation
+If you use mzLearn or mzEmbed in your research, please cite:
+```
+[mzLearn, a data-driven LC/MS signal detection algorithm, enables pre-trained generative models for untargeted metabolomics]
+[Leila Pirhaji, Jonah Eaton, Adarsh K. Jeewajee, Min Zhang, Matthew Morris, Maria Karasarides]
+[Journal/Conference Name]
+```
 
 ---
