@@ -1,13 +1,11 @@
 #!/bin/bash
-#running code in the backgrouhn
-#nohup ./retrain_adv_finetune_VAE_main.sh > output_finetune_retrain.log 2>&1 &
-#tail -f output_finetune_retrain.log
+
 
 # Define common variables
-INPUT_DATA_LOCATION="/home/leilapirhaji/PROCESSED_DATA_finetune_OG_split"
-FINETUNE_SAVE_DIR="/home/leilapirhaji/finetune_unsupervised_VAE"
-pretrain_model_name="pretrain_VAE_L_400_425_e_400_p_25_s_8.1.1"
-pretrain_trial_ID="143"
+INPUT_DATA_LOCATION="~/input_data"
+FINETUNE_SAVE_DIR="~/finetune_VAE"
+pretrain_model_name="pretrain_VAE_L_128_256_e_400_p_25"
+pretrain_trial_ID="126"
 
 TASK='NIVO OS'
 ADV_TASk='EVER OS'
@@ -28,7 +26,7 @@ python ../finetune/retrain_adverserial_cox_finetune_VAE_main.py \
     --post_latent_layer_size "64" \
     --num_layers_to_retrain "1" \
     --dropout_rate 0.4 \
-    --learning_rate 4e-5 \
+    --learning_rate 1e-5 4e-5 4e-5 \
     --l1_reg 1e-6 \
     --weight_decay 1e-3 \
     --batch_size 32 \

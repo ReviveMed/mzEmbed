@@ -1,13 +1,10 @@
 #!/bin/bash
-#running code in the backgrouhn
-#nohup ./retrain_pretrain_VAE_main.sh > output_pretrain_retrain.log 2>&1 &
-#tail -f output_pretrain_retrain.log
 
 # Define common variables
-INPUT_DATA_LOCATION="/home/leilapirhaji/PROCESSED_DATA_S_8.1.1"
-PRETRAIN_SAVE_DIR="/home/leilapirhaji/pretrained_models"
-pretrain_model_name="pretrain_VAE_L_400_425_e_400_p_25_s_8.1.1"
-pretrain_trial_ID="143"
+INPUT_DATA_LOCATION="~/input_data"
+PRETRAIN_SAVE_DIR="~/pretrained_VAE"
+pretrain_model_name="pretrain_VAE_L_128_256_e_400_p_25"
+pretrain_trial_ID="126"
 
 
 TASK='is Female'
@@ -25,7 +22,7 @@ python ../pretrain/retrain_last_layer_pretrain_VAE_main.py \
     --post_latent_layer_size "64" \
     --num_layers_to_retrain "1" \
     --dropout_rate 0.4 \
-    --learning_rate 1e-4 \
+    --learning_rate 1e-4 1e-3 \
     --l1_reg 1e-6 \
     --weight_decay 1e-3 \
     --batch_size 32 \

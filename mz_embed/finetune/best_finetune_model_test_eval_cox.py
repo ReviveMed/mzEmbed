@@ -160,7 +160,7 @@ def evaluate_model(model, latent_rep, y_duration_test, y_event_test, seed, batch
         })
 
 
-        print(f'Test C-index: {c_index}')
+        # print(f'Test C-index: {c_index}')
 
     print('Fine-tuning completed.')
     return metrics_test, all_durations, all_risks, all_events

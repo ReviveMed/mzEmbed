@@ -1,13 +1,12 @@
 #!/bin/bash
-#running code in the backgrouhn
-#nohup ./retrain_finetune_VAE_main.sh > output_finetune_retrain.log 2>&1 &
-#tail -f output_finetune_retrain.log
+
+
 
 # Define common variables
-INPUT_DATA_LOCATION="/home/leilapirhaji/PROCESSED_DATA_finetune_OG_split"
-FINETUNE_SAVE_DIR="/home/leilapirhaji/finetune_unsupervised_VAE"
-pretrain_model_name="pretrain_VAE_L_400_425_e_400_p_25_s_8.1.1"
-pretrain_trial_ID="143"
+INPUT_DATA_LOCATION="~/input_data"
+FINETUNE_SAVE_DIR="~/finetune_VAE"
+pretrain_model_name="pretrain_VAE_L_128_256_e_400_p_25"
+pretrain_trial_ID="126"
 TASK_EVENT="OS_Event"
 TASK="OS"
 TASK_TYPE="cox"

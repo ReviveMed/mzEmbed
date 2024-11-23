@@ -3,7 +3,7 @@
 Examples of the Python commands for fine-tuning use cases. 
 
 ### **1. Unsupervised Fine-Tuning**
-Fine-tune pretrained VAE models in an unsupervised manner on new datasets with transfer learning from a list of pretrained models
+Fine-tune pretrained VAE models in an unsupervised manner on new datasets with transfer learning from a list of pretrained models.
 
 ```bash
 python ../finetune/finetune_VAE_unsupervised_main.py \
@@ -26,6 +26,10 @@ Alternatively, you can run this process using the provided script:
 cd mzEmbed/mz_embed/scripts
 ./finetune_unsupervised_VAE_main.sh
 ```
+
+**Top Pretrained Models**
+The top-performing pre-trained models, identified through hyperparameter optimization using Optuna, are provided in the format below. The top models should be saved in .csv file with one column including Trial Number and one column Trial Name.
+
 
 ---
 

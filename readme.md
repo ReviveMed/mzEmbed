@@ -61,7 +61,7 @@ This repository contains the codebase for **mzEmbed**, a framework for developin
    ```
 3. building the package:
     ```
-    cd mz_embed'
+    cd mz_embed
     python -m build
     pip install -e .
     ```
