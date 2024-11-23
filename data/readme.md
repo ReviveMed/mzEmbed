@@ -79,7 +79,7 @@ The dataset used in the paper are availbe from [Metabolomics Workbench](https://
 
 #### Example: `y_Finetune_Discovery_Train.csv`
 
-| StudyID_SampleID  | Age  | Gender | Overl Survival | Treatment   |
+| StudyID_SampleID  | Age  | Gender | Overall Survival | Treatment   |
 |-------------------|------|--------|----------------|-------------|
 | ST001422_001      | 45   | Male   | 32.5           | Drug_A      |
 | ST001422_002      | 50   | Female | 27.1           | Placebo     |
