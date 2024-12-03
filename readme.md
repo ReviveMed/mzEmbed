@@ -84,10 +84,9 @@ This project is licensed under the Academic and Non-Profit Use License. See the 
 
 ## Citation
 If you use mzLearn or mzEmbed in your research, please cite:
-```
-[mzLearn, a data-driven LC/MS signal detection algorithm, enables pre-trained generative models for untargeted metabolomics]
-[Leila Pirhaji, Jonah Eaton, Adarsh K. Jeewajee, Min Zhang, Matthew Morris, Maria Karasarides]
-[Journal/Conference Name]
-```
+
+mzLearn, a data-driven LC/MS signal detection algorithm, enables pre-trained generative models for untargeted metabolomics
+Leila Pirhaji, Jonah Eaton, Adarsh K. Jeewajee, Min Zhang, Matthew Morris, Maria Karasarides
+
 
 ---
