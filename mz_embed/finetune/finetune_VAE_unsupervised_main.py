@@ -360,7 +360,32 @@ def parse_range_or_single(values, is_int=False):
 
 def main ():
 
-    
+    """
+    Unsupervised fine-tuning of a VAE on a new cohort, with optional transfer learning.
+
+    Parameters
+    ----------
+    data_location : str
+        Folder with `X_Finetune_Train.csv`, `X_Finetune_Val.csv`, `X_Finetune_Test.csv`
+        and `y_Finetune_*` CSVs. Matrices are float with shape [n_samples, 2736].
+    output_dir : str
+        Destination for `best_finetune_model.pt`, `study.html`, and logs.
+    pretrained_dir : str or None, default=None
+        If provided, initializes weights from the pretrained VAE (transfer learning);
+        otherwise the model is randomly initialized for comparison.
+    latent_size, n_layers, kl_weight, dropout, learning_rate, trials, max_epochs, seed :
+        See `pretrain.main`.
+
+    Returns
+    -------
+    None
+        Writes artifacts to `output_dir`.
+
+    Notes
+    -----
+    This stage learns cohort structure in an unsupervised manner; task heads are added later.
+    """
+
     #Set up the argument parser
     parser = argparse.ArgumentParser(description='It get a list of pre-trained models, and use them to develop finetune VAE models with trasnfer learning of the pretrained model. It also develop a fine-tune model with NO tansfer learning (i,e, random init.). It uses optuna to find the best hyper-paramteres to minize the Recon loss of finetune models. it also visulaize the latent space of the pretrained model used for transfer learning and save all the results.')
 

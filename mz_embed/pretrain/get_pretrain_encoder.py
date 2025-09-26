@@ -97,6 +97,48 @@ def generate_latent_space(X_data, encoder, batch_size=128):
 
 
 def get_pretrain_encoder_from_local(pretrain_name, pretrain_id, pretrain_save_dir):
+
+    """
+    Run Optuna-driven unsupervised pretraining of the mzEmbed VAE.
+
+    Parameters
+    ----------
+    data_location : str
+        Directory with CSV files:
+        - X_Pretrain_Discovery_Train.csv, X_Pretrain_Discovery_Val.csv, X_Pretrain_Test.csv
+          (float; shape [n_samples, 2736]; z-scored).
+        - y_Pretrain_* (optional; used for plots/bookkeeping only).
+    output_dir : str
+        Directory to save artifacts (created if missing). Writes `best_model.pt`, `study.html`,
+        `config.json`, logs, and latent visualizations.
+    latent_size : int, default=460
+        Size of the latent space.
+    n_layers : int, {2,3,4}, default=3
+        Depth of encoder/decoder.
+    kl_weight : float, default=1.0
+        Target weight of the KL term (annealed from 0 → kl_weight).
+    dropout : float, default=0.0
+        Dropout probability in encoder/decoder [0, 0.5].
+    learning_rate : float, default=1e-3
+        Adam optimizer learning rate.
+    trials : int, default=40
+        Number of Optuna trials for hyperparameter search.
+    max_epochs : int, default=200
+        Max training epochs per trial (early stopping monitors val loss).
+    seed : int, default=42
+        Random seed for torch/numpy/random.
+
+    Returns
+    -------
+    None
+        Side effects only: trained weights and reports saved to `output_dir`.
+
+    Notes
+    -----
+    - Input feature dimension is fixed at 2,736 robust peaks (see manuscript).
+    - KL-annealing and early stopping are enabled by default.
+    """
+
     
 
     model_local_path = f'{pretrain_save_dir}/{pretrain_name}/trial_{pretrain_id}'

@@ -204,6 +204,27 @@ def evaluate_model(model, latent_rep, y_data_test, num_classes, seed, batch_size
 
 def evaluate_model_main(best_model, X_data_train, X_data_val, X_data_test, y_data_train, y_data_val, y_data_test, task, num_classes, seed):
 
+    """
+    Evaluate the best fine-tuned encoder on held-out test data with a lightweight task head.
+
+    Parameters
+    ----------
+    model_dir : str
+        Directory containing `best_finetune_model.pt` and the saved config.
+    data_location : str
+        Directory with `X_Finetune_{Train,Val,Test}.csv` and `y_Finetune_{Train,Val,Test}.csv`.
+    task : {'binary', 'multiclass', 'cox'}, default='binary'
+        Task type: IMDC binary (AUC), 3-class IMDC (F1), or OS (C-index).
+    seed : int, default=42
+        Random seed for reproducibility.
+
+    Returns
+    -------
+    dict
+        Metrics on the test set (e.g., {'AUC': 0.93} or {'C-index': 0.67}).
+    """
+
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     ### retreiving the latent space of the best models
